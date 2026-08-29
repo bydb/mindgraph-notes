@@ -1316,14 +1316,20 @@ function createWindow(): void {
   // window.open. Nur dieser vertrauenswürdige Main-Host überschreibt ihn, um HTTP(S)-Links
   // kontrolliert im Standardbrowser zu öffnen — alles andere (about:/data:/blob:/mgxplugin:/…)
   // bleibt verworfen. Default-deny, kein Fail-open.
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      shell.openExternal(url).catch((err) =>
-        console.error('[security] openExternal fehlgeschlagen:', err instanceof Error ? err.message : err)
-      )
-    }
-    return { action: 'deny' }
-  })
+  // Bedingungslos verweigern — wie jedes andere WebContents auch (web-contents-created
+  // oben). KEIN shell.openExternal von hier aus, und das ist der Kern:
+  //
+  // mainWindow zeigt in der HTML-Vorschau des Code-Editors fremdes Vault-HTML in einem
+  // <iframe>. Ein Popup daraus landet im SELBEN Handler wie ein Popup aus der App-
+  // Oberflaeche, und der Handler kann die beiden nicht unterscheiden — gemessen am
+  // 29.08.2026: identische HandlerDetails, referrer.url in beiden Faellen leer.
+  // Solange hier openExternal stand, konnte eine praeparierte Vault-Datei also ohne
+  // Klick beliebige URLs im Standardbrowser oeffnen.
+  //
+  // Der bewusste Weg nach draussen ist der IPC `open-external` (Protokoll-Allowlist:
+  // http/https/mailto). Im Renderer kapselt ihn Shared/ExternalLink — deshalb gibt es
+  // dort kein target="_blank" mehr. Diese Regel haelt der Test in windowSecurity.test.ts.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
 
   // Context menu (Kopieren, Einfügen, Ausschneiden)
   mainWindow.webContents.on('context-menu', (_event, params) => {

@@ -565,13 +565,18 @@ export const CodeViewer: React.FC<CodeViewerProps> = ({ vaultPath, relativePath 
       />
 
       {/* Sandbox OHNE allow-same-origin: opaque Origin, kein Zugriff auf App/Storage.
-          allow-popups: target=_blank-Links landen via setWindowOpenHandler im System-Browser. */}
+          KEIN allow-popups mehr: Der Weg nach draussen war window.open -> mainWindows
+          setWindowOpenHandler -> shell.openExternal, und der Handler konnte nicht
+          erkennen, dass das Popup aus DIESEM Rahmen kam. Er verweigert jetzt
+          bedingungslos (main/index.ts); ohne allow-popups gibt es hier gar nichts mehr
+          zu verweigern. Folge fuer den Nutzer: Links in einer Vorschau-Seite oeffnen
+          keinen Browser mehr — bewusst, siehe Kommentar dort. */}
       {isHtml && viewMode === 'preview' && !error && (
         <iframe
           key={previewNonce}
           className="code-viewer-preview"
           src={previewUrl}
-          sandbox="allow-scripts allow-forms allow-popups"
+          sandbox="allow-scripts allow-forms"
           title={fileName}
         />
       )}

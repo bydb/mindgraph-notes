@@ -10,6 +10,7 @@ import { parseFrontmatter } from '../../utils/metadataExtractor'
 import { findImageInVault, isImageFile } from '../../utils/imageUtils'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { wordpressService } from '../../stores/wordpressServiceBridge'
+import { ExternalLink } from '../Shared/ExternalLink'
 
 interface PublishToWordPressModalProps {
   note: Note
@@ -197,7 +198,7 @@ export const PublishToWordPressModal: React.FC<PublishToWordPressModalProps> = (
             <p>{result.status === 'publish' ? t('publishWp.successPublished') : t('publishWp.successDraft')}</p>
             {result.postUrl && (
               <p>
-                <a href={result.postUrl} target="_blank" rel="noreferrer">{result.postUrl}</a>
+                <ExternalLink href={result.postUrl}>{result.postUrl}</ExternalLink>
               </p>
             )}
             <div className="ai-image-dialog-footer">

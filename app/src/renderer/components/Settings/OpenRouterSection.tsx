@@ -6,6 +6,7 @@ import {
 } from '../../../shared/llmBackend'
 import openrouterLogo from '../../assets/model-vendors/openrouter.svg'
 import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
+import { ExternalLink } from '../Shared/ExternalLink'
 
 // Preis-Etikett des Modell-Pickers. Stand bis 28.08.2026 fest auf Deutsch in
 // shared/llmCost.ts — im englischen Picker las sich das als "je 1 Mio.".
@@ -164,7 +165,7 @@ export function OpenRouterSection() {
             )}
           </div>
           <p className="settings-hint" style={{ fontSize: '11px', margin: '0 0 0 128px' }}>
-            <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">openrouter.ai/keys</a>
+            <ExternalLink href="https://openrouter.ai/keys">openrouter.ai/keys</ExternalLink>
           </p>
 
           {/* Default-Modell */}

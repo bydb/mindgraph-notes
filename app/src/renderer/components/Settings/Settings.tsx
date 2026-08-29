@@ -30,6 +30,7 @@ import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
 import { ACTIVITY_TYPES, type ActivityType } from '../../../shared/activityLog'
 import { writeClipboardText } from '../../utils/clipboard'
+import { ExternalLink } from '../Shared/ExternalLink'
 
 type TabTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 import {
@@ -3935,7 +3936,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                         <strong>Ollama</strong> {t('settings.integrations.ollamaDesc')}
                       </p>
                       <p>
-                        {t('settings.integrations.installOllama')} <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a>
+                        {t('settings.integrations.installOllama')} <ExternalLink href="https://ollama.ai">ollama.ai</ExternalLink>
                       </p>
                     </div>
                   </>
@@ -4004,7 +4005,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                         <strong>LM Studio</strong> {t('settings.integrations.lmstudioDesc')}
                       </p>
                       <p>
-                        Download: <a href="https://lmstudio.ai" target="_blank" rel="noopener noreferrer">lmstudio.ai</a>
+                        Download: <ExternalLink href="https://lmstudio.ai">lmstudio.ai</ExternalLink>
                       </p>
                       <p>
                         <strong>Setup:</strong> {t('settings.integrations.lmstudioSetup')}

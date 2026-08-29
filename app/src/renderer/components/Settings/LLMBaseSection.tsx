@@ -6,6 +6,7 @@ import {
 } from '../../../shared/llmBackend'
 import llmbaseLogo from '../../assets/model-vendors/llmbase.svg'
 import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
+import { ExternalLink } from '../Shared/ExternalLink'
 
 // Preis-Etikett des Modell-Pickers. Stand bis 28.08.2026 fest auf Deutsch in
 // shared/llmCost.ts — im englischen Picker las sich das als "je 1 Mio.".
@@ -166,7 +167,7 @@ export function LLMBaseSection() {
             )}
           </div>
           <p className="settings-hint" style={{ fontSize: '11px', margin: '0 0 0 128px' }}>
-            <a href="https://llmbase.ai" target="_blank" rel="noopener noreferrer">llmbase.ai</a>
+            <ExternalLink href="https://llmbase.ai">llmbase.ai</ExternalLink>
           </p>
 
           {/* Default-Modell */}

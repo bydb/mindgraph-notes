@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { WEB_SEARCH_PROVIDER_META, WEB_SEARCH_PROVIDER_IDS, type WebSearchProviderId } from '../../../shared/webResearch'
+import { ExternalLink } from '../Shared/ExternalLink'
 
 type LoadedWebResearchConfig = {
   provider: WebSearchProviderId
@@ -213,7 +214,7 @@ export function WebResearchSection() {
             {en
               ? 'Your own SearXNG instance with the JSON format enabled (settings.yml → search.formats: json). A local/LAN address requires a one-time confirmation.'
               : 'Deine eigene SearXNG-Instanz mit aktiviertem JSON-Format (settings.yml → search.formats: json). Eine lokale/LAN-Adresse verlangt eine einmalige Bestätigung.'}
-            {' '}<a href="https://docs.searxng.org/" target="_blank" rel="noopener noreferrer">docs.searxng.org</a>
+            {' '}<ExternalLink href="https://docs.searxng.org/">docs.searxng.org</ExternalLink>
           </p>
         </>
       )}
@@ -241,7 +242,7 @@ export function WebResearchSection() {
           </div>
           <p className="settings-hint" style={{ fontSize: '11px', margin: '0 0 0 128px' }}>
             {provider === 'tavily' && (en ? 'Free key (no credit card): ' : 'Kostenloser Key (keine Kreditkarte): ')}
-            <a href={meta.keysUrl} target="_blank" rel="noopener noreferrer">{meta.keysUrl.replace(/^https?:\/\//, '')}</a>
+            <ExternalLink href={meta.keysUrl}>{meta.keysUrl.replace(/^https?:\/\//, '')}</ExternalLink>
           </p>
         </>
       )}

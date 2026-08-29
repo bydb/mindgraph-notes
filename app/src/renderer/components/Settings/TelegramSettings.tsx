@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
+import { ExternalLink } from '../Shared/ExternalLink'
 
 export const TelegramSettings: React.FC = () => {
   const { t } = useTranslation()
@@ -309,7 +310,7 @@ export const TelegramSettings: React.FC = () => {
       <div className="settings-group">
         <label className="settings-label">{t('telegramSettings.botToken')} {hasToken && <span style={{ color: '#44c767' }}>{t('telegramSettings.savedCheck')}</span>}</label>
         <p className="settings-help">
-          {t('telegramSettings.tokenHelpBefore')} <a href="https://t.me/BotFather" target="_blank" rel="noopener noreferrer">@BotFather</a> {t('telegramSettings.tokenHelpAfter')} <code>123456:ABC-DEF...</code>.
+          {t('telegramSettings.tokenHelpBefore')} <ExternalLink href="https://t.me/BotFather">@BotFather</ExternalLink> {t('telegramSettings.tokenHelpAfter')} <code>123456:ABC-DEF...</code>.
         </p>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
