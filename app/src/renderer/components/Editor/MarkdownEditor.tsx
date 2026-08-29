@@ -4039,6 +4039,15 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             const blob = new Blob([byteArray], { type: 'application/pdf' })
             const blobUrl = URL.createObjectURL(blob)
 
+            // KEIN sandbox-Attribut am iframe — das ist Absicht, nicht vergessen.
+            // Gemessen 29.08.2026 (Electron 41.10.7 / Chromium 145): Mit sandbox
+            // (auch "allow-scripts allow-same-origin" oder leer) laedt Chromiums
+            // PDF-Betrachter gar nicht erst, der Rahmen bleibt WEISS. Ohne sandbox
+            // rendert er das PDF in einem chrome-extension://-Frame — also unter
+            // fremder Origin, die Same-Origin-Policy trennt es ohnehin vom
+            // App-Dokument. Praeparierte PDFs (OpenAction-JavaScript, URI-OpenAction,
+            // Seiten-/AA) loesten weder setWindowOpenHandler noch eine Navigation aus.
+            // Siehe Memory project-pdf-embed-iframes-no-sandbox.
             // Replace loading placeholder with actual PDF embed
             pdfEl.innerHTML = `
               <div class="pdf-embed-header">
