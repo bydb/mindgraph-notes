@@ -126,7 +126,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/sql.js": "^1.4.11",
     "@types/ws": "^8.5.13",
-    "electron": "^40.0.0",
+    "electron": "^41.10.7",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",
     "turndown-plugin-gfm": "^1.0.2",
