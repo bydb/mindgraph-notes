@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.57-beta",
+    "softwareVersion": "0.10.58-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Belegen statt behaupten: der Vergleichsmodus &middot; v0.10.55</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Denkmodelle laufen wieder durch &middot; v0.10.58</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.57 &middot; Nichts Halbfertiges</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.58 &middot; Zwei stille Fehler</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Geschlossene Sicherheitsl&uuml;cken. Und ein Agent, der Unfertiges nicht als fertig ausgibt.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Ein Wartungs-Release ohne gro&szlig;e Geste. Es schlie&szlig;t 29 bekannte Sicherheitsl&uuml;cken in den mitgelieferten Bibliotheken &mdash; darunter ausgerechnet in der, die fremdes HTML entsch&auml;rfen soll. Und der Agent legt dir kein Ergebnis mehr vor, in dem noch Platzhalter stehen.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Belegen statt behaupten: der Vergleichsmodus &middot; v{vs}",
+        "hero.release": "Denkmodelle laufen wieder durch &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Nichts Halbfertiges",
-        "release.heading": "Was ist neu — <em>Geschlossene Sicherheitslücken. Und ein Agent, der Unfertiges nicht als fertig ausgibt.</em>",
-        "release.lead": "Ein Wartungs-Release ohne große Geste. Es schließt 29 bekannte Sicherheitslücken in den mitgelieferten Bibliotheken — darunter ausgerechnet in der, die fremdes HTML entschärfen soll. Und der Agent legt dir kein Ergebnis mehr vor, in dem noch Platzhalter stehen.",
-        "release.c1h": "Nichts Halbfertiges mehr",
-        "release.c1": "Vor dem Speichern prüft die App das Ergebnis auf stehengebliebene Platzhalter, abgebrochene Textauszeichnung und darauf, ob die geforderte Anzahl an Entwürfen wirklich da ist. Fehlt etwas, schreibt der Agent neu, statt es dir vorzulegen. Das ergänzt die Personendaten-Regel: Die verhindert erfundene Inhalte, diese Prüfung unfertige, die fertig aussehen.",
-        "release.c2h": "29 Sicherheitslücken geschlossen",
-        "release.c2": "Betroffen waren unter anderem die Bibliothek zum Entschärfen von fremdem HTML, der Diagramm-Renderer und die Netzwerkschicht des Mail-Abrufs. Alles davon verarbeitet Inhalte, die von außen kommen — fremde Notizen, Mails, Diagramme. Eine Aktualisierung haben wir bewusst ausgelassen: Sie hätte beim PDF-Lesen eine neue Lücke gebracht.",
-        "release.c3h": "Cloud-Läufe fordern Nicht-Speicherung an",
-        "release.c3": "Läuft der Agent über OpenRouter, verlangt jede einzelne Anfrage ausdrücklich, dass der Anbieter nichts aufbewahrt — nicht nur als Kontoeinstellung, die falsch stehen kann. Ob eine Anfrage abgelehnt wird, wenn er das nicht zusichern kann, ist noch ungeprüft; bis dahin gilt es als Bevorzugung, nicht als Zusicherung.",
+        "release.label": "Release {vs} · Zwei stille Fehler",
+        "release.heading": "Was ist neu — <em>Denkmodelle laufen wieder durch. Und die Vorschau macht keine Fenster mehr auf.</em>",
+        "release.lead": "Ein kleines Release mit zwei Ursachen, die beide erst beim genauen Hinsehen sichtbar wurden. Ein Modell in der Cloud konnte antworten, ohne dass die App die Antwort überhaupt sah — der Lauf galt trotzdem als gescheitert. Und die Vorschau für HTML-Dateien konnte den Standardbrowser öffnen, ohne dass jemand klickt.",
+        "release.c1h": "Denkmodelle laufen wieder durch",
+        "release.c1": "Modelle, die vor der Antwort nachdenken, legen ihren Text manchmal in ein eigenes Feld. Der Agent las nur das gewöhnliche Feld, fand dort nichts und brach den Lauf mit der Empfehlung ab, ein stärkeres Modell zu wählen — obwohl das Modell längst geantwortet hatte. Betraf Läufe über die Cloud-Anbindung.",
+        "release.c2h": "Sicherheitslücke in der Vorschau geschlossen",
+        "release.c2": "Die Programmgrundlage der App ist auf die erste Fassung aktualisiert, in der die Lücke behoben ist. Sie betraf abgeschottete Rahmen — also genau die Stelle, an der die App fremdes HTML aus dem Vault anzeigt.",
+        "release.c3h": "Die Vorschau macht keine Fenster mehr auf",
+        "release.c3": "Eine HTML-Datei aus dem Vault konnte in der Vorschau den Standardbrowser mit einer beliebigen Adresse aufmachen, ohne Zutun. Das geht nicht mehr. Der Preis ist sichtbar: Links innerhalb einer Vorschau-Seite öffnen jetzt gar nichts mehr. Der Weg nach draußen führt über die Oberfläche der App.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Prove it, don't claim it: the comparison mode &middot; v{vs}",
+        "hero.release": "Reasoning models get through again &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Nothing half-finished",
-        "release.heading": "What’s new — <em>Security holes closed. And an agent that stops passing off unfinished work as finished.</em>",
-        "release.lead": "A maintenance release without a grand gesture. It closes 29 known security holes in the bundled libraries — including, of all things, the one meant to neutralise foreign HTML. And the agent no longer hands you a result with placeholders still in it.",
-        "release.c1h": "Nothing half-finished",
-        "release.c1": "Before saving, the app checks the result for leftover placeholders, broken text formatting, and whether the number of drafts you asked for is actually there. If something is missing the agent rewrites it instead of handing it to you. This complements the personal-data rule: that one prevents invented content, this check prevents unfinished content that looks finished.",
-        "release.c2h": "29 security holes closed",
-        "release.c2": "Affected were, among others, the library that neutralises foreign HTML, the diagram renderer and the network layer of the mail fetch. All of these process content that comes from outside — foreign notes, mails, diagrams. One update was deliberately skipped: it would have introduced a new hole in PDF reading.",
-        "release.c3h": "Cloud runs request no retention",
-        "release.c3": "When the agent runs via OpenRouter, every single request explicitly asks that the provider retain nothing — not just as an account setting that can be wrong. Whether a request is refused when the provider cannot guarantee it is still unverified; until then it counts as a preference, not an assurance.",
+        "release.label": "Release {vs} · Two silent faults",
+        "release.heading": "What’s new — <em>Reasoning models get through again. And the preview no longer opens windows.</em>",
+        "release.lead": "A small release with two causes, both of which only became visible on close inspection. A model in the cloud could answer without the app ever seeing the answer — the run still counted as failed. And the preview for HTML files could open your default browser without anyone clicking.",
+        "release.c1h": "Reasoning models get through again",
+        "release.c1": "Models that think before answering sometimes put their text in a separate field. The agent read only the ordinary field, found nothing there and ended the run recommending a stronger model — although the model had answered long before. Affected runs via the cloud connection.",
+        "release.c2h": "Security hole in the preview closed",
+        "release.c2": "The app’s runtime is updated to the first version in which the hole is fixed. It concerned sandboxed frames — precisely where the app displays foreign HTML from your vault.",
+        "release.c3h": "The preview no longer opens windows",
+        "release.c3": "An HTML file from your vault could make the preview open your default browser at any address, without you doing anything. That is over. The cost is visible: links inside a preview page now do nothing at all. The way out leads through the app’s own interface.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

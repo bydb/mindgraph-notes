@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.58-beta] - 2026-08-29
+
+Zwei Fehler, die beide erst beim genauen Hinsehen sichtbar wurden: Ein Modell konnte antworten, ohne dass die App die Antwort überhaupt sah. Und die Vorschau für HTML-Dateien konnte den Standardbrowser öffnen, ohne dass jemand klickt.
+
+### Behoben
+
+- **Denkmodelle in der Cloud laufen wieder durch.** Modelle, die vor der Antwort nachdenken, legen ihren Text manchmal in ein eigenes Feld statt in das gewöhnliche. Der Notiz-Agent las nur das gewöhnliche Feld, fand dort nichts und beendete den Lauf mit der Meldung, man solle den Auftrag konkreter fassen oder ein stärkeres Modell wählen — obwohl das Modell längst geantwortet hatte. Betroffen waren Läufe über die Cloud-Anbindung; der normale Chat hatte diesen Rückfall schon immer.
+- **Sicherheitslücke in der Programmgrundlage geschlossen.** Die Lücke betraf abgeschottete Rahmen: Ein solcher Rahmen konnte ein Fenster öffnen, obwohl ihm genau das verboten war. Das ist die Stelle, an der die App fremdes HTML aus dem Vault anzeigt. Aktualisiert auf die erste Fassung, in der die Lücke behoben ist.
+
+### Geändert
+
+- **Die HTML-Vorschau öffnet keine Browser-Fenster mehr.** Eine präparierte HTML-Datei im Vault konnte in der Vorschau den Standardbrowser mit einer beliebigen Adresse aufmachen, ohne Zutun — die App konnte nicht erkennen, dass die Anfrage aus der Vorschau kam und nicht aus ihrer eigenen Oberfläche. Beides führte durch dieselbe Tür, die jetzt zu ist. **Sichtbare Folge:** Links innerhalb einer Vorschau-Seite öffnen nichts mehr. Links in der Oberfläche der App funktionieren unverändert; sie nehmen einen eigenen, ausdrücklichen Weg.
+
 ## [0.10.57-beta] - 2026-08-29
 
 Ein Wartungs-Release. Es schließt bekannte Sicherheitslücken in den mitgelieferten Bibliotheken und sorgt dafür, dass der Agent keine halbfertige Arbeit mehr als fertig ausgibt.
