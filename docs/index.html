@@ -729,13 +729,13 @@
         <div class="product-body">
           <div class="product-heading"><div><b>Getestet, nicht geraten</b><div class="mock-meta">lokal ausf&uuml;hrbar</div></div></div>
           <table class="matrix">
-            <thead><tr><th>Modell</th><th>Brain</th><th>Tasks</th><th>Mail</th><th>Radar</th></tr></thead>
+            <thead><tr><th>Modell</th><th>Brain</th><th>Tasks</th><th>Mail</th><th>Agent</th></tr></thead>
             <tbody>
+              <tr><td>Qwen 3.8 27B</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td></tr>
               <tr><td>Qwen 3.6 27B</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td></tr>
-              <tr><td>Qwen 3.5 4B</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="warn">!</td><td class="ok">&#10003;</td></tr>
-              <tr><td>Gemma 3</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="warn">!</td></tr>
-              <tr><td>Llama 3.1 8B</td><td class="ok">&#10003;</td><td class="warn">!</td><td class="no">&times;</td><td>&middot;</td></tr>
-              <tr><td>bge-m3</td><td>&middot;</td><td>&middot;</td><td>&middot;</td><td class="ok">&#10003;</td></tr>
+              <tr><td>Qwen 3.5 4B</td><td>&middot;</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="warn">!</td></tr>
+              <tr><td>Gemma 4 12B</td><td class="warn">!</td><td class="ok">&#10003;</td><td class="ok">&#10003;</td><td class="warn">!</td></tr>
+              <tr><td>Llama 3.1 8B</td><td class="no">&times;</td><td class="warn">!</td><td class="ok">&#10003;</td><td class="no">&times;</td></tr>
             </tbody>
           </table>
         </div>
@@ -1506,7 +1506,7 @@
       <div>
         <div class="section-label" data-i18n="modelq.label">Qualitätsnachweis</div>
         <h2 class="section-heading" data-i18n="modelq.heading">Lokale KI-Modelle,<br>getestet pro Modul.</h2>
-        <p class="section-sub" data-i18n="modelq.sub">MindGraph nutzt nicht einfach irgendein lokales Modell. E-Mail-Analyse, Task-Extraktion, Dashboard-Radar, Brain und Projekt-Status werden gegen eine dokumentierte Kompatibilit&auml;tsmatrix gepr&uuml;ft.</p>
+        <p class="section-sub" data-i18n="modelq.sub">MindGraph nutzt nicht einfach irgendein lokales Modell. E-Mail-Analyse, Task-Extraktion, Notiz-Agent, Brain und Projekt-Status werden gegen eine dokumentierte Kompatibilit&auml;tsmatrix gepr&uuml;ft.</p>
       </div>
       <div class="model-quality-actions">
         <a href="model-quality.html" class="btn btn-primary" data-i18n="modelq.matrix">Vollst&auml;ndige Matrix ansehen</a>
@@ -1514,9 +1514,9 @@
       </div>
     </div>
     <figure class="model-quality-figure fade-in">
-      <img src="model-quality.webp" alt="MindGraph Notes Modellqualit&auml;t lokaler KI: Kompatibilit&auml;tsmatrix f&uuml;r Brain, Tasks, Mail, Radar, Projekt-Status und Smart Connections" loading="lazy">
+      <img src="model-quality.webp" alt="MindGraph Notes Modellqualit&auml;t lokaler KI: Kompatibilit&auml;tsmatrix f&uuml;r Brain, Tasks, Mail, Notiz-Agent, Projekt-Status und Smart Connections" loading="lazy">
     </figure>
-    <p class="model-quality-note" data-i18n="modelq.note">Datenstand 07.06.2026. Quelle: produktive Modell-Kompatibilit&auml;tsmatrix und lokale Benchmark-Reports.</p>
+    <p class="model-quality-note" data-i18n="modelq.note">Datenstand 19.08.2026. Quelle: produktive Modell-Kompatibilit&auml;tsmatrix und lokale Benchmark-Reports.</p>
   </section>
 
 
@@ -1958,7 +1958,7 @@
         "compare.c4.desc": "Dein bestehender Vault \u00f6ffnet 1:1: Markdown, Wikilinks, Tags, Frontmatter, Canvas, Dataview. Wenn MindGraph nicht passt, nimmst du deine Daten ohne Migration mit.",
         "modelq.label": "Qualit\u00e4tsnachweis",
         "modelq.heading": "Lokale KI-Modelle,<br>getestet pro Modul.",
-        "modelq.sub": "MindGraph nutzt nicht einfach irgendein lokales Modell. E-Mail-Analyse, Task-Extraktion, Dashboard-Radar, Brain und Projekt-Status werden gegen eine dokumentierte Kompatibilit\u00e4tsmatrix gepr\u00fcft.",
+        "modelq.sub": "MindGraph nutzt nicht einfach irgendein lokales Modell. E-Mail-Analyse, Task-Extraktion, Notiz-Agent, Brain und Projekt-Status werden gegen eine dokumentierte Kompatibilit\u00e4tsmatrix gepr\u00fcft.",
         "modelq.matrix": "Vollst\u00e4ndige Matrix ansehen",
         "modelq.pdf": "PDF \u00f6ffnen",
         "modelq.note": "Die vollst\u00e4ndige Matrix mit aktuellem Datenstand, Methodik und Grenzen wird automatisch aus der produktiven Kompatibilit\u00e4ts-Matrix der App generiert \u2014 Testf\u00e4lle und Roh-Ergebnisse sind auf GitHub offen.",
@@ -2226,7 +2226,7 @@
         "compare.c4.desc": "Your existing vault opens 1:1: Markdown, wikilinks, tags, frontmatter, canvas, dataview. If MindGraph doesn't fit, you take your data with you without migration.",
         "modelq.label": "Quality proof",
         "modelq.heading": "Local AI models,<br>tested per module.",
-        "modelq.sub": "MindGraph does not just use any local model. Email analysis, task extraction, dashboard radar, brain and project status are checked against a documented compatibility matrix.",
+        "modelq.sub": "MindGraph does not just use any local model. Email analysis, task extraction, note agent, brain and project status are checked against a documented compatibility matrix.",
         "modelq.matrix": "View full matrix",
         "modelq.pdf": "Open PDF",
         "modelq.note": "The full matrix with current data, methodology and limitations is generated automatically from the app's production compatibility matrix — test cases and raw results are open on GitHub.",
