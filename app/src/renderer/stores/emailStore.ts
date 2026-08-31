@@ -17,6 +17,14 @@ interface EmailState {
   // Unbekannte Mails, die beim letzten Abruf wegen `maxEmailsPerFetch` liegen
   // blieben. Sichtbar machen statt still lassen — genau daran fehlten Mails.
   pendingBacklog: number
+  /** Revision, auf der der Stand im Speicher aufbaut (Inhalts-Hash der Datei).
+   *  Wird bei jedem Speichern als Basis mitgeschickt. `null` = noch nie geladen. */
+  storeRevision: string | null
+  /** Gesetzt, wenn ein Speichern abgelehnt wurde. Ein fremder Stand allein löst
+   *  das nicht mehr aus — der wird eingearbeitet. Übrig bleibt die beschädigte
+   *  Datei. Der Stand im Speicher bleibt erhalten; er darf NICHT still
+   *  verworfen werden, sonst ist genau das weg, was der Nutzer gerade getan hat. */
+  storeConflict: { detectedAt: string; rejectedWrites: number; message: string } | null
   activeFilter: EmailFilter
   unreadRelevantCount: number
   selectedEmailId: string | null
@@ -37,6 +45,10 @@ interface EmailState {
   // Actions
   loadEmails: (vaultPath: string, skipAutoActions?: boolean) => Promise<void>
   saveEmails: (vaultPath: string) => Promise<void>
+  /** Konflikt auflösen: den Stand von der Platte übernehmen und die eigenen,
+   *  nicht gespeicherten Änderungen aufgeben. Nur auf ausdrücklichen Wunsch —
+   *  deshalb gibt es dafür einen Knopf und keinen Automatismus. */
+  reloadAfterStoreConflict: (vaultPath: string) => Promise<void>
   fetchEmails: (vaultPath: string, forceRefresh?: boolean) => Promise<EmailFetchResult>
   loadFolders: (accountId: string, force?: boolean) => Promise<void>
   setActiveFolder: (accountId: string, folder: string) => void
@@ -99,6 +111,8 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   analysisProgress: null,
   analysisError: null,
   pendingBacklog: 0,
+  storeRevision: null,
+  storeConflict: null,
   activeFilter: { onlyRelevant: true },
   unreadRelevantCount: 0,
   selectedEmailId: null,
@@ -115,10 +129,38 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   loadEmails: async (vaultPath: string, skipAutoActions?: boolean) => {
     try {
       const data = await window.electronAPI.emailLoad(vaultPath)
+
+      if (data?.damaged) {
+        // Beschädigte Datei: Der Stand im Speicher bleibt, wie er ist, und der
+        // Hinweis geht hoch. Ohne ihn stünde der Nutzer vor einer leeren Inbox
+        // ohne jede Erklärung — das schlechteste aller Verhalten.
+        set({
+          storeConflict: {
+            detectedAt: new Date().toISOString(),
+            rejectedWrites: get().storeConflict?.rejectedWrites ?? 0,
+            message: data.damaged
+          }
+        })
+        return
+      }
+
       if (data) {
+        // Steht ein Schreibkonflikt offen, darf NICHT nachgeladen werden: Der
+        // Stand im Speicher enthält Änderungen, die noch nirgends gespeichert
+        // sind, und ein Reload würde sie wortlos verschlucken. Genau dieses
+        // stille Verwerfen ist der Fehler, den diese Absicherung verhindern soll.
+        // Auflösen geht nur über `reloadAfterStoreConflict` — also auf Knopfdruck.
+        if (get().storeConflict) {
+          console.warn('[EmailStore] Nachladen übersprungen — es liegt ein ungelöster Schreibkonflikt vor.')
+          return
+        }
         set({
           emails: data.emails || [],
-          lastFetchedAt: data.lastFetchedAt || {}
+          lastFetchedAt: data.lastFetchedAt || {},
+          storeRevision: data.revision ?? null,
+          // Frisch geladen heißt: Der Stand im Speicher ist wieder deckungsgleich
+          // mit der Platte — ein früherer Konflikt ist damit erledigt.
+          storeConflict: null
         })
         get().updateUnreadRelevantCount()
 
@@ -150,11 +192,46 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
   saveEmails: async (vaultPath: string) => {
     try {
-      const { emails, lastFetchedAt } = get()
-      await window.electronAPI.emailSave(vaultPath, { emails, lastFetchedAt })
+      const { emails, lastFetchedAt, storeRevision, storeConflict } = get()
+      const result = await window.electronAPI.emailSave(vaultPath, { emails, lastFetchedAt }, storeRevision)
+
+      if (result?.success) {
+        set({ storeRevision: result.revision ?? null, storeConflict: null })
+        // Es lag ein fremder Stand vor und wurde eingearbeitet — nachladen,
+        // sonst fehlen die eingearbeiteten Mails in der Anzeige, obwohl sie in
+        // der Datei stehen. Verlustfrei: Der eigene Stand ist Teil der
+        // Vereinigung, die gerade geschrieben wurde.
+        if (result.merged) {
+          await get().loadEmails(vaultPath, true)
+        }
+        return
+      }
+
+      if (result?.conflict) {
+        // Übrig bleibt nur der nicht vereinbare Fall: Die Datei auf der Platte
+        // ist beschädigt. Weder überschreiben (die Datei ist vielleicht noch zu
+        // retten) noch stillschweigend weitermachen — der Stand im Speicher
+        // bleibt, und der Nutzer erfährt davon.
+        set({
+          storeConflict: {
+            detectedAt: new Date().toISOString(),
+            rejectedWrites: (storeConflict?.rejectedWrites ?? 0) + 1,
+            message: result.error || 'Die Mailliste wurde von anderer Stelle geändert.'
+          }
+        })
+        console.warn('[EmailStore] Speichern abgelehnt — Mailliste wurde von anderer Stelle geändert.')
+        return
+      }
+
+      console.error('[EmailStore] Failed to save emails:', result?.error)
     } catch (error) {
       console.error('[EmailStore] Failed to save emails:', error)
     }
+  },
+
+  reloadAfterStoreConflict: async (vaultPath: string) => {
+    set({ storeConflict: null })
+    await get().loadEmails(vaultPath, true)
   },
 
   fetchEmails: async (vaultPath: string, forceRefresh?: boolean) => {
@@ -409,7 +486,20 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     const { email: emailSettings } = useUIStore.getState()
     const activeFolders = emailSettings.activeFolders || {}
 
+    // Aufbewahrungsfenster wirkt nur noch auf die ANZEIGE. Früher kürzte der
+    // Ladevorgang damit die Datei und schrieb sie zurück — ein Gerät mit 30 Tagen
+    // löschte so die 60-Tage-Historie des anderen, still und ohne Abruf.
+    // Eine Anzeigeeinstellung darf keine Daten löschen.
+    const retainDays = emailSettings.retainDays || 0
+    const displayCutoff = retainDays > 0
+      ? new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000).toISOString()
+      : null
+
     return emails.filter((email) => {
+      if (displayCutoff && email.date && email.date < displayCutoff) {
+        return false
+      }
+
       // Folder-Scope: nur Mails aus dem aktuell gewählten Folder des jeweiligen Accounts.
       // Legacy-Mails ohne folder-Feld werden 'INBOX' zugeordnet.
       // Gesendete Mails ohne folder-Feld (vor dem Folder-Patch) bleiben sichtbar, sobald
@@ -618,7 +708,11 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         analysis: {
           ...e.analysis,
           replyHandled: handled,
-          replyHandledAt: handled ? new Date().toISOString() : undefined
+          replyHandledAt: handled ? new Date().toISOString() : undefined,
+          // Auch das Zurücknehmen bekommt einen Zeitstempel. Ohne ihn ließe sich
+          // beim Zusammenführen zweier Geräte nur noch ODER bilden — und ein
+          // „doch noch nicht beantwortet" wäre bei jedem Fremdstand wieder weg.
+          replyHandledChangedAt: new Date().toISOString()
         }
       }
     })
@@ -645,7 +739,11 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
   setEmailProject: async (vaultPath: string, emailId: string, folderRel: string | null) => {
     const { emails } = get()
-    const next = emails.map(e => e.id === emailId ? { ...e, userProject: folderRel } : e)
+    // Jede Entscheidung bekommt einen Zeitstempel — auch das Zurücksetzen auf
+    // automatische Zuordnung. Sonst lässt sich beim Zusammenführen zweier Geräte
+    // nicht sagen, welche Wahl die spätere war, und der Wert pendelt.
+    const changedAt = new Date().toISOString()
+    const next = emails.map(e => e.id === emailId ? { ...e, userProject: folderRel, userProjectChangedAt: changedAt } : e)
     set({ emails: next })
     await get().saveEmails(vaultPath)
   },

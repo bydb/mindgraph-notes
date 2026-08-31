@@ -51,7 +51,14 @@ describe('isSyncable', () => {
   })
 
   it('synct echte .mindgraph-Daten (z.B. emails.json) und .attachments', () => {
-    expect(isSyncable('.mindgraph/emails.json')).toBe(true)
+    // Die Mailliste ab Fassung 2. Sie MUSS synchronisiert werden — der Sync
+    // vereinigt sie inzwischen (syncEngine.downloadEmailStore), statt sie zu
+    // ersetzen.
+    expect(isSyncable('.mindgraph/email-store.json')).toBe(true)
+    // Die ALTE Mailliste dagegen nicht mehr: Sie ist die Arbeitsdatei von
+    // Geräten mit älterer Fassung und wird hier nur einmal gelesen. Ein Download
+    // würde sie überschreiben, bevor sie übernommen ist.
+    expect(isSyncable('.mindgraph/emails.json')).toBe(false)
     expect(isSyncable('.attachments/datei.bin')).toBe(true)
   })
 
@@ -269,8 +276,37 @@ describe('isSyncable — Embedding-Caches', () => {
   })
 
   it('lässt andere .mindgraph-JSONs unberührt', () => {
-    expect(isSyncable('.mindgraph/emails.json')).toBe(true)
+    expect(isSyncable('.mindgraph/email-store.json')).toBe(true)
     expect(isSyncable('.mindgraph/contacts.json')).toBe(true)
+  })
+})
+
+describe('diffManifests — die alte Mailliste wird in Ruhe gelassen', () => {
+  const LEGACY = '.mindgraph/emails.json'
+
+  it('löscht sie NICHT auf dem Server, nur weil diese Fassung sie nicht mehr führt', () => {
+    // Das aktualisierte Gerät listet sie nicht mehr. Ohne Schutz wäre das für
+    // diffManifests „vom Nutzer gelöscht" → Löschung auf dem Server → und das
+    // noch nicht aktualisierte Gerät löscht sie daraufhin bei sich. Genau
+    // dessen Arbeitsdatei.
+    const local = { files: {}, lastSyncTime: 0, vaultId: 'v' }
+    const remote = { files: { [LEGACY]: { hash: 'h', size: 10, modifiedAt: 2000, syncedAt: null } }, lastSyncTime: 0, vaultId: 'v' }
+    const previous = { files: { [LEGACY]: { hash: 'h', size: 10, modifiedAt: 1000, syncedAt: 500 } }, lastSyncTime: 0, vaultId: 'v' }
+
+    const diff = diffManifests(local, remote, previous)
+
+    expect(diff.toDeleteRemote).not.toContain(LEGACY)
+    expect(diff.toDownload).not.toContain(LEGACY)
+  })
+
+  it('lädt sie auch nicht herunter — sonst überschriebe der Sync den Altbestand vor der Übernahme', () => {
+    const local = { files: {}, lastSyncTime: 0, vaultId: 'v' }
+    const remote = { files: { [LEGACY]: { hash: 'h', size: 10, modifiedAt: 2000, syncedAt: null } }, lastSyncTime: 0, vaultId: 'v' }
+
+    const diff = diffManifests(local, remote)
+
+    expect(diff.toDownload).not.toContain(LEGACY)
+    expect(diff.toDeleteRemote).not.toContain(LEGACY)
   })
 })
 

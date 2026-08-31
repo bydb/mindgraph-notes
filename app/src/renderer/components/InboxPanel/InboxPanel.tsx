@@ -116,6 +116,8 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     isAnalyzing,
     fetchProgress,
     pendingBacklog,
+    storeConflict,
+    reloadAfterStoreConflict,
     analysisProgress,
     analysisError,
     clearAnalysisError,
@@ -1427,6 +1429,26 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
       {/* Rueckstand sichtbar machen: Frueher fielen gekappte Mails still weg. */}
       {!isFetching && pendingBacklog > 0 && (
         <div className="inbox-backlog-hint">{t('inbox.backlogPending').replace('{n}', String(pendingBacklog))}</div>
+      )}
+      {/* Schreibkonflikt: Ein zweites Geraet hat die Mailliste geaendert, unser
+          Speichern wurde deshalb abgelehnt. Frueher haette hier eine Seite still
+          verloren — jetzt bleibt der eigene Stand erhalten und der Nutzer
+          entscheidet. Kein Automatismus: Neu laden verwirft Ungespeichertes. */}
+      {storeConflict && (
+        <div className="inbox-store-conflict" role="alert">
+          <div className="inbox-store-conflict-text">
+            <strong>{t('inbox.storeConflictTitle')}</strong>
+            <span>{t('inbox.storeConflictBody')}</span>
+          </div>
+          <button
+            type="button"
+            className="inbox-store-conflict-action"
+            title={t('inbox.storeConflictReloadHint')}
+            onClick={() => { if (vaultPath) void reloadAfterStoreConflict(vaultPath) }}
+          >
+            {t('inbox.storeConflictReload')}
+          </button>
+        </div>
       )}
       {isAnalyzing && analysisProgress && (
         <div className="inbox-progress">

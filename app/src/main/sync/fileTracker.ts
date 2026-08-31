@@ -76,10 +76,33 @@ const INCLUDE_DIRS = new Set([
   '.attachments'
 ])
 
+/** Die alte Mailliste. Ab Fassung 2 liegt der Bestand in `email-store.json`;
+ *  `emails.json` wird von dieser App nur noch EINMAL gelesen (Übernahme des
+ *  Altbestands) und danach nie wieder angefasst.
+ *
+ *  Sie ist aber die ARBEITSDATEI von Geräten, die noch die alte Fassung fahren.
+ *  Deshalb zwei Regeln, die zusammengehören:
+ *   1. Nicht synchronisieren — sonst überschriebe ein Download die lokale
+ *      Altdatei, bevor sie übernommen wurde.
+ *   2. Ihr Verschwinden aus dem Manifest NICHT als Löschung deuten (s.
+ *      `NEVER_PROPAGATE_DELETE`) — sonst löscht das aktualisierte Gerät sie auf
+ *      dem Server, und das noch nicht aktualisierte löscht sie daraufhin bei
+ *      sich. Regel 1 ohne Regel 2 wäre schlimmer als gar nichts zu tun. */
+export const LEGACY_EMAIL_STORE_REL_PATH = '.mindgraph/emails.json'
+
+/** Pfade, deren Fehlen im lokalen Manifest NIE als Löschung gilt.
+ *
+ *  Normalerweise heißt „war mal synchronisiert, ist lokal weg" = der Nutzer hat
+ *  gelöscht. Für Dateien, die eine neue App-Fassung bloß nicht mehr anfasst,
+ *  stimmt das nicht — dort ist das Fehlen eine Entscheidung des Programms, keine
+ *  des Nutzers. Solche Pfade werden schlicht in Ruhe gelassen. */
+export const NEVER_PROPAGATE_DELETE = new Set<string>([LEGACY_EMAIL_STORE_REL_PATH])
+
 function shouldExclude(relativePath: string, fileName: string): boolean {
   if (EXCLUDE_PATTERNS.includes(fileName)) return true
   if (relativePath === '.mindgraph/sync-manifest.json') return true
   if (relativePath === '.mindgraph/notes-cache.json') return true
+  if (relativePath === LEGACY_EMAIL_STORE_REL_PATH) return true
   if (relativePath.startsWith('.mindgraph/backups/') || relativePath.startsWith('.mindgraph\\backups\\')) return true
   // Projekt-RAG-Indizes sind geräte-lokal abgeleitete Daten (große Embeddings,
   // modellabhängig) — wie die Backups vom Sync ausgeschlossen.
@@ -272,6 +295,14 @@ export function diffManifests(
         toUpload.push(filePath)
       }
     } else if (!localFile && remoteFile) {
+      // Diese Datei fasst die App nicht mehr an (s. NEVER_PROPAGATE_DELETE). Ihr
+      // Fehlen im lokalen Manifest ist deshalb KEINE Löschung durch den Nutzer:
+      // weder herunterladen noch auf dem Server löschen, einfach liegen lassen.
+      // Ohne diesen Zweig würde das aktualisierte Gerät die alte Mailliste auf
+      // dem Server löschen — und das noch nicht aktualisierte Gerät zöge daraus
+      // den Schluss, sie auch lokal zu löschen. Genau dessen Arbeitsdatei.
+      if (NEVER_PROPAGATE_DELETE.has(filePath)) continue
+
       // Only exists remotely — was it previously synced locally and then deleted by the user?
       const previousFile = previousLocal?.files[filePath]
       if (previousFile && previousFile.syncedAt !== null) {

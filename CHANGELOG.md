@@ -2,6 +2,34 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.10.59-beta] - 2026-08-31
+
+Dieses Release behebt den größten bekannten Fehler der App: Wer MindGraph Notes auf zwei Rechnern nutzt, konnte Mails aus der Liste verlieren. Nicht gelöscht, nicht im Papierkorb — einfach weg.
+
+**Wichtig für Nutzer mit zwei Geräten:** Bitte beide Geräte aktualisieren. Die Mailliste liegt ab dieser Fassung in einer neuen Datei (`.mindgraph/email-store.json`). Die alte Datei bleibt unangetastet liegen, ein Zurück auf die vorherige Fassung ist also jederzeit möglich. Solange ein Gerät noch die alte Fassung fährt, arbeitet es auf der alten Datei weiter.
+
+### Behoben
+
+- **Zwei Geräte löschen sich nicht mehr gegenseitig Mails.** Die Mailliste ist eine einzige Datei, die zwischen den Geräten synchronisiert wird. Bisher schrieb jedes Gerät sie beim Speichern komplett neu, ohne vorher nachzusehen, was inzwischen darin steht — wer zuletzt speicherte, gewann, und alles, was das andere Gerät zwischenzeitlich geholt hatte, fiel aus der Liste. In einem realen Fall wurden aus 198 Mails 186. Beide Stände werden jetzt zusammengelegt: Was nur eine Seite kennt, wird übernommen. Bei Widerspruch gelten feste Regeln — Betreff, Text und Ordner kommen vom zuletzt geholten Stand, Ihre eigenen Markierungen gehen nie verloren, und bei zwei Analysen gewinnt die jüngere.
+
+- **Der Sync legt keine Mail-Konfliktkopien mehr an.** Bei einem Konflikt sicherte er die lokale Fassung als `.sync-conflict-…` weg und übernahm die andere. Diese Kopie liest aber nie wieder jemand, sie wird nicht einmal synchronisiert — schloss man die App danach, war der weggesicherte Stand endgültig verloren. Eingehende Stände werden jetzt genauso zusammengelegt wie alles andere, und das Ergebnis geht zurück an den Server.
+
+- **Das Aufbewahrungsfenster löscht keine Daten mehr.** Die Einstellung, wie lange Mails aufbewahrt werden, kürzte bisher beim Öffnen der App die gespeicherte Liste und schrieb das Ergebnis sofort zurück. Ein Gerät mit 30 Tagen schnitt damit die 60-Tage-Historie des anderen ab — still, ohne Abruf, allein durchs Öffnen. Die Einstellung wirkt jetzt nur noch auf die Anzeige.
+
+- **„Doch noch nicht beantwortet" bleibt bestehen.** Nahm man die Markierung „beantwortet" zurück, während das andere Gerät noch die alte Markierung hielt, wurde die Rücknahme beim Abgleich verworfen. Beide Entscheidungen tragen jetzt einen Zeitstempel; es gilt, was Sie zuletzt entschieden haben. Dasselbe für die Projektzuordnung einer Mail.
+
+- **Jedes Gerät holt seine Mails selbst.** Der Merker, bis wohin abgerufen wurde, lag bisher einmal für alle Geräte in der gemeinsamen Datei. Holte Gerät A eine Mail und rückte den Merker vor, holte Gerät B sie nie selbst — ging die Liste verloren, war die Mail für beide Geräte unerreichbar, obwohl sie auf dem Server lag. Jedes Gerät führt jetzt seinen eigenen Merker.
+
+- **Eine beschädigte Mailliste wird nicht mehr überschrieben — und nicht mehr verschwiegen.** Bisher zeigte die App in diesem Fall eine leere Liste ohne jeden Hinweis, und der nächste Speichervorgang hätte die Datei mit dieser leeren Liste überschrieben. Jetzt bleibt die Datei unangetastet, damit sie sich retten lässt, und ein Hinweis über der Liste erklärt, was los ist. Ein Mailabruf, der seine Ergebnisse nicht ablegen konnte, meldet einen Fehler statt „fertig".
+
+- **Das Telegram-Morgenbriefing enthielt nie eine Mail.** Der Filter prüfte ein Feld, das es nicht gibt, und schloss damit immer alles aus. Behoben.
+
+### Technisch
+
+- Alle Schreibpfade der Mailliste laufen über ein gemeinsames Modul: eine Schreiboperation je Vault gleichzeitig, atomares Schreiben über eine Temporärdatei, und jeder Schreibvorgang nennt den Stand, auf dem er aufbaut.
+- Die Vereinigungsregeln liegen als reine Logik in `shared/emailMerge.ts` und sind vertauschbar, gruppierbar und wiederholbar — zwei Geräte kommen unabhängig von der Reihenfolge zum selben Ergebnis.
+- Gelöschte Mails hinterlassen eine Spur, damit sie beim nächsten Abgleich nicht vom anderen Gerät zurückkehren. Automatisch gelöscht wird derzeit nichts.
+
 ## [0.10.58-beta] - 2026-08-29
 
 Zwei Fehler, die beide erst beim genauen Hinsehen sichtbar wurden: Ein Modell konnte antworten, ohne dass die App die Antwort überhaupt sah. Und die Vorschau für HTML-Dateien konnte den Standardbrowser öffnen, ohne dass jemand klickt.

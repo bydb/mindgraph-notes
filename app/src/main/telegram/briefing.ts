@@ -5,8 +5,8 @@
 import { chat } from '../llm/chatClient'
 import { tasksDueToday, tasksOverdue, eventsForRange, loadRecentBrainEntry, type VaultTaskHit } from './vaultQueries'
 import { loadAgentMemory, formatAgentMemory } from './agent/memory'
-import { promises as fs } from 'fs'
-import path from 'path'
+import { loadEmailStore } from '../email/store'
+import type { EmailMessage } from '../../shared/types'
 
 export interface BriefingContext {
   vaultPath: string
@@ -27,26 +27,31 @@ export interface EmailSummary {
   urgency?: string
 }
 
+/**
+ * Liest die relevanten Mails fuer das Briefing.
+ *
+ * Zwei Fehler steckten hier, beide still:
+ *  - Gelesen wurde `emails.json` direkt. Seit Fassung 2 liegt der Bestand in
+ *    `email-store.json`; die alte Datei wird nicht mehr gepflegt. Das Briefing
+ *    haette ab dem Umstieg einen eingefrorenen Altbestand gemeldet.
+ *  - Gefiltert wurde auf `analysis.relevance`. Das Feld heisst `relevanceScore`
+ *    und hat nie anders geheissen — `(undefined ?? 0) >= 60` ist immer falsch,
+ *    das Briefing enthielt also NIE eine Mail. Ebenso ist `from` ein Objekt
+ *    aus Name und Adresse, kein String; ausgegeben worden waere „[object Object]".
+ */
 async function loadRelevantEmails(vaultPath: string, limit = 5): Promise<EmailSummary[]> {
   try {
-    const emailFile = path.join(vaultPath, '.mindgraph', 'emails.json')
-    const raw = await fs.readFile(emailFile, 'utf-8')
-    const data = JSON.parse(raw) as {
-      emails?: Array<{
-        from?: string
-        subject?: string
-        analysis?: { summary?: string; needsReply?: boolean; replyUrgency?: string; relevance?: number }
-        sent?: boolean
-      }>
-    }
-    const emails = (data.emails ?? [])
-      .filter(e => !e.sent && e.analysis && (e.analysis.relevance ?? 0) >= 60)
-      .sort((a, b) => (b.analysis?.relevance ?? 0) - (a.analysis?.relevance ?? 0))
+    const snapshot = await loadEmailStore(vaultPath)
+    if (snapshot.exists && !snapshot.readable) return []
+
+    const emails = (snapshot.data.emails as unknown as EmailMessage[])
+      .filter(e => !e.sent && e.analysis && (e.analysis.relevanceScore ?? 0) >= 60)
+      .sort((a, b) => (b.analysis?.relevanceScore ?? 0) - (a.analysis?.relevanceScore ?? 0))
       .slice(0, limit)
 
     return emails.map(e => ({
-      from: e.from ?? 'unbekannt',
-      subject: e.subject ?? '(kein Betreff)',
+      from: e.from?.name || e.from?.address || 'unbekannt',
+      subject: e.subject || '(kein Betreff)',
       summary: e.analysis?.summary ?? '',
       needsReply: e.analysis?.needsReply ?? false,
       urgency: e.analysis?.replyUrgency

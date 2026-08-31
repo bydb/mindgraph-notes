@@ -597,8 +597,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-relevance-config-save', vaultPath, config),
   emailLoad: (vaultPath: string) =>
     ipcRenderer.invoke('email-load', vaultPath),
-  emailSave: (vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) =>
-    ipcRenderer.invoke('email-save', vaultPath, data),
+  // `baseRevision` ist die Revision, auf der dieser Stand aufbaut (aus emailLoad).
+  // Passt sie nicht mehr zur Datei, lehnt der Main-Prozess ab statt zu ueberschreiben.
+  emailSave: (vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }, baseRevision?: string | null) =>
+    ipcRenderer.invoke('email-save', vaultPath, data, baseRevision),
   emailContactsLoad: (vaultPath: string) =>
     ipcRenderer.invoke('email-contacts-load', vaultPath),
   emailSavePassword: (accountId: string, password: string) =>

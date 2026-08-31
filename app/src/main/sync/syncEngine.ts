@@ -15,6 +15,7 @@ import {
   type FileManifest
 } from './fileTracker'
 import { moveToSyncTrash } from './trash'
+import { mergeIncomingEmailStore, EMAIL_STORE_REL_PATH } from '../email/store'
 import type { SyncProgress, SyncResult } from '../../shared/types'
 
 type SyncStatus = SyncProgress['status']
@@ -1251,6 +1252,17 @@ export class SyncEngine {
       }
     }
 
+    // Die Mailliste ist die einzige Datei, bei der ein Download sie NICHT
+    // ersetzen darf. Sie ist eine gemeinsame Sammlung, kein Dokument: Was hier
+    // ankommt, kann Mails enthalten, die dieses Gerät nicht hat — und umgekehrt.
+    // Ein reines Überschreiben ist genau der Verlustpfad aus
+    // docs/email-store-multi-device-plan.md. Deshalb geht der eingehende Stand
+    // durch dieselbe Tür wie jeder App-Schreibvorgang: unter derselben Sperre,
+    // vereinigt und atomar geschrieben.
+    if (relativePath === EMAIL_STORE_REL_PATH) {
+      return this.downloadEmailStore(relativePath, plaintext)
+    }
+
     await fs.writeFile(absPath, plaintext)
 
     // Update local manifest entry. modifiedAt kommt aus der echten mtime, nicht aus
@@ -1269,6 +1281,71 @@ export class SyncEngine {
       }
     }
     return downloaded
+  }
+
+  /**
+   * Nimmt einen eingehenden Mail-Stand entgegen: vereinigen statt ersetzen,
+   * anschließend das Ergebnis hochladen.
+   *
+   * Der Upload ist kein Beiwerk. Nach der Vereinigung liegt auf der Platte ein
+   * Stand, den der Server nicht kennt — ohne Upload bliebe er auf diesem Gerät
+   * und das andere sähe die eingearbeiteten Mails nie. Und ins Manifest gehört
+   * der Hash dessen, was WIRKLICH auf der Platte liegt, nicht der des
+   * Server-Stands.
+   */
+  private async downloadEmailStore(relativePath: string, remotePlaintext: Buffer): Promise<UploadedState | null> {
+    const absPath = path.join(this.vaultPath, relativePath)
+
+    const merged = await mergeIncomingEmailStore(this.vaultPath, remotePlaintext.toString('utf-8'), {
+      beforeWrite: this.beforeOverwrite
+        ? async (nextContent: Buffer) => { await this.beforeOverwrite!(absPath, nextContent) }
+        : undefined
+    })
+
+    if (!merged.ok) {
+      console.error('[Sync] Mailliste konnte nicht vereinigt werden:', merged.reason)
+      this.sendLog({ type: 'error', message: `Mailliste konnte nicht vereinigt werden: ${merged.reason}`, fileName: relativePath })
+      return null
+    }
+
+    console.log(`[Sync] Mailliste vereinigt: ${merged.localCount} lokal + ${merged.incomingCount} entfernt → ${merged.mergedCount}`)
+    this.sendLog({
+      type: 'sync',
+      message: `Mailliste vereinigt: ${merged.localCount} lokal + ${merged.incomingCount} entfernt → ${merged.mergedCount} Mails`,
+      fileName: relativePath
+    })
+
+    // Das Ergebnis zurueck zum Server, sonst bleibt die Vereinigung lokal.
+    let uploaded: UploadedState
+    try {
+      uploaded = await this.uploadFile(relativePath)
+    } catch (error) {
+      // Lokal ist der vereinigte Stand da und nichts verloren — aber der Server
+      // hat ihn NICHT. Als Erfolg zurueckzumelden waere hier falsch: Der
+      // Aufrufer stempelt bei jedem Nicht-null-Ergebnis `syncedHash` und meldet
+      // den Lauf gruen. Der Stand gaelte damit als bestaetigt, obwohl ihn
+      // niemand bestaetigt hat — und der Nutzer erfuehre nichts davon.
+      // Also: als Fehlschlag melden, Manifest unberuehrt lassen, naechster Lauf
+      // versucht es erneut (das Vereinigen ist wiederholbar).
+      const msg = error instanceof Error ? error.message : String(error)
+      console.warn('[Sync] Vereinigte Mailliste konnte nicht hochgeladen werden:', error)
+      this.sendLog({
+        type: 'error',
+        message: `Mailliste vereinigt, aber nicht hochgeladen: ${msg}. Der vereinigte Stand liegt lokal; der nächste Lauf versucht es erneut.`,
+        fileName: relativePath
+      })
+      return null
+    }
+
+    if (this.manifest) {
+      this.manifest.files[relativePath] = {
+        ...uploaded,
+        syncedAt: Date.now(),
+        // Bestaetigt ist der VEREINIGTE Stand, nicht der vom Server geholte.
+        syncedHash: uploaded.hash
+      }
+    }
+    return uploaded
   }
 
   private async mtimeOf(absPath: string): Promise<number> {
@@ -1292,6 +1369,15 @@ export class SyncEngine {
     // JSON merge for flashcards — merge by card ID instead of overwriting
     if (relativePath === '.mindgraph/flashcards.json') {
       await this.mergeFlashcardsConflict(relativePath, localManifest)
+      return
+    }
+
+    // Mailliste: vereinigen statt „eine Seite als Konfliktkopie wegsichern".
+    // Die Konfliktkopie ist vom Sync ausgeschlossen und wird von niemandem mehr
+    // gelesen — schliesst die App ohne weiteren Mail-Schreibvorgang, ist der
+    // weggesicherte Stand endgueltig weg.
+    if (relativePath === EMAIL_STORE_REL_PATH) {
+      await this.mergeEmailStoreConflict(relativePath, localManifest)
       return
     }
 
@@ -1365,6 +1451,37 @@ export class SyncEngine {
         syncedAt: Date.now(),
         syncedHash: uploaded.hash
       }
+    }
+  }
+
+  /**
+   * Loest einen Konflikt der Mailliste durch Vereinigen.
+   *
+   * Kein Konfliktkopie-Zweig, keine „juengere Seite gewinnt"-Entscheidung: Bei
+   * einer gemeinsamen Sammlung ist jede solche Entscheidung ein Datenverlust.
+   */
+  private async mergeEmailStoreConflict(relativePath: string, localManifest: FileManifest): Promise<void> {
+    if (!this.key) return
+
+    const fileData = await this.requestFile(relativePath)
+    if (!fileData) {
+      throw new Error('Could not fetch the server copy of the email list')
+    }
+    const remotePlaintext = decryptFile(
+      Buffer.from(fileData.data, 'base64'),
+      this.key,
+      Buffer.from(fileData.iv, 'base64'),
+      Buffer.from(fileData.tag, 'base64')
+    )
+
+    const merged = await this.downloadEmailStore(relativePath, remotePlaintext)
+    if (!merged) {
+      throw new Error('Could not merge the email list')
+    }
+    localManifest.files[relativePath] = {
+      ...merged,
+      syncedAt: Date.now(),
+      syncedHash: this.manifest?.files[relativePath]?.syncedHash ?? merged.hash
     }
   }
 

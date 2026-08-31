@@ -147,6 +147,9 @@ import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
 import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
+import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
+import { getDeviceId } from './deviceId'
+import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns } from './llm/telemetry'
 import { fromOllamaResponse, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
@@ -10255,9 +10258,11 @@ ipcMain.handle('email-save-attachment', async (_event, filename: string, content
 // Persistenter Kontakt-Speicher ({vault}/.mindgraph/contacts.json):
 // Empfänger gesendeter Mails werden VOR dem retainDays-Pruning gesichert,
 // sonst verschwinden selten angeschriebene Adressen aus dem Compose-Autocomplete.
-// sentDates: Sende-Zeitpunkte pro Adresse — Reply-Evidenz für buildReplyStats, die das
-// emails.json-Pruning (Default 30 Tage) überlebt; sonst wäre das 90-Tage-Fenster der
-// Antwort-Häufigkeit effektiv auf die Retention gedeckelt.
+// sentDates: Sende-Zeitpunkte pro Adresse — Reply-Evidenz für buildReplyStats, die
+// unabhängig vom Mailbestand geführt wird. Der Bestand enthält nur, was per IMAP
+// geholt wurde (Abruffenster); das 90-Tage-Fenster der Antwort-Häufigkeit wäre
+// sonst effektiv darauf gedeckelt. Galt erst recht, solange der Ladevorgang den
+// Bestand noch nach retainDays kürzte — das tut er nicht mehr.
 interface SavedEmailContact { email: string; name?: string; lastUsedAt?: string; sentDates?: string[] }
 
 // Länger als windowDays (90) aufbewahren, damit eine künftig konfigurierbare Fenstergröße
@@ -10362,52 +10367,79 @@ ipcMain.handle('email-contacts-load', async (_event, vaultPath: string) => {
   }
 })
 
-// Emails laden (JSON-Persistenz) — bereinigt alte E-Mails nach retainDays
+// Emails laden (JSON-Persistenz).
+//
+// Liefert zusaetzlich eine `revision` — den Inhalts-Hash der Datei. Der Renderer
+// merkt sie sich und nennt sie bei jedem Speichern als Basis; passt sie dann
+// nicht mehr, wird nicht ueberschrieben (siehe email/store.ts).
+//
+// Dieser Handler schreibt NICHT mehr zurueck. Frueher kuerzte er den Bestand
+// nach der LOKALEN `retainDays`-Einstellung und speicherte das Ergebnis sofort —
+// ein Geraet mit 30 Tagen kappte damit die 60-Tage-Historie des anderen, still,
+// allein durchs Oeffnen der App. `retainDays` geht jetzt als Zahl an den
+// Renderer und wirkt dort nur noch auf die Anzeige.
 ipcMain.handle('email-load', async (_event, vaultPath: string) => {
   console.log(`[Email] email-load called: vault=${vaultPath}`)
   try {
     assertApprovedVault(vaultPath, 'email-load')
-    const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
-    const content = await fs.readFile(emailsPath, 'utf-8')
-    const data = JSON.parse(content)
+    const deviceId = await getDeviceId()
+    const snapshot = await loadEmailStore(vaultPath, { deviceId })
 
-    // Alte E-Mails nach retainDays bereinigen
-    const retainDays = await getEmailRetainDays()
-
-    if (Array.isArray(data.emails)) {
-      // Empfänger gesendeter Mails VOR dem Pruning in contacts.json sichern
-      await harvestSentRecipients(vaultPath, data.emails)
-      const cutoff = new Date(Date.now() - retainDays * 24 * 60 * 60 * 1000).toISOString()
-      const before = data.emails.length
-      data.emails = data.emails.filter((e: { date?: string }) => !e.date || e.date >= cutoff)
-      if (data.emails.length < before) {
-        console.log(`[Email] ${before - data.emails.length} alte E-Mails bereinigt (retainDays: ${retainDays})`)
-        // Bereinigtes JSON direkt zurückschreiben
-        await fs.writeFile(emailsPath, JSON.stringify(data, null, 2), 'utf-8')
-      }
+    if (snapshot.exists && !snapshot.readable) {
+      // Beschaedigte Datei: keine Revision herausgeben. Ohne Basis lehnt
+      // `saveEmailStore` jeden Schreibversuch ab — die Datei bleibt fuer eine
+      // Rettung erhalten, statt von einer leeren Liste ueberschrieben zu werden.
+      // Der Renderer bekommt den Grund und zeigt ihn an; still bleiben waere
+      // hier das Schlimmste (leere Inbox ohne Erklaerung).
+      console.error('[Email] Mailliste ist beschaedigt — sie bleibt unangetastet.')
+      return { emails: [], lastFetchedAt: {}, revision: '', retainDays: await getEmailRetainDays(), damaged: snapshot.reason || 'Die gespeicherte Mailliste ist beschädigt.' }
     }
+    if (!snapshot.exists) return null
 
-    return data
-  } catch {
+    // Empfaenger gesendeter Mails in contacts.json sichern (eigene Datei, kein
+    // Schreibzugriff auf die Mailliste).
+    await harvestSentRecipients(vaultPath, snapshot.data.emails as Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }> }>)
+
+    // Der Renderer bekommt den Merker DIESES Geraets, nicht den gemeinsamen.
+    // Sonst gilt der Abruf-Fortschritt des anderen Geraets auch hier — genau
+    // die Kopplung, die den gemeldeten Mailverlust total gemacht hat.
+    return {
+      ...snapshot.data,
+      lastFetchedAt: readDeviceCursor(snapshot.data.lastFetchedAtByDevice, snapshot.data.lastFetchedAt, deviceId),
+      revision: snapshot.revision,
+      retainDays: await getEmailRetainDays()
+    }
+  } catch (error) {
+    console.error('[Email] Failed to load:', error)
     return null
   }
 })
 
-// Emails speichern (JSON-Persistenz)
-ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }) => {
+// Emails speichern (JSON-Persistenz) — nur auf der Revision, auf der der
+// Aufrufer aufgebaut hat. Weicht sie ab, hat ein anderes Geraet (per Sync) oder
+// ein anderer Schreibpfad die Datei veraendert: Dann wird ABGELEHNT statt
+// ueberschrieben, und der Renderer meldet den Konflikt sichtbar.
+ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: object[]; lastFetchedAt: Record<string, string> }, baseRevision?: string | null) => {
   try {
     assertApprovedVault(vaultPath, 'email-save')
-    const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
-    await fs.mkdir(path.dirname(emailsPath), { recursive: true })
-    await fs.writeFile(emailsPath, JSON.stringify(data, null, 2), 'utf-8')
-    // Frisch gesendete Mails sofort in den Kontakt-Speicher übernehmen
-    if (Array.isArray(data.emails)) {
-      await harvestSentRecipients(vaultPath, data.emails as Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }> }>)
+    const next: EmailStoreData = {
+      emails: (data.emails || []) as Array<Record<string, unknown>>,
+      lastFetchedAt: data.lastFetchedAt || {}
     }
-    return true
+    const result = await saveEmailStore(vaultPath, next, baseRevision ?? null, { deviceId: await getDeviceId() })
+    if (!result.ok) {
+      console.warn(`[Email] Speichern abgelehnt (Konflikt): ${result.reason}`)
+      return { success: false, conflict: true, revision: result.currentRevision, error: result.reason }
+    }
+    // Frisch gesendete Mails sofort in den Kontakt-Speicher uebernehmen
+    await harvestSentRecipients(vaultPath, next.emails as Array<{ sent?: boolean; folder?: string; date?: string; to?: Array<{ name?: string; address?: string }> }>)
+    // `merged` heisst: Es lag ein fremder Stand vor, er wurde eingearbeitet.
+    // Der Renderer muss danach neu laden, sonst zeigt er die eingearbeiteten
+    // Mails nicht an.
+    return { success: true, revision: result.revision, merged: result.merged }
   } catch (error) {
     console.error('[Email] Failed to save:', error)
-    return false
+    return { success: false, conflict: false, error: error instanceof Error ? error.message : 'Speichern fehlgeschlagen' }
   }
 })
 
@@ -10417,14 +10449,13 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     assertApprovedVault(vaultPath, 'email-fetch')
     const { ImapFlow } = await import('imapflow')
 
-    // Bestehende Emails laden
-    let existingEmails: Array<{ id: string; folder?: string }> = []
-    try {
-      const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
-      const content = await fs.readFile(emailsPath, 'utf-8')
-      const data = JSON.parse(content)
-      existingEmails = data.emails || []
-    } catch { /* Keine existierenden Emails */ }
+    const deviceId = await getDeviceId()
+
+    // Bestehenden Stand nur zum Erkennen schon bekannter Mails laden. Was am
+    // Ende geschrieben wird, entscheidet ein FRISCHER Lesevorgang — der Abruf
+    // laeuft minutenlang, und in dieser Zeit kann sich die Datei aendern.
+    const existingEmails: Array<{ id: string; folder?: string }> =
+      (await loadEmailStore(vaultPath, { deviceId })).data.emails as Array<{ id: string; folder?: string }>
 
     const existingIds = new Set(existingEmails.map(e => e.id))
     const existingFolders = new Map(existingEmails.map(e => [e.id, e.folder]))
@@ -10646,24 +10677,61 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
       }
     }
 
-    // Folder-Updates für bereits bekannte Mails anwenden (z.B. wenn eine Mail im Server verschoben wurde).
-    if (folderUpdates.length > 0) {
-      const updateMap = new Map(folderUpdates.map(u => [u.id, u.folder]))
-      existingEmails = (existingEmails as Array<{ id: string; folder?: string }>).map(e => {
-        const next = updateMap.get(e.id)
-        return next && next !== e.folder ? { ...e, folder: next } : e
-      })
+    // ── Lesen-Aendern-Schreiben statt Komplett-Rueckschreib ───────────────────
+    // Den beim Start gelesenen Bestand am Ende zurueckzuschreiben wuerde alles
+    // verlieren, was waehrend des Abrufs dazukam (Erledigt-Toggle, fertige
+    // Analysen, ein Sync-Update vom Zweitgeraet). Deshalb frisch lesen und nur
+    // das Eigene daraufsetzen.
+    const folderUpdateMap = new Map(folderUpdates.map(u => [u.id, u.folder]))
+    const written = await mutateEmailStore(vaultPath, (fresh) => {
+      const freshEmails = fresh.emails as Array<{ id?: string; folder?: string }>
+
+      // Folder-Updates fuer bereits bekannte Mails anwenden (z.B. wenn eine Mail
+      // auf dem Server verschoben wurde).
+      const merged = folderUpdateMap.size === 0
+        ? [...freshEmails]
+        : freshEmails.map(e => {
+            const next = e.id ? folderUpdateMap.get(e.id) : undefined
+            return next && next !== e.folder ? { ...e, folder: next } : e
+          })
+
+      // Neu geholte Mails anhaengen, die im frischen Bestand noch fehlen.
+      const seen = new Set(merged.map(e => e.id))
+      const deduplicatedNew = (newEmails as Array<{ id: string }>).filter(e => !seen.has(e.id))
+
+      // Abruf-Merker: nur der DIESES Geraets wird fortgeschrieben, fremde
+      // bleiben unberuehrt. Das alte gemeinsame Feld wird daraus abgeleitet,
+      // damit eine aeltere App-Version an derselben Datei nicht das ganze
+      // Postfach neu zieht.
+      const byDevice = writeDeviceCursor(fresh.lastFetchedAtByDevice, deviceId, updatedLastFetchedAt)
+      const legacyCursor: Record<string, string> = { ...fresh.lastFetchedAt }
+      for (const [key, value] of Object.entries(flattenDeviceCursors(byDevice))) {
+        if (!legacyCursor[key] || value > legacyCursor[key]) legacyCursor[key] = value
+      }
+
+      const allEmails = [...merged, ...deduplicatedNew] as Array<Record<string, unknown>>
+      return {
+        data: { ...fresh, emails: allEmails, lastFetchedAt: legacyCursor, lastFetchedAtByDevice: byDevice },
+        // `added` zaehlt, was TATSAECHLICH dazukam. Eine Mail, die inzwischen
+        // schon per Sync in der Datei stand, ist fuer dieses Geraet nicht neu —
+        // sie als neu zu melden wuerde einen ueberfluessigen Analyse-Lauf ausloesen.
+        result: { total: allEmails.length, added: deduplicatedNew.length }
+      }
+    })
+
+    if (written.damaged) {
+      // Die geholten Mails konnten nicht abgelegt werden. Als Erfolg zu melden
+      // waere die schlimmste Variante: Der Nutzer sieht „Abruf fertig" und eine
+      // Liste, in der nichts angekommen ist.
+      return { success: false, newCount: 0, totalCount: 0, error: written.damaged }
     }
 
-    // Zusammenführen und deduplizieren (nach ID)
-    const seen = new Set((existingEmails as Array<{ id: string }>).map(e => e.id))
-    const deduplicatedNew = (newEmails as Array<{ id: string }>).filter(e => !seen.has(e.id))
-    const allEmails = [...existingEmails, ...deduplicatedNew]
-    const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
-    await fs.mkdir(path.dirname(emailsPath), { recursive: true })
-    await fs.writeFile(emailsPath, JSON.stringify({ emails: allEmails, lastFetchedAt: updatedLastFetchedAt }, null, 2), 'utf-8')
-
-    return { success: true, newCount: newEmails.length, totalCount: allEmails.length, skippedCount: totalSkipped }
+    return {
+      success: true,
+      newCount: written.result?.added ?? 0,
+      totalCount: written.result?.total ?? 0,
+      skippedCount: totalSkipped
+    }
   } catch (error) {
     console.error('[Email] Fetch error:', error)
     return { success: false, newCount: 0, totalCount: 0, error: error instanceof Error ? error.message : 'Fehler beim Abruf' }
@@ -10818,11 +10886,24 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
       console.warn(`[Email] email-analyze abgelehnt: Modell „${model}" ist für task-extraction hard-locked (Prompt-Injection-Risiko).`)
       return { success: false, error: `Das Modell „${model}" ist für die Mail-/Task-Analyse gesperrt (Prompt-Injection-Anfälligkeit). Bitte in den Einstellungen ein geeignetes Modell wählen.` }
     }
-    // Emails laden
-    const emailsPath = path.join(vaultPath, '.mindgraph', 'emails.json')
-    const content = await fs.readFile(emailsPath, 'utf-8')
-    const data = JSON.parse(content)
-    const emails = data.emails || []
+    // Emails laden (Startstand — nur um zu entscheiden, WAS analysiert wird;
+    // geschrieben wird spaeter immer auf dem frisch gelesenen Bestand).
+    type AnalyzableEmail = {
+      id: string
+      from: { name: string; address: string }
+      subject: string
+      date: string
+      bodyText: string
+      analysis?: object
+      noteCreated?: boolean
+      sent?: boolean
+      folder?: string
+    }
+    const analyzeSnapshot = await loadEmailStore(vaultPath, { deviceId: await getDeviceId() })
+    if (analyzeSnapshot.exists && !analyzeSnapshot.readable) {
+      return { success: false, error: analyzeSnapshot.reason || 'Die gespeicherte Mailliste ist beschädigt.' }
+    }
+    const emails = analyzeSnapshot.data.emails as unknown as AnalyzableEmail[]
 
     // Instruktions-Notiz laden (Pfad aus Settings - wird vom Renderer mitgesendet via model param)
     // Settings werden über den Store geladen - hier lesen wir die Instruktions-Notiz
@@ -10843,8 +10924,8 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     // dem gesamten Mailbestand vorberechnen ("wem antworte ich tatsächlich").
     const relevanceConfig = parseRelevanceConfig(instructionContent)
     const softInstruction = stripConfigBlock(instructionContent)
-    // Persistierte Sende-Zeitpunkte aus contacts.json dazu: emails.json hält per Default
-    // nur 30 Tage, das Antwort-Häufigkeits-Fenster ist aber 90 Tage.
+    // Persistierte Sende-Zeitpunkte aus contacts.json dazu: Der Mailbestand enthält
+    // nur, was per IMAP geholt wurde, das Antwort-Häufigkeits-Fenster ist aber 90 Tage.
     const replyStats = buildReplyStats(emails, relevanceConfig.replyHistory, Date.now(), await loadPersistedSentDates(vaultPath))
     console.log(`[Email] Hybrid-Scorer: ${relevanceConfig.vipSenders.length} VIP, ${relevanceConfig.domains.length} Domains, ${relevanceConfig.keywords.length} Keywords, ${replyStats.size} Kontakte`)
 
@@ -10855,12 +10936,12 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     // isSentMail prüft sent-Flag UND Ordnername: per IMAP aus „Gesendet" gefetchte Mails
     // tragen kein sent-Flag, würden sonst beim Wechsel in den Sent-Ordner analysiert.
     const toAnalyze = emailIds
-      ? emails.filter((e: { id: string; analysis?: object }) => emailIds.includes(e.id))
-      : emails.filter((e: { analysis?: object; noteCreated?: boolean; sent?: boolean; folder?: string }) => !e.analysis && !e.noteCreated && !isSentMail(e))
+      ? emails.filter((e) => emailIds.includes(e.id))
+      : emails.filter((e) => !e.analysis && !e.noteCreated && !isSentMail(e))
     // Neueste zuerst: auf langsamer Hardware (Minuten pro Mail) soll die Mail von heute
     // Morgen nicht hinter einem alten Backlog warten — die aktuellsten Ergebnisse sind
     // die wertvollsten und so zuerst in der Inbox sichtbar.
-    toAnalyze.sort((a: { date?: string }, b: { date?: string }) => (b.date || '').localeCompare(a.date || ''))
+    toAnalyze.sort((a, b) => (b.date || '').localeCompare(a.date || ''))
 
     console.log(`[Email] ${emails.length} total, ${toAnalyze.length} to analyze`)
 
@@ -10875,20 +10956,28 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     const pendingAnalyses = new Map<string, Record<string, unknown>>()
     const persistAnalyses = async (): Promise<void> => {
       if (pendingAnalyses.size === 0) return
-      let target = data
-      try {
-        target = JSON.parse(await fs.readFile(emailsPath, 'utf-8'))
-      } catch { /* Datei weg/korrupt → Start-Snapshot als Fallback */ }
-      const targetEmails: Array<{ id: string; analysis?: { replyHandled?: boolean; replyHandledAt?: string } }> =
-        Array.isArray(target.emails) ? target.emails : []
-      for (const [id, analysisData] of pendingAnalyses) {
-        const t = targetEmails.find((e) => e.id === id)
-        if (!t) continue // Mail wurde zwischenzeitlich geprunt/gelöscht
-        // replyHandled aus dem FRISCHEN Bestand — der User kann während des Laufs
-        // getoggelt haben; der Stand vom Batch-Start wäre hier eine Lost-Update-Quelle.
-        t.analysis = { ...analysisData, replyHandled: t.analysis?.replyHandled, replyHandledAt: t.analysis?.replyHandledAt }
+      const out = await mutateEmailStore(vaultPath, (fresh) => {
+        const targetEmails = fresh.emails as Array<{ id?: string; analysis?: { replyHandled?: boolean; replyHandledAt?: string; replyHandledChangedAt?: string } }>
+        let touched = false
+        for (const [id, analysisData] of pendingAnalyses) {
+          const t = targetEmails.find((e) => e.id === id)
+          if (!t) continue // Mail wurde zwischenzeitlich gelöscht
+          // replyHandled aus dem FRISCHEN Bestand — der User kann während des Laufs
+          // getoggelt haben; der Stand vom Batch-Start wäre hier eine Lost-Update-Quelle.
+          t.analysis = {
+            ...analysisData,
+            replyHandled: t.analysis?.replyHandled,
+            replyHandledAt: t.analysis?.replyHandledAt,
+            replyHandledChangedAt: t.analysis?.replyHandledChangedAt
+          }
+          touched = true
+        }
+        return touched ? { data: fresh, result: null } : null
+      })
+      if (out.damaged) {
+        // Weiterrechnen waere sinnlos — nichts davon kaeme an.
+        throw new Error(out.damaged)
       }
-      await fs.writeFile(emailsPath, JSON.stringify(target, null, 2), 'utf-8')
     }
     // Crash-Schutz: alle N fertigen Analysen zwischenspeichern, nicht erst am Batch-Ende.
     const PERSIST_EVERY = 5

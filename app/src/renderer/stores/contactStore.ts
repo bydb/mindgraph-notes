@@ -117,7 +117,7 @@ export const useContactStore = create<ContactState>()((set, get) => ({
       }
 
       // Source 4: Persistenter Kontakt-Speicher (.mindgraph/contacts.json) —
-      // Empfänger gesendeter Mails, überlebt das retainDays-Pruning von emails.json
+      // Empfänger gesendeter Mails, unabhängig vom Mailbestand geführt
       if (vaultPath) {
         const saved = await window.electronAPI.emailContactsLoad(vaultPath)
         for (const s of saved) {

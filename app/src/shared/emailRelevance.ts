@@ -156,8 +156,9 @@ interface MailLike {
 /** address(lowercased) → Statistik, gerechnet über den gesamten Bestand im Zeitfenster.
  *
  *  persistedSentDates: Sende-Zeitpunkte pro Empfänger-Adresse aus contacts.json — Evidenz,
- *  die das retainDays-Pruning von emails.json (Default 30 Tage) überlebt. Ohne sie wäre
- *  das windowDays-Fenster (Default 90 Tage) effektiv nie größer als die Retention.
+ *  die unabhängig vom Mailbestand geführt wird. Der enthält nur, was per IMAP geholt
+ *  wurde; ohne diese Quelle wäre das windowDays-Fenster (Default 90 Tage) effektiv nie
+ *  größer als das Abruffenster.
  *  Dedup zwischen live und persistiert läuft über den exakten Datums-String: dieselbe
  *  Mail trägt in beiden Quellen denselben ISO-Timestamp. */
 export function buildReplyStats(

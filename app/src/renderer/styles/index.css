@@ -11989,6 +11989,48 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 11px;
   line-height: 1.45;
 }
+/* Schreibkonflikt der Mailliste: bewusst auffaelliger als der Rueckstand-Hinweis.
+   Hier stehen ungespeicherte Aenderungen auf dem Spiel — das darf man nicht
+   uebersehen. Warnfarbe ueber den Amber-Akzent, nicht ueber Rot: Es ist kein
+   Fehler, sondern eine Entscheidung, die der Nutzer treffen muss. */
+.inbox-store-conflict {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, #d98324 40%, var(--border-color));
+  background: color-mix(in srgb, #d98324 14%, var(--bg-secondary, transparent));
+}
+.inbox-store-conflict-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inbox-store-conflict-text strong {
+  font-size: 11.5px;
+  color: var(--text-primary);
+}
+.inbox-store-conflict-text span {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.inbox-store-conflict-action {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, #d98324 55%, transparent);
+  border-radius: 5px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+}
+.inbox-store-conflict-action:hover {
+  background: color-mix(in srgb, #d98324 18%, var(--bg-primary));
+}
+
 .inbox-progress {
   padding: 6px 12px;
   font-size: 11px;

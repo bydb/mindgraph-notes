@@ -1042,8 +1042,8 @@ export interface ElectronAPI {
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean, cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null) => Promise<{ success: boolean; analyzed: number; failed?: number; total?: number; lastError?: string | null; error?: string }>;
   emailRelevanceConfigLoad: (vaultPath: string) => Promise<{ success: boolean; config?: RelevanceConfig; hasBlock?: boolean; notePath?: string; error?: string }>;
   emailRelevanceConfigSave: (vaultPath: string, config: RelevanceConfig) => Promise<{ success: boolean; notePath?: string; error?: string }>;
-  emailLoad: (vaultPath: string) => Promise<{ emails: EmailMessage[]; lastFetchedAt: Record<string, string> } | null>;
-  emailSave: (vaultPath: string, data: { emails: EmailMessage[]; lastFetchedAt: Record<string, string> }) => Promise<boolean>;
+  emailLoad: (vaultPath: string) => Promise<EmailStoreLoadResult | null>;
+  emailSave: (vaultPath: string, data: { emails: EmailMessage[]; lastFetchedAt: Record<string, string> }, baseRevision?: string | null) => Promise<EmailStoreSaveResult>;
   emailContactsLoad: (vaultPath: string) => Promise<SavedEmailContact[]>;
   emailSavePassword: (accountId: string, password: string) => Promise<boolean>;
   emailLoadPassword: (accountId: string) => Promise<string | null>;
@@ -1465,6 +1465,10 @@ export interface EmailMessage {
   /** Vom User manuell zugewiesener Projektordner (vault-relativer Pfad).
    *  null = explizit "kein Projekt"; undefined = auto-Match aktiv. */
   userProject?: string | null
+  /** ISO-Zeitpunkt der letzten Änderung an `userProject` — auch beim
+   *  Zurücksetzen auf auto-Match. Da `undefined` keine JSON-Runde übersteht,
+   *  trägt dieser Zeitstempel die Absicht beim Zusammenführen zweier Geräte. */
+  userProjectChangedAt?: string
   /** IMAP-Folder, aus dem die Mail abgerufen wurde. Default 'INBOX' (für Legacy-Mails ohne Feld). */
   folder?: string
 }
@@ -1512,6 +1516,10 @@ export interface EmailAnalysis {
   hardFloor?: number
   replyHandled?: boolean   // true wenn User die Antwort anderweitig erledigt hat (z.B. Telefon)
   replyHandledAt?: string  // ISO-Timestamp wann markiert
+  /** ISO-Zeitpunkt der letzten Änderung an `replyHandled` — auch beim
+   *  Zurücknehmen. Grundlage für das Zusammenführen zweier Geräte
+   *  (`shared/emailMerge.ts`); ohne ihn wäre ein Zurücknehmen nicht übertragbar. */
+  replyHandledChangedAt?: string
   /** Exactly-once-Marker: workflowId → runId. Verhindert Mehrfach-Auslösung
    *  desselben Workflows für dieselbe Mail über Re-Analyse/Neustart (Decision #5). */
   workflowRuns?: Record<string, string>
@@ -1566,6 +1574,42 @@ export interface EmailSendResult {
   sentMailbox?: string    // Name des verwendeten Sent-Folders bei erfolgreichem Append
 }
 
+/** Antwort von `emailLoad`. `revision` ist der Inhalts-Hash der geladenen Datei;
+ *  sie muss bei jedem Speichern als Basis mitgegeben werden, damit ein
+ *  zwischenzeitlich vom Sync eingespielter Fremdstand nicht ueberschrieben wird. */
+export interface EmailStoreLoadResult {
+  emails: EmailMessage[]
+  lastFetchedAt: Record<string, string>
+  revision: string
+  /** Gesetzt, wenn die gespeicherte Datei beschaedigt ist. Dann sind `emails`
+   *  leer und `revision` ist leer — es wird NICHT darauf geschrieben, und die
+   *  Oberflaeche muss das zeigen statt eine leere Inbox vorzutaeuschen. */
+  damaged?: string
+  /** Aufbewahrungsfenster in Tagen — wirkt nur noch auf die ANZEIGE.
+   *  Frueher kuerzte der Ladevorgang damit die Datei und loeschte so die
+   *  laengere Historie des anderen Geraets. */
+  retainDays: number
+}
+
+/** Antwort von `emailSave`.
+ *
+ *  `merged: true` heisst: Auf der Platte stand ein fremder Stand (typisch: das
+ *  zweite Geraet ueber den Sync). Er wurde nach den Regeln aus
+ *  `shared/emailMerge.ts` eingearbeitet statt ueberschrieben — der Aufrufer
+ *  sollte danach neu laden, sonst zeigt er die eingearbeiteten Mails nicht.
+ *
+ *  `conflict: true` heisst: Es wurde NICHT geschrieben, weil sich der Stand auf
+ *  der Platte nicht vereinigen liess (beschaedigte Datei). Der Aufrufer behaelt
+ *  seinen Stand und muss das sichtbar machen. */
+export interface EmailStoreSaveResult {
+  success: boolean
+  merged?: boolean
+  conflict?: boolean
+  /** Revision nach dem Schreiben (Erfolg) bzw. die aktuelle auf der Platte (Konflikt). */
+  revision?: string
+  error?: string
+}
+
 export interface EmailFetchResult {
   success: boolean
   newCount: number
@@ -1578,7 +1622,7 @@ export interface EmailFetchResult {
 }
 
 /** Persistenter Kontakt-Speicher ({vault}/.mindgraph/contacts.json).
- *  Empfänger gesendeter Mails — überlebt das retainDays-Pruning von emails.json,
+ *  Empfänger gesendeter Mails — unabhängig vom Mailbestand geführt,
  *  damit selten angeschriebene Adressen im Compose-Autocomplete bleiben. */
 export interface SavedEmailContact {
   email: string
