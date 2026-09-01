@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.2-beta] - 2026-09-01
+
+Arbeitsblätter für den Unterricht. Der Notiz-Agent kann jetzt den Lehrplan des angegebenen Bundeslandes nachschlagen, ein fertiges Blatt später noch einmal überarbeiten und Bilder in eine erzeugte Seite einbinden. Dazu ein mitgelieferter Skill „Arbeitsblatt".
+
+### Neu
+
+- **Skill „Arbeitsblatt" wird mitgeliefert.** Er erzeugt ein unterrichtstaugliches Arbeitsblatt als HTML-Seite: Kopfzeile zum Ausfüllen, Lernziel, Material, ansteigende Aufgaben über drei Niveaustufen, Schreiblinien, Selbsteinschätzung und ein vollständiges Lösungsblatt auf eigener Seite. Aus dem Editor lässt sich daraus mit einem Klick ein A4-PDF machen. Der Skill setzt eingeschaltete Webrecherche voraus und belegt jede fachliche Aussage an einer Quelle, die im Lauf tatsächlich geöffnet wurde. Neue Vaults bekommen ihn automatisch, bestehende über Einstellungen → Agenten → Skills.
+- **Lehrplanbezug nach Bundesland.** Steht im Auftrag ein Bundesland, schlägt der Agent den passenden Fachlehrplan im amtlichen Portal des Landes nach — die Adressen aller sechzehn Länder liegen dem Skill bei. Kompetenzbereich und Klassenstufe kommen in der Formulierung des Landes ins Lösungsblatt, mit Quelle. Findet er den Lehrplan nicht, schreibt er die Lücke hin, statt einen plausibel klingenden Bezug zu erfinden. Im Test hat das gleich einen Fehler im Auftrag aufgedeckt: Neutralisation steht in Bayern im Lernbereich C10 und damit in Jahrgangsstufe 10, nicht in Klasse 9.
+- **Eine erzeugte Seite lässt sich nachbessern.** HTML-Dateien können jetzt als Kontext angehängt werden. Damit hängt man ein fertiges Arbeitsblatt an, sagt, was falsch ist, und bekommt eine korrigierte Fassung — bisher gab es keinen Weg zurück, der Agent konnte seine eigene Seite nicht einmal lesen. Die neue Fassung entsteht als eigene Datei; überschrieben wird nichts.
+- **Bilder in erzeugten Seiten.** Ein mit der Bild-Generierung erzeugtes Bild lässt sich in eine HTML-Seite einbinden, nicht mehr nur in eine Notiz. Bild und Seite landen beim Übernehmen im selben Ordner, der Dateiname trägt also ohne Pfadangabe. Die Endung wird automatisch auf die tatsächlich gelieferte Datei gezogen, und die Bildbreite bleibt in der Textspalte.
+
+### Behoben
+
+- **Lange Skills verloren still ihren Schluss.** Ein Skill wird nur bis 12 000 Zeichen an das Modell gegeben; was darüber steht, verschwindet ohne Hinweis. Der neue Arbeitsblatt-Skill lagert sein Nachschlagematerial deshalb in eine Zusatzdatei aus, die der Agent bei Bedarf liest.
+- **Beim Überarbeiten einer Seite ging das Layout verloren.** Der Agent bekam beim Lesen einer erzeugten Seite nicht nur seinen eigenen Text zurück, sondern auch das Gerüst, das die App selbst beisteuert. Beim Zurückschreiben wurde es ein zweites Mal eingewickelt, und der Gestaltungsblock fiel weg — die korrigierte Fassung sah aus wie nackter Fließtext, ohne jede Fehlermeldung. Gelesen wird jetzt genau der selbst verfasste Teil; fehlt der Gestaltungsblock trotzdem, setzt die App ihn aus der angehängten Datei wieder ein.
+- **Abgelehnte Schreib-Aufrufe sagen jetzt, was ankam.** Fehlte einem Schreib-Werkzeug ein Pflichtfeld, hieß es nur „Parameter fehlt". Das Modell baute daraufhin das ganze Ergebnis neu, was mehrere Minuten kostete. Die Meldung nennt jetzt die tatsächlich übergebenen Felder samt Länge — im Protokoll und für das Modell.
+
 ## [0.11.1-beta] - 2026-09-01
 
 Ein Nachtrag zu 0.11.0. In der Macher-Leiste unter der Notiz und im Agent-Tab war nicht mehr zu erkennen, welches Modell gerade arbeitet — im Auswahlfeld stand nur noch „OpenRouter · deepseek/deepseek…".
