@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.10.59-beta",
+    "softwareVersion": "0.11.0-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Keine Mails mehr verloren zwischen zwei Ger&auml;ten &middot; v0.10.59</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Vorlesen ohne Beiwerk &middot; jetzt auch als MP3 &middot; v0.11.0</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.10.59 &middot; Die Mailliste auf zwei Ger&auml;ten</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Geschlossene Sicherheitsl&uuml;cken. Und ein Agent, der Unfertiges nicht als fertig ausgibt.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Ein Wartungs-Release ohne gro&szlig;e Geste. Es schlie&szlig;t 29 bekannte Sicherheitsl&uuml;cken in den mitgelieferten Bibliotheken &mdash; darunter ausgerechnet in der, die fremdes HTML entsch&auml;rfen soll. Und der Agent legt dir kein Ergebnis mehr vor, in dem noch Platzhalter stehen.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.0 &middot; Vorlesen, das nur den Text spricht</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Vorlesen, das nur den Text spricht. Und eine Notiz, die zur Audiodatei wird.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Wer sich Notizen vorlesen lie&szlig;, bekam bisher viel Beiwerk mit: Kopfdaten, Tabellenstriche, Aufgabenzeichen, E-Mail-Kopfzeilen. Schlimmer noch, an manchen Stellen verschwand echter Text, ohne dass es jemand merkte. Beides ist behoben &mdash; und wer m&ouml;chte, speichert eine Notiz jetzt als Audiodatei.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Keine Mails mehr verloren zwischen zwei Ger&auml;ten</b><p data-i18n="release.c1">Jedes Ger&auml;t schrieb die Mailliste komplett neu, ohne vorher nachzusehen &mdash; wer zuletzt speicherte, gewann. Jetzt werden beide St&auml;nde zusammengelegt, auch beim Abgleich &uuml;ber den Sync.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Das Aufbewahrungsfenster l&ouml;scht nichts mehr</b><p data-i18n="release.c2">Die Einstellung k&uuml;rzte bisher beim &Ouml;ffnen der App die gespeicherte Liste. Sie wirkt jetzt nur noch auf die Anzeige.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Cloud-L&auml;ufe fordern Nicht-Speicherung an</b><p data-i18n="release.c3">Bei OpenRouter verlangt jede einzelne Anfrage ausdr&uuml;cklich, dass der Anbieter nichts aufbewahrt &mdash; nicht nur als Kontoeinstellung, die falsch stehen kann.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Vorlesen liest nur noch den Text</b><p data-i18n="release.c1">Kopfdaten, Tabellenstriche, Aufgabenzeichen und bei Mails der ganze Kopfblock wurden bisher mitgesprochen. Jetzt bleiben sie stumm.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Beim Vorlesen ging Text verloren</b><p data-i18n="release.c2">Eine einzelne ge&ouml;ffnete Doppelklammer verschluckte alles bis zur n&auml;chsten geschlossenen &mdash; ohne Fehlermeldung.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Eine Notiz als MP3 speichern</b><p data-i18n="release.c3">Mit eingerichteter ElevenLabs-Stimme vertont der Editor eine Notiz und legt sie als Audiodatei ab.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Keine Mails mehr verloren zwischen zwei Ger&auml;ten &middot; v{vs}",
+        "hero.release": "Vorlesen ohne Beiwerk &middot; jetzt auch als MP3 &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Die Mailliste auf zwei Geräten",
-        "release.heading": "Was ist neu — <em>Denkmodelle laufen wieder durch. Und die Vorschau macht keine Fenster mehr auf.</em>",
-        "release.lead": "Ein kleines Release mit zwei Ursachen, die beide erst beim genauen Hinsehen sichtbar wurden. Ein Modell in der Cloud konnte antworten, ohne dass die App die Antwort überhaupt sah — der Lauf galt trotzdem als gescheitert. Und die Vorschau für HTML-Dateien konnte den Standardbrowser öffnen, ohne dass jemand klickt.",
-        "release.c1h": "Keine Mails mehr verloren zwischen zwei Geräten",
-        "release.c1": "Wer MindGraph Notes auf zwei Rechnern nutzt, konnte Mails aus der Liste verlieren: Jedes Gerät schrieb die Liste komplett neu, ohne vorher nachzusehen — wer zuletzt speicherte, gewann. Jetzt werden beide Stände zusammengelegt, auch beim Abgleich über den Sync. Was Sie selbst gesetzt haben, etwa „erledigt“ oder eine Projektzuordnung, überlebt das Zusammenlegen.",
-        "release.c2h": "Das Aufbewahrungsfenster löscht nichts mehr",
-        "release.c2": "Die Einstellung, wie lange Mails aufbewahrt werden, kürzte bisher beim Öffnen der App die gespeicherte Liste — ein Gerät mit 30 Tagen schnitt damit die längere Historie des anderen ab. Sie wirkt jetzt nur noch auf die Anzeige. Eine Anzeigeeinstellung darf keine Daten löschen.",
-        "release.c3h": "Die Vorschau macht keine Fenster mehr auf",
-        "release.c3": "Eine HTML-Datei aus dem Vault konnte in der Vorschau den Standardbrowser mit einer beliebigen Adresse aufmachen, ohne Zutun. Das geht nicht mehr. Der Preis ist sichtbar: Links innerhalb einer Vorschau-Seite öffnen jetzt gar nichts mehr. Der Weg nach draußen führt über die Oberfläche der App.",
+        "release.label": "Release {vs} · Vorlesen, das nur den Text spricht",
+        "release.heading": "Was ist neu — <em>Vorlesen, das nur den Text spricht. Und eine Notiz, die zur Audiodatei wird.</em>",
+        "release.lead": "Wer sich Notizen vorlesen ließ, bekam bisher viel Beiwerk mit: Kopfdaten, Tabellenstriche, Aufgabenzeichen, E-Mail-Kopfzeilen. Schlimmer noch, an manchen Stellen verschwand echter Text, ohne dass es jemand merkte. Beides ist behoben — und wer möchte, speichert eine Notiz jetzt als Audiodatei.",
+        "release.c1h": "Vorlesen liest nur noch den Text",
+        "release.c1": "Kopfdaten am Anfang einer Notiz, Tabellenstriche, Aufgabenzeichen wie „eckige Klammer x“, Kennzeichen und Fälligkeitsdaten, bei Mails der ganze Kopfblock mit Absender und Datum: All das wurde bisher mitgesprochen. Jetzt bleibt es stumm, und übrig bleibt, was Sie tatsächlich hören wollen.",
+        "release.c2h": "Beim Vorlesen ging Text verloren",
+        "release.c2": "Enthielt eine Notiz eine einzelne geöffnete Doppelklammer — etwa in einem Beispiel, das die Schreibweise von Verknüpfungen erklärt — verschluckte die Aufbereitung alles bis zur nächsten geschlossenen Klammer. In einer der mitgelieferten Beispielnotizen fielen so ein ganzer Satz und eine Überschrift weg. Ohne Fehlermeldung, man hörte es einfach nicht.",
+        "release.c3h": "Eine Notiz als MP3 speichern",
+        "release.c3": "Wer eine ElevenLabs-Stimme eingerichtet hat, findet im Export-Menü des Editors jetzt „Als MP3 vertonen“. Der Speicherort wird gefragt, bevor irgendetwas übertragen wird — ein Abbruch kostet also nichts. Ohne eingerichtete Cloud-Stimme erscheint der Eintrag gar nicht erst.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "No more emails lost between two devices &middot; v{vs}",
+        "hero.release": "Read-aloud without the clutter &middot; now as MP3 &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · The email list across two devices",
-        "release.heading": "What’s new — <em>Reasoning models get through again. And the preview no longer opens windows.</em>",
-        "release.lead": "A small release with two causes, both of which only became visible on close inspection. A model in the cloud could answer without the app ever seeing the answer — the run still counted as failed. And the preview for HTML files could open your default browser without anyone clicking.",
-        "release.c1h": "No more emails lost between two devices",
-        "release.c1": "If you use MindGraph Notes on two machines, emails could disappear from the list: each device rewrote the whole list without looking first — whoever saved last won. Both versions are now merged, including during a sync. Anything you set yourself, such as “handled” or a project assignment, survives the merge.",
-        "release.c2h": "The retention window no longer deletes anything",
-        "release.c2": "The setting for how long emails are kept used to trim the stored list whenever the app opened — a device set to 30 days cut off the longer history of the other one. It now affects the display only. A display setting must never delete data.",
-        "release.c3h": "The preview no longer opens windows",
-        "release.c3": "An HTML file from your vault could make the preview open your default browser at any address, without you doing anything. That is over. The cost is visible: links inside a preview page now do nothing at all. The way out leads through the app’s own interface.",
+        "release.label": "Release {vs} · Read-aloud that speaks only the text",
+        "release.heading": "What’s new — <em>Read-aloud that speaks only the text. And a note that becomes an audio file.</em>",
+        "release.lead": "Having a note read aloud used to come with a lot of clutter: front matter, table pipes, task markers, email headers. Worse, in some places real text quietly disappeared. Both are fixed — and if you want, a note can now be saved as an audio file.",
+        "release.c1h": "Read-aloud speaks only the text",
+        "release.c1": "Front matter at the top of a note, table pipes, task markers such as “bracket x”, tags and due dates, and for emails the entire header block with sender and date: all of it used to be spoken. It is silent now, and what remains is what you actually wanted to hear.",
+        "release.c2h": "Read-aloud was losing text",
+        "release.c2": "If a note contained a single opening double bracket — for instance in an example explaining how links are written — the text preparation swallowed everything up to the next closing bracket. In one of the bundled example notes, a whole sentence and a heading disappeared this way. No error message; you simply never heard it.",
+        "release.c3h": "Save a note as MP3",
+        "release.c3": "If you have set up an ElevenLabs voice, the editor’s export menu now offers “Read aloud as MP3”. You are asked where to save before anything is transmitted, so cancelling costs nothing. Without a cloud voice configured, the entry does not appear at all.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

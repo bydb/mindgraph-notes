@@ -2,6 +2,26 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.0-beta] - 2026-09-01
+
+Wer sich Notizen vorlesen lässt, bekam bisher viel mit, was gar nicht zum Text gehört: Kopfdaten am Anfang der Notiz, Tabellenstriche, Aufgabenzeichen, bei Mails den ganzen Kopfblock mit Absender und Datum. An manchen Stellen ging sogar echter Text verloren, ohne dass es jemand bemerkte. Diese Fassung räumt das auf — und wer eine ElevenLabs-Stimme eingerichtet hat, kann eine Notiz jetzt als MP3 speichern.
+
+### Neu
+
+- **Notiz als MP3 vertonen.** Im Export-Menü des Editors steht neben PDF, DOCX und reMarkable jetzt „Als MP3 vertonen". Der Eintrag erscheint nur, wenn eine ElevenLabs-Stimme eingerichtet ist — aus einem Export-Menü soll kein Cloud-Aufruf entstehen, wenn bewusst die Systemstimme gewählt wurde. Der Speicherort wird gefragt, bevor etwas übertragen wird; ein Abbruch kostet also nichts. Ist der Text länger, als das gewählte Modell erlaubt, nennt die Meldung Zeichenzahl, Grenze und Modellnamen statt still abzubrechen.
+
+### Behoben
+
+- **Beim Vorlesen ging Text verloren.** Enthielt eine Notiz eine einzelne geöffnete Doppelklammer — etwa in einem Beispiel, das die Schreibweise von Verknüpfungen erklärt — verschluckte die Textaufbereitung alles bis zur nächsten geschlossenen Klammer. In der mitgelieferten Beispielnotiz „Demo-Tour" fielen so ein ganzer Satz und eine Überschrift weg. Es gab keine Fehlermeldung; man hörte es einfach nicht. Dieselbe Ursache machte aus Dateinamen wie `rate_2026_final.md` ein `rate2026final.md`.
+- **Kopfdaten wurden vorgelesen.** Der Frontmatter-Block am Anfang einer Notiz wurde bei Windows-Zeilenenden, bei einem Byte-Order-Mark und bei Dateien, die direkt am schließenden `---` enden, komplett mitgesprochen — und zwar in zerhackter Form.
+- **Beiwerk bleibt jetzt stumm.** Tabellen, Aufgabenzeilen samt ihrer eingerückten Unterpunkte, Kennzeichen, Fälligkeitsdaten, Fußnoten, Trennlinien, HTML, nackte Internetadressen, Bildunterschriften, der Kopfblock von Mail-Notizen, der Quellenblock des Notiz-Agenten und der Herkunftsvermerk von Workflows. Gemessen an 107 Beispielnotizen bleibt davon nichts übrig. Emojis bleiben bewusst erhalten.
+- **Überschriften klingen richtig.** „Was ist neu?" bekommt keinen zusätzlichen Punkt mehr angehängt, und eine Überschrift, unter der nach der Bereinigung nichts mehr steht, entfällt ganz.
+- **Karteikarten werden nicht stumm.** Besteht eine Karte nur aus einer Tabelle, wird sie weiterhin vorgelesen. Karteikarten und gesprochene Antworten auf Sprachbefehle laufen in einer schonenden Fassung der Aufbereitung, die keine Zeile verwirft.
+
+### Für Entwickler
+
+- Die Textaufbereitung für die Sprachausgabe liegt jetzt in `shared/speakableText.ts` und wird von Vorlesen und MP3-Export geteilt. Sie arbeitet zeilenorientiert statt als Regex-Kette: Muster dürfen keine Zeilengrenze mehr überschreiten, womit die oben beschriebene Fehlerklasse konstruktiv ausgeschlossen ist. 38 neue Unit-Tests, darunter eine Invariante über die echte `Demo-Tour.md`.
+
 ## [0.10.59-beta] - 2026-08-31
 
 Dieses Release behebt den größten bekannten Fehler der App: Wer MindGraph Notes auf zwei Rechnern nutzt, konnte Mails aus der Liste verlieren. Nicht gelöscht, nicht im Papierkorb — einfach weg.
