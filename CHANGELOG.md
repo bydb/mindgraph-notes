@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.1-beta] - 2026-09-01
+
+Ein Nachtrag zu 0.11.0. In der Macher-Leiste unter der Notiz und im Agent-Tab war nicht mehr zu erkennen, welches Modell gerade arbeitet — im Auswahlfeld stand nur noch „OpenRouter · deepseek/deepseek…".
+
+### Behoben
+
+- **Der Name des aktiven Modells ist wieder lesbar.** Drei Ursachen kamen zusammen. Erstens tragen die Kennungen der Cloud-Anbieter den Hersteller oft doppelt (`deepseek/deepseek-v4-flash`); der doppelte Teil fraß genau den Platz, an dem der eigentliche Modellname stehen müsste. Er wird jetzt weggelassen — aber nur dann, wenn der Rest ihn ohnehin wiederholt. Bei `openai/gpt-5` bleibt er stehen, weil er dort etwas aussagt. Zweitens war die aufgeklappte Liste an die Breite des Auswahlfelds gekettet und damit genauso abgeschnitten; man sollte auswählen, was man nicht lesen konnte. Sie wächst jetzt mit dem längsten Namen mit. Drittens gab es keinen Tooltip: Beim Überfahren stand nur „Modell", jetzt der vollständige Name.
+- Die Korrektur wirkt überall, wo die Modell-Auswahl vorkommt — auch im Notizen-Chat, in den Smart Connections und in den Einstellungen.
+
 ## [0.11.0-beta] - 2026-09-01
 
 Wer sich Notizen vorlesen lässt, bekam bisher viel mit, was gar nicht zum Text gehört: Kopfdaten am Anfang der Notiz, Tabellenstriche, Aufgabenzeichen, bei Mails den ganzen Kopfblock mit Absender und Datum. An manchen Stellen ging sogar echter Text verloren, ohne dass es jemand bemerkte. Diese Fassung räumt das auf — und wer eine ElevenLabs-Stimme eingerichtet hat, kann eine Notiz jetzt als MP3 speichern.
