@@ -6,6 +6,7 @@ import { useVoiceStore } from '../../stores/voiceStore'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useTranslation } from '../../utils/translations'
 import { speak, stopSpeaking } from '../../utils/voice/tts'
+import { SPEAKABLE_SNIPPET } from '../../../shared/speakableText'
 import { MarkdownContent } from './MarkdownContent'
 
 export const FlashcardStudy: React.FC = () => {
@@ -40,27 +41,27 @@ export const FlashcardStudy: React.FC = () => {
   const speakFront = useCallback(() => {
     if (!currentCard) return
     if (isSpeakingFront) { stopSpeaking(); return }
-    speak(currentCard.front, { contextId: 'flashcard-front' })
+    speak(currentCard.front, { contextId: 'flashcard-front', speakable: SPEAKABLE_SNIPPET })
   }, [currentCard, isSpeakingFront])
 
   const speakBack = useCallback(() => {
     if (!currentCard) return
     if (isSpeakingBack) { stopSpeaking(); return }
-    speak(currentCard.back, { contextId: 'flashcard-back' })
+    speak(currentCard.back, { contextId: 'flashcard-back', speakable: SPEAKABLE_SNIPPET })
   }, [currentCard, isSpeakingBack])
 
   // Auto-Play beim Karten-Wechsel: immer die Vorderseite vorlesen.
   useEffect(() => {
     if (!speechEnabled || !flashcardsAutoPlay || !isStudying || !currentCard) return
     stopSpeaking()
-    speak(currentCard.front, { contextId: 'flashcard-front' })
+    speak(currentCard.front, { contextId: 'flashcard-front', speakable: SPEAKABLE_SNIPPET })
   }, [speechEnabled, flashcardsAutoPlay, isStudying, currentCard?.id])
 
   // Auto-Play der Rückseite beim Umdrehen.
   useEffect(() => {
     if (!speechEnabled || !flashcardsAutoPlay || !isStudying || !currentCard || !isFlipped) return
     stopSpeaking()
-    speak(currentCard.back, { contextId: 'flashcard-back' })
+    speak(currentCard.back, { contextId: 'flashcard-back', speakable: SPEAKABLE_SNIPPET })
   }, [speechEnabled, flashcardsAutoPlay, isStudying, isFlipped, currentCard?.id])
 
   // Beim Beenden der Study-Session oder Unmount TTS stoppen.

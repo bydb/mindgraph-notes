@@ -4,6 +4,7 @@
 
 import { useUIStore } from '../../stores/uiStore'
 import { useVoiceStore } from '../../stores/voiceStore'
+import { markdownToSpeakable, type SpeakableOptions } from '../../../shared/speakableText'
 
 export interface TtsOptions {
   /** Kontext-ID (z. B. 'editor', 'flashcard-front'), wird im voiceStore gesetzt. */
@@ -23,6 +24,15 @@ export interface TtsOptions {
    * gewählt, nicht dafür, dass selbst erzeugte Antworten das Gerät verlassen.
    */
   forceLocal?: boolean
+  /**
+   * Wie scharf der Text vor dem Sprechen gesäubert wird.
+   *
+   * Default ist die Notiz-Fassung: Tabellen, Aufgabenzeilen und App-Beiwerk fliegen
+   * raus. Für kurze Schnipsel (Karteikarten, fertige Antwortsätze) gehört
+   * `SPEAKABLE_SNIPPET` übergeben — dort ist eine Tabelle unter Umständen der
+   * ganze Inhalt.
+   */
+  speakable?: SpeakableOptions
 }
 
 /**
@@ -53,53 +63,6 @@ export function getAvailableVoices(): Promise<SpeechSynthesisVoice[]> {
   })
 }
 
-/**
- * Entfernt Markdown-Syntax, damit beim Vorlesen nicht "Sternchen", "Unterstrich" usw. gesprochen wird.
- * Hält Wikilinks, Headings, Listen, Code-Blöcke in sprechfreundlicher Form.
- */
-export function markdownToSpeakable(markdown: string): string {
-  return markdown
-    // Code-Blöcke entfernen (werden in TTS zu Gekrächze)
-    .replace(/```[\s\S]*?```/g, ' … ')
-    // Inline-Code: Inhalt behalten, Backticks weg
-    .replace(/`([^`]+)`/g, '$1')
-    // Bilder entfernen
-    .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
-    // Links: Linktext behalten, URL weg
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // Wikilinks: [[Titel|Alias]] → Alias, [[Titel]] → Titel
-    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
-    .replace(/\[\[([^\]]+)\]\]/g, '$1')
-    // Fett/Kursiv: Marker weg, Text bleibt
-    .replace(/\*\*\*([^*]+)\*\*\*/g, '$1')
-    .replace(/\*\*([^*]+)\*\*/g, '$1')
-    .replace(/\*([^*]+)\*/g, '$1')
-    .replace(/___([^_]+)___/g, '$1')
-    .replace(/__([^_]+)__/g, '$1')
-    .replace(/_([^_]+)_/g, '$1')
-    // Durchgestrichen
-    .replace(/~~([^~]+)~~/g, '$1')
-    // Überschriften-Hashes weg, Text bleibt (mit Pause davor)
-    .replace(/^#{1,6}\s+(.+)$/gm, '$1.')
-    // Listen-Marker weg
-    .replace(/^[\s]*[-*+]\s+/gm, '')
-    .replace(/^[\s]*\d+\.\s+/gm, '')
-    // HTML-Kommentare
-    .replace(/<!--[\s\S]*?-->/g, '')
-    // Callout-Syntax > [!info] …
-    .replace(/^>\s*\[![^\]]+\]\s*/gm, '')
-    // Einfaches Blockquote-Zeichen
-    .replace(/^>\s?/gm, '')
-    // Frontmatter entfernen
-    .replace(/^---\n[\s\S]*?\n---\n/, '')
-    // Tabellen-Separator-Zeilen
-    .replace(/^\s*\|[\s:|-]+\|\s*$/gm, '')
-    // Mehrfach-Leerzeichen zusammenfassen
-    .replace(/[ \t]+/g, ' ')
-    // Mehrfache Leerzeilen → einfache Pause
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
 
 // Aktuell laufendes HTMLAudioElement (ElevenLabs-Pfad), damit stop() es abbrechen kann.
 let currentAudio: HTMLAudioElement | null = null
@@ -126,7 +89,7 @@ function disposeCurrentAudio() {
  * Gibt `true` zurück, wenn gestartet, `false` bei leerem Text.
  */
 export function speak(text: string, opts: TtsOptions): boolean {
-  const trimmed = markdownToSpeakable(text).trim()
+  const trimmed = markdownToSpeakable(text, opts.speakable).trim()
   if (!trimmed) return false
 
   // Immer erst stoppen, damit nicht zwei Utterances gleichzeitig laufen

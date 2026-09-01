@@ -21,6 +21,7 @@ import { bundledResourcesDir } from './bundledResources'
 import { trashPath, VAULT_TRASH_DIR, type TrashDestination } from './fileTrash'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
+import { checkTtsLength } from '../shared/ttsLimits'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../shared/emailFetchWindow'
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 
@@ -861,6 +862,7 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.newFolder.title': 'Neuen Ordner erstellen',
     'dialog.newFolder.button': 'Ordner erstellen',
     'dialog.exportPdf.title': 'Als PDF exportieren',
+    'dialog.exportMp3.title': 'Als MP3 exportieren',
     'dialog.exportEpub.title': 'Als EPUB exportieren',
     'dialog.stripWikilinks.title': 'Wikilinks entfernen',
     'dialog.stripWikilinks.message': 'Wikilinks in "{name}" entfernen?',
@@ -912,6 +914,7 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'dialog.newFolder.title': 'Create New Folder',
     'dialog.newFolder.button': 'Create Folder',
     'dialog.exportPdf.title': 'Export as PDF',
+    'dialog.exportMp3.title': 'Export as MP3',
     'dialog.exportEpub.title': 'Export as EPUB',
     'dialog.stripWikilinks.title': 'Remove Wikilinks',
     'dialog.stripWikilinks.message': 'Remove wikilinks in "{name}"?',
@@ -6913,6 +6916,54 @@ ipcMain.handle('elevenlabs-synthesize', async (_event, params: { text: string; v
     const arrBuf = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
     return { success: true, audio: arrBuf as ArrayBuffer }
   } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+/**
+ * Synthetisiert Text zu MP3 und speichert ihn über den Systemdialog.
+ *
+ * Reihenfolge ist Absicht: erst der Speicherdialog, dann der Netzwerkaufruf.
+ * ElevenLabs rechnet nach Zeichen ab — wer den Dialog abbricht, soll nichts bezahlt
+ * haben. Der Text kommt bereits gesäubert aus dem Renderer (`shared/speakableText`)
+ * und wird hier NICHT ein zweites Mal gefiltert: der zeilenorientierte Reiniger ist
+ * nicht idempotent, ein zweiter Lauf würde Zeilen verwerfen, die erst im ersten
+ * entstanden sind.
+ *
+ * Kein `assertSafePath` auf den Zielpfad: der kommt aus dem OS-Dialog und soll
+ * bewusst außerhalb des Vaults liegen dürfen (Schreibtisch, Downloads). Eine
+ * Vault-Prüfung würde genau den Normalfall blockieren.
+ */
+ipcMain.handle('elevenlabs-export-mp3', async (_event, params: { text: string; defaultFileName: string; voiceId: string; modelId: string; stability: number; similarity: number }) => {
+  if (!mainWindow) return { success: false, error: 'Kein Fenster verfügbar' }
+  const apiKey = await loadElevenLabsKey()
+  if (!apiKey) return { success: false, error: 'Kein API-Key gespeichert' }
+  if (!params.voiceId) return { success: false, error: 'Keine Stimme ausgewählt' }
+  if (!params.text.trim()) return { success: false, error: 'Kein sprechbarer Text in der Notiz' }
+
+  const check = checkTtsLength(params.text, params.modelId)
+  if (!check.ok) {
+    return { success: false, error: `Text zu lang: ${check.chars} Zeichen, erlaubt sind ${check.limit} (${params.modelId})` }
+  }
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: t('dialog.exportMp3.title'),
+    defaultPath: params.defaultFileName.replace(/\.md$/, '') + '.mp3',
+    filters: [{ name: 'MP3', extensions: ['mp3'] }]
+  })
+  if (result.canceled || !result.filePath) return { success: false, canceled: true }
+
+  try {
+    const { synthesize } = await import('./voice/elevenlabsService')
+    const buffer = await synthesize(apiKey, params)
+    if (buffer.byteLength === 0) {
+      // Lieber gar keine Datei als eine 0-Byte-Datei, die aussieht wie ein Erfolg.
+      return { success: false, error: 'Synthese lieferte 0 Bytes — API-Key ohne text_to_speech-Recht?' }
+    }
+    await fs.writeFile(result.filePath, buffer)
+    return { success: true, path: result.filePath, chars: check.chars }
+  } catch (err) {
+    console.error('MP3 Export Fehler:', err)
     return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 })

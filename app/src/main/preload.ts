@@ -426,6 +426,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('elevenlabs-list-voices'),
   elevenlabsSynthesize: (params: { text: string; voiceId: string; modelId: string; stability: number; similarity: number }): Promise<{ success: boolean; audio?: ArrayBuffer; error?: string }> =>
     ipcRenderer.invoke('elevenlabs-synthesize', params),
+  elevenlabsExportMp3: (params: { text: string; defaultFileName: string; voiceId: string; modelId: string; stability: number; similarity: number }): Promise<{ success: boolean; path?: string; chars?: number; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke('elevenlabs-export-mp3', params),
 
   // Docling PDF Extraction API
   doclingCheck: (baseUrl?: string) => ipcRenderer.invoke('docling-check', baseUrl),

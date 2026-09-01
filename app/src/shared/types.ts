@@ -909,6 +909,13 @@ export interface ElectronAPI {
     audio?: ArrayBuffer;
     error?: string;
   }>;
+  elevenlabsExportMp3: (params: { text: string; defaultFileName: string; voiceId: string; modelId: string; stability: number; similarity: number }) => Promise<{
+    success: boolean;
+    path?: string;
+    chars?: number;
+    canceled?: boolean;
+    error?: string;
+  }>;
 
   // Docling PDF Extraction API
   doclingCheck: (baseUrl?: string) => Promise<{

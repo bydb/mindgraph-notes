@@ -59,6 +59,7 @@ import { isImageFile, findImageInVault, getFilePathsFromDataTransfer, extractIma
 import { highlightCode } from '../../utils/highlightSetup'
 import { renderedCodeBlockRule } from '../../utils/wysiwygCodeBlockRule'
 import { speak, stopSpeaking } from '../../utils/voice/tts'
+import { markdownToSpeakable } from '../../../shared/speakableText'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { useVoiceStore } from '../../stores/voiceStore'
@@ -955,8 +956,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const { vaultPath, selectedNoteId, secondarySelectedNoteId, notes, updateNote, selectNote, selectSecondaryNote, addNote, fileTree, setFileTree, navigateBack, navigateForward, canNavigateBack, canNavigateForward } = useNotesStore(
     useShallow(s => ({ vaultPath: s.vaultPath, selectedNoteId: s.selectedNoteId, secondarySelectedNoteId: s.secondarySelectedNoteId, notes: s.notes, updateNote: s.updateNote, selectNote: s.selectNote, selectSecondaryNote: s.selectSecondaryNote, addNote: s.addNote, fileTree: s.fileTree, setFileTree: s.setFileTree, navigateBack: s.navigateBack, navigateForward: s.navigateForward, canNavigateBack: s.canNavigateBack, canNavigateForward: s.canNavigateForward }))
   )
-  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, readingModeHintDismissed, setReadingModeHintDismissed, editorShowContextPanel, setEditorShowContextPanel, editorLastExport, setEditorLastExport } = useUIStore(
-    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, readingModeHintDismissed: s.readingModeHintDismissed, setReadingModeHintDismissed: s.setReadingModeHintDismissed, editorShowContextPanel: s.editorShowContextPanel, setEditorShowContextPanel: s.setEditorShowContextPanel, editorLastExport: s.editorLastExport, setEditorLastExport: s.setEditorLastExport }))
+  const { pendingTemplateInsert, setPendingTemplateInsert, pendingAgentContext, setPendingAgentContext, ollama, editorHeadingFolding, outlineStyle, editorShowWordCount, editorHeaderActions, languageTool, setLanguageTool, editorDefaultView, showFormattingToolbar, setShowFormattingToolbar, showRawEditor, readingModeHintDismissed, setReadingModeHintDismissed, editorShowContextPanel, setEditorShowContextPanel, editorLastExport, setEditorLastExport, speech } = useUIStore(
+    useShallow(s => ({ pendingTemplateInsert: s.pendingTemplateInsert, setPendingTemplateInsert: s.setPendingTemplateInsert, pendingAgentContext: s.pendingAgentContext, setPendingAgentContext: s.setPendingAgentContext, ollama: s.ollama, editorHeadingFolding: s.editorHeadingFolding, outlineStyle: s.outlineStyle, editorShowWordCount: s.editorShowWordCount, editorHeaderActions: s.editorHeaderActions, languageTool: s.languageTool, setLanguageTool: s.setLanguageTool, editorDefaultView: s.editorDefaultView, showFormattingToolbar: s.showFormattingToolbar, setShowFormattingToolbar: s.setShowFormattingToolbar, showRawEditor: s.showRawEditor, readingModeHintDismissed: s.readingModeHintDismissed, setReadingModeHintDismissed: s.setReadingModeHintDismissed, editorShowContextPanel: s.editorShowContextPanel, setEditorShowContextPanel: s.setEditorShowContextPanel, editorLastExport: s.editorLastExport, setEditorLastExport: s.setEditorLastExport, speech: s.speech }))
   )
   const [wordpress] = usePluginConfig('wordpress', WORDPRESS_DEFAULTS)
 
@@ -971,6 +972,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const isPreviewSpeaking = (voiceStatus === 'speaking' || voiceStatus === 'transcribing') && voiceContext === 'preview'
 
   const [isSaving, setIsSaving] = useState(false)
+  const [isExportingMp3, setIsExportingMp3] = useState(false)
   // Initial-Wert aus dem konfigurierten Standardmodus, damit der erste Render
   // schon im richtigen Modus ist (nicht erst nach dem Notiz-Load-Effekt).
   const [viewMode, setViewMode] = useState<ViewMode>(editorDefaultView)
@@ -4620,6 +4622,60 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return res.success === true
   }, [selectedNote, vaultPath])
 
+  /**
+   * Vertont die Notiz und speichert sie als MP3.
+   *
+   * Bewusst immer der ganze Notiztext (`previewContent`), nie eine Auswahl: im
+   * Lesen-Modus liefert eine Auswahl gerenderten DOM-Text ohne Markdown-Struktur —
+   * eine Tabelle hätte dort keine `|` mehr und würde trotz Filter mitgesprochen.
+   * Ein Podcast muss reproduzierbar sein.
+   *
+   * Der voiceStore bleibt unangetastet: Ein Export während laufender Wiedergabe darf
+   * den Sprech-Status nicht überschreiben, sonst springt der Stop-Knopf auf „Play"
+   * zurück, während noch Ton läuft. Fehler gehen trotzdem in den Voice-Toast, weil es
+   * die einzige sichtbare Fehlerstelle für Sprachsachen ist.
+   */
+  const handleExportMp3 = useCallback(async () => {
+    if (!selectedNote || isExportingMp3) return false
+    const fileName = selectedNote.path.split('/').pop() || 'notiz.md'
+
+    let content = previewContent
+    if (vaultPath) {
+      try {
+        const fresh = await window.electronAPI.readFile(`${vaultPath}/${selectedNote.path}`)
+        if (fresh) content = fresh
+      } catch {
+        // Was im Editor steht, ist gut genug
+      }
+    }
+
+    const spoken = markdownToSpeakable(content)
+    if (!spoken.trim()) {
+      useVoiceStore.getState().setError(t('editor.exportMp3Empty'))
+      return false
+    }
+
+    setIsExportingMp3(true)
+    try {
+      const res = await window.electronAPI.elevenlabsExportMp3({
+        text: spoken,
+        defaultFileName: fileName,
+        voiceId: speech.elevenlabsVoiceId,
+        modelId: speech.elevenlabsModel || 'eleven_multilingual_v2',
+        stability: speech.elevenlabsStability,
+        similarity: speech.elevenlabsSimilarity
+      })
+      if (res.success) {
+        console.log('MP3 exportiert nach:', res.path)
+        return true
+      }
+      if (!res.canceled && res.error) useVoiceStore.getState().setError(res.error)
+      return false
+    } finally {
+      setIsExportingMp3(false)
+    }
+  }, [selectedNote, isExportingMp3, previewContent, vaultPath, speech, t])
+
   const handleExportPDF = useCallback(async (pdfStyle: 'standard' | 'remarkable-book' = 'standard') => {
     if (!selectedNote) return
 
@@ -4680,8 +4736,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (kind === 'pdf') ok = (await handleExportPDF('standard')) === true
     else if (kind === 'remarkable') ok = (await handleExportPDF('remarkable-book')) === true
     else if (kind === 'docx') ok = (await handleExportDocx()) === true
+    else if (kind === 'mp3') ok = (await handleExportMp3()) === true
     if (ok) setEditorLastExport({ kind, at: Date.now() })
-  }, [handleExportPDF, handleExportDocx, setEditorLastExport])
+  }, [handleExportPDF, handleExportDocx, handleExportMp3, setEditorLastExport])
 
   if (!selectedNote) {
     return (
@@ -4705,7 +4762,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     ? selectedNote.path.split('/').slice(-2, -1)[0]
     : null
   const wordpressAvailable = Boolean(editorHeaderActions.wordpress && wordpress.enabled && wordpress.baseUrl)
-  const exportAvailable = editorHeaderActions.pdf || editorHeaderActions.docx || editorHeaderActions.remarkable || wordpressAvailable
+  // MP3 nur mit ElevenLabs: die Systemstimme liefert keinen Datenstrom, aus dem eine
+  // Datei werden könnte. Und wer bewusst die lokale Stimme gewählt hat, darf aus dem
+  // Export-Menü keinen Cloud-Aufruf auslösen.
+  const mp3Available = Boolean(
+    editorHeaderActions.mp3 && speechEnabled && speech.ttsEngine === 'elevenlabs' && speech.elevenlabsVoiceId
+  )
+  const exportAvailable = editorHeaderActions.pdf || editorHeaderActions.docx || editorHeaderActions.remarkable || wordpressAvailable || mp3Available
   // „Titel im Dokument" (Design 1c): Titel + Eigenschaften-Zeile wandern aus der
   // Kopfzeile in den Dokumentbereich. Frontmatter-title hat Vorrang vor dem Dateinamen.
   const docHeaderTitle = bodyStartsWithH1 ? null : (frontmatterTitle || selectedNoteDisplayTitle)
@@ -4716,7 +4779,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     pdf: t('editor.exportMenu.pdf'),
     docx: t('editor.exportMenu.docx'),
     remarkable: t('editor.exportMenu.remarkable'),
-    wordpress: t('editor.exportMenu.wordpress')
+    wordpress: t('editor.exportMenu.wordpress'),
+    mp3: t('editor.exportMenu.mp3')
   }
 
   return (
@@ -4896,6 +4960,21 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                       {t('editor.exportMenu.remarkable')}
                     </button>
                   )}
+                  {mp3Available && (
+                    <button
+                      className="header-menu-item"
+                      onClick={() => runExport('mp3')}
+                      disabled={isExportingMp3}
+                      title={t('editor.exportMp3')}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                        <path d="M6 11V3.5l6-1V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <circle cx="4.5" cy="11.5" r="1.8" stroke="currentColor" strokeWidth="1.5"/>
+                        <circle cx="10.5" cy="10" r="1.8" stroke="currentColor" strokeWidth="1.5"/>
+                      </svg>
+                      {isExportingMp3 ? t('editor.exportMp3Running') : t('editor.exportMenu.mp3')}
+                    </button>
+                  )}
                   {wordpressAvailable && (
                     <button className="header-menu-item" onClick={() => runExport('wordpress')} title={t('editor.publishWp')}>
                       <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
@@ -4908,7 +4987,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                   {editorLastExport && (
                     <div className="header-menu-footer">
                       {t('editor.exportMenu.last', {
-                        label: exportKindLabels[editorLastExport.kind],
+                        label: exportKindLabels[editorLastExport.kind] ?? editorLastExport.kind,
                         time: formatExportTime(editorLastExport.at, language)
                       })}
                     </div>

@@ -16,8 +16,9 @@ export interface EditorHeaderActions {
   remarkable: boolean
   docx: boolean
   wordpress: boolean
+  mp3: boolean
 }
-export type EditorExportKind = 'pdf' | 'docx' | 'remarkable' | 'wordpress'
+export type EditorExportKind = 'pdf' | 'docx' | 'remarkable' | 'wordpress' | 'mp3'
 export interface EditorLastExport {
   kind: EditorExportKind
   at: number // Date.now() des letzten Exports
@@ -947,7 +948,8 @@ const defaultState = {
     pdf: true,
     remarkable: true,
     docx: true,
-    wordpress: true
+    wordpress: true,
+    mp3: true
   } as EditorHeaderActions,
   imagesFolder: '.attachments',
 

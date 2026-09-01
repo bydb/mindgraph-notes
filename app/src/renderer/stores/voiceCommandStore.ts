@@ -15,6 +15,7 @@ import { ACTIONS, type ActionOutcome, type TFn } from '../voice/actions'
 import { getVoiceUiBridge } from '../voice/uiBridge'
 import { startDictation, type DictationHandle } from '../utils/voice/stt'
 import { speak, stopSpeaking } from '../utils/voice/tts'
+import { SPEAKABLE_SNIPPET } from '../../shared/speakableText'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 
@@ -121,7 +122,7 @@ function speakIfVoice(text: string | null, source: 'keyboard' | 'voice'): void {
   const speech = useUIStore.getState().speech
   if (!speech.enabled) return
   // forceLocal: selbst erzeugte Antworten aus Vault-Daten verlassen das Gerät nicht.
-  speak(text, { contextId: VOICE_CONTEXT_ID, forceLocal: true })
+  speak(text, { contextId: VOICE_CONTEXT_ID, forceLocal: true, speakable: SPEAKABLE_SNIPPET })
 }
 
 

@@ -3423,7 +3423,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   ['pdf', 'settings.editor.headerActionPdf'],
                   ['remarkable', 'settings.editor.headerActionRemarkable'],
                   ['docx', 'settings.editor.headerActionDocx'],
-                  ['wordpress', 'settings.editor.headerActionWordpress']
+                  ['wordpress', 'settings.editor.headerActionWordpress'],
+                  ['mp3', 'settings.editor.headerActionMp3']
                 ] as const).map(([action, label]) => (
                   <div className="settings-row" key={action}>
                     <label>{t(label)}</label>
