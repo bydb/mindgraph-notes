@@ -5,7 +5,7 @@
 // und das ![[…]] dazwischen tot.
 
 import { describe, it, expect } from 'vitest'
-import { repairImageEmbeds, type NoteAgentContext } from './skills'
+import { repairImageEmbeds, repairImageSrcAttributes, type NoteAgentContext } from './skills'
 import type { AgentRun, AgentResultEntry } from './runRegistry'
 
 function ctxWithImages(...names: string[]): NoteAgentContext {
@@ -59,5 +59,36 @@ describe('repairImageEmbeds', () => {
   it('lässt einen Markdown-Link auf ein fremdes Bild in Ruhe', () => {
     const md = '![Foto](urlaub.png)'
     expect(repairImageEmbeds(md, ctxWithImages('Titelbild.jpg'))).toBe(md)
+  })
+})
+
+// Arbeitsblätter und wissenschaftliche Seiten binden ihr Bild als <img> ein, nicht
+// als Wikilink — dort gilt dieselbe Endungsfalle.
+describe('repairImageSrcAttributes', () => {
+  it('zieht die Endung im src-Attribut nach', () => {
+    expect(repairImageSrcAttributes('<figure class="fig"><img src="Titelbild.png" alt="x"></figure>', ctxWithImages('Titelbild.jpg')))
+      .toBe('<figure class="fig"><img src="Titelbild.jpg" alt="x"></figure>')
+  })
+
+  it('greift unabhängig von der Attribut-Reihenfolge', () => {
+    expect(repairImageSrcAttributes('<img alt="Wasserkreislauf" src="kreislauf.png">', ctxWithImages('kreislauf.jpg')))
+      .toBe('<img alt="Wasserkreislauf" src="kreislauf.jpg">')
+  })
+
+  it('lässt Pfade und fremde Bilder unangetastet', () => {
+    const withPath = '<img src="bilder/Titelbild.png">'
+    expect(repairImageSrcAttributes(withPath, ctxWithImages('Titelbild.jpg'))).toBe(withPath)
+    const fremd = '<img src="urlaub.png">'
+    expect(repairImageSrcAttributes(fremd, ctxWithImages('Titelbild.jpg'))).toBe(fremd)
+  })
+
+  it('fasst andere Tags mit src nicht an', () => {
+    const script = '<script src="katex.png"></script>'
+    expect(repairImageSrcAttributes(script, ctxWithImages('katex.jpg'))).toBe(script)
+  })
+
+  it('lässt ohne erzeugte Bilder alles unverändert', () => {
+    const html = '<img src="Titelbild.png">'
+    expect(repairImageSrcAttributes(html, ctxWithImages())).toBe(html)
   })
 })

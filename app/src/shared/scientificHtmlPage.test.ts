@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   buildScientificHtmlPage,
   extractArticleBody,
+  extractAuthoredBodyHtml,
   looksLikeFullHtmlDocument,
   HTML_PAGE_ASSETS_DIRNAME
 } from './scientificHtmlPage'
@@ -135,5 +136,43 @@ describe('extractArticleBody', () => {
   it('null wenn nichts Brauchbares übrig bleibt', () => {
     expect(extractArticleBody('<!DOCTYPE html><html><head><title>T</title></head><body></body></html>')).toBe(null)
     expect(extractArticleBody('<html></html>')).toBe(null)
+  })
+})
+
+// Rundlauf: erzeugte Seite → Anhang → Korrektur → wieder erzeugte Seite.
+// Ohne extractAuthoredBodyHtml kam das App-Gerüst mit zurück und die neue Datei trug
+// ein </article> ohne Partner (real aufgetreten, 01.09.2026).
+describe('extractAuthoredBodyHtml', () => {
+  const bodyHtml = '<style>.x{color:red}</style>\n<div class="ab-kopf">Kopf</div>\n<p>Inhalt</p>'
+
+  it('liefert exakt den verfassten Teil zurück', () => {
+    const page = buildScientificHtmlPage({ title: 'Titel', bodyHtml, aiModel: 'testmodell' })
+    expect(extractAuthoredBodyHtml(page)).toBe(bodyHtml)
+  })
+
+  it('lässt weder Kopfzeile noch KI-Fußzeile noch article-Tags durch', () => {
+    const page = buildScientificHtmlPage({ title: 'Titel', bodyHtml, aiModel: 'testmodell' })
+    const authored = extractAuthoredBodyHtml(page) as string
+    expect(authored).not.toContain('<article')
+    expect(authored).not.toContain('</article>')
+    expect(authored).not.toContain('header class="paper"')
+    expect(authored).not.toContain('ai-provenance')
+  })
+
+  it('funktioniert auch ohne KI-Fußzeile (kein Modell gesetzt)', () => {
+    const page = buildScientificHtmlPage({ title: 'Titel', bodyHtml })
+    expect(extractAuthoredBodyHtml(page)).toBe(bodyHtml)
+  })
+
+  it('ist stabil über zwei Runden', () => {
+    const first = buildScientificHtmlPage({ title: 'Titel', bodyHtml, aiModel: 'testmodell' })
+    const back = extractAuthoredBodyHtml(first) as string
+    const second = buildScientificHtmlPage({ title: 'Titel', bodyHtml: back, aiModel: 'testmodell' })
+    expect(extractAuthoredBodyHtml(second)).toBe(bodyHtml)
+    expect((second.match(/<\/article>/g) || []).length).toBe(1)
+  })
+
+  it('gibt null für fremdes HTML ohne article zurück', () => {
+    expect(extractAuthoredBodyHtml('<html><body><p>fremd</p></body></html>')).toBeNull()
   })
 })

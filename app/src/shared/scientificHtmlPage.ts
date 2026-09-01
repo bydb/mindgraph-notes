@@ -38,6 +38,31 @@ export function looksLikeFullHtmlDocument(bodyHtml: string): boolean {
 // Dokument liefern (real aufgetreten mit GLM 5.2): Artikel-Inhalt aus dem Gerüst ziehen
 // statt ablehnen — jede Ablehnung kostet eine volle Neu-Generierung der Seite und damit
 // eine Loop-Iteration. null = nichts Brauchbares extrahierbar (dann greift die Ablehnung).
+/**
+ * Der vom Modell VERFASSTE Teil einer Seite, die aus buildScientificHtmlPage stammt —
+ * also genau das, was write_html als `body_html` wieder entgegennimmt.
+ *
+ * Warum eigens: `extractArticleBody` liefert den ganzen <body> und damit auch das
+ * Gerüst, das die App selbst beisteuert — <article>, die Titel-Kopfzeile und die
+ * KI-Fußzeile. Wird eine erzeugte Seite so wieder angehängt und korrigiert, schreibt
+ * das Modell dieses Gerüst mit zurück, die App wickelt es ein zweites Mal ein, und in
+ * der neuen Datei steht ein </article> ohne Partner (real aufgetreten, 01.09.2026).
+ *
+ * Gibt null zurück, wenn die Seite nicht aus diesem Template stammt — dann bleibt der
+ * Aufrufer bei extractArticleBody bzw. beim Rohtext.
+ */
+export function extractAuthoredBodyHtml(html: string): string | null {
+  const article = html.match(/<article[^>]*>([\s\S]*)<\/article>/i)
+  if (!article) return null
+  let inner = article[1]
+  // Kopfzeile der App (<header class="paper"><h1>…</h1></header>) am Anfang entfernen.
+  inner = inner.replace(/^\s*<header class="paper">[\s\S]*?<\/header>/i, '')
+  // KI-Fußzeile am Ende entfernen — sie wird beim nächsten Schreiben neu gesetzt.
+  inner = inner.replace(/<footer class="ai-provenance">[\s\S]*?<\/footer>\s*$/i, '')
+  const trimmed = inner.trim()
+  return trimmed ? trimmed : null
+}
+
 export function extractArticleBody(html: string): string | null {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
   const inner = bodyMatch
@@ -173,6 +198,9 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
     margin: 2rem 0;
   }
   figure.fig svg { width: 100%; height: auto; display: block; }
+  /* Erzeugte Bilder (generate_image) liegen neben der Seite und kommen in Originalgröße
+     (1K breit) — ohne diese Regel sprengt eines davon die Textspalte. */
+  figure.fig img { width: 100%; height: auto; display: block; }
   figure.fig figcaption {
     margin-top: 0.6rem;
     font-size: 0.9rem;

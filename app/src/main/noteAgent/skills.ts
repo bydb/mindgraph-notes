@@ -165,6 +165,25 @@ function requireString(args: Record<string, unknown>, key: string): string | nul
   return typeof v === 'string' && v.trim() ? v.trim() : null
 }
 
+// Diagnose für abgelehnte Schreib-Aufrufe: WELCHE Schlüssel kamen an und wie lang
+// waren sie. Real aufgetreten (01.09.2026, qwen3.6:27b-mlx): write_html kam mit
+// file_name und title, aber ohne body_html — und die Ablehnung „Parameter fehlt"
+// sagte weder dem Modell noch dem Protokoll, was stattdessen ankam. Das Modell
+// baute daraufhin das ganze Blatt neu (vier Minuten). Nur Namen, Typen und Längen,
+// nie Inhalte: die Zeile landet im Modellkontext UND im Log.
+function describeArgs(args: Record<string, unknown>): string {
+  const keys = Object.keys(args)
+  if (keys.length === 0) return '(gar keine Parameter)'
+  return keys
+    .map(k => {
+      const v = args[k]
+      if (typeof v === 'string') return `${k} (${v.length} Zeichen)`
+      if (v === null || v === undefined) return `${k} (leer)`
+      return `${k} (${Array.isArray(v) ? 'Liste' : typeof v})`
+    })
+    .join(', ')
+}
+
 // Das Modell nennt sein Bild oft "titelbild.png" und bettet es dann auch so ein —
 // die Datei heisst aber nach der wirklich gelieferten Endung (Nano Banana: .jpg).
 // Ohne diese Korrektur zeigt das ![[…]] in der Notiz ins Leere, obwohl beide
@@ -188,6 +207,26 @@ export function repairImageEmbeds(markdown: string, ctx: NoteAgentContext): stri
       const actual = byStem.get(stem.trim().toLowerCase())
       return actual ? `${head}${actual}${tail}` : match
     })
+}
+
+// Dasselbe für HTML-Seiten: dort steht das Bild als <img src="titelbild.png">.
+// Ein Bild und die Seite desselben Laufs landen beim Übernehmen im GLEICHEN
+// Zielordner, ein relativer Dateiname trägt also — nur die Endung stimmt oft nicht.
+// Bewusst nur pfadlose Namen: alles mit "/" zeigt woandershin und wird nicht angefasst.
+export function repairImageSrcAttributes(html: string, ctx: NoteAgentContext): string {
+  const byStem = new Map<string, string>()
+  for (const r of ctx.run.results.values()) {
+    if (r.kind !== 'png' && r.kind !== 'jpg') continue
+    byStem.set(r.suggestedName.replace(/\.[^.]+$/, '').toLowerCase(), r.suggestedName)
+  }
+  if (byStem.size === 0) return html
+  return html.replace(
+    /(<img\b[^>]*?\bsrc\s*=\s*")([^"<>/]+?)\.(png|jpe?g)(")/gi,
+    (match, head: string, stem: string, _ext, tail: string) => {
+      const actual = byStem.get(stem.trim().toLowerCase())
+      return actual ? `${head}${actual}${tail}` : match
+    }
+  )
 }
 
 async function registerStagedResult(
@@ -236,6 +275,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (!info) return err(`Anhang "${name}" nicht gefunden. Verfügbar: ${infos.map(i => i.name).join(', ') || '(keine)'}`)
       const res = await readAttachmentRaw(ctx.senderId, info.id, ctx.run.instruction)
       ctx.run.sources.add(info.name)
+      // Stil-Block einer angehängten Seite sichern, bevor er durch den Modellkontext
+      // läuft — write_html setzt ihn wieder ein, falls das Modell ihn weglässt.
+      if (/\.html?$/i.test(info.name)) {
+        const styles = res.content.match(/<style[\s\S]*?<\/style>/gi)
+        if (styles?.length) ctx.run.htmlSourceStyles = styles.join('\n')
+      }
       return { ok: true, content: res.content, display: `read_attachment: ${info.name}` }
     }
   })
@@ -272,7 +317,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'read_context_file',
     description:
-      'Liest EINE Datei aus einem angehängten Ordner (Excel, Word, PowerPoint, PDF, Markdown, Text, CSV). Parameter: folder = exakte Ordnerbezeichnung aus der Anhang-Liste, file = exakter Dateiname aus dem Manifest, optional sheet (Excel: Blattname oder Nummer), offset (erste Zeile, 1-basiert, Default 1) und max_rows (Default 200 Tabellenzeilen bzw. 400 Textzeilen). Bei großen Dateien in Abschnitten lesen statt alles auf einmal.',
+      'Liest EINE Datei aus einem angehängten Ordner (Excel, Word, PowerPoint, PDF, Markdown, Text, CSV, HTML). Parameter: folder = exakte Ordnerbezeichnung aus der Anhang-Liste, file = exakter Dateiname aus dem Manifest, optional sheet (Excel: Blattname oder Nummer), offset (erste Zeile, 1-basiert, Default 1) und max_rows (Default 200 Tabellenzeilen bzw. 400 Textzeilen). Bei großen Dateien in Abschnitten lesen statt alles auf einmal.',
     parameters: {
       type: 'object',
       properties: {
@@ -626,7 +671,13 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const rawName = requireString(args, 'file_name')
       const markdown = requireString(args, 'markdown')
       if (!rawName) return err('Parameter "file_name" fehlt')
-      if (!markdown) return err('Parameter "markdown" fehlt oder ist leer')
+      if (!markdown) {
+        console.warn('[note-agent] Schreib-Aufruf abgelehnt (markdown fehlt) — angekommen:', describeArgs(args))
+        return err(
+          `Parameter "markdown" fehlt oder ist leer. Angekommen ist: ${describeArgs(args)}. ` +
+          'Rufe das Werkzeug noch einmal auf und übergib den vollständigen Text als EINEN String im Parameter "markdown".'
+        )
+      }
       const fileName = sanitizeOutputFileName(rawName, '.docx')
       // markdownToDocx schreibt selbst — in eine temp-Datei im Staging rendern lassen.
       const stagingPath = await writeStagingFile(ctx.run, fileName, '')
@@ -739,7 +790,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'write_html',
     description:
-      'Erzeugt eine wissenschaftliche HTML-Seite im Staging (Formeln via LaTeX, Grafiken als Inline-SVG). Parameter: file_name, title (Seitentitel — wird als Überschrift gesetzt, NICHT im Body wiederholen), body_html (NUR vollständig ausgearbeiteter Artikel-Inhalt — niemals Platzhalter, Auslassungspunkte oder leere Gerüst-Elemente; kein html/head/body-Gerüst), optional lang ("de"/"en"). CSS-Klassen des Seiten-Templates: div.equation umschließt eine $$-Display-Formel (wird automatisch nummeriert); Inline-Formeln in \\( \\); figure.fig enthält ein Inline-SVG plus figcaption (wird automatisch als Abbildung nummeriert); div.abstract für die Zusammenfassung; div.table-wrap um Tabellen; section.references mit ol fürs Literaturverzeichnis, Textverweise als sup.cite-Anker. SVG-Regeln: viewBox setzen (z.B. 0 0 640 300), alle Koordinaten innerhalb der viewBox, polyline-points NUR mit Leerzeichen/Komma trennen (keine Semikolons), Farben aus var(--fig-line), var(--fig-line-2), var(--muted), var(--fig-grid) oder currentColor, Beschriftung als text-Elemente ohne LaTeX.',
+      'Erzeugt eine wissenschaftliche HTML-Seite im Staging (Formeln via LaTeX, Grafiken als Inline-SVG). Parameter: file_name, title (Seitentitel — wird als Überschrift gesetzt, NICHT im Body wiederholen), body_html (NUR vollständig ausgearbeiteter Artikel-Inhalt — niemals Platzhalter, Auslassungspunkte oder leere Gerüst-Elemente; kein html/head/body-Gerüst), optional lang ("de"/"en"). CSS-Klassen des Seiten-Templates: div.equation umschließt eine $$-Display-Formel (wird automatisch nummeriert); Inline-Formeln in \\( \\); figure.fig enthält ein Inline-SVG ODER ein <img> plus figcaption (wird automatisch als Abbildung nummeriert) — <img src="dateiname.jpg"> ist NUR für Bilder erlaubt, die du in diesem Lauf selbst mit generate_image erzeugt hast (reiner Dateiname ohne Pfad, Bild und Seite landen im selben Ordner); Bild-URLs aus dem Web lädt die Seite nicht; div.abstract für die Zusammenfassung; div.table-wrap um Tabellen; section.references mit ol fürs Literaturverzeichnis, Textverweise als sup.cite-Anker. SVG-Regeln: viewBox setzen (z.B. 0 0 640 300), alle Koordinaten innerhalb der viewBox, polyline-points NUR mit Leerzeichen/Komma trennen (keine Semikolons), Farben aus var(--fig-line), var(--fig-line-2), var(--muted), var(--fig-grid) oder currentColor, Beschriftung als text-Elemente ohne LaTeX.',
     parameters: {
       type: 'object',
       properties: {
@@ -757,7 +808,14 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const bodyHtml = requireString(args, 'body_html')
       if (!rawName) return err('Parameter "file_name" fehlt')
       if (!title) return err('Parameter "title" fehlt')
-      if (!bodyHtml) return err('Parameter "body_html" fehlt oder ist leer')
+      if (!bodyHtml) {
+        console.warn('[note-agent] write_html abgelehnt (body_html fehlt) — angekommen:', describeArgs(args))
+        return err(
+          `Parameter "body_html" fehlt oder ist leer. Angekommen ist: ${describeArgs(args)}. ` +
+          'Rufe write_html noch einmal auf und übergib den vollständigen Seiteninhalt als EINEN String im Parameter "body_html" — ' +
+          'kein Dokumentgerüst, keine Aufteilung auf mehrere Aufrufe, kein anderer Parametername.'
+        )
+      }
       // Dokumentgerüst selbst heilen statt ablehnen — eine Ablehnung zwingt das Modell,
       // die komplette Seite neu zu generieren (Minuten + eine Loop-Iteration).
       let articleHtml = bodyHtml
@@ -778,6 +836,19 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
         articleHtml = mergeDeterministicSourcesHtml(articleHtml, ctx.run.web.fetches, lang)
       }
+      // Endungen selbst erzeugter Bilder nachziehen (Nano Banana liefert JPEG, das
+      // Modell schreibt gern .png) — sonst bleibt im Blatt ein leerer Bildrahmen.
+      articleHtml = repairImageSrcAttributes(articleHtml, ctx)
+      // Stil-Block einer korrigierten Seite wiederherstellen. Das Modell lässt den
+      // langen, unveränderten CSS-Block beim Umschreiben gern weg; die neue Fassung
+      // rendert dann als nackter Fließtext, und zwar ohne jede Fehlermeldung. Es wird
+      // ausschließlich zurückgelegt, was in der angehängten Datei des Nutzers stand.
+      let styleRestored = false
+      if (ctx.run.htmlSourceStyles && !/<style[\s>]/i.test(articleHtml)) {
+        articleHtml = `${ctx.run.htmlSourceStyles}\n${articleHtml}`
+        styleRestored = true
+        console.warn('[note-agent] write_html: Stil-Block der Vorlage fehlte und wurde wieder eingesetzt')
+      }
       const fileName = sanitizeOutputFileName(rawName, '.html', ['.htm'])
       const html = buildScientificHtmlPage({
         title,
@@ -786,7 +857,13 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         // KI-Provenienz: HTML trägt kein YAML — Kennzeichnung via <meta> + Fußzeile.
         aiModel: ctx.run.model
       })
-      const res = await registerStagedResult(ctx, fileName, 'html', html, `${wordCount} Wörter, wissenschaftliche HTML-Seite`)
+      const res = await registerStagedResult(
+        ctx,
+        fileName,
+        'html',
+        html,
+        `${wordCount} Wörter, wissenschaftliche HTML-Seite${styleRestored ? ', Stil-Block der Vorlage wiederhergestellt' : ''}`
+      )
       if (res.ok && ctx.run.web) {
         ctx.run.web.wrote = true
         ctx.run.web.phase = 'write'
@@ -849,7 +926,13 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const rawName = requireString(args, 'file_name')
       let markdown = requireString(args, 'markdown')
       if (!rawName) return err('Parameter "file_name" fehlt')
-      if (!markdown) return err('Parameter "markdown" fehlt oder ist leer')
+      if (!markdown) {
+        console.warn('[note-agent] Schreib-Aufruf abgelehnt (markdown fehlt) — angekommen:', describeArgs(args))
+        return err(
+          `Parameter "markdown" fehlt oder ist leer. Angekommen ist: ${describeArgs(args)}. ` +
+          'Rufe das Werkzeug noch einmal auf und übergib den vollständigen Text als EINEN String im Parameter "markdown".'
+        )
+      }
       // Der Namensfilter würde `seite.html` zu `seite.html.md` machen — eine
       // Markdown-Datei voller HTML. Statt das stillschweigend zu tun, das
       // Modell auf das richtige Werkzeug stoßen: es kann die Seite danach in

@@ -6,7 +6,7 @@ import { useMemo } from 'react'
 import { useNotesStore } from '../stores/notesStore'
 import type { FileEntry } from '../../shared/types'
 
-const SUPPORTED = /\.(xlsx|xls|docx|pptx|pdf|md|markdown|txt|csv)$/i
+const SUPPORTED = /\.(xlsx|xls|docx|pptx|pdf|md|markdown|txt|csv|html|htm)$/i
 
 export interface ContextVaultFile {
   relPath: string

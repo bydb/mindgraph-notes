@@ -4091,7 +4091,7 @@ ipcMain.handle('ollama-delete-model', async (_event, modelName: string) => {
 // der Freigabe-Akt (gleiche Logik wie open-vault) — der Renderer kann sich keine
 // Freigaben selbst erteilen.
 const NOTE_AGENT_FILE_FILTERS = [
-  { name: 'Dokumente', extensions: ['xlsx', 'xls', 'docx', 'pptx', 'pdf', 'md', 'markdown', 'txt', 'csv'] }
+  { name: 'Dokumente', extensions: ['xlsx', 'xls', 'docx', 'pptx', 'pdf', 'md', 'markdown', 'txt', 'csv', 'html', 'htm'] }
 ]
 const noteAgentCleanupHooked = new Set<number>()
 

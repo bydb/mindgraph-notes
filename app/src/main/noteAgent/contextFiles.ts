@@ -11,6 +11,7 @@
 
 import { promises as fs } from 'fs'
 import * as path from 'path'
+import { extractArticleBody, extractAuthoredBodyHtml } from '../../shared/scientificHtmlPage'
 import { randomBytes } from 'crypto'
 import { parseExcel, sheetToMarkdownTable, parseDocx, parsePptx } from '../office/officeService'
 import {
@@ -18,7 +19,7 @@ import {
   type CollectedTable, type FileCollectStatus, type RowFilter, type SheetLike
 } from '../../shared/tableCollect'
 
-export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'folder'
+export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'folder'
 
 export interface ContextAttachmentInfo {
   id: string
@@ -73,7 +74,12 @@ const EXT_TO_KIND: Record<string, ContextFileKind> = {
   '.md': 'md',
   '.markdown': 'md',
   '.txt': 'txt',
-  '.csv': 'csv'
+  '.csv': 'csv',
+  // .html/.htm: damit eine mit write_html erzeugte Seite in einem Folgelauf
+  // korrigiert werden kann. Ohne sie gab es keinen Weg zurück — der Agent konnte
+  // seine eigene Seite nicht lesen und musste sie aus dem Gedächtnis neu bauen.
+  '.html': 'html',
+  '.htm': 'html'
 }
 
 export function contextKindFromFilename(name: string): ContextFileKind | null {
@@ -133,7 +139,7 @@ export async function registerContextAttachment(
     return { ok: false, error: `Datei nicht lesbar: ${baseName}` }
   }
 
-  const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
+  const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
   if (sizeBytes > maxBytes) {
     const mb = (n: number) => Math.max(1, Math.round(n / 1024 / 1024))
     return { ok: false, error: `${baseName} ist zu groß (${mb(sizeBytes)} MB, Limit ${mb(maxBytes)} MB)` }
@@ -306,7 +312,7 @@ async function listSupportedFolderFiles(
 }
 
 function maxBytesFor(kind: ContextFileKind): number {
-  return kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
+  return kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
 }
 
 /** Manifest eines angehängten Ordners: alle unterstützten Dateien, KEINE Inhalte. */
@@ -552,6 +558,15 @@ async function extractContent(entry: AttachmentEntry): Promise<string> {
     }
     case 'pdf':
       return extractPdfText(src)
+    case 'html': {
+      // Zurückgegeben wird NUR der selbst verfasste Teil, nicht das ganze Dokument:
+      // genau das erwartet write_html als body_html zurück. Das Gerüst der App
+      // (KaTeX-Verweise, Seiten-CSS, Titel-Kopfzeile, KI-Fußzeile) gehört NICHT dazu
+      // — käme es mit zurück, wickelte die App es ein zweites Mal ein. Fremde
+      // HTML-Dateien fallen auf den Body und zuletzt auf den Rohtext zurück.
+      const raw = await fs.readFile(src, 'utf-8')
+      return extractAuthoredBodyHtml(raw) ?? extractArticleBody(raw) ?? raw
+    }
     default:
       return fs.readFile(src, 'utf-8')
   }
@@ -604,7 +619,7 @@ async function readFolderContext(
     } catch {
       continue
     }
-    const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
+    const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
     if (st.size > maxBytes) {
       oversizedCount++
       continue
@@ -877,7 +892,7 @@ export async function extractFileContentRaw(absPath: string): Promise<string> {
   const kind = contextKindFromFilename(name)
   if (!kind || kind === 'folder') throw new Error(`Dateityp nicht unterstützt: ${name}`)
   const st = await fs.stat(absPath)
-  const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
+  const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
   if (st.size > maxBytes) throw new Error(`${name} ist zu groß`)
   const entry: AttachmentEntry = { id: '', name, kind, insideVault: true, sizeBytes: st.size, absPath }
   let content = hygieneText(await extractContent(entry)).trim()

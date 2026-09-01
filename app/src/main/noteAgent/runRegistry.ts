@@ -92,6 +92,11 @@ export interface AgentRun {
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
   // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
   imageGen?: boolean
+  // Stil-Block(s) aus einer angehängten HTML-Seite, die dieser Lauf gelesen hat.
+  // Beim Korrigieren einer Seite lässt das Modell den CSS-Block gern weg — er ist
+  // lang und ändert sich nicht. Die Seite rendert dann komplett ohne Layout (real
+  // aufgetreten, 01.09.2026). write_html setzt ihn deterministisch wieder ein.
+  htmlSourceStyles?: string
 }
 
 // Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
