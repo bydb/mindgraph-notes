@@ -21223,7 +21223,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--text-muted);
 }
 .ai-bar-model-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-bar-model-pick { min-width: 0; flex: 0 1 260px; }
+.ai-bar-model-pick { min-width: 0; flex: 0 1 320px; }
 .ai-bar-model-pick .model-picker-button { padding: 5px 9px; font-size: 12px; }
 .ai-bar-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .ai-bar-cancel {
@@ -21759,11 +21759,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .model-picker-caret { flex-shrink: 0; color: var(--text-muted); font-size: 10px; }
 
 .model-picker-list {
+  /* Die Liste ist bewusst NICHT an die Breite des Felds gekoppelt (kein right: 0).
+     Das Feld ist in der Macher-Leiste schmal; waere die Liste genauso schmal, waeren
+     alle Cloud-Modelle abgeschnitten und man koennte nicht auswaehlen, was man nicht
+     lesen kann. min-width haelt sie mindestens so breit wie das Feld. */
   position: absolute;
   z-index: 1300;
   top: calc(100% + 4px);
   left: 0;
-  right: 0;
+  right: auto;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(560px, 92vw);
   margin: 0;
   padding: 4px;
   list-style: none;

@@ -129,6 +129,29 @@ export interface CloudFeatureRoute {
   label: string
   model: string
 }
+/**
+ * Kürzt eine Cloud-Modell-ID fürs Anzeige-Label.
+ *
+ * OpenRouter-IDs tragen den Anbieter oft doppelt: `deepseek/deepseek-v4-flash`.
+ * Im Auswahlfeld der Macher-Leiste ist der Platz knapp, und der Präfix frisst genau
+ * die Stelle, an der der eigentliche Modellname stehen müsste — der Nutzer sieht dann
+ * nur noch „OpenRouter · deepseek/deepseek…“ und weiß nicht, welches Modell läuft.
+ *
+ * Entfernt wird der Organisations-Präfix deshalb NUR, wenn der Rest ihn ohnehin
+ * wiederholt. Bei `openai/gpt-5` oder `google/gemini-3` bleibt er stehen: dort trägt er
+ * echte Information, die der Modellname allein nicht hergibt.
+ *
+ * Betrifft ausschließlich die Anzeige — `CloudFeatureRoute.model` behält die volle ID,
+ * die an die API geht.
+ */
+export function shortenCloudModelId(modelId: string): string {
+  const trimmed = modelId.trim()
+  const parts = /^([^/]+)\/(.+)$/.exec(trimmed)
+  if (!parts) return trimmed
+  const [, org, rest] = parts
+  return rest.toLowerCase().startsWith(org.toLowerCase()) ? rest : trimmed
+}
+
 export function cloudRoutesForFeature(
   feature: CloudFeatureId,
   providers: { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings }
@@ -141,7 +164,7 @@ export function cloudRoutesForFeature(
     routes.push({
       provider: id,
       sentinel: meta.sentinel,
-      label: `${meta.label} · ${settings!.model.trim()}`,
+      label: `${meta.label} · ${shortenCloudModelId(settings!.model)}`,
       model: settings!.model.trim()
     })
   }

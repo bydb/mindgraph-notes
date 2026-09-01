@@ -92,6 +92,9 @@ export function ModelPicker({
       <button
         type="button"
         className="model-picker-button"
+        // Voller Name als Tooltip: im Auswahlfeld ist der Platz knapp, und ein
+        // abgeschnittener Modellname beantwortet die Frage „welches Modell laeuft?" nicht.
+        title={currentLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
@@ -112,6 +115,7 @@ export function ModelPicker({
               role="option"
               aria-selected={o.value === value}
               className={`model-picker-option${i === highlight ? ' highlight' : ''}${o.value === value ? ' selected' : ''}`}
+              title={o.label}
               onMouseEnter={() => setHighlight(i)}
               onMouseDown={(e) => { e.preventDefault(); select(o.value) }}
             >
