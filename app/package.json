@@ -160,7 +160,7 @@
     "html-to-image": "^1.11.13",
     "imapflow": "^1.2.9",
     "jszip": "^3.10.1",
-    "katex": "^0.16.27",
+    "katex": "^0.18.4",
     "linkedom": "^0.18.13",
     "mailparser": "^3.9.3",
     "mammoth": "^1.11.0",
