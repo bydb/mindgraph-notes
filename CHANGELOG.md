@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.4-beta] - 2026-09-02
+
+Ein Nachtrag für edoobox. Ein Kunde bekam unter Windows beim Verbindungstest nur „Authentication failed (401): Details unterdrückt", obwohl dieselben Schlüssel auf einem Mac funktionierten. Ohne den Antworttext des Servers ließ sich nicht sagen, ob edoobox die Schlüssel ablehnt oder ein Proxy im Schulnetz dazwischen antwortet.
+
+### Behoben
+
+- **Anmeldefehler bei edoobox zeigen jetzt den Fehlertext des Servers.** Die App blendete den Antworttext bisher bewusst aus, weil edoobox-Antworten Teilnehmerdaten enthalten können. Für die Anmeldung gilt das nicht, dort steht nur ein Fehlercode oder die Seite eines Proxys. Genau dieser Text erscheint jetzt immer, ohne Umweg über eine Debug-Variable. Antwortet statt edoobox eine HTML-Seite, sagt die Meldung ausdrücklich, dass ein Proxy oder Webfilter geantwortet hat. Bei einem 401 nennt sie die typischen Ursachen: falscher Server (app1 oder Sandbox), falsche API-Version, falsche Uhrzeit des Rechners. Key und Secret werden aus dem Text entfernt, falls ein Server sie zurückspiegelt.
+- **Key und Secret werden beim Speichern getrimmt.** Aus einer Mail oder Datei kopierte Schlüssel bringen gern ein Zeilenende oder Leerzeichen mit; edoobox antwortet darauf mit 401, und niemand sieht das unsichtbare Zeichen. Auch bereits gespeicherte Schlüssel werden vor dem Senden getrimmt.
+
 ## [0.11.3-beta] - 2026-09-02
 
 Das Leistungsfenster zeigte bisher nur eine Momentaufnahme der laufenden Sitzung; nach dem Neustart waren die Zahlen weg. Jetzt gibt es eine Messgeschichte: welches Modell wie oft lief, was die Cloud gekostet hat, wie viel Rechenzeit lokale Modelle gebraucht haben, wie viel Zeit die Läufe gespart haben und wie schnell die Modelle waren — über heute, 7 Tage, 30 Tage oder 12 Monate.
