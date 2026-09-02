@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.2-beta",
+    "softwareVersion": "0.11.3-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Arbeitsbl&auml;tter mit Lehrplanbezug &middot; v0.11.2</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Modell-Einsatz, Kosten und Zeitgewinn &uuml;ber Monate &middot; v0.11.3</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.2 &middot; Arbeitsbl&auml;tter mit Lehrplanbezug</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Ein Arbeitsblatt, das den Lehrplan Ihres Bundeslandes kennt. Und sich nachbessern l&auml;sst.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Nennen Sie Fach, Klassenstufe und Bundesland &mdash; der Agent schl&auml;gt den Fachlehrplan im amtlichen Portal des Landes nach und erzeugt daraus ein fertiges Arbeitsblatt mit Aufgaben, Schreibraum, Niveaustufen und L&ouml;sungsblatt. F&auml;llt Ihnen danach ein Fehler auf, h&auml;ngen Sie das Blatt einfach wieder an und lassen ihn korrigieren.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.3 &middot; Messgeschichte im Leistungsfenster</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Welches Modell lief wie oft, was hat es gekostet, wie viel Zeit hat es gespart &mdash; &uuml;ber Wochen und Monate, nicht nur heute.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Das Leistungsfenster zeigt jetzt vier Kurven &uuml;ber einen w&auml;hlbaren Zeitraum: Einsatz je Modell, Cloud-Kosten und lokale Rechenzeit, gesch&auml;tzter Zeitgewinn und Geschwindigkeit. Jede Zahl tr&auml;gt ihre Stichprobengr&ouml;&szlig;e, L&uuml;cken bleiben L&uuml;cken, und Untergrenzen hei&szlig;en Untergrenzen.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Der Lehrplan Ihres Bundeslandes</b><p data-i18n="release.c1">Der Agent schl&auml;gt den Fachlehrplan im amtlichen Portal des Landes nach &mdash; alle sechzehn sind hinterlegt. Erfunden wird nichts.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Fertige Bl&auml;tter nachbessern</b><p data-i18n="release.c2">Blatt wieder anh&auml;ngen, Fehler nennen, korrigierte Fassung bekommen &mdash; als neue Datei, &uuml;berschrieben wird nichts.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Arbeitsblatt-Skill inklusive</b><p data-i18n="release.c3">Aufgaben &uuml;ber drei Niveaustufen, Schreibraum, Selbsteinsch&auml;tzung und L&ouml;sungsblatt &mdash; im Editor als A4-PDF.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Ein Logbuch, das den Neustart &uuml;berlebt</b><p data-i18n="release.c1">Jeder Modellaufruf wird auf diesem Rechner festgehalten &mdash; ein Jahr lang, ohne Inhalte, au&szlig;erhalb von Vault und Sync.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Kosten je Lauf, ehrlich getrennt</b><p data-i18n="release.c2">Gemeldete und gerechnete Cloud-Betr&auml;ge getrennt, Aufrufe ohne Preis gez&auml;hlt, lokale Modelle mit gemessener Rechenzeit statt gesch&auml;tztem Strom.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Vier Ansichten, ein Zeitraum</b><p data-i18n="release.c3">Heute, 7 Tage, 30 Tage oder 12 Monate &mdash; als Diagramme, hell und dunkel, mit Export als Markdown oder CSV.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Arbeitsbl&auml;tter mit Lehrplanbezug &middot; v{vs}",
+        "hero.release": "Modell-Einsatz, Kosten und Zeitgewinn &uuml;ber Monate &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Arbeitsblätter mit Lehrplanbezug",
-        "release.heading": "Was ist neu — <em>Ein Arbeitsblatt, das den Lehrplan Ihres Bundeslandes kennt. Und sich nachbessern lässt.</em>",
-        "release.lead": "Nennen Sie Fach, Klassenstufe und Bundesland — der Agent schlägt den Fachlehrplan im amtlichen Portal des Landes nach und erzeugt daraus ein fertiges Arbeitsblatt mit Aufgaben, Schreibraum, Niveaustufen und Lösungsblatt. Fällt Ihnen danach ein Fehler auf, hängen Sie das Blatt einfach wieder an und lassen ihn korrigieren.",
-        "release.c1h": "Der Lehrplan Ihres Bundeslandes",
-        "release.c1": "Steht ein Bundesland im Auftrag, schlägt der Agent den Fachlehrplan im amtlichen Portal dieses Landes nach — die Adressen aller sechzehn Länder sind hinterlegt. Kompetenzbereich und Klassenstufe stehen anschließend in der Formulierung des Landes auf dem Lösungsblatt, mit Quelle. Findet er nichts Belastbares, benennt er die Lücke, statt einen plausibel klingenden Bezug zu erfinden.",
-        "release.c2h": "Fertige Blätter nachbessern",
-        "release.c2": "Bisher war ein erzeugtes Blatt endgültig: Der Agent konnte seine eigene Seite nicht einmal lesen. Jetzt hängen Sie die fertige Datei wieder an, nennen den Fehler, und bekommen eine korrigierte Fassung — als neue Datei, überschrieben wird nichts. Aufgaben, Layout und Lösungen bleiben dabei unangetastet.",
-        "release.c3h": "Arbeitsblatt-Skill inklusive",
-        "release.c3": "Der neue Skill „Arbeitsblatt“ wird mitgeliefert: Kopfzeile zum Ausfüllen, Lernziel, Material, ansteigende Aufgaben über drei Niveaustufen, Schreiblinien und ein vollständiges Lösungsblatt auf eigener Seite — im Editor mit einem Klick als A4-PDF. Jede fachliche Aussage wird an einer Quelle belegt, die im Lauf tatsächlich geöffnet wurde.",
+        "release.label": "Release {vs} · Messgeschichte im Leistungsfenster",
+        "release.heading": "Was ist neu — <em>Welches Modell lief wie oft, was hat es gekostet, wie viel Zeit hat es gespart — über Wochen und Monate, nicht nur heute.</em>",
+        "release.lead": "Das Leistungsfenster zeigt jetzt vier Kurven über einen wählbaren Zeitraum: Einsatz je Modell, Cloud-Kosten und lokale Rechenzeit, geschätzter Zeitgewinn und Geschwindigkeit. Jede Zahl trägt ihre Stichprobengröße, Lücken bleiben Lücken, und Untergrenzen heißen Untergrenzen — die App zieht keinen Schluss, sie zeigt, was gemessen wurde.",
+        "release.c1h": "Ein Logbuch, das den Neustart überlebt",
+        "release.c1": "Bisher waren die Leistungszahlen nach jedem Programmstart weg. Jetzt wird jeder Modellaufruf auf diesem Rechner festgehalten — ein Jahr lang, ohne Prompts oder Antworten, außerhalb des Vaults und außerhalb des Syncs. Alle Aufrufstellen melden mit, auch die, die bisher stumm waren: Quiz, Übersetzen, Reranker, Workflows, Plugins und das Cloud-Streaming im Chat.",
+        "release.c2h": "Kosten je Lauf, ehrlich getrennt",
+        "release.c2": "Was ein Agentenlauf gekostet hat, steht jetzt neben seiner Arbeitszeit: vom Anbieter gemeldete und aus Token gerechnete Beträge getrennt, Aufrufe ohne Preis gezählt statt als null verbucht. Lokale Modelle bekommen keinen Dollarwert, sondern ihre gemessene Rechenzeit — kein geschätzter Strom. Wer die Referenzzeit ändert, sieht das als Markierung in der Kurve.",
+        "release.c3h": "Vier Ansichten, ein Zeitraum",
+        "release.c3": "Heute, 7 Tage, 30 Tage oder 12 Monate: Einsatz je Modell als gestapelte Säulen, Cloud-Kosten mit Schraffur für Untergrenzen, Zeitgewinn auch im Minus, Geschwindigkeit als Linie mit Lücken. Ein Wert erscheint erst ab drei Läufen. Hell und dunkel, mit Export als Markdown oder CSV für Notizen und Videofolien.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Worksheets that follow your state curriculum &middot; v{vs}",
+        "hero.release": "Model usage, cost and time saved across months &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Worksheets that follow your state curriculum",
-        "release.heading": "What’s new — <em>A worksheet that knows your state curriculum. And that you can fix afterwards.</em>",
-        "release.lead": "Name the subject, the year group and the federal state — the agent looks up the official state curriculum and builds a finished worksheet from it: tasks, writing space, three levels of difficulty and a full answer sheet. Spot a mistake later? Attach the sheet again and have it corrected.",
-        "release.c1h": "Your state’s curriculum",
-        "release.c1": "If the request names a federal state, the agent looks up the subject curriculum on that state’s official portal — the addresses of all sixteen are built in. The competence area and year group then appear on the answer sheet in the state’s own wording, with a source. If it finds nothing solid, it says so rather than inventing a plausible-sounding reference.",
-        "release.c2h": "Fix a finished sheet",
-        "release.c2": "Until now a generated sheet was final: the agent could not even read its own page. Now you attach the finished file again, name the mistake, and get a corrected version — as a new file, nothing is overwritten. Tasks, layout and answers stay untouched.",
-        "release.c3h": "Worksheet skill included",
-        "release.c3": "The new “Arbeitsblatt” skill ships with the app: a fill-in header, learning goal, material, tasks rising across three levels, writing lines and a full answer sheet on its own page — one click for an A4 PDF in the editor. Every factual claim is backed by a source the run actually opened.",
+        "release.label": "Release {vs} · Measurement history in the performance view",
+        "release.heading": "What’s new — <em>Which model ran how often, what it cost, how much time it saved — across weeks and months, not just today.</em>",
+        "release.lead": "The performance view now shows four charts over a selectable period: usage per model, cloud cost and local compute time, estimated time saved and speed. Every number carries its sample size, gaps stay gaps, and lower bounds are labelled as such — the app draws no conclusion, it shows what was measured.",
+        "release.c1h": "A log that survives a restart",
+        "release.c1": "Until now the performance numbers vanished with every restart. Now every model call is recorded on this machine — for a year, without prompts or answers, outside the vault and outside sync. Every call site reports, including the ones that were silent before: quiz, translation, reranker, workflows, plugins and cloud streaming in the chat.",
+        "release.c2h": "Cost per run, honestly separated",
+        "release.c2": "What an agent run cost now sits next to its working time: provider-reported and token-computed amounts kept apart, calls without a price counted rather than booked as zero. Local models get no dollar figure but their measured compute time — no estimated electricity. Change the reference time and you see it as a marker in the curve.",
+        "release.c3h": "Four views, one period",
+        "release.c3": "Today, 7 days, 30 days or 12 months: usage per model as stacked bars, cloud cost hatched where it is a lower bound, time saved including negatives, speed as a line with gaps. A value appears only from three runs. Light and dark, with export as Markdown or CSV for notes and video slides.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

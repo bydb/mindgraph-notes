@@ -2,6 +2,31 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.3-beta] - 2026-09-02
+
+Das Leistungsfenster zeigte bisher nur eine Momentaufnahme der laufenden Sitzung; nach dem Neustart waren die Zahlen weg. Jetzt gibt es eine Messgeschichte: welches Modell wie oft lief, was die Cloud gekostet hat, wie viel Rechenzeit lokale Modelle gebraucht haben, wie viel Zeit die Läufe gespart haben und wie schnell die Modelle waren — über heute, 7 Tage, 30 Tage oder 12 Monate.
+
+### Neu
+
+- **Ein Logbuch für jeden Modellaufruf.** Jeder Aufruf wird auf diesem Rechner festgehalten, ein Jahr lang. Gespeichert werden nur Zahlen (Modell, Modul, Dauer, Token, Kosten), keine Prompts und keine Antworten. Die Datei liegt außerhalb des Vaults und außerhalb des Syncs, damit sich Zähler über mehrere Geräte nicht verdoppeln. Zahlen gelten je Gerät.
+- **Vier Ansichten über Zeiträume im Leistungsfenster.** Einsatz je Modell als gestapelte Säulen, Cloud-Kosten und lokale Rechenzeit, geschätzter Zeitgewinn je Woche und Tätigkeit, Geschwindigkeit als Linie. Umschalter Heute, 7 Tage, 30 Tage, 12 Monate. Diagramme in hellem und dunklem Thema, Werte per Tooltip, Export des gewählten Zeitraums als Markdown oder CSV.
+- **Kosten und Verbrauch stehen jetzt am Lauf.** Ein Agentenlauf oder ein Mail-Durchlauf trägt die Summe aller seiner Modellaufrufe: Anzahl, Token, Rechenzeit, Cloud-Kosten. Vom Anbieter gemeldete und aus Token gerechnete Beträge bleiben getrennt; Aufrufe ohne Preis werden gezählt und die Summe als Untergrenze ausgewiesen. Lokale Modelle bekommen keinen Dollarwert, sondern ihre gemessene Rechenzeit.
+- **Alle Aufrufstellen melden.** Bisher meldeten 15 Stellen keine Leistungsdaten (Quiz, Übersetzen, Aufgaben-Tagger, Reranker, Workflow-Runner, Plugins, Bildgenerierung, Projekt-RAG, Vision-OCR, Zettel-Vorschlag, Synonyme, Crystallizer, Embeddings, Telegram, Cloud-Streaming im Chat), und fast alles Übrige lief unter dem Modul „chat". Jetzt gibt es einen festen Modulkatalog, und jeder Aufruf ordnet sich einem Modul zu.
+- **Änderungen der Referenzzeit werden festgehalten.** Wer in der Zeitbilanz eine Referenzminute ändert, bewertet damit auch die Vergangenheit neu. Die Änderung wird protokolliert und in der Zeitgewinn-Kurve als senkrechte Markierung gezeigt, mit dem Hinweis, dass mit der heutigen Referenz bewertet wird.
+
+### Ehrlichkeitsregeln der Ansichten
+
+- Tage ohne Daten sind Lücken, keine Nullen. Eine Linie wird über eine Lücke nicht durchgezogen.
+- Neben jeder aggregierten Zahl steht die Stichprobengröße. Ein Wert erscheint erst ab drei Läufen, dieselbe Grenze wie im Vergleichsmodus.
+- Kaltstarts sind aus der Geschwindigkeit herausgerechnet und getrennt gezählt. Läufe mit verstecktem Reasoning bilden eine eigene, gestrichelte Linie.
+- Cloud-Modelle melden keine Serverzeiten und bekommen deshalb keine Geschwindigkeitslinie; das steht in der Ansicht.
+- Die App zieht keinen Schluss und empfiehlt kein Modell. Für einen belastbaren Vergleich gibt es den Vergleichsmodus mit Zuteilung.
+
+### Behoben
+
+- **Die Cloud-Mailanalyse zählte als „chat".** Lief die Mail-Analyse über einen Cloud-Anbieter, landete sie in der Vergleichstabelle in der falschen Zeile. Sie heißt jetzt wie die lokale Analyse „mail-summary".
+- **Der letzte Cloud-Aufruf eines Laufs konnte in der Bilanz fehlen.** Cloud-Aufrufe werden erst nach einer Preisabfrage festgehalten. Meldete der Lauf vorher „fertig", fehlte der letzte, oft teuerste Aufruf still in der Summe. Die Bilanz wartet jetzt laufende Erfassungen ab.
+
 ## [0.11.2-beta] - 2026-09-01
 
 Arbeitsblätter für den Unterricht. Der Notiz-Agent kann jetzt den Lehrplan des angegebenen Bundeslandes nachschlagen, ein fertiges Blatt später noch einmal überarbeiten und Bilder in eine erzeugte Seite einbinden. Dazu ein mitgelieferter Skill „Arbeitsblatt".
