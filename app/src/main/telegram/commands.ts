@@ -300,7 +300,8 @@ ${context}`
       ],
       {
         ollamaModel: deps.ollamaModel(),
-        maxTokens: 800
+        maxTokens: 800,
+        telemetryModule: 'telegram'
       }
     )
 

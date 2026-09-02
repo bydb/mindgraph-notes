@@ -132,6 +132,16 @@ export async function setEmailForegroundMs(vaultPath: string, id: string, foregr
 }
 
 /**
+ * Alle Ereignisse des Protokolls (90 Tage, höchstens 5000). Für die Messgeschichte:
+ * Der Renderer teilt sie selbst in Wochen ein — mit der GESAMTEN Liste, weil ein Lauf um
+ * 23:58 enden und um 00:03 übernommen werden kann (siehe summarizeActivity).
+ */
+export async function readActivityEvents(vaultPath: string): Promise<ActivityEvent[]> {
+  const file = ledgerFile(vaultPath)
+  return enqueue(file, () => readFile(file))
+}
+
+/**
  * Bilanz eines Zeitraums. Die Auswertung bekommt ALLE Ereignisse, nicht nur den
  * Zeitraum — sonst fehlt die Laufzeit zu einer Übernahme, deren Lauf vor Mitternacht
  * endete (siehe summarizeActivity).

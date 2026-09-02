@@ -34,7 +34,7 @@ export async function suggestAgentMemory(run: AgentRun, chatOptions: ChatOptions
       { role: 'user', content: userPrompt }
     ],
     // signal des (beendeten) Laufs bewusst nicht weiterreichen; kurzer eigener Timeout.
-    { ...chatOptions, signal: undefined, timeoutMs: 60_000, maxTokens: 200, temperature: 0.2, telemetryModule: 'note-agent' }
+    { ...chatOptions, signal: undefined, timeoutMs: 60_000, maxTokens: 200, temperature: 0.2, telemetryModule: 'note-agent', telemetryRunId: run.runId }
   )
   return parseSuggestion(res.text)
 }

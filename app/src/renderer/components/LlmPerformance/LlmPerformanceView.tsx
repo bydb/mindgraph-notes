@@ -22,6 +22,7 @@ import {
   buildComparisonRows, toMarkdownTable, toCsv, formatTps, formatCostCell, type LlmComparisonRow
 } from '../../../shared/llmTelemetry'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
+import { HistorySection } from './HistorySection'
 import './LlmPerformanceView.css'
 
 /**
@@ -69,6 +70,12 @@ export function LlmPerformanceView() {
         <h1>{t('llmPerf.title')}</h1>
         <p className="llmperf-sub">{t('llmPerf.subtitle')}</p>
       </header>
+
+      {/* Messgeschichte über Zeiträume — aus den Logbüchern, nicht aus dem Ringpuffer. */}
+      <HistorySection />
+
+      <h2 className="llmperf-section-title">{t('llmPerf.session')}</h2>
+      <p className="llmperf-sub">{t('llmPerf.sessionSub')}</p>
 
       {rows.length === 0 ? (
         <div className="llmperf-empty">

@@ -167,7 +167,8 @@ REGELN:
     ],
     {
       ollamaModel: ctx.ollamaModel,
-      maxTokens: 600
+      maxTokens: 600,
+      telemetryModule: 'telegram'
     }
   )
 

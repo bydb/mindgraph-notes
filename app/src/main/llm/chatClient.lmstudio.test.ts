@@ -46,7 +46,7 @@ describe('chatWithTools über LM Studio', () => {
     const res = await chatWithTools(
       [{ role: 'user', content: 'Suche Digitalwoche' }],
       TOOLS,
-      { backend: 'lmstudio', lmstudioModel: 'qwen/qwen3.5-4b', lmstudioUrl: 'http://127.0.0.1:1234' }
+      { backend: 'lmstudio', lmstudioModel: 'qwen/qwen3.5-4b', lmstudioUrl: 'http://127.0.0.1:1234', telemetryModule: 'chat' }
     )
 
     const [url, init] = netFetch.mock.calls[0] as [string, RequestInit]
@@ -65,7 +65,7 @@ describe('chatWithTools über LM Studio', () => {
   it('meldet ein nicht erreichbares LM Studio klar, statt gegen Ollama zu laufen', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED') }))
 
-    await expect(chatWithTools([{ role: 'user', content: 'hi' }], TOOLS, {
+    await expect(chatWithTools([{ role: 'user', content: 'hi' }], TOOLS, { telemetryModule: 'chat',
       backend: 'lmstudio',
       lmstudioModel: 'qwen/qwen3.5-4b',
       lmstudioUrl: 'http://127.0.0.1:1234'
@@ -75,7 +75,7 @@ describe('chatWithTools über LM Studio', () => {
 
   it('nutzt den Standard-Port, wenn keine URL gesetzt ist', async () => {
     netFetch.mockResolvedValue(jsonResponse({ choices: [{ message: { content: 'ok' } }] }))
-    await chatWithTools([{ role: 'user', content: 'hi' }], TOOLS, {
+    await chatWithTools([{ role: 'user', content: 'hi' }], TOOLS, { telemetryModule: 'chat',
       backend: 'lmstudio',
       lmstudioModel: 'modell'
     })
@@ -83,7 +83,7 @@ describe('chatWithTools über LM Studio', () => {
   })
 
   it('verlangt ein ausgewähltes Modell', async () => {
-    await expect(chatWithTools([{ role: 'user', content: 'hi' }], TOOLS, {
+    await expect(chatWithTools([{ role: 'user', content: 'hi' }], TOOLS, { telemetryModule: 'chat',
       backend: 'lmstudio'
     })).rejects.toThrow(/Kein LM-Studio-Modell/)
   })

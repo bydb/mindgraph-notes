@@ -10,6 +10,7 @@
 // Das Protokoll trägt nur Art, Zeitpunkt, Dauer und Status.
 
 import { activeMs as activeTimeOf } from './activeTime'
+import { isRunCallTotals, type RunCallTotals } from './llmTelemetry'
 
 /**
  * Tätigkeitsart eines Agent-Laufs. Wird aus der WERKZEUGFOLGE abgeleitet, nie aus Text.
@@ -39,6 +40,12 @@ export type ActivityEvent =
       activityType: ActivityType
       resultCount: number
       status: 'ok' | 'failed' | 'aborted'
+      /**
+       * Verbrauch des Laufs: Aufrufe, Token, Rechenzeit, Cloud-Kosten — summiert über alle
+       * Modellaufrufe mit dieser runId (shared/llmTelemetry.ts summarizeRunCalls). Fehlt bei
+       * Läufen vor dieser Messung und bei Läufen ohne einen einzigen Modellaufruf.
+       */
+      llm?: RunCallTotals
     }
   | {
       at: number
@@ -79,8 +86,23 @@ export type ActivityEvent =
       durationMs: number
       model?: string
       waitingMs?: number
+      /** Verbrauch des Durchlaufs über alle analysierten Mails (siehe agent-run-finished). */
+      llm?: RunCallTotals
     }
   | { at: number; kind: 'task-created'; count: number }
+  | {
+      /**
+       * Der Nutzer hat eine Referenzzeit geändert. Die Zeitbilanz bewertet ALLE Läufe mit
+       * der heutigen Referenz — wer 30 auf 20 Minuten ändert, schreibt damit rückwirkend
+       * jede Woche um. Das ist gewollt, muss aber in der Kurve sichtbar sein
+       * (docs/measurement-history-plan.md § 7). null = keine Referenz hinterlegt.
+       */
+      at: number
+      kind: 'reference-changed'
+      activityType: ActivityType
+      fromMinutes: number | null
+      toMinutes: number | null
+    }
   | {
       at: number
       kind: 'voice-command'
@@ -118,12 +140,17 @@ export function isActivityEvent(value: unknown): value is ActivityEvent {
   if (typeof e.at !== 'number' || !Number.isFinite(e.at)) return false
   if (typeof e.kind !== 'string' || !KNOWN_KINDS.includes(e.kind as ActivityEventKind)) return false
   if (e.kind === 'agent-run-finished') {
+    if (e.llm !== undefined && !isRunCallTotals(e.llm)) return false
     return typeof e.runId === 'string' && typeof e.durationMs === 'number' && typeof e.activityType === 'string'
   }
   if (e.kind === 'agent-result-accepted' || e.kind === 'agent-result-discarded') {
     return typeof e.runId === 'string' && typeof e.format === 'string'
   }
   if (e.kind === 'task-created') return typeof e.count === 'number'
+  if (e.kind === 'reference-changed') {
+    const minuten = (v: unknown): boolean => v === null || (typeof v === 'number' && Number.isFinite(v) && v >= 0)
+    return typeof e.activityType === 'string' && minuten(e.fromMinutes) && minuten(e.toMinutes)
+  }
   if (e.kind === 'email-tasks-extracted') {
     // Vollständig prüfen: Eine von Hand beschädigte Zeile ohne `emails` rutschte sonst
     // durch und erzeugte beim Summieren NaN — die Tagesbilanz wäre danach unlesbar.
@@ -131,6 +158,7 @@ export function isActivityEvent(value: unknown): value is ActivityEvent {
     if (!zahl(e.emails) || !zahl(e.tasks) || !zahl(e.durationMs)) return false
     if (e.waitingMs !== undefined && !zahl(e.waitingMs)) return false
     if (e.model !== undefined && typeof e.model !== 'string') return false
+    if (e.llm !== undefined && !isRunCallTotals(e.llm)) return false
     return typeof e.id === 'string'
   }
   return typeof e.status === 'string'

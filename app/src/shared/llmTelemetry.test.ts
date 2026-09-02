@@ -20,7 +20,7 @@ import {
 } from './llmTelemetry'
 
 function run(partial: Partial<LlmRunMetrics>): LlmRunMetrics {
-  return { at: 0, module: 'test', model: 'm', backend: 'ollama', wallMs: 1000, ...partial }
+  return { at: 0, module: 'chat', model: 'm', backend: 'ollama', wallMs: 1000, ...partial }
 }
 
 describe('nsToMs', () => {
@@ -244,5 +244,157 @@ describe('Sprachfaehige Kostenzelle', () => {
     ])
     expect(formatCostCell(lokal, { local: 'local' })).toBe('local')
     expect(formatCostCell(lokal)).toBe('lokal')
+  })
+})
+
+// ─── Messgeschichte: Ablage-Regeln ───────────────────────────────────────────
+
+import { isLlmRunMetrics, pruneLlmRuns, fromCloudResponse, TELEMETRY_RETENTION_DAYS, TELEMETRY_MAX_RUNS } from './llmTelemetry'
+
+describe('runId am Aufruf', () => {
+  it('nimmt fromOllamaResponse die Lauf-Kennung mit und lässt sie sonst weg', () => {
+    const mit = fromOllamaResponse({}, { module: 'note-agent', model: 'm', wallMs: 1, at: 0, runId: 'run-1' })
+    expect(mit.runId).toBe('run-1')
+    const ohne = fromOllamaResponse({}, { module: 'chat', model: 'm', wallMs: 1, at: 0 })
+    expect('runId' in ohne).toBe(false)
+  })
+
+  it('nimmt fromCloudResponse die Lauf-Kennung mit', () => {
+    const mit = fromCloudResponse(null, { module: 'note-agent', model: 'm', wallMs: 1, at: 0, backend: 'openrouter', runId: 'run-2' })
+    expect(mit.runId).toBe('run-2')
+  })
+})
+
+describe('isLlmRunMetrics', () => {
+  const gut: LlmRunMetrics = { at: 1, module: 'chat', model: 'm', backend: 'ollama', wallMs: 5 }
+
+  it('nimmt einen vollständigen Eintrag an', () => {
+    expect(isLlmRunMetrics(gut)).toBe(true)
+    expect(isLlmRunMetrics({ ...gut, runId: 'r', promptTokens: 10, evalMs: 2.5, hiddenThinking: true, costUsd: 0, costSource: 'computed' })).toBe(true)
+  })
+
+  it('lehnt fehlende Pflichtfelder, unbekannte Backends und Nicht-Zahlen ab', () => {
+    expect(isLlmRunMetrics(null)).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, at: undefined })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, backend: 'wolke' })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, wallMs: 'schnell' })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, wallMs: NaN })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, model: 7 })).toBe(false)
+  })
+
+  it('lehnt negative Zahlen und falsche Kostenherkunft ab — sonst wandern sie in Summen', () => {
+    expect(isLlmRunMetrics({ ...gut, costUsd: -0.01 })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, outputTokens: -3 })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, costSource: 'geraten' })).toBe(false)
+    expect(isLlmRunMetrics({ ...gut, runId: 12 })).toBe(false)
+  })
+})
+
+describe('pruneLlmRuns', () => {
+  const DAY = 86_400_000
+  const now = 1_800_000_000_000
+
+  it('behält frische Einträge und wirft alte weg', () => {
+    const alt = run({ at: now - (TELEMETRY_RETENTION_DAYS + 1) * DAY })
+    const grenze = run({ at: now - TELEMETRY_RETENTION_DAYS * DAY })
+    const frisch = run({ at: now })
+    expect(pruneLlmRuns([alt, grenze, frisch], now)).toEqual([grenze, frisch])
+  })
+
+  it('kappt auf die Obergrenze und behält die jüngsten', () => {
+    const viele = Array.from({ length: TELEMETRY_MAX_RUNS + 3 }, (_, i) => run({ at: now - TELEMETRY_MAX_RUNS - 3 + i }))
+    const kept = pruneLlmRuns(viele, now)
+    expect(kept).toHaveLength(TELEMETRY_MAX_RUNS)
+    expect(kept[kept.length - 1].at).toBe(now - 1)
+  })
+})
+
+// ─── Verbrauch eines Laufs ───────────────────────────────────────────────────
+
+import { summarizeRunCalls, isRunCallTotals } from './llmTelemetry'
+
+describe('summarizeRunCalls', () => {
+  it('summiert Token und lokale Rechenzeit über alle Aufrufe — die Summe, nicht der letzte', () => {
+    const t = summarizeRunCalls([
+      run({ promptTokens: 1000, outputTokens: 50, promptEvalMs: 500, evalMs: 1500 }),
+      run({ promptTokens: 3000, outputTokens: 80, promptEvalMs: 900, evalMs: 2100 }),
+      run({ promptTokens: 7000, outputTokens: 120, promptEvalMs: 1800, evalMs: 3000 }),
+    ])
+    expect(t.calls).toBe(3)
+    expect(t.promptTokens).toBe(11000)
+    expect(t.completionTokens).toBe(250)
+    expect(t.computeMs).toBe(9800)
+    expect(t.cloudCalls).toBe(0)
+    expect(t.costReportedUsd).toBeUndefined()
+  })
+
+  it('hält gemeldete und gerechnete Kosten getrennt und zählt Aufrufe ohne Preis', () => {
+    const t = summarizeRunCalls([
+      run({ backend: 'openrouter', costUsd: 0.002, costSource: 'reported', promptTokens: 10, outputTokens: 5 }),
+      run({ backend: 'llmbase', costUsd: 0.003, costSource: 'computed', promptTokens: 10, outputTokens: 5 }),
+      run({ backend: 'llmbase', promptTokens: 10, outputTokens: 5 }),
+    ])
+    expect(t.cloudCalls).toBe(3)
+    expect(t.costReportedUsd).toBe(0.002)
+    expect(t.costComputedUsd).toBe(0.003)
+    expect(t.unpricedCalls).toBe(1)
+    // Cloud meldet keine Serverzeiten: keine Rechenzeit.
+    expect(t.computeMs).toBeUndefined()
+  })
+
+  it('lässt Token-Felder weg, wenn kein Aufruf Token gemeldet hat, und zählt die Lücken sonst', () => {
+    const ohne = summarizeRunCalls([run({}), run({})])
+    expect(ohne.promptTokens).toBeUndefined()
+    expect(ohne.callsWithoutTokens).toBe(2)
+    const teils = summarizeRunCalls([run({ promptTokens: 5, outputTokens: 1 }), run({})])
+    expect(teils.promptTokens).toBe(5)
+    expect(teils.callsWithoutTokens).toBe(1)
+  })
+
+  it('liefert für null Aufrufe nur Nullzähler', () => {
+    expect(summarizeRunCalls([])).toEqual({ calls: 0, callsWithoutTokens: 0, cloudCalls: 0 })
+  })
+})
+
+describe('isRunCallTotals', () => {
+  it('nimmt gültige Summen an und lehnt NaN, negative Zahlen und fehlende Zähler ab', () => {
+    expect(isRunCallTotals({ calls: 2, callsWithoutTokens: 0, cloudCalls: 0 })).toBe(true)
+    expect(isRunCallTotals({ calls: 2, callsWithoutTokens: 0, cloudCalls: 1, costReportedUsd: 0.1, unpricedCalls: 0 })).toBe(true)
+    expect(isRunCallTotals({ calls: 2 })).toBe(false)
+    expect(isRunCallTotals({ calls: NaN, callsWithoutTokens: 0, cloudCalls: 0 })).toBe(false)
+    expect(isRunCallTotals({ calls: 1, callsWithoutTokens: 0, cloudCalls: 0, computeMs: -5 })).toBe(false)
+    expect(isRunCallTotals(null)).toBe(false)
+  })
+})
+
+
+// ─── Modulkatalog ────────────────────────────────────────────────────────────
+
+import { LLM_MODULES, isLlmModuleId, moduleForAiAction } from './llmTelemetry'
+
+describe('Modulkatalog', () => {
+  it('enthält die fünf Namen der Kompatibilitätsmatrix, die einen Aufrufer haben', () => {
+    for (const m of ['brain', 'task-extraction', 'mail-summary', 'smart-connections']) {
+      expect(isLlmModuleId(m)).toBe(true)
+    }
+    // dashboard-snapshot hat seit 08/2026 keinen Aufrufer — bewusst nicht im Katalog.
+    expect(isLlmModuleId('dashboard-snapshot')).toBe(false)
+    expect(isLlmModuleId('test')).toBe(false)
+    expect(isLlmModuleId(undefined)).toBe(false)
+    expect(new Set(LLM_MODULES).size).toBe(LLM_MODULES.length)
+  })
+
+  it('übersetzt die Text-Aktionen der KI-Leiste — unbekannte Aktionen laufen als ai-bar', () => {
+    expect(moduleForAiAction('translate')).toBe('translate')
+    expect(moduleForAiAction('summarize')).toBe('summarize')
+    expect(moduleForAiAction('ocr-cleanup')).toBe('vision-ocr')
+    expect(moduleForAiAction('improve')).toBe('ai-bar')
+    expect(moduleForAiAction('custom')).toBe('ai-bar')
+    expect(moduleForAiAction('irgendwas')).toBe('ai-bar')
+  })
+
+  it('lehnt einen Eintrag mit fremdem Modul beim Lesen ab', () => {
+    expect(isLlmRunMetrics({ at: 1, module: 'chat', model: 'm', backend: 'ollama', wallMs: 5 })).toBe(true)
+    expect(isLlmRunMetrics({ at: 1, module: 'erfunden', model: 'm', backend: 'ollama', wallMs: 5 })).toBe(false)
   })
 })

@@ -568,6 +568,8 @@ export interface ElectronAPI {
 
   // Leistungsdaten der Modell-Läufe (Token/s, Kaltstart, Zeit bis erstes Token).
   getLlmTelemetry: () => Promise<LlmRunMetrics[]>;
+  /** Aufrufe aus dem Logbuch auf Platte (userData/telemetry), aufsteigend nach Zeit. */
+  getLlmTelemetryRange: (range: { from: number; to: number }) => Promise<LlmRunMetrics[]>;
   onLlmTelemetryRun: (callback: (run: LlmRunMetrics) => void) => () => void;
 
   openVault: () => Promise<string | null>;
@@ -741,6 +743,8 @@ export interface ElectronAPI {
   noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
+  /** Alle Tätigkeits-Ereignisse des Vaults (90 Tage), ohne Inhalte — für die Messgeschichte. */
+  activityEvents: (vaultPath: string) => Promise<{ success: boolean; events?: ActivityEvent[]; error?: string }>;
   activityForeground: (vaultPath: string, id: string, foregroundMs: number) => Promise<{ success: boolean; error?: string }>;
   comparisonLoad: (vaultPath: string) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
   comparisonCreateCampaign: (vaultPath: string, params: { taskClass: string; inclusionRules: string; acceptanceDefinition: string }) => Promise<{ success: boolean; campaignId?: string; data?: ComparisonData; error?: string }>;

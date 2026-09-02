@@ -32,6 +32,8 @@ import { parseStatusMarker, stripFrontmatter, getISOWeekTag } from './discovery'
 import { buildVaultIndex, lintContent, appendFindingsSection } from './wikilinkLint'
 import { parseExcel, sheetToMarkdownTable } from '../office/officeService'
 import { ensureIndex as ragEnsureIndex, retrieve as ragRetrieve } from '../rag/retrieve'
+import { recordLlmRun } from '../llm/telemetry'
+import { fromOllamaResponse, type OllamaTimings } from '../../shared/llmTelemetry'
 
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
 const DEFAULT_BRAIN_FOLDER = '800 - 🧠 brain'
@@ -675,6 +677,7 @@ Start immediately with \`## In one sentence\`. NO preamble, NO code fences.`
 // ────────────────────────────────────────────────────────────────────────────
 
 async function callOllama(model: string, prompt: string): Promise<string> {
+  const startedAt = Date.now()
   const response = await fetch(`${OLLAMA_LOCAL_URL}/api/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -690,7 +693,8 @@ async function callOllama(model: string, prompt: string): Promise<string> {
     const errText = await response.text().catch(() => '')
     throw new Error(`Ollama API ${response.status} ${errText.slice(0, 200)}`)
   }
-  const data = await response.json() as { response?: string }
+  const data = await response.json() as { response?: string } & OllamaTimings
+  recordLlmRun(fromOllamaResponse(data, { module: 'crystallizer', model, wallMs: Date.now() - startedAt, at: startedAt }))
   const result = (data.response || '').trim()
   if (!result) throw new Error('Ollama lieferte leere Antwort')
   return result

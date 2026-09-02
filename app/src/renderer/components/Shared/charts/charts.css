@@ -1,0 +1,132 @@
+/* Diagramme der Messgeschichte. Eigenes SVG, keine Bibliothek.
+
+   Farben: Die kategoriale Reihe folgt der geprüften Referenzpalette (acht Stufen, je
+   hell und dunkel getrennt gestuft, Reihenfolge ist Teil der Farbenblind-Sicherheit —
+   nie umsortieren, nie rotieren). Farbe folgt dem Modell, nicht seinem Rang: Die
+   Zuweisung passiert einmal je Zeitraum über die Häufigkeit und gilt dann in allen
+   vier Ansichten. Text trägt immer Text-Token, nie die Serienfarbe.
+
+   Keine Übergänge, keine Animation: Eine sich bewegende Messkurve suggeriert eine
+   Live-Messung, die hier nicht stattfindet. Der Präsentationsmodus schaltet Übergänge
+   ohnehin ab — die Diagramme dürfen davon nicht abhängen. */
+
+:root, [data-theme="light"] {
+  --viz-1: #2a78d6;
+  --viz-2: #eb6834;
+  --viz-3: #1baf7a;
+  --viz-4: #eda100;
+  --viz-5: #e87ba4;
+  --viz-6: #008300;
+  --viz-7: #4a3aa7;
+  --viz-8: #e34948;
+  --viz-other: #9a9891;
+  --viz-negative: #d03b3b;
+  --viz-grid: color-mix(in srgb, var(--border-color) 70%, transparent);
+  --viz-marker: color-mix(in srgb, var(--text-secondary) 55%, transparent);
+  --viz-hatch: color-mix(in srgb, var(--text-secondary) 35%, transparent);
+}
+
+[data-theme="dark"] {
+  --viz-1: #3987e5;
+  --viz-2: #d95926;
+  --viz-3: #199e70;
+  --viz-4: #c98500;
+  --viz-5: #d55181;
+  --viz-6: #008300;
+  --viz-7: #9085e9;
+  --viz-8: #e66767;
+  --viz-other: #7d7c76;
+  --viz-negative: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --viz-1: #3987e5;
+    --viz-2: #d95926;
+    --viz-3: #199e70;
+    --viz-4: #c98500;
+    --viz-5: #d55181;
+    --viz-6: #008300;
+    --viz-7: #9085e9;
+    --viz-8: #e66767;
+    --viz-other: #7d7c76;
+    --viz-negative: #d03b3b;
+  }
+}
+
+.viz {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  font-family: var(--font-family, system-ui, sans-serif);
+}
+
+.viz-axis text,
+.viz-label {
+  font-size: 10px;
+  fill: var(--text-secondary);
+}
+
+.viz-grid line { stroke: var(--viz-grid); stroke-width: 1; }
+.viz-baseline { stroke: color-mix(in srgb, var(--text-secondary) 50%, transparent); stroke-width: 1; }
+
+.viz-bar { stroke: var(--bg-primary); stroke-width: 1; }
+.viz-bar:hover { filter: brightness(1.12); }
+.viz-bar-negative { fill: var(--viz-negative); }
+.viz-bar-hatched { fill: url(#viz-hatch); }
+
+.viz-line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.viz-line-dashed { stroke-dasharray: 4 3; }
+.viz-point { stroke: var(--bg-primary); stroke-width: 1.5; }
+.viz-point-halo { fill: transparent; }
+.viz-point-halo:hover + .viz-point { r: 5; }
+
+.viz-marker { stroke: var(--viz-marker); stroke-width: 1; stroke-dasharray: 2 3; }
+
+.viz-dot { stroke: var(--bg-primary); stroke-width: 1.5; }
+.viz-dot-n { font-size: 9px; fill: var(--text-secondary); }
+.viz-row-label { font-size: 11px; fill: var(--text-primary); }
+
+/* Legende: Farbchip + Text in Text-Token, nie farbiger Text. */
+.viz-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.viz-legend li { display: inline-flex; align-items: center; gap: 6px; }
+
+.viz-legend-chip {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+}
+
+.viz-legend-chip.is-line {
+  height: 2px;
+  width: 14px;
+  border-radius: 1px;
+}
+
+.viz-legend-chip.is-dashed {
+  background: repeating-linear-gradient(90deg, currentColor 0 4px, transparent 4px 7px);
+}
+
+.viz-legend-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.viz-empty {
+  padding: 28px 0;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+}

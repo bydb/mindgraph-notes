@@ -151,8 +151,9 @@ import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, 
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors } from '../shared/emailMerge'
-import { recordLlmRun, getLlmRuns } from './llm/telemetry'
-import { fromOllamaResponse, type OllamaTimings } from '../shared/llmTelemetry'
+import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
+import { readTelemetryRange } from './llm/telemetryLedger'
+import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
 import { DEFAULT_REMINDER_MINUTES, buildIcs, icsFileName, normalizeDraft, extractMeetingUrl, localDateTimeToIso, type CalendarEventDraft } from '../shared/calendarEvent'
 import { registerWorkflowActions, unregisterWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
@@ -188,8 +189,8 @@ import { createCampaign, createCase, startWork, markResultReady, addSession, cor
 import { campaignReport } from '../shared/comparison/metrics'
 import { toCsv, toMarkdown, type ExportLabels } from '../shared/comparison/export'
 import type { ComparisonCase, Quality, WorkSession } from '../shared/comparison/types'
-import { recordActivity, readActivitySummary, onActivityChanged, setEmailForegroundMs } from './activityLedger'
-import { deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
+import { readActivityEvents, recordActivity, readActivitySummary, onActivityChanged, setEmailForegroundMs } from './activityLedger'
+import { ACTIVITY_TYPES, deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
@@ -771,6 +772,7 @@ function buildPluginHostServices(): HostServices {
       if (isModelIsCloud(model) && !opts.allowCloud) {
         throw new Error(`Cloud-Modell '${model}' für Plugins gesperrt (Privacy)`)
       }
+      const startedAt = Date.now()
       const res = await fetch(`${OLLAMA_API_URL}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -780,7 +782,8 @@ function buildPluginHostServices(): HostServices {
         })
       })
       if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
-      const data = await res.json()
+      const data = await res.json() as { response?: string } & OllamaTimings
+      recordLlmRun(fromOllamaResponse(data, { module: 'plugin', model, wallMs: Date.now() - startedAt, at: startedAt }))
       return (data.response || '').trim()
     },
     httpFetch: (url, init) => fetch(url, init),
@@ -1522,8 +1525,16 @@ ipcMain.handle('clipboard-read-text', () => {
 ipcMain.handle('get-display-health', () => getDisplayHealth())
 
 // Leistungsdaten der Modell-Läufe (Token/s, Kaltstart, Zeit bis erstes Token).
-// Nur Lesen aus dem Arbeitsspeicher — kein Dateizugriff, keine Modellanfrage.
+// `get` liest den Ringpuffer der Sitzung; `range` liest das Logbuch auf Platte
+// (userData/telemetry, siehe llm/telemetryLedger.ts). Beides nur lesend — der
+// Renderer kann keine Aufrufe anhängen.
 ipcMain.handle('llm-telemetry-get', () => getLlmRuns())
+ipcMain.handle('llm-telemetry-range', async (_event, range: { from: number; to: number }) => {
+  if (!lastKnownVaultPath) return []
+  const from = Number(range?.from), to = Number(range?.to)
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return []
+  return readTelemetryRange(lastKnownVaultPath, { from, to })
+})
 
 // Letzten Vault-Pfad laden
 // Aktueller Vault-Pfad im Main-Prozess (für Telegram-Bot etc.)
@@ -1532,6 +1543,7 @@ let lastKnownVaultPath: string | null = null
 ipcMain.handle('get-last-vault', async () => {
   const settings = await loadSettings()
   lastKnownVaultPath = settings.lastVaultPath ?? null
+  setTelemetryVault(lastKnownVaultPath)
   // Persistierter Vault aus unserem eigenen Settings-File ist vertrauenswürdig
   if (settings.lastVaultPath) await addApprovedRoot(settings.lastVaultPath)
   return settings.lastVaultPath || null
@@ -1550,6 +1562,7 @@ ipcMain.handle('set-last-vault', async (_event, vaultPath: string) => {
   }
   await saveSettings({ lastVaultPath: vaultPath })
   lastKnownVaultPath = vaultPath
+  setTelemetryVault(vaultPath)
   return true
 })
 
@@ -1560,9 +1573,33 @@ ipcMain.handle('load-ui-settings', async () => {
 
 // UI-Settings speichern
 ipcMain.handle('save-ui-settings', async (_event, settings: Record<string, unknown>) => {
+  const before = await loadUISettings()
   await saveUISettings(settings)
+  recordReferenceChanges(before, settings)
   return true
 })
+
+/**
+ * Geänderte Referenzzeiten der Zeitbilanz ins Tätigkeitsprotokoll schreiben.
+ *
+ * Schreibt DIESER Prozess beim Speichern der Einstellungen, nicht der Renderer: Das
+ * Ereignis ist Teil der Bilanz, und die Bilanz darf der Renderer nicht erfinden. Nur
+ * echte Änderungen zählen — das Speichern anderer Einstellungen erzeugt kein Ereignis.
+ */
+function recordReferenceChanges(before: Record<string, unknown>, after: Record<string, unknown>): void {
+  if (!lastKnownVaultPath || !('impact' in after)) return
+  const minuten = (impact: unknown): Record<string, unknown> => {
+    const ref = (impact as { referenceMinutes?: unknown } | undefined)?.referenceMinutes
+    return ref && typeof ref === 'object' ? ref as Record<string, unknown> : {}
+  }
+  const alt = minuten(before.impact), neu = minuten(after.impact)
+  const wert = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null
+  for (const type of ACTIVITY_TYPES) {
+    const von = wert(alt[type]), nach = wert(neu[type])
+    if (von === nach) continue
+    recordActivity(lastKnownVaultPath, { at: Date.now(), kind: 'reference-changed', activityType: type, fromMinutes: von, toMinutes: nach })
+  }
+}
 
 // Sprache für Main-Process-Dialoge setzen (vom Renderer bei Sprachwechsel aufgerufen)
 ipcMain.handle('set-main-language', (_event, lang: string) => {
@@ -2174,13 +2211,15 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
 
   const ollamaGenerate = async (prompt: string, model: string): Promise<string> => {
     if (!model) throw new Error('Kein Ollama-Modell konfiguriert.')
+    const startedAt = Date.now()
     const res = await fetch(`${OLLAMA_API_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model, prompt, stream: false, think: false, options: { temperature: 0.4, num_predict: 1200 } })
     })
     if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
-    const data = await res.json()
+    const data = await res.json() as { response?: string } & OllamaTimings
+    recordLlmRun(fromOllamaResponse(data, { module: 'workflow', model, wallMs: Date.now() - startedAt, at: startedAt }))
     return (data.response || '').trim()
   }
 
@@ -4423,6 +4462,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
         recordComparisonSession(run.vaultPath, run.comparisonCaseId, 'auftrag', run.instructionMs, Date.now())
         // Tätigkeitsprotokoll: Dauer genau EINMAL, hier am Lauf-Ende — nicht bei der
         // Übernahme. Sonst zählte ein Lauf mit drei übernommenen Ergebnissen dreifach.
+        // Verbrauch (Aufrufe, Token, Rechenzeit, Cloud-Kosten) aus allen Modellaufrufen
+        // mit dieser runId — die Summe, nicht der letzte Aufruf.
+        const llm = await collectRunTotals(run.runId)
         recordActivity(run.vaultPath, {
           at: Date.now(),
           kind: 'agent-run-finished',
@@ -4432,7 +4474,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           model: run.model,
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
-          status: 'ok'
+          status: 'ok',
+          llm
         })
         if (!sender.isDestroyed()) {
           sender.send('note-agent-done', {
@@ -4459,6 +4502,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       } catch (e) {
         const cancelled = run.abort.signal.aborted
         finishRun(run, cancelled ? 'cancelled' : 'error')
+        // Auch ein gescheiterter Lauf hat gekostet — Aufrufe und Token bleiben in der Bilanz.
+        const llm = await collectRunTotals(run.runId)
         recordActivity(run.vaultPath, {
           at: Date.now(),
           kind: 'agent-run-finished',
@@ -4468,7 +4513,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           model: run.model,
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
-          status: cancelled ? 'aborted' : 'failed'
+          status: cancelled ? 'aborted' : 'failed',
+          llm
         })
         let message = e instanceof Error ? e.message : String(e)
         if (/aborted due to timeout|TimeoutError/i.test(message)) {
@@ -4854,6 +4900,18 @@ ipcMain.handle('activity-foreground', async (event, vaultPath: string, id: strin
   }
 })
 
+// Rohereignisse für die Messgeschichte (Leistungsfenster, Zeitgewinn über Wochen). Nur lesend;
+// die Liste enthält keine Inhalte — Dauern, Zähler, Modellnamen, Kennungen.
+ipcMain.handle('activity-events', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'activity-events')
+    return { success: true, events: await readActivityEvents(vaultPath) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
 ipcMain.handle('activity-summary', async (event, vaultPath: string, range?: { from: number; to: number }) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   try {
@@ -5091,6 +5149,7 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
           [{ role: 'user', content: chunkPrompt }],
           {
             ...cloudResolved.chatOptions,
+            telemetryModule: moduleForAiAction(request.action),
             temperature,
             // Provider-Default-Caps reichen für Übersetzungs-Output nicht → explizit setzen;
             // Default-timeoutMs (120 s) ist für lange Chunks zu knapp.
@@ -5114,6 +5173,7 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
         // 300 s ohne Response-Header hart ab (gleiche Falle wie beim Notiz-Agenten,
         // siehe chatFetch in llm/chatClient.ts). Zeitgrenze: 30 min pro Chunk.
         const { net } = await import('electron')
+        const chunkStartedAt = Date.now()
         const response = await net.fetch(`${OLLAMA_API_URL}/api/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -5137,7 +5197,11 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
           throw new Error(`Ollama API Fehler: ${response.status}`)
         }
 
-        const data = await response.json()
+        const data = await response.json() as { response?: string; done?: boolean } & OllamaTimings
+        recordLlmRun(fromOllamaResponse(data, {
+          module: moduleForAiAction(request.action), model: request.model,
+          wallMs: Date.now() - chunkStartedAt, at: chunkStartedAt,
+        }))
         console.log('[Ollama] Response received:', {
           chunk: `${i + 1}/${chunks.length}`,
           hasResponse: !!data.response,
@@ -5209,6 +5273,7 @@ END_UNTRUSTED_CONTEXT
 
 Antworte nur mit dem JSON-Array:`
 
+    const startedAt = Date.now()
     const response = await fetch(`${OLLAMA_API_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5223,7 +5288,8 @@ Antworte nur mit dem JSON-Array:`
     if (!response.ok) {
       return { success: false, error: `Ollama API Fehler: ${response.status}` }
     }
-    const data = await response.json()
+    const data = await response.json() as { response?: string } & OllamaTimings
+    recordLlmRun(fromOllamaResponse(data, { module: 'task-extraction', model, wallMs: Date.now() - startedAt, at: startedAt }))
     const raw = String(data.response || '')
 
     // JSON-Array herausparsen, Fallback auf #-/kommagetrennte Tokens.
@@ -5568,6 +5634,7 @@ ipcMain.handle('ollama-rerank-pair', async (_event, model: string, query: string
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 30000)
+    const startedAt = Date.now()
 
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
       method: 'POST',
@@ -5607,8 +5674,9 @@ ipcMain.handle('ollama-rerank-pair', async (_event, model: string, query: string
       return { success: false, error: `Ollama HTTP ${response.status}` }
     }
 
-    const data = await response.json() as { message?: { content?: string; thinking?: string }; error?: string; done_reason?: string; eval_count?: number }
+    const data = await response.json() as { message?: { content?: string; thinking?: string }; error?: string; done_reason?: string } & OllamaTimings
     if (data.error) return { success: false, error: data.error }
+    recordLlmRun(fromOllamaResponse(data, { module: 'smart-connections', model, wallMs: Date.now() - startedAt, at: startedAt }))
 
     // Fallback auf `thinking`-Feld falls `think: false` doch ignoriert wurde (z.B. weil
     // Ollama-Version zu alt oder Modell anders implementiert).
@@ -5654,6 +5722,7 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
     // Timeout nach 60 Sekunden
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 60000)
+    const startedAt = Date.now()
 
     const response = await fetch(`${OLLAMA_API_URL}/api/embeddings`, {
       method: 'POST',
@@ -5674,6 +5743,8 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
     }
 
     const data = await response.json()
+    // /api/embeddings meldet keine Zeiten — der Aufruf wird gezählt, mehr nicht.
+    recordLlmRun(fromOllamaResponse({}, { module: 'embedding', model, wallMs: Date.now() - startedAt, at: startedAt }))
 
     if (!data.embedding) {
       throw new Error('Keine Embeddings in der Antwort')
@@ -5819,7 +5890,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       try {
         const full = await streamCloudChat(
           allMessages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant', content: m.content })),
-          { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controllerC.signal },
+          { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controllerC.signal, telemetryModule: chatMode === 'email' ? 'mail-summary' : 'chat' },
           (delta) => event.sender.send(chunkChannel, delta)
         )
         event.sender.send(doneChannel)
@@ -6005,6 +6076,7 @@ ipcMain.handle('ollama-generate-image', async (event, request: OllamaImageReques
   console.log('[Ollama] Image generation request:', request.prompt, 'with model:', request.model)
 
   try {
+    const startedAt = Date.now()
     const response = await fetch(`${OLLAMA_API_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -6085,6 +6157,8 @@ ipcMain.handle('ollama-generate-image', async (event, request: OllamaImageReques
         console.log('[Ollama] Could not parse final buffer')
       }
     }
+    // Bildmodelle melden keine Token-Zeiten — gezählt wird der Aufruf mit seiner Dauer.
+    recordLlmRun(fromOllamaResponse({}, { module: 'image', model: request.model, wallMs: Date.now() - startedAt, at: startedAt }))
 
     if (!imageBase64) {
       throw new Error('Kein Bild in der Antwort')
@@ -7210,6 +7284,8 @@ ipcMain.handle('project-rag-answer', async (event, vaultPath: string, projectFol
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300000) // 5 min
+    const ragStartedAt = Date.now()
+    let ragFirstTokenMs: number | undefined
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -7248,10 +7324,16 @@ ipcMain.handle('project-rag-answer', async (event, vaultPath: string, projectFol
         const t = line.trim()
         if (!t) continue
         try {
-          const json = JSON.parse(t)
+          const json = JSON.parse(t) as { message?: { content?: string }; done?: boolean } & OllamaTimings
           if (json.message?.content) {
+            if (ragFirstTokenMs === undefined) ragFirstTokenMs = Date.now() - ragStartedAt
             full += json.message.content
             event.sender.send('project-rag-answer-chunk', json.message.content)
+          }
+          if (json.done) {
+            recordLlmRun(fromOllamaResponse(json, {
+              module: 'project-rag', model: chatModel, wallMs: Date.now() - ragStartedAt, at: ragStartedAt, firstTokenMs: ragFirstTokenMs,
+            }))
           }
         } catch {
           // ungültige JSON-Zeile ignorieren
@@ -7935,6 +8017,7 @@ ipcMain.handle('vision-ocr-extract-page', async (_event, base64Image: string, mo
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min per page
+    const startedAt = Date.now()
 
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
       method: 'POST',
@@ -7968,7 +8051,8 @@ Rules:
       throw new Error(`Ollama API error: ${response.status}`)
     }
 
-    const data = await response.json() as { message?: { content?: string } }
+    const data = await response.json() as { message?: { content?: string } } & OllamaTimings
+    recordLlmRun(fromOllamaResponse(data, { module: 'vision-ocr', model, wallMs: Date.now() - startedAt, at: startedAt }))
     const pageText = (data.message?.content || '')
       .replace(/<think>[\s\S]*?<\/think>/g, '')
       .trim()
@@ -8791,10 +8875,11 @@ async function quizLlmComplete(
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage }
       ],
-      { ...cloudResolved.chatOptions, temperature: opts.temperature, maxTokens: opts.maxTokens, responseFormat: 'json' }
+      { ...cloudResolved.chatOptions, telemetryModule: 'quiz', temperature: opts.temperature, maxTokens: opts.maxTokens, responseFormat: 'json' }
     )
     return result.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
   }
+  const startedAt = Date.now()
   const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -8812,7 +8897,8 @@ async function quizLlmComplete(
   if (!response.ok) {
     throw new Error(`Ollama API error: ${response.status}`)
   }
-  const data = await response.json() as { message?: { content?: string } }
+  const data = await response.json() as { message?: { content?: string } } & OllamaTimings
+  recordLlmRun(fromOllamaResponse(data, { module: 'quiz', model, wallMs: Date.now() - startedAt, at: startedAt }))
   return (data.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim()
 }
 
@@ -8861,7 +8947,7 @@ CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no expla
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        { ...cloudResolved.chatOptions, temperature: 0.7, maxTokens: 4000, responseFormat: 'json' }
+        { ...cloudResolved.chatOptions, telemetryModule: 'quiz', temperature: 0.7, maxTokens: 4000, responseFormat: 'json' }
       )
       console.log(`[Quiz] ${cloudResolved.provider} response received in ${Date.now() - startTime}ms`)
       rawResponse = result.text
@@ -8902,7 +8988,8 @@ CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no expla
         throw new Error(`Ollama API error: ${response.status}`)
       }
 
-      const data = await response.json() as { message?: { content?: string } }
+      const data = await response.json() as { message?: { content?: string } } & OllamaTimings
+      recordLlmRun(fromOllamaResponse(data, { module: 'quiz', model, wallMs: Date.now() - startTime, at: startTime }))
       rawResponse = data.message?.content || ''
     }
 
@@ -9905,7 +9992,7 @@ function registerCloudProviderIpc(provider: CloudChatBackend): void {
       const chatOptions: LlmChatOptions = provider === 'llmbase'
         ? { backend: 'llmbase', llmbaseApiKey: key, llmbaseModel: model, maxTokens: 5 }
         : { backend: 'openrouter', openrouterApiKey: key, openrouterModel: model, maxTokens: 5 }
-      const res = await llmChat([{ role: 'user', content: 'Antworte nur mit: OK' }], chatOptions)
+      const res = await llmChat([{ role: 'user', content: 'Antworte nur mit: OK' }], { ...chatOptions, telemetryModule: 'connection-test' })
       return { success: true, reply: res.text.slice(0, 100) }
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : String(error) }
@@ -11040,6 +11127,10 @@ ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string,
     let extractedTasks = 0
     const analysisStartedAt = Date.now()
     let usedModel = model
+    // Kennung dieses Durchlaufs. Sie steht an jedem Modellaufruf (Telemetrie) und am
+    // Ereignis im Tätigkeitsprotokoll — nur so lassen sich Kosten und Rechenzeit der
+    // Mail-Analyse später dem Durchlauf zurechnen.
+    const impactId = `mail-${randomBytes(8).toString('hex')}`
     // Letzter Fehlergrund für die UI — sonst scheitert die Analyse (OOM, fehlendes Modell,
     // Timeout) komplett lautlos und der Datensatz behält ein evtl. gesyncten Fremd-Modell.
     let lastError: string | null = null
@@ -11127,7 +11218,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
             try {
               const res = await llmChat(
                 [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
-                { ...cloudResolved.chatOptions, responseFormat: 'json', temperature: 0.1 }
+                { ...cloudResolved.chatOptions, responseFormat: 'json', temperature: 0.1, telemetryModule: 'mail-summary', telemetryRunId: impactId }
               )
               const parsed = parseEmailAnalysisJson(res.text || '')
               if (!parsed) {
@@ -11184,6 +11275,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
             const result = await response.json() as { message?: { content?: string; thinking?: string } } & OllamaTimings
             recordLlmRun(fromOllamaResponse(result, {
               module: 'mail-summary',
+              runId: impactId,
               model,
               wallMs: Date.now() - analysisStartedAt,
               at: analysisStartedAt,
@@ -11286,9 +11378,12 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     await persistAnalyses()
 
     // Nur ein Durchgang MIT Fund ersetzt Handarbeit — einer ohne kostet Zeit und spart nichts.
-    let impactId: string | null = null
+    // Der Korb wird in jedem Fall geleert — sonst bliebe er bei einem Durchlauf ohne
+    // Fund liegen, bis er verfällt.
+    const llm = await collectRunTotals(impactId)
+    let impactIdForRenderer: string | null = null
     if (extractedTasks > 0) {
-      impactId = `mail-${randomBytes(8).toString('hex')}`
+      impactIdForRenderer = impactId
       recordActivity(vaultPath, {
         at: Date.now(),
         kind: 'email-tasks-extracted',
@@ -11296,7 +11391,8 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
         emails: analyzed,
         tasks: extractedTasks,
         durationMs: Date.now() - analysisStartedAt,
-        model: usedModel
+        model: usedModel,
+        llm
       })
     }
 
@@ -11309,7 +11405,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       // Kennzahlen für die Wirkungsbilanz schreibt DIESER Prozess — sie sind hier
       // gemessen. Der Renderer bekommt nur eine opake Kennung, über die er
       // ausschließlich die Vordergrundzeit nachtragen kann (siehe activity-foreground).
-      impact: impactId ? { id: impactId } : undefined
+      impact: impactIdForRenderer ? { id: impactIdForRenderer } : undefined
     }
   } catch (error) {
     console.error('[Email] Analysis error:', error)
@@ -12370,7 +12466,7 @@ ipcMain.handle('email-extract-event', async (_event, payload: {
     if (cloudResolved) {
       const res = await llmChat(
         [{ role: 'system', content: systemPrompt }, { role: 'user', content: prompt }],
-        { ...cloudResolved.chatOptions, responseFormat: 'json', temperature: 0.1 },
+        { ...cloudResolved.chatOptions, telemetryModule: 'task-extraction', responseFormat: 'json', temperature: 0.1 },
       )
       responseText = res.text || ''
     } else {
@@ -13082,6 +13178,7 @@ END_UNTRUSTED_CONTEXT
 
 Antworte nur mit dem JSON-Objekt:`
 
+    const startedAt = Date.now()
     const response = await fetch(`${OLLAMA_API_URL}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -13096,7 +13193,8 @@ Antworte nur mit dem JSON-Objekt:`
     if (!response.ok) {
       return { success: false, error: `Ollama API Fehler: ${response.status}` }
     }
-    const data = await response.json()
+    const data = await response.json() as { response?: string } & OllamaTimings
+    recordLlmRun(fromOllamaResponse(data, { module: 'zettel', model, wallMs: Date.now() - startedAt, at: startedAt }))
     const raw = String(data.response || '')
 
     // JSON-Objekt parsen; Fallbacks: Array-Regex für Tags, Emoji-Filter über die Rohantwort.

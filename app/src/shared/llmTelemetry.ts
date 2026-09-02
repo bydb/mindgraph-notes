@@ -14,10 +14,67 @@ import { type CallUsage, type CostSource, type ModelPricing, callCostUsd, format
 
 export type LlmBackendId = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
 
+// ─── Modulkatalog (docs/measurement-history-plan.md § 4) ─────────────────────
+//
+// Fester Katalog statt Freitext: Bis 09/2026 setzten nur drei Aufrufer ein Modul, alles
+// andere lief als „chat" — die Vergleichstabelle beschrieb damit keine einzige Aufgabe.
+// Ein Aufruf ohne Modul ist seit dem Katalog ein Typfehler, kein stilles „chat".
+// Die fünf Namen der Kompatibilitätsmatrix (modelCompatibility.ts) sind identisch;
+// `dashboard-snapshot` fehlt bewusst — es gibt seit 08/2026 keinen Aufrufer mehr.
+export const LLM_MODULES = [
+  'chat',              // Notizen-Chat (direkt, sokratisch, grill)
+  'ai-bar',            // KI-Leiste: fortsetzen, verbessern, freie Anweisung
+  'translate',
+  'summarize',
+  'note-agent',        // Notiz-Agent inkl. Merkvorschlag
+  'telegram',          // Telegram-Bot: Agent, Briefing, Fragen
+  'mail-summary',      // Mail-Analyse (lokal wie Cloud)
+  'task-extraction',   // Aufgaben-Tagger, Termin aus Mail
+  'brain',
+  'smart-connections', // LLM-as-Judge-Reranker
+  'embedding',         // /api/embeddings — Ollama meldet dort keine Zeiten, nur gezählt
+  'quiz',              // Karteikarten und Quiz
+  'workflow',          // Workflow-Canvas-Runner
+  'plugin',            // Plugin-Host llm.generate
+  'crystallizer',      // Projekt-Status
+  'synonyms',          // Projekt-Synonyme
+  'zettel',            // Zettel-Vorschlag (Tags, Emojis)
+  'project-rag',
+  'vision-ocr',        // Vision-OCR und OCR-Textbereinigung
+  'image',             // Bildgenerierung über Ollama
+  'connection-test',   // „Antworte nur mit: OK"
+] as const
+
+export type LlmModuleId = typeof LLM_MODULES[number]
+
+const MODULE_SET: ReadonlySet<string> = new Set(LLM_MODULES)
+
+export function isLlmModuleId(value: unknown): value is LlmModuleId {
+  return typeof value === 'string' && MODULE_SET.has(value)
+}
+
+/**
+ * Modul für die Text-Aktionen der KI-Leiste (`ollama-generate`). Der Renderer kennt nur
+ * die Aktion; der Main-Prozess übersetzt, damit der Renderer keine Modulnamen erfinden kann.
+ */
+export function moduleForAiAction(action: string): LlmModuleId {
+  switch (action) {
+    case 'translate': return 'translate'
+    case 'summarize': return 'summarize'
+    case 'ocr-cleanup': return 'vision-ocr'
+    default: return 'ai-bar'
+  }
+}
+
 /** Ein einzelner Modell-Lauf. Zeiten in Millisekunden, nicht Nanosekunden. */
 export interface LlmRunMetrics {
   at: number                  // Zeitstempel des Laufs (Date.now())
-  module: string              // 'task-extraction', 'note-agent', 'chat', …
+  module: LlmModuleId         // aus dem Katalog oben, kein Freitext
+  // Kennung des übergeordneten Laufs (Agentenauftrag, Mail-Extraktion), wenn es
+  // einen gibt. Verbindet die Aufrufe mit dem Tätigkeitsprotokoll: Kosten, Token
+  // und Rechenzeit werden je Lauf summiert. Ohne runId zählt der Aufruf nur für
+  // Einsatz und Leistung (docs/measurement-history-plan.md § 1).
+  runId?: string
   model: string
   backend: LlmBackendId
   executionProfile?: string   // nur stabile Profil-ID, niemals Thinking-Inhalt
@@ -89,11 +146,12 @@ export interface OllamaTimings {
 
 export function fromOllamaResponse(
   timings: OllamaTimings,
-  meta: { module: string; model: string; wallMs: number; at: number; backend?: LlmBackendId; firstTokenMs?: number; hiddenThinking?: boolean; executionProfile?: string }
+  meta: { module: LlmModuleId; model: string; wallMs: number; at: number; backend?: LlmBackendId; firstTokenMs?: number; hiddenThinking?: boolean; executionProfile?: string; runId?: string }
 ): LlmRunMetrics {
   return {
     at: meta.at,
     module: meta.module,
+    ...(meta.runId ? { runId: meta.runId } : {}),
     model: meta.model,
     backend: meta.backend ?? 'ollama',
     executionProfile: meta.executionProfile,
@@ -119,15 +177,16 @@ export function fromOllamaResponse(
 export function fromCloudResponse(
   usage: CallUsage | null,
   meta: {
-    module: string; model: string; wallMs: number; at: number
+    module: LlmModuleId; model: string; wallMs: number; at: number
     backend: LlmBackendId; pricing?: ModelPricing | null
-    firstTokenMs?: number; executionProfile?: string
+    firstTokenMs?: number; executionProfile?: string; runId?: string
   }
 ): LlmRunMetrics {
   const cost = callCostUsd(usage, meta.pricing)
   return {
     at: meta.at,
     module: meta.module,
+    ...(meta.runId ? { runId: meta.runId } : {}),
     model: meta.model,
     backend: meta.backend,
     executionProfile: meta.executionProfile,
@@ -139,6 +198,130 @@ export function fromCloudResponse(
     reasoningTokens: usage?.reasoningTokens,
     ...(cost ? { costUsd: cost.usd, costSource: cost.source } : {}),
   }
+}
+
+// ─── Messgeschichte: Ablage-Regeln (docs/measurement-history-plan.md § 2) ───
+//
+// Die Aufrufe werden im Main-Prozess auf Platte geschrieben (main/llm/telemetryLedger.ts).
+// Hier stehen nur die Regeln, die Main und Renderer gemeinsam kennen müssen:
+// was ein gültiger Eintrag ist und wie lange er lebt.
+
+/** Rohdaten bleiben ein Jahr — Mediane und Kaltstart-Ausschluss lassen sich aus Summen nicht rechnen. */
+export const TELEMETRY_RETENTION_DAYS = 365
+/** Obergrenze danach; die jüngsten Einträge bleiben. Rund 250 Byte je Eintrag → unter 15 MB. */
+export const TELEMETRY_MAX_RUNS = 50_000
+
+const BACKENDS: ReadonlySet<string> = new Set<LlmBackendId>(['ollama', 'lmstudio', 'openrouter', 'llmbase'])
+
+/**
+ * Prüft einen Eintrag aus der Datei. Zeilenweise, damit eine halb geschriebene
+ * oder von Hand veränderte Zeile nur sich selbst verliert, nicht die Geschichte.
+ * Zahlenfelder müssen endlich und nicht negativ sein — eine NaN-Zeile würde sonst
+ * jede Summe, in der sie steckt, unlesbar machen.
+ */
+export function isLlmRunMetrics(value: unknown): value is LlmRunMetrics {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  const zahl = (x: unknown): boolean => typeof x === 'number' && Number.isFinite(x) && x >= 0
+  const optZahl = (x: unknown): boolean => x === undefined || zahl(x)
+  const optText = (x: unknown): boolean => x === undefined || typeof x === 'string'
+  if (!zahl(v.at) || !zahl(v.wallMs)) return false
+  // Unbekanntes Modul = ungültige Zeile. Alle je geschriebenen Namen stehen im Katalog;
+  // ein fremder Name wäre eine von Hand veränderte Datei, keine alte Version.
+  if (!isLlmModuleId(v.module) || typeof v.model !== 'string') return false
+  if (typeof v.backend !== 'string' || !BACKENDS.has(v.backend)) return false
+  if (!optText(v.runId) || !optText(v.executionProfile)) return false
+  for (const key of ['promptTokens', 'outputTokens', 'promptEvalMs', 'evalMs', 'loadMs', 'firstTokenMs', 'costUsd', 'cachedTokens', 'reasoningTokens']) {
+    if (!optZahl(v[key])) return false
+  }
+  if (v.hiddenThinking !== undefined && typeof v.hiddenThinking !== 'boolean') return false
+  if (v.costSource !== undefined && v.costSource !== 'reported' && v.costSource !== 'computed') return false
+  return true
+}
+
+/** Verbleib: erst nach Alter, dann auf die Obergrenze — die jüngsten Einträge bleiben. */
+export function pruneLlmRuns(runs: LlmRunMetrics[], nowMs: number): LlmRunMetrics[] {
+  const cutoff = nowMs - TELEMETRY_RETENTION_DAYS * 86_400_000
+  const kept = runs.filter(r => r.at >= cutoff)
+  return kept.length > TELEMETRY_MAX_RUNS ? kept.slice(kept.length - TELEMETRY_MAX_RUNS) : kept
+}
+
+// ─── Verbrauch eines Laufs (docs/measurement-history-plan.md § 3) ───────────
+//
+// Ein Lauf (Agentenauftrag, Mail-Durchlauf) besteht aus vielen Modellaufrufen; der
+// Agenten-Loop schickt bei jeder Iteration die ganze Konversation neu. Was er
+// gekostet hat, ist die SUMME aller Aufrufe mit seiner runId — nie der letzte.
+// Die Summe wandert ins Tätigkeitsprotokoll (activityLog.ts), damit Modell, aktive
+// Arbeitszeit, Übernahme und Kosten in EINEM Datensatz stehen.
+
+export interface RunCallTotals {
+  /** Alle Modellaufrufe des Laufs. */
+  calls: number
+  /** Aufrufe, zu denen der Server keine Token gemeldet hat — die Token-Summen sind dann Untergrenzen. */
+  callsWithoutTokens: number
+  promptTokens?: number
+  completionTokens?: number
+  /**
+   * Gemessene Rechenzeit lokaler Aufrufe (Prompt lesen + Antwort schreiben), in ms.
+   * Der ehrliche Preis eines lokalen Modells: gemessene Sekunden, kein geschätzter Strom.
+   * Nur ollama/lmstudio; fehlt, wenn kein lokaler Aufruf Zeiten gemeldet hat.
+   */
+  computeMs?: number
+  /** Cloud-Aufrufe (openrouter/llmbase). Die drei Kostenfelder gibt es nur, wenn > 0. */
+  cloudCalls: number
+  /** Vom Anbieter gemeldet (Abrechnungswahrheit). */
+  costReportedUsd?: number
+  /** Aus Token × Katalogpreis gerechnet. Wird NIE mit `costReportedUsd` addiert. */
+  costComputedUsd?: number
+  /** Cloud-Aufrufe ohne Preis — jede Kostensumme mit unpricedCalls > 0 ist eine Untergrenze („≥"). */
+  unpricedCalls?: number
+}
+
+export function summarizeRunCalls(runs: LlmRunMetrics[]): RunCallTotals {
+  const out: RunCallTotals = { calls: runs.length, callsWithoutTokens: 0, cloudCalls: 0 }
+  let prompt = 0, completion = 0, compute = 0
+  let sawTokens = false, sawCompute = false
+  let reported = 0, computed = 0, unpriced = 0
+  for (const r of runs) {
+    if (typeof r.promptTokens === 'number' || typeof r.outputTokens === 'number') {
+      sawTokens = true
+      prompt += r.promptTokens ?? 0
+      completion += r.outputTokens ?? 0
+    } else {
+      out.callsWithoutTokens += 1
+    }
+    const isCloud = r.backend === 'openrouter' || r.backend === 'llmbase'
+    if (isCloud) {
+      out.cloudCalls += 1
+      if (typeof r.costUsd !== 'number') unpriced += 1
+      else if (r.costSource === 'reported') reported += r.costUsd
+      else computed += r.costUsd
+    } else if (typeof r.promptEvalMs === 'number' || typeof r.evalMs === 'number') {
+      sawCompute = true
+      compute += (r.promptEvalMs ?? 0) + (r.evalMs ?? 0)
+    }
+  }
+  if (sawTokens) { out.promptTokens = prompt; out.completionTokens = completion }
+  if (sawCompute) out.computeMs = compute
+  if (out.cloudCalls > 0) {
+    out.costReportedUsd = reported
+    out.costComputedUsd = computed
+    out.unpricedCalls = unpriced
+  }
+  return out
+}
+
+/** Prüfung beim Lesen aus dem Tätigkeitsprotokoll — eine NaN-Summe würde jede Auswertung kippen. */
+export function isRunCallTotals(value: unknown): value is RunCallTotals {
+  if (!value || typeof value !== 'object') return false
+  const v = value as Record<string, unknown>
+  const zahl = (x: unknown): boolean => typeof x === 'number' && Number.isFinite(x) && x >= 0
+  const optZahl = (x: unknown): boolean => x === undefined || zahl(x)
+  if (!zahl(v.calls) || !zahl(v.callsWithoutTokens) || !zahl(v.cloudCalls)) return false
+  for (const key of ['promptTokens', 'completionTokens', 'computeMs', 'costReportedUsd', 'costComputedUsd', 'unpricedCalls']) {
+    if (!optZahl(v[key])) return false
+  }
+  return true
 }
 
 export function median(values: number[]): number | null {
@@ -184,7 +367,7 @@ export function formatTps(value: number | null): string {
 
 export interface LlmComparisonRow {
   model: string
-  module: string
+  module: LlmModuleId
   summary: LlmSummary
   cost: LlmCostSummary
 }
@@ -241,15 +424,14 @@ export function summarizeCost(runs: LlmRunMetrics[]): LlmCostSummary {
 export function buildComparisonRows(runs: LlmRunMetrics[]): LlmComparisonRow[] {
   const groups = new Map<string, LlmRunMetrics[]>()
   for (const run of runs) {
-    const key = `${run.model} ${run.module}`
+    const key = `${run.model}\u0000${run.module}`
     const list = groups.get(key)
     if (list) list.push(run)
     else groups.set(key, [run])
   }
   const rows: LlmComparisonRow[] = []
-  for (const [key, list] of groups) {
-    const [model, module] = key.split(' ')
-    rows.push({ model, module, summary: summarize(list), cost: summarizeCost(list) })
+  for (const list of groups.values()) {
+    rows.push({ model: list[0].model, module: list[0].module, summary: summarize(list), cost: summarizeCost(list) })
   }
   // Schnellste zuerst — das ist die Frage, mit der man auf diese Tabelle schaut.
   // Zeilen ohne messbaren Durchsatz nach hinten, nicht als „0" dazwischen.

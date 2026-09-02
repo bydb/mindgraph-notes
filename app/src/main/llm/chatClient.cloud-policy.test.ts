@@ -27,7 +27,7 @@ describe('Cloud-Policy des Notiz-Agent-Wire', () => {
       usage: { prompt_tokens: 10, completion_tokens: 2 }
     }))
 
-    await chatWithTools([{ role: 'user', content: 'Auswerten' }], [], {
+    await chatWithTools([{ role: 'user', content: 'Auswerten' }], [], { telemetryModule: 'chat',
       backend: 'openrouter',
       openrouterApiKey: 'test-key',
       openrouterModel: 'vendor/model',
@@ -50,7 +50,7 @@ describe('Cloud-Policy des Notiz-Agent-Wire', () => {
   it('sendet keine OpenRouter-spezifische Policy an LLMBase', async () => {
     netFetch.mockResolvedValue(jsonResponse({ choices: [{ message: { content: 'fertig' } }] }))
 
-    await chatWithTools([{ role: 'user', content: 'Auswerten' }], [], {
+    await chatWithTools([{ role: 'user', content: 'Auswerten' }], [], { telemetryModule: 'chat',
       backend: 'llmbase',
       llmbaseApiKey: 'test-key',
       llmbaseModel: 'vendor/model',
@@ -76,7 +76,7 @@ describe('lokale Auto-Auswahl', () => {
       prompt_eval_count: 4
     }))
 
-    await chatWithTools([{ role: 'user', content: 'Hallo' }], [], { backend: 'ollama' })
+    await chatWithTools([{ role: 'user', content: 'Hallo' }], [], { backend: 'ollama', telemetryModule: 'chat' })
 
     const body = JSON.parse((netFetch.mock.calls[0][1] as RequestInit).body as string)
     expect(body.model).toBe('qwen3.8:4b')

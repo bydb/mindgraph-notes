@@ -81,6 +81,17 @@ describe('isActivityEvent', () => {
     expect(isActivityEvent({ at: NOW, kind: 'was-anderes' })).toBe(false)
     expect(isActivityEvent({ at: NOW, kind: 'task-created', count: 3 })).toBe(true)
   })
+
+  it('prüft den Verbrauch eines Laufs mit — eine NaN-Summe darf nicht in die Bilanz', () => {
+    const basis = { at: NOW, kind: 'agent-run-finished', runId: 'r', durationMs: 1000, activityType: 'summary', resultCount: 1, status: 'ok' }
+    expect(isActivityEvent(basis)).toBe(true)
+    expect(isActivityEvent({ ...basis, llm: { calls: 3, callsWithoutTokens: 0, cloudCalls: 0, promptTokens: 900, computeMs: 4200 } })).toBe(true)
+    expect(isActivityEvent({ ...basis, llm: { calls: 'drei' } })).toBe(false)
+    expect(isActivityEvent({ ...basis, llm: { calls: 3, callsWithoutTokens: 0, cloudCalls: 1, costReportedUsd: NaN } })).toBe(false)
+    const mail = { at: NOW, kind: 'email-tasks-extracted', id: 'm', emails: 2, tasks: 1, durationMs: 500 }
+    expect(isActivityEvent({ ...mail, llm: { calls: 2, callsWithoutTokens: 0, cloudCalls: 0 } })).toBe(true)
+    expect(isActivityEvent({ ...mail, llm: { calls: -1, callsWithoutTokens: 0, cloudCalls: 0 } })).toBe(false)
+  })
 })
 
 describe('summarizeActivity', () => {

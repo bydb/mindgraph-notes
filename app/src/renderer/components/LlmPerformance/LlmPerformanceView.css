@@ -138,3 +138,9 @@
   text-decoration: underline dotted color-mix(in srgb, var(--text-secondary) 40%, transparent);
   text-underline-offset: 3px;
 }
+
+.llmperf-section-title {
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}

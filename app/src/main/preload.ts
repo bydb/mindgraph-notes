@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Leistungsdaten der Modell-Läufe. `get` liest den Ringpuffer, `on…` bekommt
   // jeden neuen Lauf gepusht (einmal pro Anfrage, nicht pro Token).
   getLlmTelemetry: () => ipcRenderer.invoke('llm-telemetry-get'),
+  // Logbuch auf Platte, nach Zeitraum. Nur lesend — Anhängen gibt es vom Renderer aus nicht.
+  getLlmTelemetryRange: (range: { from: number; to: number }) => ipcRenderer.invoke('llm-telemetry-range', range),
   onLlmTelemetryRun: (callback: (run: unknown) => void) => {
     const handler = (_e: unknown, run: unknown) => callback(run)
     ipcRenderer.on('llm-telemetry-run', handler)
@@ -225,6 +227,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activityAppend: (vaultPath: string, entry: unknown) => ipcRenderer.invoke('activity-append', vaultPath, entry),
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) =>
     ipcRenderer.invoke('activity-summary', vaultPath, range),
+  // Rohereignisse (ohne Inhalte) für die Messgeschichte im Leistungsfenster.
+  activityEvents: (vaultPath: string) => ipcRenderer.invoke('activity-events', vaultPath),
   // Vergleichsmodus: Der Renderer schickt Absichten, der Main zieht den Weg und prüft
   // die Übergänge (docs/comparison-mode-plan.md).
   comparisonLoad: (vaultPath: string) => ipcRenderer.invoke('comparison-load', vaultPath),

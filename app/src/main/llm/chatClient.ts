@@ -16,13 +16,13 @@
 // (isCloudProviderReady / canUseCloudForFeature) und den Email-Picker (analysisModel).
 // Das Brain-Modul nutzt diesen Client NICHT — es ist hardcoded localhost.
 
-import { fromOllamaResponse, fromCloudResponse, type OllamaTimings } from '../../shared/llmTelemetry'
+import { fromOllamaResponse, fromCloudResponse, type OllamaTimings , type LlmModuleId } from '../../shared/llmTelemetry'
 import {
   resolveOllamaExecutionProfile,
   type LlmExecutionProfile
 } from '../../shared/agentExecutionProfile'
 import { isCloudModel } from '../../shared/modelCompatibility'
-import { recordLlmRun } from './telemetry'
+import { recordLlmRun, trackPendingTelemetry } from './telemetry'
 import { getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
 
@@ -100,9 +100,21 @@ export interface ChatOptions {
   // Deshalb setzt der Notiz-Agent den Wert explizit, statt zu hoffen.
   numCtx?: number
   // Für welches Modul dieser Lauf zählt (Leistungsanzeige). Rein beschreibend —
-  // beeinflusst weder Modellwahl noch Hard-Lock. Ohne Angabe läuft er unter 'chat'.
-  telemetryModule?: string
+  // beeinflusst weder Modellwahl noch Hard-Lock. In ChatOptions optional, weil die
+  // Optionen oft ohne Aufrufkontext gebaut werden (resolveCloudChatOptions); am
+  // Aufruf selbst ist das Modul Pflicht — siehe ChatCallOptions.
+  telemetryModule?: LlmModuleId
+  // Kennung des übergeordneten Laufs (Agentenauftrag, Mail-Extraktion). Damit lassen
+  // sich die Aufrufe eines Laufs später zu Kosten, Token und Rechenzeit summieren.
+  telemetryRunId?: string
 }
+
+/**
+ * Optionen am Aufruf: das Modul ist Pflicht. Bis 09/2026 fiel ein fehlendes Modul still
+ * auf 'chat' zurück — fast jede Zeile der Vergleichstabelle hieß so und beschrieb keine
+ * einzige Aufgabe. Jetzt ist ein Aufruf ohne Modul ein Typfehler.
+ */
+export type ChatCallOptions = ChatOptions & { telemetryModule: LlmModuleId }
 
 export interface ChatResult {
   text: string
@@ -328,7 +340,7 @@ async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<
 
 // ─── Ollama: plain chat ──────────────────────────────────────────────────────
 
-async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promise<ChatResult> {
+async function chatViaOllama(messages: ChatMessage[], opts: ChatCallOptions): Promise<ChatResult> {
   const url = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
   if (!model) throw new Error('Kein Ollama-Modell verfügbar')
@@ -360,7 +372,8 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatOptions): Promis
   }
   const json = await res.json() as { message?: { content?: string; thinking?: string } } & OllamaTimings
   recordLlmRun(fromOllamaResponse(json, {
-    module: opts.telemetryModule ?? 'chat',
+    module: opts.telemetryModule,
+    runId: opts.telemetryRunId,
     model,
     wallMs: Date.now() - startedAt,
     at: startedAt,
@@ -515,9 +528,9 @@ function cloudRequestPolicy(backend: ChatBackend, opts: ChatOptions): Record<str
  * nichts; ein Eintrag mit 0 wäre dort keine Messung, sondern eine Behauptung.
  */
 async function recordCloudCall(
-  target: OpenAiCompatibleTarget,
+  target: Pick<OpenAiCompatibleTarget, 'model' | 'pricingLookup'>,
   rawUsage: unknown,
-  meta: { module: string; wallMs: number; at: number; firstTokenMs?: number }
+  meta: { module: LlmModuleId; runId?: string; wallMs: number; at: number; firstTokenMs?: number }
 ): Promise<void> {
   const lookup = target.pricingLookup
   if (!lookup) return
@@ -529,6 +542,7 @@ async function recordCloudCall(
       : null
     recordLlmRun(fromCloudResponse(usage, {
       module: meta.module,
+      runId: meta.runId,
       model: target.model,
       backend: lookup.backend,
       wallMs: meta.wallMs,
@@ -544,7 +558,7 @@ async function recordCloudCall(
 async function chatViaOpenAiCompatible(
   backend: ChatBackend,
   messages: ChatMessage[],
-  opts: ChatOptions
+  opts: ChatCallOptions
 ): Promise<ChatResult> {
   const target = openAiCompatibleTarget(backend, opts)
   const startedAt = Date.now()
@@ -566,15 +580,16 @@ async function chatViaOpenAiCompatible(
     throw new Error(target.friendlyError(res.status, await res.text()))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: unknown }
-  void recordCloudCall(target, json.usage, {
-    module: opts.telemetryModule ?? 'chat',
+  trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(target, json.usage, {
+    module: opts.telemetryModule,
+    runId: opts.telemetryRunId,
     wallMs: Date.now() - startedAt,
     at: startedAt
-  })
+  }))
   return { text: openrouterMessageText(json.choices?.[0]?.message), backend }
 }
 
-export async function chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
+export async function chat(messages: ChatMessage[], opts: ChatCallOptions): Promise<ChatResult> {
   if (isCloudChatBackend(opts.backend)) {
     return chatViaOpenAiCompatible(opts.backend, messages, opts)
   }
@@ -625,7 +640,7 @@ interface OllamaToolCallWire {
 async function chatWithToolsViaOllama(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  opts: ChatOptions
+  opts: ChatCallOptions
 ): Promise<ChatWithToolsResult> {
   const url = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
   const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
@@ -682,7 +697,8 @@ async function chatWithToolsViaOllama(
   } & OllamaTimings
 
   recordLlmRun(fromOllamaResponse(json, {
-    module: opts.telemetryModule ?? 'chat',
+    module: opts.telemetryModule,
+    runId: opts.telemetryRunId,
     model,
     wallMs: Date.now() - startedAt,
     at: startedAt,
@@ -761,7 +777,7 @@ async function chatWithToolsViaOpenAiCompatible(
   backend: ChatBackend,
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  opts: ChatOptions
+  opts: ChatCallOptions
 ): Promise<ChatWithToolsResult> {
   const target = openAiCompatibleTarget(backend, opts)
   const wireTools = tools.map(t => ({
@@ -790,11 +806,12 @@ async function chatWithToolsViaOpenAiCompatible(
   const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: { prompt_tokens?: number } }
   // Jede Iteration des Agenten-Loops ist ein eigener bezahlter Aufruf — hier wird
   // sie einzeln erfasst, aggregiert wird erst im Loop (shared/llmCost.ts sumCalls).
-  void recordCloudCall(target, json.usage, {
-    module: opts.telemetryModule ?? 'chat',
+  trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(target, json.usage, {
+    module: opts.telemetryModule,
+    runId: opts.telemetryRunId,
     wallMs: Date.now() - startedAt,
     at: startedAt
-  })
+  }))
   const msg = json.choices?.[0]?.message
   const rawCalls = msg?.tool_calls ?? []
   const toolCalls: ToolCall[] = rawCalls
@@ -840,7 +857,7 @@ async function chatWithToolsViaOpenAiCompatible(
 export async function chatWithTools(
   messages: ChatMessage[],
   tools: ToolDefinition[],
-  opts: ChatOptions = {}
+  opts: ChatCallOptions
 ): Promise<ChatWithToolsResult> {
   if (isCloudChatBackend(opts.backend)) {
     return chatWithToolsViaOpenAiCompatible(opts.backend, messages, tools, opts)
@@ -865,13 +882,19 @@ export async function chatWithTools(
 // Streaming anfühlt (kein „hängen" bis die ganze Antwort da ist).
 export async function streamCloudChat(
   messages: ChatMessage[],
-  opts: { backend: CloudChatBackend; apiKey: string; model: string; signal?: AbortSignal },
+  opts: { backend: CloudChatBackend; apiKey: string; model: string; signal?: AbortSignal; telemetryModule: LlmModuleId; telemetryRunId?: string },
   onToken: (delta: string) => void
 ): Promise<string> {
   const label = CLOUD_PROVIDERS[opts.backend].label
   if (!opts.apiKey) throw new Error(`${label}-API-Key fehlt.`)
   if (!opts.model) throw new Error(`Kein ${label}-Modell ausgewählt.`)
 
+  const startedAt = Date.now()
+  let firstTokenMs: number | undefined
+  // Manche Anbieter schicken im letzten Stream-Chunk einen usage-Block. Wir fordern ihn
+  // nicht eigens an (stream_options ist nicht bei jedem Anbieter erlaubt) — kommt er,
+  // wird er genommen; kommt er nicht, zählt der Aufruf als „ohne Preis", nie als 0.
+  let usage: unknown = undefined
   const res = await fetch(`${CLOUD_PROVIDERS[opts.backend].baseUrl}/chat/completions`, {
     method: 'POST',
     headers: cloudHeaders(opts.backend, opts.apiKey),
@@ -903,9 +926,11 @@ export async function streamCloudChat(
       const data = trimmed.slice(5).trim()
       if (data === '[DONE]') continue
       try {
-        const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> }
+        const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }>; usage?: unknown }
+        if (json.usage) usage = json.usage
         const delta = json.choices?.[0]?.delta?.content
         if (delta) {
+          if (firstTokenMs === undefined) firstTokenMs = Date.now() - startedAt
           full += delta
           onToken(delta)
         }
@@ -914,13 +939,19 @@ export async function streamCloudChat(
       }
     }
   }
+  // Bis 09/2026 wurde Cloud-Streaming gar nicht erfasst — weder Dauer noch Kosten.
+  trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(
+    { model: opts.model, pricingLookup: { backend: opts.backend, baseUrl: CLOUD_PROVIDERS[opts.backend].baseUrl, apiKey: opts.apiKey } },
+    usage,
+    { module: opts.telemetryModule, runId: opts.telemetryRunId, wallMs: Date.now() - startedAt, at: startedAt, firstTokenMs }
+  ))
   return full
 }
 
 // Historischer Name — OpenRouter-Streaming, bestehende Aufrufer bleiben gültig.
 export async function streamOpenRouterChat(
   messages: ChatMessage[],
-  opts: { apiKey: string; model: string; signal?: AbortSignal },
+  opts: { apiKey: string; model: string; signal?: AbortSignal; telemetryModule: LlmModuleId; telemetryRunId?: string },
   onToken: (delta: string) => void
 ): Promise<string> {
   return streamCloudChat(messages, { ...opts, backend: 'openrouter' }, onToken)

@@ -6,6 +6,9 @@
  * Cloud-/LM-Studio-Pfad für Projektinhalte.
  */
 
+import { recordLlmRun } from '../llm/telemetry'
+import { fromOllamaResponse } from '../../shared/llmTelemetry'
+
 const OLLAMA_LOCAL_URL = 'http://localhost:11434'
 const EMBED_TIMEOUT_MS = 60000
 
@@ -22,6 +25,7 @@ export class EmbeddingModelMissingError extends Error {
 export async function embedText(model: string, text: string): Promise<number[]> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), EMBED_TIMEOUT_MS)
+  const startedAt = Date.now()
   try {
     const response = await fetch(`${OLLAMA_LOCAL_URL}/api/embeddings`, {
       method: 'POST',
@@ -38,6 +42,8 @@ export async function embedText(model: string, text: string): Promise<number[]> 
       throw new Error(`Ollama Embeddings Fehler ${response.status}`)
     }
     const data = (await response.json()) as { embedding?: number[] }
+    // /api/embeddings meldet keine Zeiten — der Aufruf wird gezählt, mehr nicht.
+    recordLlmRun(fromOllamaResponse({}, { module: 'embedding', model, wallMs: Date.now() - startedAt, at: startedAt }))
     if (!data.embedding || data.embedding.length === 0) {
       throw new Error('Leere Embedding-Antwort von Ollama')
     }

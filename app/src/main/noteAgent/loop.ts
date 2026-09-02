@@ -220,7 +220,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
 
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
-    const result = await chatWithTools(messages, tools, { ...chatOptions, telemetryModule: 'note-agent' })
+    const result = await chatWithTools(messages, tools, { ...chatOptions, telemetryModule: 'note-agent', telemetryRunId: run.runId })
     callUsages.push(result.usage ?? null)
     if (run.abort.signal.aborted) throw new Error('Abgebrochen')
 

@@ -15,7 +15,7 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
-const OPTS = {
+const OPTS = { telemetryModule: 'chat' as const,
   backend: 'openrouter' as const,
   openrouterApiKey: 'test-key',
   openrouterModel: 'deepseek/deepseek-v4-flash'

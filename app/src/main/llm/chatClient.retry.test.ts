@@ -19,7 +19,7 @@ vi.mock('electron', () => ({ net: { fetch: (...args: unknown[]) => netFetch(...a
 
 import { chatWithTools, CHAT_RETRY_DELAY_MS, errorChainText } from './chatClient'
 
-const OPTS = { backend: 'openrouter' as const, openrouterApiKey: 'k', openrouterModel: 'moonshotai/kimi-k3' }
+const OPTS = { telemetryModule: 'chat' as const, backend: 'openrouter' as const, openrouterApiKey: 'k', openrouterModel: 'moonshotai/kimi-k3' }
 const MSGS = [{ role: 'user' as const, content: 'hi' }]
 
 function okResponse(text = 'fertig'): Response {

@@ -55,7 +55,7 @@ describe('Ollama-Thinking im Tool-Loop', () => {
         eval_count: 8
       }))
 
-    const options = {
+    const options = { telemetryModule: 'chat' as const,
       backend: 'ollama' as const,
       ollamaModel: 'qwen3.8:27b-mlx',
       executionProfile: PROFILE
