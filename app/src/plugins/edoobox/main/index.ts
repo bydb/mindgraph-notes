@@ -170,8 +170,10 @@ export default definePluginMain(
     actions.register('edoobox.saveCredentials', async (p) => {
       try {
         const { apiKey, apiSecret } = p as { apiKey: string; apiSecret: string }
-        await host.secrets.set('apiKey', apiKey)
-        await host.secrets.set('apiSecret', apiSecret)
+        // Getrimmt speichern: Aus Mail oder Datei kopierte Schlüssel bringen gern ein Zeilenende
+        // oder Leerzeichen mit, und edoobox antwortet darauf mit 401 — ohne jeden Hinweis.
+        await host.secrets.set('apiKey', apiKey.trim())
+        await host.secrets.set('apiSecret', apiSecret.trim())
         return true
       } catch {
         return false

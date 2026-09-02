@@ -64,8 +64,13 @@ describe('edoobox-Plugin — Vertikale durch Registry + Host', () => {
     expect(await registry.invoke('edoobox', 'edoobox.saveCredentials', { apiKey: 'k', apiSecret: 's' })).toBe(true)
     expect(secrets.get('plugin:edoobox:apiKey')).toBe('k')
     expect(secrets.get('plugin:edoobox:apiSecret')).toBe('s')
+    // Zeilenende und Leerzeichen aus der Zwischenablage dürfen nicht mitgespeichert werden —
+    // edoobox antwortet darauf mit 401, ohne dass jemand das unsichtbare Zeichen sähe.
+    expect(await registry.invoke('edoobox', 'edoobox.saveCredentials', { apiKey: ' key\r\n', apiSecret: 'secret \n' })).toBe(true)
+    expect(secrets.get('plugin:edoobox:apiKey')).toBe('key')
+    expect(secrets.get('plugin:edoobox:apiSecret')).toBe('secret')
 
-    expect(await registry.invoke('edoobox', 'edoobox.loadCredentials', {})).toEqual({ apiKey: 'k', apiSecret: 's' })
+    expect(await registry.invoke('edoobox', 'edoobox.loadCredentials', {})).toEqual({ apiKey: 'key', apiSecret: 'secret' })
   })
 
   it('API-Action ohne Credentials liefert {success:false}', async () => {

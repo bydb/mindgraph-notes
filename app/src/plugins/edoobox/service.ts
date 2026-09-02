@@ -49,6 +49,28 @@ function errorDetail(raw: string): string {
   return EDOOBOX_VERBOSE ? truncateError(raw) : 'Details unterdrückt (Debug: MINDGRAPH_DEBUG_EDOOBOX=1)'
 }
 
+/**
+ * Fehlertext für eine GESCHEITERTE ANMELDUNG — immer sichtbar, nicht nur im Debug-Modus.
+ *
+ * Die Antwort auf /v2/auth enthält keine Teilnehmerdaten, nur einen edoobox-Fehlercode oder die
+ * Seite eines Proxys. Die Unterdrückung schützte hier nichts, kostete aber die Diagnose: Ein
+ * Kunde mit korrekten Schlüsseln (auf dem Mac geprüft) bekam unter Windows nur „Details
+ * unterdrückt" und niemand konnte sagen, ob edoobox oder ein Schulnetz-Proxy geantwortet hat.
+ * Key und Secret werden trotzdem aus dem Text entfernt, falls ein Server sie zurückspiegelt.
+ */
+export function describeAuthFailure(status: number, body: string, secrets: string[] = []): string {
+  let detail = truncateError(body.trim())
+  for (const secret of secrets) {
+    if (secret && detail.includes(secret)) detail = detail.split(secret).join('[entfernt]')
+  }
+  const hint = body.includes('<!DOCTYPE') || body.includes('<html')
+    ? ' — die Antwort kam nicht von edoobox, sondern von einem Proxy oder Webfilter im Netz'
+    : status === 401
+      ? ' — edoobox hat Key und Secret abgelehnt; passen Server (app1/Sandbox), API-Version und Uhrzeit des Rechners?'
+      : ''
+  return `Authentication failed (${status}): ${detail || '(leere Antwort)'}${hint}`
+}
+
 function truncateError(text: string, maxLen = 200): string {
   if (text.length <= maxLen) return text
   if (text.includes('<!DOCTYPE') || text.includes('<html')) {
@@ -69,8 +91,10 @@ export class EdooboxService {
 
   constructor(baseUrl: string, apiKey: string, apiSecret: string, fetchImpl: FetchImpl, apiVersion: ApiVersion = 'v1') {
     this.baseUrl = baseUrl.replace(/\/$/, '').replace(/\/v[12]$/i, '')
-    this.apiKey = apiKey
-    this.apiSecret = apiSecret
+    // Ein Zeilenende aus der Zwischenablage reicht für einen 401 — hier nochmals getrimmt,
+    // auch wenn das Speichern es schon tut (ältere Bestände kennen den Trim nicht).
+    this.apiKey = apiKey.trim()
+    this.apiSecret = apiSecret.trim()
     this.apiVersion = apiVersion
     this.fetchImpl = fetchImpl
   }
@@ -105,7 +129,7 @@ export class EdooboxService {
 
     if (!res.ok) {
       const text = await res.text()
-      throw new Error(`Authentication failed (${res.status}): ${errorDetail(text)}`)
+      throw new Error(describeAuthFailure(res.status, text, [this.apiKey, this.apiSecret]))
     }
 
     const data = await res.json()
