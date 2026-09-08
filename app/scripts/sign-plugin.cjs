@@ -11290,7 +11290,8 @@ var CAPABILITY_VALUES = [
   "pdf.render",
   "pdf.optimize",
   "dialog",
-  "resource"
+  "resource",
+  "activity"
 ];
 var CATEGORY_VALUES = [
   "ai",
