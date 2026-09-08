@@ -84,6 +84,8 @@ export interface RunOptions {
    * Wird von `runWorkflow` beim Start initialisiert.
    */
   aiTrace?: { lastModel: string | null }
+  /** Name des laufenden Workflows — für Titel von Artefakten (Prüfnotiz). Setzt `runWorkflow`. */
+  workflowName?: string
 }
 
 /** Modell der letzten LLM-Action dieses Laufs — null, wenn keine gelaufen ist. */
@@ -147,6 +149,31 @@ function isEffectivelyEmptyContext(ctx: string): boolean {
 
 type Executor = (node: WorkflowNode, inputs: Record<string, unknown>, opts: RunOptions) => Promise<ExecResult>
 
+/** Zielordner der Prüfnotizen von „Mensch prüft (Text)" — derselbe wie der Default von notes.create. */
+const REVIEW_NOTE_FOLDER = '000 - 📥 inbox/010 - 📥 Notes'
+
+/** Führende „Betreff: …"-Zeilen (auch fett) am Textanfang entfernen. Exportiert für Tests. */
+export function stripLeadingSubjectLines(text: string): string {
+  let out = text.replace(/^\s+/, '')
+  // Mehrere hintereinander möglich (Modell + Auslöser) — alle am Anfang abräumen.
+  for (;;) {
+    const next = out.replace(/^(?:\*\*)?\s*betreff(?:\*\*)?\s*:.*(?:\r?\n|$)/i, '').replace(/^\s+/, '')
+    if (next === out) return out.trim()
+    out = next
+  }
+}
+
+/** Titel der Prüfnotiz: bevorzugt der Workflow-Name (vorhersagbar, dateinamensicher); ohne
+ *  Namen die erste Textzeile ohne Markdown-Auszeichnung und ohne Doppelpunkte (die würde die
+ *  Dateinamen-Bereinigung sonst zu „16-30 Uhr" verstümmeln), gedeckelt. */
+export function reviewNoteTitle(text: string, workflowName?: string): string {
+  const name = (workflowName || '').trim()
+  if (name) return `Zur Prüfung – ${name}`
+  const first = text.split('\n').map(l => l.replace(/[*_#>`]/g, '').replace(/[:：]\s*$/, '').replace(/[:：]/g, ' ').replace(/\s{2,}/g, ' ').trim()).find(Boolean) || ''
+  const core = first.length > 60 ? `${first.slice(0, 57).trimEnd()}…` : first
+  return core ? `Zur Prüfung – ${core}` : 'Zur Prüfung'
+}
+
 /** Email-Trigger (selectedEmail/replyReceived/icsReceived): gibt die geseedete Mail aus. */
 const triggerEmailExecutor: Executor = async (_node, _inputs, opts) => {
   const email = opts.seed?.email
@@ -206,7 +233,9 @@ const EXECUTORS: Record<string, Executor> = {
 
   'email.composeDraft': async (_node, inputs) => {
     const email = asEmail(inputs.email)
-    const text = asText(inputs.text).trim()
+    // Modelle setzen trotz Anweisung gern eine eigene „Betreff:"-Zeile voran — die Betreffzeile
+    // kommt aber aus dem Auslöser. Sonst standen im Entwurf zwei Betreffs (real bei Antares).
+    const text = stripLeadingSubjectLines(asText(inputs.text))
     const subject = email.subject ? `Betreff: ${email.subject}\n\n` : ''
     return {
       outputs: { draft: `${subject}${text}`.trim() },
@@ -275,7 +304,8 @@ const EXECUTORS: Record<string, Executor> = {
       'Stütze dich AUSSCHLIESSLICH auf Fakten aus der E-Mail und dem Projektkontext unten. Erfinde nichts.',
       'Du hast etwaige Anhänge (Bilder, PDFs, Dateien) NICHT gesehen. Behaupte nicht, Material geprüft, bewertet oder freigegeben zu haben.',
       'Triff KEINE Zusagen, Freigaben oder Qualitätsurteile, die du nicht belegen kannst. Bittet die Mail um Abnahme/Feedback zu nicht einsehbarem Material, bleib neutral und stelle die Prüfung in Aussicht (z.B. "ich sehe mir die Entwürfe an und melde mich kurz").',
-      'Ist kein Projektkontext vorhanden, schreibe keine projektspezifischen Details.'
+      'Ist kein Projektkontext vorhanden, schreibe keine projektspezifischen Details.',
+      'Schließe mit einer Grußformel ab, aber OHNE Namen, Unterschrift oder Signatur darunter — die Signatur ergänzt die App automatisch. Keine Platzhalter wie [Name].'
     ].map(r => `- ${r}`).join('\n')
     const prompt = `Entwirf eine freundliche, professionelle Antwort auf die folgende E-Mail.\n${anredeHinweis}\n\nWichtige Regeln:\n${regeln}\n\nLeichte Formatierung ist erlaubt (Markdown: **fett**, *kursiv*, Listen mit "• "). KEINE "Betreff:"-Zeile, beginne direkt mit der Anrede. Gib NUR den Antworttext zurück.\n\n=== E-Mail ===\nBetreff: ${email.subject || ''}\n${email.bodyText || ''}\n\n=== Projektkontext ===\n${context || '(keiner)'}`
     const out = await opts.services.ollamaGenerate(prompt, model)
@@ -286,7 +316,7 @@ const EXECUTORS: Record<string, Executor> = {
   'ollama.extractTasks': async (node, inputs, opts) => {
     const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const out = await opts.services.ollamaGenerate(
-      `Extrahiere konkrete, umsetzbare Aufgaben aus dem folgenden Text. Gib NUR eine Liste, eine Aufgabe pro Zeile. Keine Einleitung, keine Überschrift. Wenn keine Aufgaben enthalten sind, antworte mit einer leeren Zeile.\n\n${asText(inputs.text)}`,
+      `Extrahiere konkrete, umsetzbare Aufgaben aus dem folgenden Text — und zwar die Aufgaben, die sich daraus für MICH als Empfänger ergeben (z.B. „Frage X beantworten", „Y prüfen und zurückmelden", „Z zuschicken"), nicht die Aufgaben des Absenders. Formuliere jede Aufgabe als To-do für mich, im Infinitiv. Gib NUR eine Liste, eine Aufgabe pro Zeile. Keine Einleitung, keine Überschrift. Wenn keine Aufgaben enthalten sind, antworte mit einer leeren Zeile.\n\n${asText(inputs.text)}`,
       model
     )
     noteAiModel(opts, model)
@@ -321,7 +351,12 @@ const EXECUTORS: Record<string, Executor> = {
   'ollama.transformText': async (node, inputs, opts) => {
     const model = opts.services.resolveModel(node.config.model as string | undefined, 'task-extraction')
     const userPrompt = (node.config.prompt as string) || 'Bearbeite den folgenden Text.'
-    const out = await opts.services.ollamaGenerate(`${userPrompt}\n\n${asText(inputs.text)}`, model)
+    // Chat-Modelle leiten gern ein („Hier ist die knappe Prüfnotiz…") — das landete real als
+    // erste Zeile in der Prüfnotiz. Der Zusatz gilt für jeden freien Prompt.
+    const out = await opts.services.ollamaGenerate(
+      `${userPrompt}\n\nGib NUR das Ergebnis aus — ohne Einleitungssatz, ohne Kommentar, ohne Rückfrage.\n\n${asText(inputs.text)}`,
+      model
+    )
     noteAiModel(opts, model)
     return { outputs: { text: out }, log: [`Text transformiert mit ${model}`] }
   },
@@ -359,12 +394,25 @@ const EXECUTORS: Record<string, Executor> = {
   },
 
   'human.reviewText': async (_node, inputs, opts) => {
-    const text = asText(inputs.text)
+    const text = asText(inputs.text).trim()
+    // Das Ergebnis muss den Lauf überleben: vorher stand der Text nur im Lauf-Panel (manuell)
+    // bzw. als 80-Zeichen-Aufgabe (Event) — die eigentliche Prüfnotiz war weg, sobald das
+    // Panel geschlossen wurde. Jetzt landet sie als Notiz im Inbox-Ordner.
+    const noteRel = await opts.services.createNote(REVIEW_NOTE_FOLDER, reviewNoteTitle(text, opts.workflowName), text, aiModelOf(opts))
+    const noteName = noteRel.split('/').pop()?.replace(/\.md$/i, '') || noteRel
     if (isEventTrigger(opts.trigger)) {
-      const taskRel = await opts.services.createTask(`- [ ] 📝 Prüfen: ${text.slice(0, 80)}`)
-      return { outputs: { approval: 'pending' }, log: ['Aufgabe zur Prüfung angelegt'], handoff: { kind: 'task', payload: { taskRel, text } } }
+      const taskRel = await opts.services.createTask(`- [ ] 📝 Prüfen: [[${noteName}]]`)
+      return {
+        outputs: { approval: 'pending' },
+        log: [`Prüfnotiz angelegt: ${noteRel}`, 'Aufgabe zur Prüfung angelegt'],
+        handoff: { kind: 'task', payload: { taskRel, text, noteRel } }
+      }
     }
-    return { outputs: { approval: 'pending' }, log: ['Wartet auf Prüfung durch den Menschen'], handoff: { kind: 'note', payload: { text } } }
+    return {
+      outputs: { approval: 'pending' },
+      log: [`Prüfnotiz angelegt: ${noteRel}`],
+      handoff: { kind: 'note', payload: { text, noteRel } }
+    }
   },
 
   'human.reviewDraftReply': async (_node, inputs, opts) => {
@@ -407,6 +455,7 @@ export async function runWorkflow(workflow: Workflow, opts: RunOptions): Promise
   // Modell-Spur pro Lauf frisch — ein früherer Lauf darf einen rein deterministischen
   // Folgelauf nicht fälschlich als KI-Inhalt stempeln.
   opts.aiTrace = { lastModel: null }
+  opts.workflowName = workflow.name
   const order = topoSort(workflow)
   const baseRun: WorkflowRun = {
     id: genId('run'),

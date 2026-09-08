@@ -114,3 +114,16 @@
   text-align: right;
   opacity: 0.8;
 }
+
+/* Nutzenbilanz: Ergebnisliste statt Diagramm — was erledigt wurde, in Worten. */
+.llmhist-benefit-list { margin: 8px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.6; }
+.llmhist-benefit-list li { margin: 0; }
+
+/* Nachtrag: schmale Zeile unter dem Zeitgewinn — Auswahl, Minuten, Knopf. */
+.llmhist-correction { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border-color); }
+.llmhist-correction-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.llmhist-correction-row select { max-width: 100%; min-width: 260px; font-size: 12px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-secondary); color: var(--text-primary); }
+.llmhist-correction-row input { width: 90px; font-size: 12px; padding: 5px 8px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-secondary); color: var(--text-primary); }
+.llmhist-correction-row button { padding: 6px 12px; font-size: 12px; border: 1px solid var(--border-color); border-radius: 7px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer; }
+.llmhist-correction-row button:hover:not(:disabled) { background: var(--bg-hover); }
+.llmhist-correction-row button:disabled { opacity: 0.5; cursor: default; }

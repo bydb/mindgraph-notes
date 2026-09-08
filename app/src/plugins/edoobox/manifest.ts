@@ -6,7 +6,7 @@
 import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
-export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource', 'llm.generate'] as const
+export const EDOOBOX_CAPABILITIES = ['http.fetch', 'secrets', 'vault.read', 'vault.write', 'dialog', 'resource', 'llm.generate', 'activity'] as const
 
 // — Ausgabe-Schemas (Defense-in-Depth). Die meisten Actions liefern die alte {success,…}-IPC-
 //   Hülle. `success:boolean` ist IMMER da → required; die vom Renderer/Workflow KONSUMIERTEN
@@ -33,8 +33,8 @@ const categoriesEnvelope = envelope({ categories: arr })
 const bookingsEnvelope = envelope({ bookings: arr })
 const datesEnvelope = envelope({ dates: arr })
 const importEventEnvelope = envelope({ offerId: str })
-const fileExportEnvelope = envelope({ filePath: str, canceled: { type: 'boolean' } })
-const contentEnvelope = envelope({ blogPost: str, igCaption: str })
+const fileExportEnvelope = envelope({ filePath: str, canceled: { type: 'boolean' }, jobId: str })
+const contentEnvelope = envelope({ blogPost: str, igCaption: str, jobId: str })
 const apiCredentialsResult: JsonSchema = {
   anyOf: [
     { type: 'null' },
@@ -191,12 +191,19 @@ export const manifest: PluginManifest = {
     {
       id: 'edoobox.generateAttendanceList',
       label: 'Teilnehmerliste exportieren',
-      requiredCapabilities: ['resource', 'dialog'],
+      requiredCapabilities: ['resource', 'dialog', 'activity'],
       isWrite: true,
       inputSchema: {
         type: 'object',
         required: ['data', 'suggestedFileName'],
-        properties: { data: { type: 'object' }, suggestedFileName: { type: 'string' } },
+        properties: {
+          data: { type: 'object' },
+          suggestedFileName: { type: 'string' },
+          // Arbeitsbilanz: opake Vorgangsteile (Angebots-ID + Termine, kein Titel) und
+          // die Vordergrundzeit des Renderers bis zum Speichern.
+          jobKey: { type: 'string' },
+          activeMs: { type: 'number' },
+        },
         additionalProperties: false,
       },
     },
@@ -205,11 +212,40 @@ export const manifest: PluginManifest = {
     //   via wordpressServiceBridge); Bild-Generierung das Core-Modul `image-generation`. —
     {
       id: 'edoobox.marketingGenerateContent',
-      requiredCapabilities: ['llm.generate'],
+      requiredCapabilities: ['llm.generate', 'activity'],
       inputSchema: {
         type: 'object',
         required: ['offerData'],
         properties: { offerData: { type: 'object' } },
+        additionalProperties: false,
+      },
+    },
+    {
+      // Vorbereitung aufgegeben (erneut generiert oder gescheitert): Ihr Aufwand ist ein
+      // Fehlversuch und wird abgezogen — sonst sähe die Bilanz nach Wiederholungen nur den Treffer.
+      id: 'edoobox.marketingAbandon',
+      label: 'Marketing-Vorbereitung aufgeben',
+      requiredCapabilities: ['activity'],
+      isWrite: true,
+      inputSchema: {
+        type: 'object',
+        required: ['jobId'],
+        properties: { jobId: { type: 'string' }, activeMs: { type: 'number' } },
+        additionalProperties: false,
+      },
+    },
+    {
+      // Instagram hat keinen Nachweis an der Main-Grenze (Zwischenablage ist Renderer).
+      // Der Klick „Als verwendet markieren" ist dieselbe Vertrauensklasse wie „Übernehmen"
+      // beim Agenten: eine Nutzerentscheidung, hier festgehalten — keine erfundene Messung.
+      id: 'edoobox.marketingMarkUsed',
+      label: 'Instagram-Text als verwendet markieren',
+      requiredCapabilities: ['activity'],
+      isWrite: true,
+      inputSchema: {
+        type: 'object',
+        required: ['jobId'],
+        properties: { jobId: { type: 'string' }, activeMs: { type: 'number' } },
         additionalProperties: false,
       },
     },
@@ -269,6 +305,8 @@ const EDOOBOX_OUTPUT_SCHEMAS: Record<string, JsonSchema> = {
   'edoobox.generateIqReport': fileExportEnvelope,
   'edoobox.generateAttendanceList': fileExportEnvelope,
   'edoobox.marketingGenerateContent': contentEnvelope,
+  'edoobox.marketingMarkUsed': plainEnvelope,
+  'edoobox.marketingAbandon': plainEnvelope,
   'edoobox.marketingSelectImage': selectedImageResult,
   'edoobox.marketingSaveImage': fileExportEnvelope,
 }

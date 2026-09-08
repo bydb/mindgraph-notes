@@ -18,7 +18,7 @@ export function buildEdooboxConfirmationExample(): Workflow {
         position: { x: 340, y: 220 },
         config: {
           model: '',
-          prompt: 'Verfasse aus den folgenden Anmeldedaten eine freundliche, professionelle Bestätigungs-E-Mail zur Fortbildungs-Anmeldung. Sprich die Person mit „Sie" an. Bestätige die Anmeldung, nenne Angebot und Teilnehmer, danke für das Interesse und weise darauf hin, dass weitere organisatorische Informationen rechtzeitig folgen. Erfinde keine Details: Ort, Datum, Uhrzeit oder Zahlungsangaben nur nennen, wenn sie im Text vorkommen. Höchstens 120 Wörter. Gib nur den E-Mail-Text aus (Anrede bis Grußformel), keinen Betreff.'
+          prompt: 'Verfasse aus den folgenden Anmeldedaten eine freundliche, professionelle Bestätigungs-E-Mail zur Fortbildungs-Anmeldung. Sprich die Person mit „Sie" an. Bestätige die Anmeldung, nenne Angebot und Teilnehmer, danke für das Interesse und weise darauf hin, dass weitere organisatorische Informationen rechtzeitig folgen. Erfinde keine Details: Ort, Datum, Uhrzeit oder Zahlungsangaben nur nennen, wenn sie im Text vorkommen. Höchstens 120 Wörter. Gib nur den E-Mail-Text aus (Anrede bis Grußformel): keinen Betreff, keine Platzhalter, keine Unterschrift oder Signatur — die ergänzt die App.'
         }
       },
       { id: 'n_draft', actionId: 'email.composeDraft', position: { x: 640, y: 220 }, config: {} },

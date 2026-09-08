@@ -16,9 +16,11 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import {
   isActivityEvent,
+  isCorrectionTargetKnown,
   pruneActivityEvents,
   summarizeActivity,
   localDayRange,
+  MAX_CORRECTION_MS,
   type ActivityEvent,
   type ActivitySummary
 } from '../shared/activityLog'
@@ -132,7 +134,55 @@ export async function setEmailForegroundMs(vaultPath: string, id: string, foregr
 }
 
 /**
- * Alle Ereignisse des Protokolls (90 Tage, höchstens 5000). Für die Messgeschichte:
+ * Trägt die vollständig gemessene Vordergrundzeit an einem Vorgangsabschluss nach.
+ *
+ * Warum nötig (Review F08): Der Renderer misst, der Kern schreibt — aber der Abschluss
+ * entsteht im Kern (Speicherdialog, WordPress-Antwort), während die Messung im Renderer
+ * noch läuft. Der beim Aufruf mitgegebene Wert ist deshalb eine Untergrenze. Nach der
+ * Antwort darf der Renderer sie an der opaken Kennung anheben — nur anheben, nie senken,
+ * nur an einem vorhandenen Abschluss dieses Kanals.
+ */
+export async function raiseJobActiveMs(vaultPath: string, jobId: string, jobType: string, activeMs: number): Promise<boolean> {
+  if (!vaultPath || !jobId || !jobType || !Number.isFinite(activeMs) || activeMs < 0) return false
+  const file = ledgerFile(vaultPath)
+  return enqueue(file, async () => {
+    try {
+      const events = await readFile(file)
+      const treffer = [...events].reverse().find(e => e.kind === 'job-outcome' && e.jobId === jobId && e.jobType === jobType)
+      if (!treffer || treffer.kind !== 'job-outcome') return false
+      const bisher = typeof treffer.activeMs === 'number' ? treffer.activeMs : -1
+      if (activeMs <= bisher) return false
+      treffer.activeMs = Math.round(activeMs)
+      await writeAtomic(file, events)
+      for (const listener of listeners) {
+        try { listener(vaultPath) } catch { /* ein defekter Beobachter darf nichts aufhalten */ }
+      }
+      return true
+    } catch {
+      return false
+    }
+  })
+}
+
+/**
+ * Manuelle Zeitkorrektur: Nacharbeit, die die App nicht sehen konnte (Excel, Word, Browser).
+ * Vertrauensklasse wie die Referenzminuten — eine Angabe des Nutzers. Angenommen wird sie nur
+ * für ein Ziel, das im Protokoll steht, in Minuten zwischen 1 und acht Stunden; die
+ * Rohmessung bleibt unverändert, der Nachtrag ist ein eigenes Ereignis.
+ */
+export async function appendTimeCorrection(vaultPath: string, targetId: string, extraMs: number): Promise<boolean> {
+  if (!vaultPath || typeof targetId !== 'string' || !targetId) return false
+  const ms = Math.round(extraMs)
+  if (!Number.isFinite(ms) || ms <= 0 || ms > MAX_CORRECTION_MS) return false
+  const file = ledgerFile(vaultPath)
+  const known = await enqueue(file, async () => isCorrectionTargetKnown(await readFile(file), targetId))
+  if (!known) return false
+  await appendActivityEvent(vaultPath, { at: Date.now(), kind: 'time-correction', targetId, extraMs: ms, source: 'manual' })
+  return true
+}
+
+/**
+ * Alle Ereignisse des Protokolls (ACTIVITY_RETENTION_DAYS, ACTIVITY_MAX_EVENTS). Für die Messgeschichte:
  * Der Renderer teilt sie selbst in Wochen ein — mit der GESAMTEN Liste, weil ein Lauf um
  * 23:58 enden und um 00:03 übernommen werden kann (siehe summarizeActivity).
  */

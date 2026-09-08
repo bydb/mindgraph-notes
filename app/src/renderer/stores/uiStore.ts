@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ActivityType, ReferenceMinutes } from '../../shared/activityLog'
+import type { ValuedType, ReferenceMinutes, ReferenceSources, ReferenceSource } from '../../shared/activityLog'
 import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
 import { DEFAULT_OPENROUTER_SETTINGS, DEFAULT_LLMBASE_SETTINGS, type CloudProviderSettings } from '../../shared/llmBackend'
@@ -622,6 +622,15 @@ export interface ImpactSettings {
   /** Tagesbilanz in der Statusleiste. An, aber abschaltbar — eine dauerhaft sichtbare
    *  Zahl über die eigene Arbeit will nicht jeder ständig vor sich haben. */
   showInStatusBar: boolean
+  /**
+   * Optionaler Stundensatz für den Zeitwert — eine offengelegte Szenariorechnung, kein
+   * Geldfluss. Ohne Eintrag bleibt der Zeitwert ungerechnet; die App rät keinen Satz.
+   */
+  hourlyRate?: number | null
+  /** ISO-Währungscode des Stundensatzes. Eine Nettorechnung gegen die USD-Ausgaben gibt es nur bei USD. */
+  currency?: string
+  /** Woher jede Referenzzeit stammt: geschätzt (Default) oder selbst gestoppt. */
+  referenceSources?: ReferenceSources
 }
 
 interface UIState {
@@ -904,7 +913,8 @@ interface UIState {
 
   // Effizienzindex: Referenzzeiten je Tätigkeitsart
   impact: ImpactSettings
-  setReferenceMinutes: (type: ActivityType, minutes: number | null) => void
+  setReferenceMinutes: (type: ValuedType, minutes: number | null) => void
+  setReferenceSource: (type: ValuedType, source: ReferenceSource) => void
   setImpact: (settings: Partial<ImpactSettings>) => void
 
   // Telegram Bot
@@ -1450,6 +1460,9 @@ export const useUIStore = create<UIState>()((set, get) => ({
     else next[type] = Math.round(minutes)
     return { impact: { ...state.impact, referenceMinutes: next } }
   }),
+  setReferenceSource: (type, source) => set((state) => ({
+    impact: { ...state.impact, referenceSources: { ...(state.impact.referenceSources ?? {}), [type]: source } }
+  })),
   setTelegramBot: (settings) => set((state) => ({
     telegramBot: { ...state.telegramBot, ...settings }
   })),

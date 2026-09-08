@@ -5,7 +5,9 @@ import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
 import { validateManifest, validateManifestSemantics, validateAgainst } from '@mindgraph/plugin-api/validation'
 
-function buildRegistry() {
+function buildRegistry() { return buildRegistryWith({}) }
+
+function buildRegistryWith(overrides: Partial<HostServices>) {
   const secrets = new Map<string, string>()
   const services: HostServices = {
     readVaultFile: async () => { throw new Error('ENOENT') },
@@ -29,8 +31,10 @@ function buildRegistry() {
     dialogSaveFile: async () => null,
     readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
+    recordActivity: async () => {},
     // WordPress-Host ist user-konfiguriert (pluginConfig.wordpress.baseUrl) — im Test statisch.
     resolveExtraAllowedHosts: async () => ['example.org'],
+    ...overrides,
   }
   const registry = new PluginRegistry(createHostFactory(services))
   registry.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
@@ -61,6 +65,28 @@ describe('wordpress-Plugin — Vertikale durch Registry + Host', () => {
     expect(secrets.get('plugin:wordpress:wpAppPassword')).toBe('xxxx yyyy')
 
     expect(await registry.invoke('wordpress', 'wordpress.loadCredentials', {})).toEqual({ wpAppPassword: 'xxxx yyyy' })
+  })
+
+  it('Publish mit Vorgangs-Kennung vermerkt den Abschluss mit dem Etikett der ANTWORT', async () => {
+    const recorded: Array<Record<string, unknown>> = []
+    const { registry, secrets } = buildRegistry()
+    secrets.set('plugin:wordpress:wpAppPassword', 'pw')
+    const services = (registry as unknown as { hostFactory?: unknown })
+    void services
+    // Eigene Registry mit Antwort-Attrappe: WordPress legt einen ENTWURF an, obwohl
+    // „publish" gewünscht war (z.B. fehlende Rechte) — das Etikett muss „draft" sein.
+    const reg2 = buildRegistryWith({
+      httpFetch: async () => new Response(JSON.stringify({ id: 7, link: 'https://example.org/?p=7', status: 'draft' }), { status: 201 }),
+      recordActivity: async (e) => { recorded.push(e as Record<string, unknown>) },
+    })
+    reg2.secrets.set('plugin:wordpress:wpAppPassword', 'pw')
+    await reg2.registry.activate('wordpress')
+    const res = await reg2.registry.invoke('wordpress', 'wordpress.publishPost', {
+      siteUrl: 'https://example.org', username: 'admin', title: 't', content: 'c', status: 'publish',
+      activity: { jobId: 'mk-1', activeMs: 2500 },
+    })
+    expect(res).toEqual({ success: true, postId: 7, postUrl: 'https://example.org/?p=7', status: 'draft' })
+    expect(recorded).toEqual([expect.objectContaining({ kind: 'job-outcome', jobId: 'mk-1', jobType: 'wp-post', outcome: 'draft', pluginId: 'wordpress', activeMs: 2500 })])
   })
 
   it('Publish ohne App-Passwort liefert {success:false}', async () => {

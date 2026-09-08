@@ -28,7 +28,7 @@ import { isCloudProviderReady, cloudProviderForSentinel, CLOUD_PROVIDER_META, ty
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
-import { ACTIVITY_TYPES, type ActivityType } from '../../../shared/activityLog'
+import { VALUED_TYPES, type ValuedType } from '../../../shared/activityLog'
 import { writeClipboardText } from '../../utils/clipboard'
 import { ExternalLink } from '../Shared/ExternalLink'
 
@@ -1771,19 +1771,27 @@ const ImpactStatusBarToggle: React.FC<{ t: TabTFn }> = ({ t }) => {
 const ReferenceMinutesRows: React.FC<{ t: TabTFn }> = ({ t }) => {
   const referenceMinutes = useUIStore(state => state.impact.referenceMinutes)
   const setReferenceMinutes = useUIStore(state => state.setReferenceMinutes)
+  const referenceSources = useUIStore(state => state.impact.referenceSources)
+  const setReferenceSource = useUIStore(state => state.setReferenceSource)
+  const hourlyRate = useUIStore(state => state.impact.hourlyRate)
+  const currency = useUIStore(state => state.impact.currency)
+  const setImpact = useUIStore(state => state.setImpact)
 
-  const labels: Record<ActivityType, string> = {
+  const labels: Record<ValuedType, string> = {
     'table-merge': t('voiceCommand.activityType.tableMerge'),
     document: t('voiceCommand.activityType.document'),
     summary: t('voiceCommand.activityType.summary'),
     'web-research': t('voiceCommand.activityType.webResearch'),
     'email-tasks': t('voiceCommand.activityType.emailTasks'),
-    other: t('voiceCommand.activityType.other')
+    other: t('voiceCommand.activityType.other'),
+    'attendance-list': t('voiceCommand.activityType.attendanceList'),
+    'wp-post': t('voiceCommand.activityType.wpPost'),
+    'ig-caption': t('voiceCommand.activityType.igCaption')
   }
 
   return (
     <>
-      {ACTIVITY_TYPES.map(type => (
+      {VALUED_TYPES.map(type => (
         <div className="settings-row" key={type}>
           <label>{labels[type]}</label>
           <input
@@ -1796,8 +1804,43 @@ const ReferenceMinutesRows: React.FC<{ t: TabTFn }> = ({ t }) => {
             style={{ width: 140 }}
           />
           <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>{t('settings.impact.column')}</span>
+          <select
+            value={referenceSources?.[type] ?? 'estimated'}
+            onChange={e => setReferenceSource(type, e.target.value === 'measured' ? 'measured' : 'estimated')}
+            style={{ marginLeft: 8 }}
+            aria-label={t('settings.impact.source')}
+            disabled={!(referenceMinutes[type] && referenceMinutes[type]! > 0)}
+          >
+            <option value="estimated">{t('settings.impact.sourceEstimated')}</option>
+            <option value="measured">{t('settings.impact.sourceMeasured')}</option>
+          </select>
         </div>
       ))}
+      <p className="settings-hint">{t('settings.impact.sourceHint')}</p>
+      <div className="settings-row">
+        <label>{t('settings.impact.hourlyRate')}</label>
+        <input
+          type="number"
+          min={0}
+          step={5}
+          value={typeof hourlyRate === 'number' && hourlyRate > 0 ? hourlyRate : ''}
+          placeholder={t('settings.impact.placeholder')}
+          onChange={e => {
+            const v = Number(e.target.value)
+            setImpact({ hourlyRate: e.target.value === '' || !Number.isFinite(v) || v <= 0 ? null : v })
+          }}
+          style={{ width: 140 }}
+        />
+        <input
+          type="text"
+          value={currency ?? 'EUR'}
+          maxLength={3}
+          onChange={e => setImpact({ currency: e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3) || 'EUR' })}
+          style={{ width: 60, marginLeft: 8 }}
+          aria-label={t('settings.impact.currency')}
+        />
+      </div>
+      <p className="settings-hint">{t('settings.impact.hourlyRateHint')}</p>
     </>
   )
 }

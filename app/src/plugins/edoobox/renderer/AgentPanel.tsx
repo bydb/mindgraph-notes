@@ -8,6 +8,8 @@ import { writeClipboardText } from '../../../renderer/utils/clipboard'
 import { PanelHeader, PanelHeaderIconButton } from '../../../renderer/components/Shared/PanelHeader'
 import { IconCalendar } from '../../../renderer/components/Shared/Icons'
 import { edooboxClient } from './edooboxClient'
+import { createActiveMeasurement } from '../../../renderer/utils/activeTimeTracker'
+import { useNotesStore } from '../../../renderer/stores/notesStore'
 import type { EdooboxEvent, EdooboxEventDate, EdooboxOfferDashboard, AttendanceListData, AttendanceParticipant } from '../../../shared/types'
 
 const MAX_ATTENDANCE_PARTICIPANTS = 100
@@ -96,6 +98,9 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
     setListError(null)
     setListNote(null)
     setGeneratingList(true)
+    // Arbeitsbilanz: Vordergrundzeit vom Klick bis zum Speichern (Dialog eingeschlossen).
+    const measurement = createActiveMeasurement()
+    measurement.begin()
     try {
       // Immer frisch nachladen, damit neue Felder (Schule/Personalnummer) sicher
       // aktuell sind und kein Cache aus älteren Sessions verwendet wird.
@@ -138,7 +143,19 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
       }
 
       const fileName = `Teilnehmerliste - ${sanitizeFileName(offer.name)}.docx`
-      const result = await edooboxClient.generateAttendanceList(data, fileName)
+      // Opaker Vorgangsschlüssel: Angebots-ID + Termine, kein Titel — der Kern hasht ihn.
+      const result = await edooboxClient.generateAttendanceList(data, fileName, {
+        jobKey: `${offer.id}|${dates.join(',')}`,
+        activeMs: measurement.peek(),
+      })
+      // Erzeugung und Speicherdialog liefen im Kern, die Messung hier weiter: jetzt ist
+      // sie vollständig und darf den beim Aufruf mitgegebenen Stand anheben (Review F08).
+      if (result.success && result.jobId) {
+        const vaultPath = useNotesStore.getState().vaultPath
+        if (vaultPath) {
+          await window.electronAPI.activityJobForeground(vaultPath, result.jobId, 'attendance-list', measurement.peek()).catch(() => undefined)
+        }
+      }
       if (!result.success && !result.canceled) {
         setListError(result.error || t('agent.attendanceList.generateFailed'))
       } else if (result.success && waitlistCount > 0) {
@@ -147,6 +164,7 @@ const DashboardOfferCard: React.FC<{ offer: EdooboxOfferDashboard }> = ({ offer 
     } catch (err) {
       setListError(err instanceof Error ? err.message : t('agent.attendanceList.generateFailed'))
     } finally {
+      measurement.cancel()
       setGeneratingList(false)
     }
   }, [offer, loadBookingsForOffer, edooboxBaseUrl, edooboxApiVersion, t])
@@ -609,9 +627,9 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
   const {
     generatedBlogPost, generatedIgCaption, isGenerating, isPublishing,
     generateContent, setGeneratedBlogPost, setGeneratedIgCaption,
-    publishToWordpress, selectImage, generateImage, downloadImage, isGeneratingImage,
+    publishToWordpress, markIgUsed, selectImage, generateImage, downloadImage, isGeneratingImage,
     isSavingImage, imageSaveStatus, selectedImageBase64, selectedImageFileName,
-    imagePreviewDataUrl, imageGeneratedInfo, imageGenerationError, marketingPublishStatus
+    imagePreviewDataUrl, imageGeneratedInfo, imageGenerationError, marketingPublishStatus, marketingJobId
   } = useAgentStore()
   // WordPress-Publishing = eigenes Plugin; der Marketing-Tab liest dessen Config nur mit.
   const [wordpress] = usePluginConfig('wordpress', WORDPRESS_DEFAULTS)
@@ -632,6 +650,15 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
     if (!generatedBlogPost) return
     await publishToWordpress(offer.id, offer.name, generatedBlogPost)
   }, [offer.id, offer.name, generatedBlogPost, publishToWordpress])
+
+  // Der Status hängt am VORGANG, nicht an der Veranstaltung (Review F15): Nach erneutem
+  // Generieren ist ein neuer Text da, und der darf erneut als verwendet markiert werden.
+  const igUsedForThisJob = !!marketingJobId && status?.instagram?.jobId === marketingJobId
+  const [igMarking, setIgMarking] = useState(false)
+  const handleMarkIgUsed = useCallback(async () => {
+    setIgMarking(true)
+    try { await markIgUsed(offer.id) } finally { setIgMarking(false) }
+  }, [markIgUsed, offer.id])
 
   const [igCopied, setIgCopied] = useState(false)
   const handleCopyIgCaption = useCallback(() => {
@@ -796,6 +823,7 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
         <div className="agent-marketing-section">
           <div className="agent-marketing-section-header">
             <label>{t('agent.marketing.instagram')}</label>
+            {igUsedForThisJob && <span className="agent-marketing-link">{t('agent.marketing.markedUsed')}</span>}
           </div>
           <textarea
             className="agent-marketing-textarea"
@@ -808,6 +836,16 @@ const MarketingPublishDetail: React.FC<{ offer: EdooboxOfferDashboard; onBack: (
             onClick={handleCopyIgCaption}
           >
             {igCopied ? t('agent.marketing.copied') : t('agent.marketing.copyCaption')}
+          </button>
+          {/* Kopieren belegt keine Verwendung — Instagram hat keine Antwort, die der Kern
+              sehen könnte. Der Klick ist die Nutzerentscheidung, wie „Übernehmen" beim Agenten. */}
+          <button
+            className="agent-marketing-publish-btn ig"
+            onClick={handleMarkIgUsed}
+            disabled={igMarking || igUsedForThisJob || !marketingJobId}
+            title={t('agent.marketing.markUsedHint')}
+          >
+            {igUsedForThisJob ? t('agent.marketing.markedUsed') : t('agent.marketing.markUsed')}
           </button>
         </div>
       )}

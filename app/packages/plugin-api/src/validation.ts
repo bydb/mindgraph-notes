@@ -55,6 +55,7 @@ const CAPABILITY_VALUES = [
   'pdf.optimize',
   'dialog',
   'resource',
+  'activity',
 ] as const
 
 const CATEGORY_VALUES = [

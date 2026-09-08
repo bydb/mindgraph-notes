@@ -54,12 +54,27 @@ export default definePluginMain(
 
     actions.register('wordpress.publishPost', async (p) => {
       try {
-        const { siteUrl, username, title, content, status, featuredMediaId } = p as {
+        const { siteUrl, username, title, content, status, featuredMediaId, activity } = p as {
           siteUrl: string; username: string; title: string; content: string
           status: 'draft' | 'publish'; featuredMediaId?: number
+          activity?: { jobId: string; activeMs?: number }
         }
         const wp = await makeWp(siteUrl, username)
         const post = await wp.createPost(title, content, status, featuredMediaId)
+        // Nachweis = WordPress hat den Beitrag angelegt. Das Etikett folgt der ANTWORT
+        // (Entwurf oder veröffentlicht), nicht dem Wunsch im Aufruf. Still bei Fehler:
+        // ein fehlender Vermerk darf einen angelegten Beitrag nicht als gescheitert melden.
+        if (activity?.jobId) {
+          try {
+            await host.activity.record({
+              kind: 'job-outcome', jobId: activity.jobId, jobType: 'wp-post',
+              outcome: post.status === 'publish' ? 'published' : 'draft',
+              ...(typeof activity.activeMs === 'number' ? { activeMs: activity.activeMs } : {}),
+            })
+          } catch (e) {
+            host.log(`Tätigkeitsprotokoll: ${errMsg(e, 'unbekannt')}`)
+          }
+        }
         return { success: true, postId: post.id, postUrl: post.link, status: post.status }
       } catch (e) {
         return { success: false, error: errMsg(e, 'Veröffentlichung fehlgeschlagen') }

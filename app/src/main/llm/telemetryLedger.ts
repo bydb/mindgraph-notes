@@ -139,6 +139,19 @@ export async function readTelemetryRange(
     .sort((a, b) => a.at - b.at)
 }
 
+/**
+ * Zeitpunkt des ältesten Aufrufs im Logbuch, `null` ohne Einträge. Die Messgeschichte
+ * zeigt damit, ab wann ihre Zahlen überhaupt Daten haben: Ein Logbuch beginnt mit der
+ * Installation der Version, die es schreibt, nicht mit dem Anfang des gewählten Zeitraums.
+ */
+export async function readTelemetryOldestAt(vaultPath: string, nowMs: number = Date.now()): Promise<number | null> {
+  if (!vaultPath) return null
+  const file = ledgerFile(vaultPath)
+  const all = await enqueue(file, () => readAll(file))
+  const kept = pruneLlmRuns(all, nowMs)
+  return kept.length ? Math.min(...kept.map(r => r.at)) : null
+}
+
 /** Nur für Tests: Zähler zurücksetzen, damit jeder Fall wieder mit einer Verdichtung beginnt. */
 export function resetTelemetryLedgerForTests(): void {
   appendsSinceCompact.clear()

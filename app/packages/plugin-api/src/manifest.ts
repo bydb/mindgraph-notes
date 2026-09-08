@@ -45,6 +45,10 @@ export type PluginCapability =
   // (read-only auf das resources/-Verzeichnis) — kein generisches Datei-System-Tor.
   | 'dialog'
   | 'resource'
+  // Arbeitsbilanz (Paket 2): ein Plugin meldet nachweisbare Vorgangsabschlüsse an das
+  // Tätigkeitsprotokoll des Kerns. Der Kern setzt Zeit und Plugin-ID selbst und prüft
+  // jedes Feld — ein Plugin kann weder rückdatieren noch für ein anderes schreiben.
+  | 'activity'
 
 /**
  * JSON Schema (draft-07) als reine serialisierbare Daten. Bewusst lose getypt —

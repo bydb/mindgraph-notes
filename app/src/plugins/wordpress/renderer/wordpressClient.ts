@@ -19,10 +19,13 @@ export const wordpressClient = {
 
   publishPost: (
     siteUrl: string, username: string, title: string, content: string,
-    status: 'draft' | 'publish', featuredMediaId?: number
+    status: 'draft' | 'publish', featuredMediaId?: number,
+    // Arbeitsbilanz: Vorgangs-Kennung + Vordergrundzeit — der Abschluss wird im Plugin-Main
+    // vermerkt, wo WordPress geantwortet hat. `undefined`-Felder weglassen (Schema-Gate).
+    activity?: { jobId: string; activeMs?: number }
   ) =>
     invokePlugin<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>(
-      'wordpress', 'wordpress.publishPost', { siteUrl, username, title, content, status, featuredMediaId }),
+      'wordpress', 'wordpress.publishPost', { siteUrl, username, title, content, status, featuredMediaId, ...(activity ? { activity } : {}) }),
 
   uploadImage: (siteUrl: string, username: string, imageBase64: string, fileName: string, caption?: string) =>
     invokePlugin<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>(

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
-import { acceptedLine, emailTasksLine, tasksLine, savedBasisLine, savedContextLine, unmeasuredLine, unpricedLine } from '../../utils/impactText'
+import { acceptedLine, emailTasksLine, tasksLine, jobLines, hasRuntimeContext, savedBasisLine, savedContextLine, wastedLine, correctedLine, unmeasuredLine, unpricedLine } from '../../utils/impactText'
 import {
   estimateSavedMinutes,
   impactBadge,
@@ -30,6 +30,7 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
   const { t } = useTranslation()
   const vaultPath = useNotesStore(s => s.vaultPath)
   const referenceMinutes = useUIStore(s => s.impact.referenceMinutes)
+  const referenceSources = useUIStore(s => s.impact.referenceSources)
   const showInStatusBar = useUIStore(s => s.impact.showInStatusBar)
   const [summary, setSummary] = useState<ActivitySummary | null>(null)
 
@@ -84,15 +85,22 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
     badge.kind === 'minutes' && badge.minutes < 0 ? t('statusbar.impact.loss', { minutes: Math.abs(badge.minutes) })
     : badge.kind === 'minutes' ? t('statusbar.impact.minutes', { minutes: badge.minutes })
     : badge.kind === 'accepted' ? t('statusbar.impact.accepted', { count: badge.count })
+    : badge.kind === 'jobs' ? t('statusbar.impact.jobs', { count: badge.count })
     : badge.kind === 'email-tasks' ? t('statusbar.impact.emailTasks', { count: badge.count })
     : t('statusbar.impact.tasks', { count: badge.count })
 
   const lines = [
     t('statusbar.impact.title'),
     summary.acceptedTotal > 0 ? acceptedLine(summary, t) : null,
+    ...jobLines(summary, t),
     summary.tasksCreated > 0 ? tasksLine(summary, t) : null,
     summary.emailTasks > 0 ? emailTasksLine(summary, t) : null,
-    ...saved.lines.flatMap(line => [savedBasisLine(line, t), savedContextLine(line, t)]),
+    // Eine Art mit ausschließlich Fehlversuchen hat keine Rechnung „N × Referenz" — nur den Abzug.
+    ...saved.lines.flatMap(line => [
+      ...(line.runs > 0 ? [savedBasisLine(line, t, referenceSources), ...(hasRuntimeContext(line) ? [savedContextLine(line, t)] : [])] : []),
+      ...(line.wastedRuns > 0 ? [wastedLine(line, t)] : []),
+      ...(line.correctedRuns > 0 ? [correctedLine(line, t)] : [])
+    ]),
     // Ohne Referenzzeit ist die Zahl nicht klein, sondern nicht vorhanden — das gehört
     // auch in die Kurzfassung, sonst wirkt die Statusleiste wie ein Urteil.
     saved.unpricedTypes.length > 0 ? unpricedLine(saved.unpricedTypes, t) : null,

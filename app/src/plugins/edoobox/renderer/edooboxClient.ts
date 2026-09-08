@@ -21,7 +21,7 @@ import type {
 } from '../../../shared/types'
 
 /** Rückgabe der Datei-Export-Actions (Speichern via Dialog → Pfad | abgebrochen | Fehler). */
-type FileExportResult = { success: boolean; filePath?: string; canceled?: boolean; error?: string }
+type FileExportResult = { success: boolean; filePath?: string; canceled?: boolean; error?: string; jobId?: string }
 
 export const edooboxClient = {
   saveCredentials: (apiKey: string, apiSecret: string) =>
@@ -70,8 +70,17 @@ export const edooboxClient = {
   generateIqReport: (data: IqReportData, suggestedFileName: string) =>
     invokePlugin<FileExportResult>('edoobox', 'edoobox.generateIqReport', { data, suggestedFileName }),
 
-  generateAttendanceList: (data: AttendanceListData, suggestedFileName: string) =>
-    invokePlugin<FileExportResult>('edoobox', 'edoobox.generateAttendanceList', { data, suggestedFileName }),
+  generateAttendanceList: (data: AttendanceListData, suggestedFileName: string, activity?: { jobKey: string; activeMs?: number }) =>
+    invokePlugin<FileExportResult>('edoobox', 'edoobox.generateAttendanceList', {
+      data, suggestedFileName,
+      ...(activity ? { jobKey: activity.jobKey, ...(typeof activity.activeMs === 'number' ? { activeMs: activity.activeMs } : {}) } : {}),
+    }),
+
+  /** Instagram: Nutzerentscheidung „verwendet" — an der Main-Grenze festgehalten, wie „Übernehmen" beim Agenten. */
+  marketingMarkUsed: (jobId: string, activeMs?: number) =>
+    invokePlugin<{ success: boolean; error?: string }>('edoobox', 'edoobox.marketingMarkUsed', {
+      jobId, ...(typeof activeMs === 'number' ? { activeMs } : {}),
+    }),
 
   // — Marketing: Ollama-Content + Bild-Auswahl. WordPress-Publishing = eigenes Plugin
   //   (wordpressServiceBridge), Bild-GENERIERUNG = Core-Modul image-generation. —
@@ -79,8 +88,14 @@ export const edooboxClient = {
     name: string; description?: string; dateStart?: string; dateEnd?: string
     location?: string; maxParticipants?: number; speakers?: string[]; bookingUrl?: string
   }) =>
-    invokePlugin<{ success: boolean; blogPost?: string; igCaption?: string; error?: string }>(
+    invokePlugin<{ success: boolean; blogPost?: string; igCaption?: string; jobId?: string; error?: string }>(
       'edoobox', 'edoobox.marketingGenerateContent', { offerData }),
+
+  /** Vorbereitung aufgegeben (erneut generiert oder gescheitert) — ihr Aufwand zählt als Fehlversuch. */
+  marketingAbandon: (jobId: string, activeMs?: number) =>
+    invokePlugin<{ success: boolean; error?: string }>('edoobox', 'edoobox.marketingAbandon', {
+      jobId, ...(typeof activeMs === 'number' ? { activeMs } : {}),
+    }),
 
   marketingSelectImage: () =>
     invokePlugin<{ fileName: string; imageBase64: string } | null>('edoobox', 'edoobox.marketingSelectImage'),

@@ -152,7 +152,7 @@ import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData }
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
-import { readTelemetryRange } from './llm/telemetryLedger'
+import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
 import { DEFAULT_REMINDER_MINUTES, buildIcs, icsFileName, normalizeDraft, extractMeetingUrl, localDateTimeToIso, type CalendarEventDraft } from '../shared/calendarEvent'
@@ -189,8 +189,8 @@ import { createCampaign, createCase, startWork, markResultReady, addSession, cor
 import { campaignReport } from '../shared/comparison/metrics'
 import { toCsv, toMarkdown, type ExportLabels } from '../shared/comparison/export'
 import type { ComparisonCase, Quality, WorkSession } from '../shared/comparison/types'
-import { readActivityEvents, recordActivity, readActivitySummary, onActivityChanged, setEmailForegroundMs } from './activityLedger'
-import { ACTIVITY_TYPES, deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
+import { readActivityEvents, recordActivity, appendActivityEvent, readActivitySummary, onActivityChanged, setEmailForegroundMs, raiseJobActiveMs, appendTimeCorrection } from './activityLedger'
+import { VALUED_TYPES, deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
@@ -783,9 +783,16 @@ function buildPluginHostServices(): HostServices {
       })
       if (!res.ok) throw new Error(`Ollama Fehler: ${res.status}`)
       const data = await res.json() as { response?: string } & OllamaTimings
-      recordLlmRun(fromOllamaResponse(data, { module: 'plugin', model, wallMs: Date.now() - startedAt, at: startedAt }))
+      recordLlmRun(fromOllamaResponse(data, { module: 'plugin', model, wallMs: Date.now() - startedAt, at: startedAt, runId: opts.runId }))
       return (data.response || '').trim()
     },
+    // Arbeitsbilanz: Plugin-Vorgänge landen im Tätigkeitsprotokoll des offenen Vaults.
+    // Das Ereignis ist im Host bereits geprüft und trägt die Plugin-ID des Aufrufers.
+    recordActivity: async (event) => {
+      const vp = requireVault('plugin:activity')
+      await appendActivityEvent(vp, event)
+    },
+    collectRunTotals: (runId) => collectRunTotals(runId),
     httpFetch: (url, init) => fetch(url, init),
     httpFetchBasicAuth: nativeServices.httpFetchBasicAuth,
     resolveExtraAllowedHosts: async (pluginId) => {
@@ -1536,6 +1543,13 @@ ipcMain.handle('llm-telemetry-range', async (_event, range: { from: number; to: 
   return readTelemetryRange(lastKnownVaultPath, { from, to })
 })
 
+// Ab wann das Logbuch Daten hat — damit die 12-Monats-Ansicht sagen kann, dass sie erst
+// seit der Installation zählt und nicht seit zwölf Monaten. Nur lesend.
+ipcMain.handle('llm-telemetry-oldest', async () => {
+  if (!lastKnownVaultPath) return null
+  return readTelemetryOldestAt(lastKnownVaultPath)
+})
+
 // Letzten Vault-Pfad laden
 // Aktueller Vault-Pfad im Main-Prozess (für Telegram-Bot etc.)
 let lastKnownVaultPath: string | null = null
@@ -1594,7 +1608,7 @@ function recordReferenceChanges(before: Record<string, unknown>, after: Record<s
   }
   const alt = minuten(before.impact), neu = minuten(after.impact)
   const wert = (v: unknown): number | null => typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null
-  for (const type of ACTIVITY_TYPES) {
+  for (const type of VALUED_TYPES) {
     const von = wert(alt[type]), nach = wert(neu[type])
     if (von === nach) continue
     recordActivity(lastKnownVaultPath, { at: Date.now(), kind: 'reference-changed', activityType: type, fromMinutes: von, toMinutes: nach })
@@ -2286,7 +2300,12 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
           if (marker?.keywords?.length) query = marker.keywords.join(' ')
         } catch { /* kein Marker — Ordnername als Query */ }
         const index = await ragEnsureIndex(vaultPath, folderRel, embedModel, assertSafePath)
-        const chunks = await ragRetrieve(index, query, embedModel, { topK: 5 })
+        const retrieved = await ragRetrieve(index, query, embedModel, { topK: 5 })
+        // Die Statusdatei steht schon vollständig oben — als RAG-Treffer wäre sie doppelt im
+        // Prompt (real: 910 Zeichen Kontext, davon die Hälfte Wiederholung).
+        const chunks = statusContext
+          ? retrieved.filter(c => !/^_STATUS[^/]*\.md$/i.test(c.fileRel.split('/').pop() || ''))
+          : retrieved
         if (chunks.length > 0) {
           ragContext = '## Relevante Projektquellen\n\n' + ragChunksToContext(chunks, 2500)
         }
@@ -4895,6 +4914,32 @@ ipcMain.handle('activity-foreground', async (event, vaultPath: string, id: strin
   try {
     assertApprovedVault(vaultPath, 'activity-foreground')
     return { success: await setEmailForegroundMs(vaultPath, id, foregroundMs) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Zweiter enger Nachtrag-Weg (Review F08): Die Vordergrundzeit eines Plugin-Vorgangs ist beim
+// Abschluss im Kern noch nicht fertig gemessen (Speicherdialog, HTTP-Antwort). Der Renderer
+// darf sie an der opaken Kennung anheben — nur anheben, nur an einem vorhandenen Abschluss.
+ipcMain.handle('activity-job-foreground', async (event, vaultPath: string, jobId: string, jobType: string, activeMs: number) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'activity-job-foreground')
+    return { success: await raiseJobActiveMs(vaultPath, jobId, jobType, activeMs) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Manuelle Zeitkorrektur (Paket 3): Der Nutzer trägt Nacharbeit nach, die die App nicht sehen
+// konnte. Kein Messwert, eine Angabe — dieselbe Vertrauensklasse wie die Referenzminuten, und
+// überall als „nachgetragen" ausgewiesen. Der Ledger prüft Ziel und Größe.
+ipcMain.handle('activity-correct-time', async (event, vaultPath: string, targetId: string, extraMs: number) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'activity-correct-time')
+    return { success: await appendTimeCorrection(vaultPath, targetId, extraMs) }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }

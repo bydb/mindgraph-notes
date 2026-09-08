@@ -14,7 +14,7 @@ let userDataDir = ''
 vi.mock('electron', () => ({ app: { getPath: () => userDataDir } }))
 
 import {
-  appendTelemetryRun, readTelemetryRange, ledgerFile, resetTelemetryLedgerForTests, COMPACT_EVERY
+  appendTelemetryRun, readTelemetryRange, readTelemetryOldestAt, ledgerFile, resetTelemetryLedgerForTests, COMPACT_EVERY
 } from './telemetryLedger'
 import { TELEMETRY_RETENTION_DAYS, TELEMETRY_MAX_RUNS, type LlmRunMetrics } from '../../shared/llmTelemetry'
 
@@ -146,6 +146,14 @@ describe('readTelemetryRange', () => {
     for (const at of [NOW + 5, NOW, NOW + 10, NOW + 3]) await appendTelemetryRun(VAULT, run({ at }), NOW)
     const gelesen = await readTelemetryRange(VAULT, { from: NOW, to: NOW + 10 }, NOW)
     expect(gelesen.map(r => r.at)).toEqual([NOW, NOW + 3, NOW + 5])
+  })
+
+  it('nennt den ältesten Aufruf, der die Aufbewahrung noch übersteht — und ohne Einträge null', async () => {
+    expect(await readTelemetryOldestAt(VAULT, NOW)).toBeNull()
+    await appendTelemetryRun(VAULT, run({ at: NOW - 3 * DAY }), NOW)
+    await appendTelemetryRun(VAULT, run({ at: NOW - (TELEMETRY_RETENTION_DAYS + 2) * DAY }), NOW)
+    await appendTelemetryRun(VAULT, run({ at: NOW }), NOW)
+    expect(await readTelemetryOldestAt(VAULT, NOW)).toBe(NOW - 3 * DAY)
   })
 
   it('liefert für einen unbekannten Vault eine leere Liste', async () => {

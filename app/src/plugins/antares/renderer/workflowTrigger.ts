@@ -54,7 +54,8 @@ function formatMahnung(r: AntaresVerleihRow): string {
 function antaresRowToItem(r: AntaresVerleihRow): WorkflowSeedItem {
   const name = [r.fn_vorname, r.fn_ename].filter(Boolean).join(' ').trim()
   const email = extractEmail(r)
-  const subject = `Überfällige Rückgabe: ${r.fn_titel || r.fn_leihnr || ''}`.trim()
+  // Betreff aus Sicht der Empfängerin (das ist die Mail, die sie bekommt) — nicht die interne Bezeichnung.
+  const subject = `Erinnerung: Rückgabe ${r.fn_titel ? `„${r.fn_titel}"` : `Leihnr ${r.fn_leihnr}`} fällig`.trim()
   return {
     itemKey: `mahnung:${r.fn_leihnr}`,
     text: formatMahnung(r),
@@ -93,8 +94,16 @@ export const antaresTriggerProvider: WorkflowTriggerProvider = {
   },
 
   async collectManual(): Promise<WorkflowSeedItem | null> {
-    try { await useAntaresStore.getState().loadAll() } catch { /* keine/abgelaufene Credentials */ }
-    return currentRows().map(antaresRowToItem)[0] ?? null
+    try { await useAntaresStore.getState().loadAll() } catch { /* Fehler steht in lastError */ }
+    const rows = currentRows()
+    const { lastError } = useAntaresStore.getState()
+    // Ohne Zugangsdaten hieß es vorher „Keine überfälligen Rückgaben gefunden" — falsch beruhigend.
+    if (rows.length === 0 && lastError) {
+      throw new Error(/Zugangsdaten/i.test(lastError)
+        ? 'Antares-Zugangsdaten fehlen — bitte in Einstellungen → Agenten → Antares hinterlegen.'
+        : `Antares nicht erreichbar: ${lastError}`)
+    }
+    return rows.map(antaresRowToItem)[0] ?? null
   },
 
   async collectEvent(ledger: WorkflowTriggerLedger): Promise<WorkflowEventResult> {

@@ -1521,7 +1521,10 @@ const App: React.FC = () => {
                 ) : activeTab?.type === 'agent' ? (
                   <AgentView tabId={activeTab.id} />
                 ) : activeTab?.type === 'workflow-canvas' ? (
-                  <WorkflowCanvasView onOpenInbox={() => switchRightPanel('inbox')} />
+                  // Hand-off-Fenster (Compose) lebt IM Inbox-Panel: hier nur öffnen, nie toggeln —
+                  // beim manuellen Lauf ist das Panel meist schon offen (Mail dort markiert), ein
+                  // Toggle hätte es geschlossen und der fertige Entwurf wäre unsichtbar geblieben.
+                  <WorkflowCanvasView onOpenInbox={() => { if (!inboxPanelOpen) switchRightPanel('inbox') }} />
                 ) : activeTab?.type === 'dashboard' ? (
                   <DashboardView
                     onOpenInbox={() => switchRightPanel('inbox')}

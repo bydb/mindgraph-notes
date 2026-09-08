@@ -29,6 +29,7 @@ function buildRegistry(over: Partial<HostServices> = {}) {
     dialogSaveFile: async () => null,
     readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
+    recordActivity: async () => {},
     ...over,
   }
   const registry = new PluginRegistry(createHostFactory(services))

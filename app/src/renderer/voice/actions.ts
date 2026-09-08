@@ -18,9 +18,10 @@ import {
   estimateSavedMinutes,
   localDayRange,
   type ActivityType,
+  isJobType,
   type ActivitySummary
 } from '../../shared/activityLog'
-import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, savedBasisLine, savedContextLine, sampleLine, unmeasuredLine, unpricedLine, modelComparisonLine } from '../utils/impactText'
+import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, jobRows, hasRuntimeContext, savedBasisFormula, savedContextLine, wastedFormula, correctedFormula, sampleLine, unmeasuredLine, unpricedLine, modelComparisonLine } from '../utils/impactText'
 
 export type TFn = (key: any, params?: Record<string, string | number>) => string
 
@@ -438,40 +439,66 @@ const activityToday: ActionSpec<'activity.today'> = {
       sampleByType.set(run.activityType, (sampleByType.get(run.activityType) ?? 0) + 1)
     }
     const saved = estimateSavedMinutes(summary, useUIStore.getState().impact.referenceMinutes)
+    const referenceSources = useUIStore.getState().impact.referenceSources
 
     const doneGroup = t('voiceCommand.card.groupDone')
     const lines: AnswerCard['lines'] = []
-    if (summary.acceptedTotal > 0) {
-      lines.push({ group: doneGroup, text: acceptedLine(summary, t) })
-    }
     // Nach Tätigkeitsart aufschlüsseln — aber nur Läufe, deren Ergebnis übernommen wurde.
     const runsByType = new Map<ActivityType, number>()
-    for (const run of summary.acceptedRuns) runsByType.set(run.activityType, (runsByType.get(run.activityType) ?? 0) + 1)
-    for (const [type, count] of runsByType) {
-      lines.push({ group: doneGroup, text: `${t(ACTIVITY_TYPE_LABEL_KEY[type])}: ${count}` })
+    for (const run of summary.acceptedRuns) {
+      // Plugin-Vorgänge bekommen eigene Zeilen mit ihrem Abschluss-Etikett (jobRows).
+      if (isJobType(run.activityType)) continue
+      runsByType.set(run.activityType, (runsByType.get(run.activityType) ?? 0) + 1)
     }
-    if (summary.tasksCreated > 0) {
-      lines.push({ group: doneGroup, text: tasksLine(summary, t) })
+    // Erledigt: Beschriftung links, Zahl und Etikett rechts — wie die Nutzenbilanz-Liste.
+    if (summary.acceptedTotal > 0) {
+      const arten = [...runsByType].map(([type, count]) => `${t(ACTIVITY_TYPE_LABEL_KEY[type])} ${count}`).join(', ')
+      lines.push({ group: doneGroup, kind: 'row', label: t('voiceCommand.card.doneAgent'), text: `${acceptedLine(summary, t)}${arten ? ` · ${arten}` : ''}` })
     }
-    if (summary.emailTasks > 0) {
-      lines.push({ group: doneGroup, text: emailTasksLine(summary, t) })
+    for (const row of jobRows(summary, t)) lines.push({ group: doneGroup, kind: 'row', label: row.label, text: row.text })
+    if (summary.tasksCreated > 0 || summary.emailTasks > 0) {
+      const teile = [
+        summary.tasksCreated > 0 ? tasksLine(summary, t) : null,
+        summary.emailTasks > 0 ? emailTasksLine(summary, t) : null
+      ].filter((x): x is string => x !== null).join(' · ')
+      lines.push({ group: doneGroup, kind: 'row', label: t('voiceCommand.card.doneTasks'), text: teile })
     }
+
+    // Kennzahlen unter dem Titel — dieselbe Sprache wie die Leistungsauswertung: Zahl fett,
+    // Einheit dahinter, Vorbehalt in Warnfarbe. Ein Minus wird als Minus benannt.
+    const stats: NonNullable<AnswerCard['stats']> = []
+    if (saved.lines.length > 0) {
+      stats.push(saved.totalMinutes < 0
+        ? { value: `${Math.abs(saved.totalMinutes)} min`, label: t('voiceCommand.card.statLoss'), tone: 'caveat' }
+        : { value: `${saved.totalMinutes} min`, label: t('voiceCommand.card.statSaved') })
+    }
+    if (summary.acceptedTotal > 0) stats.push({ value: String(summary.acceptedTotal), label: t('voiceCommand.card.statAccepted') })
+    if (summary.jobs.completedTotal > 0) stats.push({ value: String(summary.jobs.completedTotal), label: t('voiceCommand.card.statJobs') })
+    if (summary.tasksCreated > 0) stats.push({ value: String(summary.tasksCreated), label: t('voiceCommand.card.statTasks') })
+    if (summary.emailTasks > 0) stats.push({ value: String(summary.emailTasks), label: t('voiceCommand.card.statEmailTasks') })
+    if (saved.wastedRuns > 0) stats.push({ value: String(saved.wastedRuns), label: t('voiceCommand.card.statWasted'), tone: 'caveat' })
 
     if (saved.lines.length > 0) {
       const savedGroup = t('voiceCommand.card.groupSaved')
-      // Ein Minus wird als Minus benannt, nicht als kleiner Gewinn getarnt.
-      lines.push({
-        group: savedGroup,
-        text: saved.totalMinutes < 0
-          ? t('voiceCommand.card.savedLoss', { minutes: Math.abs(saved.totalMinutes) })
-          : t('voiceCommand.card.savedTotal', { minutes: saved.totalMinutes })
-      })
-      // Die Rechengrundlage steht auf der Karte, nicht im Kleingedruckten: Die Zahl
-      // ist eine Ableitung aus einer Angabe des Nutzers, keine Messung.
+      // Die Rechengrundlage steht auf der Karte, nicht im Kleingedruckten: Die Zahl ist
+      // eine Ableitung aus einer Angabe des Nutzers, keine Messung. Je Art eine Zeile mit
+      // Beschriftung links und Rechnung rechts, darunter Kontext gedämpft, Vorbehalte farbig.
       for (const line of saved.lines) {
-        lines.push({ group: savedGroup, text: savedBasisLine(line, t) })
-        lines.push({ group: savedGroup, text: savedContextLine(line, t) })
-        lines.push({ group: savedGroup, text: sampleLine(sampleByType.get(line.activityType) ?? line.runs, t) })
+        const label = t(ACTIVITY_TYPE_LABEL_KEY[line.activityType])
+        // Eine Art mit ausschließlich Fehlversuchen hat keine Rechnung „N × Referenz",
+        // nur den Abzug — die Grundlage-Zeile wäre dort „0 × 30 min".
+        if (line.runs > 0) {
+          lines.push({ group: savedGroup, kind: 'row', label, text: savedBasisFormula(line, t, referenceSources) })
+          const kontext = [
+            hasRuntimeContext(line) ? savedContextLine(line, t) : null,
+            sampleLine(sampleByType.get(line.activityType) ?? line.runs, t)
+          ].filter((x): x is string => x !== null).join(' · ')
+          lines.push({ group: savedGroup, kind: 'muted', text: kontext })
+        } else {
+          lines.push({ group: savedGroup, kind: 'row', label, text: '' })
+        }
+        if (line.wastedRuns > 0) lines.push({ group: savedGroup, kind: 'caveat', text: wastedFormula(line, t) })
+        if (line.correctedRuns > 0) lines.push({ group: savedGroup, kind: 'caveat', text: correctedFormula(line, t) })
       }
     }
 
@@ -532,6 +559,7 @@ const activityToday: ActionSpec<'activity.today'> = {
     return {
       card: {
         title: t('voiceCommand.card.activityTitle'),
+        stats,
         lines,
         footnote,
         sources: [],

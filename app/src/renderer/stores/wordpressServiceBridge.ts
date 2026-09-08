@@ -13,7 +13,7 @@ export interface WordpressServiceProvider {
   saveCredentials: (appPassword: string) => Promise<boolean>
   check: (siteUrl: string, username: string) => Promise<{ success: boolean; userName?: string; error?: string }>
   uploadImage: (siteUrl: string, username: string, imageBase64: string, fileName: string, caption?: string) => Promise<{ success: boolean; mediaId?: number; imageUrl?: string; error?: string }>
-  publishPost: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number) => Promise<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>
+  publishPost: (siteUrl: string, username: string, title: string, content: string, status: 'draft' | 'publish', featuredMediaId?: number, activity?: { jobId: string; activeMs?: number }) => Promise<{ success: boolean; postId?: number; postUrl?: string; status?: string; error?: string }>
 }
 
 let provider: WordpressServiceProvider | null = null
@@ -35,8 +35,8 @@ export const wordpressService: WordpressServiceProvider = {
     provider
       ? provider.uploadImage(siteUrl, username, imageBase64, fileName, caption)
       : Promise.resolve({ success: false, error: PLUGIN_INACTIVE }),
-  publishPost: (siteUrl, username, title, content, status, featuredMediaId) =>
+  publishPost: (siteUrl, username, title, content, status, featuredMediaId, activity) =>
     provider
-      ? provider.publishPost(siteUrl, username, title, content, status, featuredMediaId)
+      ? provider.publishPost(siteUrl, username, title, content, status, featuredMediaId, activity)
       : Promise.resolve({ success: false, error: PLUGIN_INACTIVE }),
 }

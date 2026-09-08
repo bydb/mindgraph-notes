@@ -570,6 +570,8 @@ export interface ElectronAPI {
   getLlmTelemetry: () => Promise<LlmRunMetrics[]>;
   /** Aufrufe aus dem Logbuch auf Platte (userData/telemetry), aufsteigend nach Zeit. */
   getLlmTelemetryRange: (range: { from: number; to: number }) => Promise<LlmRunMetrics[]>;
+  /** Zeitpunkt des ältesten Aufrufs im Logbuch, null ohne Einträge. */
+  getLlmTelemetryOldestAt: () => Promise<number | null>;
   onLlmTelemetryRun: (callback: (run: LlmRunMetrics) => void) => () => void;
 
   openVault: () => Promise<string | null>;
@@ -746,6 +748,10 @@ export interface ElectronAPI {
   /** Alle Tätigkeits-Ereignisse des Vaults (90 Tage), ohne Inhalte — für die Messgeschichte. */
   activityEvents: (vaultPath: string) => Promise<{ success: boolean; events?: ActivityEvent[]; error?: string }>;
   activityForeground: (vaultPath: string, id: string, foregroundMs: number) => Promise<{ success: boolean; error?: string }>;
+  /** Hebt die Vordergrundzeit eines Plugin-Vorgangsabschlusses an — nur anheben, nie senken. */
+  activityJobForeground: (vaultPath: string, jobId: string, jobType: string, activeMs: number) => Promise<{ success: boolean; error?: string }>;
+  /** Manuelle Zeitkorrektur an einem Lauf, Mail-Durchgang oder Vorgang (Nutzerangabe, nie Messung). */
+  activityCorrectTime: (vaultPath: string, targetId: string, extraMs: number) => Promise<{ success: boolean; error?: string }>;
   comparisonLoad: (vaultPath: string) => Promise<{ success: boolean; data?: ComparisonData; error?: string }>;
   comparisonCreateCampaign: (vaultPath: string, params: { taskClass: string; inclusionRules: string; acceptanceDefinition: string }) => Promise<{ success: boolean; campaignId?: string; data?: ComparisonData; error?: string }>;
   comparisonCreateCase: (vaultPath: string, campaignId: string, label: string) => Promise<{ success: boolean; case?: ComparisonCase; data?: ComparisonData; error?: string }>;

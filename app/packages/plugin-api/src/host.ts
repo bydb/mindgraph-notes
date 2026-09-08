@@ -104,8 +104,39 @@ export interface SecretsService {
 export interface LlmService {
   generate(
     prompt: string,
-    opts?: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number }
+    opts?: {
+      module?: CompatModuleId
+      allowCloud?: boolean
+      temperature?: number
+      maxTokens?: number
+      /** Lauf-Kennung für die Telemetrie: Aufrufe mit derselben runId werden einem Vorgang zugerechnet. */
+      runId?: string
+    }
   ): Promise<string>
+}
+
+/**
+ * Meldung an das Tätigkeitsprotokoll des Kerns (Arbeitsbilanz). Nur fachliche Felder:
+ * Zeitpunkt und Plugin-ID setzt der Kern. `job-started` = Vorbereitung (z.B. Texte erzeugt),
+ * `job-outcome` = nachweisbarer Abschluss eines Kanals. Inhalte (Titel, Namen) gehören
+ * NICHT hinein — die jobId ist eine opake Kennung.
+ */
+export type PluginActivityEntry =
+  | { kind: 'job-started'; jobId: string; jobKind: 'marketing' | 'attendance-list'; model?: string }
+  | {
+      kind: 'job-outcome'
+      jobId: string
+      jobType: 'attendance-list' | 'wp-post' | 'ig-caption'
+      outcome: 'saved' | 'draft' | 'published' | 'used'
+      /** Vordergrundzeit des ganzen Vorgangs bis zu diesem Abschluss, in ms. */
+      activeMs?: number
+    }
+  /** Vorbereitung aufgegeben (erneut generiert, gescheitert) — mit der bis dahin gemessenen Zeit. */
+  | { kind: 'job-abandoned'; jobId: string; activeMs?: number }
+
+export interface ActivityService {
+  /** Wirft bei ungültigem Eintrag — ein Plugin soll den Fehler sehen, nicht still verlieren. */
+  record(entry: PluginActivityEntry): Promise<void>
 }
 
 /** HTTP — nur gegen Hosts aus manifest.http.allowedHosts; sonst wirft. */
@@ -154,6 +185,7 @@ export interface CapabilityServiceMap {
   'pdf.optimize': { pdf: PdfOptimizeService }
   dialog: { dialog: DialogService }
   resource: { resource: ResourceService }
+  activity: { activity: ActivityService }
 }
 
 /** Union → Intersection. `{vault:R} | {vault:W}` ⇒ `{vault: R & W}`. */

@@ -21,7 +21,7 @@ import {
 } from './llmTelemetry'
 import {
   estimateSavedMinutes, summarizeActivity,
-  type ActivityEvent, type ActivitySummary, type ActivityType, type ReferenceMinutes, type SavedTime, type ModelComparisonRow,
+  type ActivityEvent, type ActivitySummary, type ValuedType, type ReferenceMinutes, type SavedTime, type ModelComparisonRow,
 } from './activityLog'
 
 export type HistoryRange = 'today' | '7d' | '30d' | '12m'
@@ -287,7 +287,7 @@ export interface SavedTimeBucket {
 
 export interface ReferenceChange {
   at: number
-  activityType: ActivityType
+  activityType: ValuedType
   fromMinutes: number | null
   toMinutes: number | null
 }

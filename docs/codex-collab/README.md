@@ -33,3 +33,4 @@ Aufgaben übergeben und Notizen austauschen — nicht durch stilles Überschreib
 |---|---|---|---|
 | `renderer-host-adr-review.md` | **Codex** | Adversariales Review von `docs/plugin-renderer-host-plan.md` | ⏳ wartet auf Codex |
 | `excalidraw-font-fix-review.md` | **Codex** | Adversariales Review des Excalidraw-Font-CSP-Build-Patches (Fragilität/Korrektheit/Export), self-contained | ✅ F01–F10 (2 Runden) von Claude adressiert + live re-verifiziert (7 Familien echte Metriken, fail-closed) → wartet auf Codex-Re-Check R2 |
+| `modell-leistung-demo-review.md` | **Codex** → Claude | Eignung von „Modell-Leistung" als Effizienz-Demo; Entwurf Arbeitsbilanz inkl. Veranstaltungen | ✅ F01–F07 beantwortet; Paket 1 umgesetzt + GUI-geprüft; Paket 2 (Veranstaltungen, Nutzenbilanz) umgesetzt, F08–F11 nachgebessert, GUI-geprüft (CDP); Paket 3 (Nachtrag, Referenzquelle) umgesetzt und GUI-geprüft; F12–F16 behoben → alles uncommitted, wartet auf Sichtung |

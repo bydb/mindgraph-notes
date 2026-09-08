@@ -2,6 +2,44 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.5-beta] - 2026-09-08
+
+Zwei Stränge. Erstens zählen Veranstaltungen jetzt in der Arbeitsbilanz mit: Teilnehmerlisten, WordPress-Beiträge und Instagram-Texte werden als Vorgänge erfasst und nur so weit bewertet, wie ein Nachweis vorliegt. Zweitens wurden alle sieben Beispiel-Workflows des Workflow-Canvas in der laufenden App Klick für Klick durchgespielt; dabei kamen neun Fehler und Unschönheiten ans Licht, die alle behoben sind.
+
+### Neu
+
+- **Veranstaltungen in der Arbeitsbilanz.** Teilnehmerliste, WordPress-Beitrag und Instagram-Text sind jetzt Vorgänge in der Zeitbilanz. Plugins melden Start und Abschluss über eine neue Host-Fähigkeit; Zeit und Zuordnung setzt der Kern selbst. Jeder Vorgang bekommt sein Etikett aus dem Nachweis: Teilnehmerliste erst nach dem Speicherdialog „gespeichert", WordPress „Entwurf" oder „veröffentlicht" je nach Antwort des Servers, Instagram „verwendet" nur über den Knopf „Als verwendet markieren", weil Kopieren nichts belegt. Gutschrift gibt es je Vorgang einmal gegen die selbst eingetragene Referenzzeit, ein zweiter Export am selben Tag zählt nicht doppelt. Die aktive Zeit wird je Vorgang einmal abgezogen; ohne Messung heißt es „nicht gemessen". Ohne Referenz wird ein Vorgang gezählt, aber nicht bewertet.
+- **Nutzenbilanz im Leistungsfenster.** Ein neuer Block fasst die Ergebnisse in Worten zusammen: Agent-Übernahmen, Mail-Aufgaben, Vorgänge mit Etikett, Vorbereitungen ohne Abschluss, Fehlversuche und Vorbehalte. Dazu der Netto-Zeitgewinn und ein Zeitwert als Szenario mit optionalem Stundensatz. Ausgaben stehen in US-Dollar; eine Nettorechnung gibt es nur, wenn auch der Stundensatz in US-Dollar eingetragen ist. Die App rechnet keinen Wechselkurs. Der Saldo trägt die Vorbehalte der Ausgaben weiter: „≤" bei Aufrufen ohne Preis, „≈" bei gerechneten Beträgen.
+- **Nacharbeit nachtragen.** Die Fensterzeit erfasst keine Nacharbeit in anderen Programmen. Unter dem Zeitgewinn gibt es deshalb ein Formular, mit dem sich Minuten an einen Agent-Lauf, einen Mail-Durchgang oder einen Vorgang nachtragen lassen (eine Minute bis acht Stunden). Die Rohmessung bleibt erhalten, der Nachtrag wird auf der Karte, im Tooltip der Statusleiste, in der Historie und im Export als Nutzerangabe ausgewiesen, nie als Messung. Ein Lauf ohne Grundmessung wird auch mit Nachtrag nicht bewertet; das Formular bietet ihn gar nicht erst an.
+- **Referenzquelle je Vorgangsart.** Neben jeder Referenzzeit in den Einstellungen lässt sich angeben, ob sie geschätzt oder selbst gestoppt ist. An der Rechnung ändert das nichts, aber Karte, Historie und Export sagen an jeder Zahl, worauf sie beruht.
+- **Tagesbilanz-Karte im Look der Leistungsauswertung.** Die Karte in der Befehlspalette war eine Textwand. Jetzt zeigt sie eine Kennzahlenzeile, einen Block je Gruppe, in der Zeitbilanz je Art eine Zeile mit Beschriftung links und Rechnung rechts, Vorbehalte in Warnfarbe. Sie heißt „Heute mit MindGraph" und scrollt in der Palette, statt abgeschnitten zu werden.
+
+### Workflow-Canvas: sieben Beispiele durchgespielt
+
+- **Der Antwortentwurf blieb unsichtbar.** Nach dem Lauf „E-Mail beantworten" öffnete die App das Postfach-Panel per Umschalter. Beim manuellen Lauf ist es aber fast immer schon offen, weil die Mail dort markiert wurde, und so schloss es sich, und das Mailfenster mit dem fertigen Entwurf erschien nie. Das Panel wird jetzt nur geöffnet, nie umgeschaltet.
+- **Erfundene Unterschrift, doppelte Signatur.** Das Modell setzte „Herr Leeder" unter den Entwurf, darunter kam die echte Signatur. Der Entwurf endet jetzt mit der Grußformel; Unterschrift, Platzhalter und Betreffzeile sind dem Modell untersagt, die Signatur ergänzt das Mailfenster.
+- **Aufgaben aus der falschen Sicht.** „Mail zu Aufgabenliste" extrahierte die Aufgaben der Absenderin („Erfahren, ob Fahrtkosten erstattet werden"). Jetzt werden die Aufgaben formuliert, die sich für den Empfänger ergeben („Klären, ob Fahrtkosten erstattet werden", „Raumplan zuschicken").
+- **Prüfergebnisse gingen verloren.** „Mensch prüft (Text)" zeigte das Ergebnis nur im Lauf-Panel, beim Ereignis-Lauf blieben 80 Zeichen in einer Aufgabe. Jetzt entsteht immer eine Prüfnotiz im Inbox-Ordner mit dem Titel „Zur Prüfung – <Workflow-Name>". Beim manuellen Lauf öffnet sie sich direkt im Editor, beim Ereignis-Lauf verweist die Aufgabe per Wikilink auf sie.
+- **Der Aufgaben-Auslöser fand nichts.** Nach dem Programmstart liegen die meisten Notizen ohne Inhalt im Zwischenspeicher, und der Auslöser „Aufgabe heute fällig" übersprang sie. Er lädt Notizen mit offenen Aufgaben jetzt nach. Außerdem stand im Auslösertext das Datum des Vortags, weil es in Weltzeit umgerechnet wurde; jetzt wird das lokale Datum verwendet.
+- **Antares und edoobox meldeten falsch „nichts gefunden".** Ohne hinterlegte Zugangsdaten hieß es „Keine Anmeldungen gefunden" beziehungsweise „Keine überfälligen Rückgaben gefunden". Jetzt steht der Grund im Lauf: Zugangsdaten fehlen, bitte in den Einstellungen hinterlegen.
+- **Zwei Betreffzeilen und Platzhalter im Mahnentwurf.** Auslöser und Modell lieferten je eine Betreffzeile, dazu „[Ihr Name]" als Platzhalter. Führende Betreffzeilen werden jetzt entfernt, die Beispiel-Prompts verbieten Platzhalter. Der Betreff der vorbereiteten Mail ist aus Sicht des Empfängers formuliert: „Anmeldebestätigung: …" statt „Neue Anmeldung: …", „Erinnerung: Rückgabe … fällig" statt der internen Bezeichnung.
+- **Einleitungssätze des Modells.** Beim freien Prompt begann die Antwort mit „Hier ist die knappe Prüfnotiz…", und genau dieser Satz wurde zum Notiztitel. Der freie Prompt verlangt jetzt nur das Ergebnis, ohne Einleitung.
+- **Doppelte Ausgaben im Lauf-Panel.** Die Aufgabenliste stand zweimal untereinander, weil zwei Ausgänge denselben Inhalt trugen; die Statuszusammenfassung wiederholte den Anfang des Projektkontexts. Gleiche Inhalte und Anfänge längerer Texte werden nur noch einmal gezeigt.
+
+### Ehrlichkeitsregeln der Arbeitsbilanz
+
+- Abgezogen wird aktive Vordergrundzeit, nie die Laufzeit eines Agenten. Nicht gemessen ist nicht null.
+- Fehlversuche zählen: eine aufgegebene Vorbereitung geht mit ihrer bis dahin gemessenen Zeit als Abzug in die Bilanz, ohne Gutschrift. Wer die App mitten in einer Vorbereitung schließt, verliert diese Zeit; das steht so im Code.
+- Bewertet wird auf Vorgangsebene, einmal: Summe der Referenzen der bepreisten Kanäle minus aktive Zeit des Vorgangs. Über Zeitabschnitte hinweg zählt bereits verbuchte Zeit nur, wenn ein früherer Kanal bepreist war, damit Balkensumme und Gesamtwert übereinstimmen.
+- Der Export als CSV trägt dieselben Vorbehalte wie das Markdown: Referenzquelle, Nachträge, Etiketten.
+
+### Behoben
+
+- **Ereignisart „Referenz geändert" ging beim Lesen verloren.** Der Ledger kannte sie nicht und warf sie beim Laden weg; der nächste Eintrag löschte sie aus der Datei. Ein Test hält Typ und Erlaubnisliste jetzt zusammen.
+- **Instagram ließ sich für einen neuen Vorgang derselben Veranstaltung nicht markieren.** Der Status hing an der Veranstaltung statt am Vorgang. Neu generieren ergibt einen neuen Vorgang, der wieder markierbar ist.
+- **Der Kartentext ging nicht auf.** Die Rechnung zeigte einen Nettowert hinter einer Bruttogleichung („25 − 6 = 15"), und getrennt gerundete Teile ergaben „4 − 1 = 4". Die Rechnung zeigt jetzt brutto, die Fehlversuch-Zeile nennt Abzug und Netto, die aktive Zeit wird aus der Gleichung abgeleitet.
+- **Die Historie lud bei neuen Läufen nicht nach**, und die Reichweite des Logbuchs war nicht zu sehen. Beides ist nachgezogen; das Logbuch reicht 365 Tage oder 20 000 Einträge, und jede Ansicht sagt, wie weit ihre Daten zurückreichen.
+
 ## [0.11.4-beta] - 2026-09-02
 
 Ein Nachtrag für edoobox. Ein Kunde bekam unter Windows beim Verbindungstest nur „Authentication failed (401): Details unterdrückt", obwohl dieselben Schlüssel auf einem Mac funktionierten. Ohne den Antworttext des Servers ließ sich nicht sagen, ob edoobox die Schlüssel ablehnt oder ein Proxy im Schulnetz dazwischen antwortet.

@@ -25,6 +25,7 @@ function fakeServices(over: Partial<HostServices> = {}): HostServices {
     dialogSaveFile: vi.fn(async () => null),
     readResource: vi.fn(async () => new Uint8Array()),
     emitWorkflow: vi.fn(async () => {}),
+    recordActivity: vi.fn(async () => {}),
     ...over,
   }
 }
@@ -137,5 +138,38 @@ describe('createHostFactory — llm-Weiterleitung', () => {
       module: 'mail-summary',
     })
     expect(services.llmGenerate).toHaveBeenCalledWith('hi', { module: 'mail-summary' })
+  })
+})
+
+describe('createHostFactory — activity (Arbeitsbilanz)', () => {
+  it('existiert nur mit Capability und setzt Zeit + Plugin-ID selbst', async () => {
+    const services = fakeServices()
+    expect((createHostFactory(services)(manifest({ capabilities: ['dialog'] })) as Record<string, unknown>).activity).toBeUndefined()
+    const host = createHostFactory(services)(manifest({ id: 'edoobox', capabilities: ['activity'] })) as Record<string, unknown>
+    const activity = host.activity as { record: (e: unknown) => Promise<void> }
+    await activity.record({ kind: 'job-outcome', jobId: 'mk-1', jobType: 'ig-caption', outcome: 'used', activeMs: 500, pluginId: 'fremd', at: 1 })
+    expect(services.recordActivity).toHaveBeenCalledOnce()
+    const event = (services.recordActivity as ReturnType<typeof vi.fn>).mock.calls[0][0] as Record<string, unknown>
+    expect(event).toMatchObject({ kind: 'job-outcome', jobId: 'mk-1', jobType: 'ig-caption', outcome: 'used', pluginId: 'edoobox', activeMs: 500 })
+    expect(typeof event.at).toBe('number')
+    expect(event.at as number).toBeGreaterThan(1)
+  })
+
+  it('weist Ungültiges laut ab und schreibt nichts', async () => {
+    const services = fakeServices()
+    const host = createHostFactory(services)(manifest({ id: 'edoobox', capabilities: ['activity'] })) as Record<string, unknown>
+    const activity = host.activity as { record: (e: unknown) => Promise<void> }
+    await expect(activity.record({ kind: 'job-outcome', jobId: 'mk-1', jobType: 'wp-post', outcome: 'gedruckt' })).rejects.toThrow(/ungültig/)
+    await expect(activity.record({ kind: 'agent-run-finished', runId: 'x' })).rejects.toThrow(/ungültig/)
+    expect(services.recordActivity).not.toHaveBeenCalled()
+  })
+
+  it('hängt an eine Vorbereitung den Modellverbrauch der runId an', async () => {
+    const totals = { calls: 2, callsWithoutTokens: 0, cloudCalls: 0, computeMs: 4000 }
+    const services = fakeServices({ collectRunTotals: vi.fn(async () => totals) })
+    const host = createHostFactory(services)(manifest({ id: 'edoobox', capabilities: ['activity'] })) as Record<string, unknown>
+    await (host.activity as { record: (e: unknown) => Promise<void> }).record({ kind: 'job-started', jobId: 'mk-2', jobKind: 'marketing' })
+    expect(services.collectRunTotals).toHaveBeenCalledWith('mk-2')
+    expect((services.recordActivity as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ kind: 'job-started', llm: totals })
   })
 })

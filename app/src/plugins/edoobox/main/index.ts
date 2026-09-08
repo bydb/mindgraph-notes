@@ -13,6 +13,7 @@ import { generateIqReportBytes, IQ_TEMPLATE_NAME, type IqReportData } from '../i
 import { generateAttendanceListBytes, ATTENDANCE_TEMPLATE_NAME, type AttendanceListData } from '../attendanceListService'
 import { buildMarketingPrompts, type MarketingOfferData } from '../marketingContent'
 import type { EdooboxEvent } from '../../../shared/types'
+import { stableJobId } from '../../../shared/activityLog'
 
 const DOCX_FILTER = [{ name: 'Word-Dokument', extensions: ['docx'] }]
 const IMAGE_FILTER = [{ name: 'Bilder', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
@@ -238,10 +239,22 @@ export default definePluginMain(
       }
     })
 
+    // Arbeitsbilanz: still, nie blockierend. Ein nicht geschriebener Vorgang darf die
+    // Teilnehmerliste oder den Beitrag nicht scheitern lassen — die Datei ist da.
+    const recordQuietly = async (entry: Parameters<typeof host.activity.record>[0]): Promise<void> => {
+      try { await host.activity.record(entry) } catch (e) { host.log(`Tätigkeitsprotokoll: ${errMsg(e, 'unbekannt')}`) }
+    }
+    const localDay = (): string => {
+      const d = new Date()
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+
     // — Teilnehmerliste (DOCX): Vorlage via host.resource, Speicherort via host.dialog. —
     actions.register('edoobox.generateAttendanceList', async (p) => {
       try {
-        const { data, suggestedFileName } = p as { data: AttendanceListData; suggestedFileName: string }
+        const { data, suggestedFileName, jobKey, activeMs } = p as {
+          data: AttendanceListData; suggestedFileName: string; jobKey?: string; activeMs?: number
+        }
         const templateBytes = await host.resource.read(ATTENDANCE_TEMPLATE_NAME)
         const bytes = await generateAttendanceListBytes(data, templateBytes)
         const saved = await host.dialog.saveFile(
@@ -249,6 +262,19 @@ export default definePluginMain(
           bytes
         )
         if (!saved) return { success: false, canceled: true }
+        // Nachweis = erfolgreicher Speicherdialog. Etikett „gespeichert", nicht „gedruckt".
+        // Gleiche Veranstaltung + gleiche Termine + gleicher Tag = derselbe Vorgang; ein
+        // zweiter Export heute ist keine zweite Arbeit, morgen (neue Anmeldungen) schon.
+        // `activeMs` ist der Stand VOR Erzeugung und Dialog (Untergrenze) — der Renderer
+        // hebt ihn nach der Antwort über `activity-job-foreground` an (Review F08).
+        if (jobKey) {
+          const jobId = stableJobId(['attendance-list', jobKey, localDay()])
+          await recordQuietly({
+            kind: 'job-outcome', jobId, jobType: 'attendance-list', outcome: 'saved',
+            ...(typeof activeMs === 'number' ? { activeMs } : {}),
+          })
+          return { success: true, filePath: saved.path, jobId }
+        }
         return { success: true, filePath: saved.path }
       } catch (e) {
         return { success: false, error: errMsg(e, 'Teilnehmerliste konnte nicht erstellt werden') }
@@ -260,14 +286,45 @@ export default definePluginMain(
     // `wordpress` (Actions wordpress.*), Bild-Generierung im Core-Modul image-generation.
 
     actions.register('edoobox.marketingGenerateContent', async (p) => {
+      // Eine Vorbereitung, zwei Kanäle: beide Modellaufrufe tragen die jobId als runId,
+      // damit der Kern ihren Verbrauch dem Vorgang zurechnet. Generieren ist noch kein
+      // Ergebnis — gutgeschrieben wird erst ein Abschluss (WordPress-Antwort, „verwendet").
+      // Die Vorbereitung wird AUCH bei Scheitern vermerkt und die jobId zurückgegeben,
+      // damit der Renderer den Aufwand als Fehlversuch aufgeben kann (Review F09).
+      const jobId = `mk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
       try {
         const { offerData } = p as { offerData: MarketingOfferData }
         const { wpPrompt, igPrompt } = buildMarketingPrompts(offerData)
-        const blogPost = (await host.llm.generate(wpPrompt, { temperature: 0.7, maxTokens: 2000 })).trim()
-        const igCaption = (await host.llm.generate(igPrompt, { temperature: 0.8, maxTokens: 1000 })).trim()
-        return { success: true, blogPost, igCaption }
+        const blogPost = (await host.llm.generate(wpPrompt, { temperature: 0.7, maxTokens: 2000, runId: jobId })).trim()
+        const igCaption = (await host.llm.generate(igPrompt, { temperature: 0.8, maxTokens: 1000, runId: jobId })).trim()
+        await recordQuietly({ kind: 'job-started', jobId, jobKind: 'marketing' })
+        return { success: true, blogPost, igCaption, jobId }
       } catch (e) {
-        return { success: false, error: errMsg(e, 'Content-Generierung fehlgeschlagen') }
+        await recordQuietly({ kind: 'job-started', jobId, jobKind: 'marketing' })
+        return { success: false, error: errMsg(e, 'Content-Generierung fehlgeschlagen'), jobId }
+      }
+    })
+
+    actions.register('edoobox.marketingAbandon', async (p) => {
+      try {
+        const { jobId, activeMs } = p as { jobId: string; activeMs?: number }
+        await host.activity.record({ kind: 'job-abandoned', jobId, ...(typeof activeMs === 'number' ? { activeMs } : {}) })
+        return { success: true }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Vorgang konnte nicht vermerkt werden') }
+      }
+    })
+
+    actions.register('edoobox.marketingMarkUsed', async (p) => {
+      try {
+        const { jobId, activeMs } = p as { jobId: string; activeMs?: number }
+        await host.activity.record({
+          kind: 'job-outcome', jobId, jobType: 'ig-caption', outcome: 'used',
+          ...(typeof activeMs === 'number' ? { activeMs } : {}),
+        })
+        return { success: true }
+      } catch (e) {
+        return { success: false, error: errMsg(e, 'Vorgang konnte nicht vermerkt werden') }
       }
     })
 

@@ -18,7 +18,7 @@ export function buildAntaresReminderExample(): Workflow {
         position: { x: 340, y: 220 },
         config: {
           model: '',
-          prompt: 'Formuliere aus den folgenden Mahnungsdaten eine höfliche, kurze E-Mail. Bitte um Rückgabe oder Rückmeldung, nenne Titel und Fälligkeitsdatum, und bleibe freundlich-sachlich.'
+          prompt: 'Formuliere aus den folgenden Mahnungsdaten eine höfliche, kurze E-Mail. Sprich die Person mit „Sie" an. Bitte um Rückgabe oder Rückmeldung, nenne Titel und Fälligkeitsdatum, und bleibe freundlich-sachlich. Gib nur den E-Mail-Text aus (Anrede bis Grußformel): keinen Betreff, keine Platzhalter wie [Name], keine Unterschrift oder Signatur — die ergänzt die App.'
         }
       },
       { id: 'n_draft', actionId: 'email.composeDraft', position: { x: 640, y: 220 }, config: {} },

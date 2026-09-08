@@ -24,6 +24,11 @@
   gap: 10px;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-color);
+  /* Die Palette ist auf 70vh gedeckelt und schneidet ab (overflow: hidden). Eine volle
+     Tagesbilanz ist länger als das — die Karte muss selbst scrollen, sonst fehlt die
+     letzte Zeile ohne jeden Hinweis. Kopfzeile (~56px) und Fußleiste (~34px) abgezogen. */
+  max-height: calc(70vh - 90px);
+  overflow-y: auto;
 }
 
 .voice-transcript {
@@ -118,6 +123,73 @@
   color: var(--text-primary);
 }
 
+/* Kopf wie ein Block der Leistungsauswertung: Titel links, Kennzahlen rechts (Zahl fett, Einheit dahinter). */
+.voice-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.voice-card-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.voice-card-stats b {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.voice-card-stat-caveat { color: var(--color-warning, #d08540); }
+
+/* Ein Block je Gruppe mit eigener Fläche — statt einer Textwand mit Zwischenüberschriften. */
+.voice-card-block {
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+}
+
+.voice-card-block-plain {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Beschriftung links, Rechnung rechts; auf schmalen Karten umbrechend. */
+.voice-card-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 34%) 1fr;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.voice-card-row-label { font-weight: 600; }
+.voice-card-row-text { font-variant-numeric: tabular-nums; }
+
+.voice-card-muted {
+  padding-left: calc(34% + 12px);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.voice-card-caveat {
+  padding-left: calc(34% + 12px);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-warning, #d08540);
+}
+
 .voice-card-empty {
   font-size: 13px;
   color: var(--text-secondary);
@@ -133,15 +205,11 @@
 }
 
 .voice-card-group {
-  margin-top: 4px;
+  margin: 0 0 8px;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--text-secondary);
-}
-
-.voice-card-group:first-child {
-  margin-top: 0;
 }
 
 .voice-card-line {

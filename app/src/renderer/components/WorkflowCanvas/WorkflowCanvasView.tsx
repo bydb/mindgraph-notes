@@ -20,7 +20,7 @@ import { invokePlugin } from '../../plugins/client'
 import { usePluginEnabled } from '../../plugins/config'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { useTranslation } from '../../utils/translations'
-import { useNotesStore } from '../../stores/notesStore'
+import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useEmailStore } from '../../stores/emailStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -44,7 +44,14 @@ const nodeTypes = { workflowNode: WorkflowNodeCard }
 // Versehentliche "Betreff:"-Zeile aus dem Entwurf entfernen (Markdown bleibt sonst erhalten
 // und wird beim Senden via renderEmailHtml dargestellt).
 function cleanDraft(text: string): string {
-  return text.replace(/^\s*(?:\*\*)?betreff(?:\*\*)?\s*:.*$\n?/im, '').trimStart()
+  // Alle führenden „Betreff:"-Zeilen abräumen (Auslöser + ggf. eine vom Modell) — die
+  // Betreffzeile setzt das Compose-Fenster selbst. Vorher blieb die zweite im Body stehen.
+  let out = text.trimStart()
+  for (;;) {
+    const next = out.replace(/^(?:\*\*)?\s*betreff(?:\*\*)?\s*:.*(?:\r?\n|$)/i, '').trimStart()
+    if (next === out) return out
+    out = next
+  }
 }
 
 // Echte Antwortadresse aus dem Mail-Body ziehen — NUR aus einer beschrifteten
@@ -230,6 +237,32 @@ function InnerCanvas({ onOpenInbox }: Props) {
   // onOpenInbox über Ref, damit der Effekt nur an `run` hängt (kein Re-Fire bei App-Render).
   const onOpenInboxRef = useRef(onOpenInbox)
   onOpenInboxRef.current = onOpenInbox
+  // Notiz-Hand-off („Mensch prüft (Text)", manueller Lauf): die Prüfnotiz liegt im Vault —
+  // in den Store nachladen und öffnen, damit der Mensch sie vor sich hat.
+  useEffect(() => {
+    if (!run || run.mode !== 'execute' || run.handoff?.kind !== 'note') return
+    const noteRel = String((run.handoff.payload as { noteRel?: unknown }).noteRel || '')
+    const vp = useNotesStore.getState().vaultPath
+    if (!noteRel || !vp) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const ns = useNotesStore.getState()
+        let note = ns.getNoteByPath(noteRel)
+        if (!note) {
+          const abs = `${vp}/${noteRel}`
+          const content = await window.electronAPI.readFile(abs)
+          note = await createNoteFromFile(abs, noteRel, content)
+          useNotesStore.getState().addNote(note)
+        }
+        if (!cancelled) useNotesStore.getState().selectNote(note.id)
+      } catch (e) {
+        console.warn('[workflow] Prüfnotiz konnte nicht geöffnet werden:', e)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [run])
+
   useEffect(() => {
     if (!run || run.mode !== 'execute' || run.handoff?.kind !== 'compose') return
     const draft = String((run.handoff.payload as { draft?: unknown }).draft || '')

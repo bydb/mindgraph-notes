@@ -12,6 +12,7 @@ import type {
 import type { WorkflowSeedItem } from '../../../shared/workflow/model'
 import type { EdooboxBooking, EdooboxOfferDashboard } from '../../../shared/types'
 import { useEventAgentBridge } from '../../../renderer/stores/eventAgentBridge'
+import { edooboxClient } from './edooboxClient'
 
 function formatBooking(o: EdooboxOfferDashboard, prev: number, neu: number): string {
   return [
@@ -43,7 +44,8 @@ function edooboxBookingToItem(o: EdooboxOfferDashboard, b: EdooboxBooking, newCo
     meta: {
       offerId: o.id, bookingId: b.id, bookingCount: o.bookingCount, newCount,
       recipientEmail: b.userEmail, recipientName: b.userName, userEmail: b.userEmail, userName: b.userName,
-      subject: `Neue Anmeldung: ${o.name}`
+      // Betreff der Mail, die die Teilnehmerin bekommt — „Neue Anmeldung" ist die interne Sicht.
+      subject: `Anmeldebestätigung: ${o.name}`
     },
     email: { id: `edoobox:${b.id || `${o.id}:${o.bookingCount}`}`, subject: `Neue Anmeldung: ${o.name}`, bodyText: text, from: b.userEmail, name: b.userName }
   }
@@ -53,7 +55,7 @@ function edooboxOfferToItem(o: EdooboxOfferDashboard, prev: number, newCount: nu
   return {
     itemKey: `booking:${o.id}:${o.bookingCount}`,
     text,
-    meta: { offerId: o.id, bookingCount: o.bookingCount, newCount, subject: `Neue Anmeldung: ${o.name}` },
+    meta: { offerId: o.id, bookingCount: o.bookingCount, newCount, subject: `Anmeldebestätigung: ${o.name}` },
     email: { id: `edoobox:${o.id}:${o.bookingCount}`, subject: `Neue Anmeldung: ${o.name}`, bodyText: text }
   }
 }
@@ -115,8 +117,14 @@ export const edooboxTriggerProvider: WorkflowTriggerProvider = {
   },
 
   async collectManual(): Promise<WorkflowSeedItem | null> {
+    // Vorher hieß es ohne Zugangsdaten „Keine Anmeldungen gefunden" — falsch beruhigend.
+    let creds: { apiKey?: string; apiSecret?: string } | null = null
+    try { creds = await edooboxClient.loadCredentials() } catch { creds = null }
+    if (!creds?.apiKey || !creds?.apiSecret) {
+      throw new Error('edoobox-Zugangsdaten fehlen — bitte in Einstellungen → Agenten → edoobox hinterlegen.')
+    }
     const bridge = useEventAgentBridge.getState()
-    try { await bridge.loadOffers() } catch { /* keine/abgelaufene Credentials */ }
+    try { await bridge.loadOffers() } catch { /* abgelaufene Credentials / Netz */ }
     const offer = useEventAgentBridge.getState().offers.find(o => o.bookingCount > 0)
     if (!offer) return null
     let bookings: EdooboxBooking[] = []

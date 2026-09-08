@@ -46,6 +46,8 @@ export interface ActiveMeasurement {
   begin: () => void
   /** Beendet sie und liefert die aktive Zeit in Millisekunden. */
   end: () => number
+  /** Zwischenstand, ohne die Messung zu beenden — für Vorgänge mit mehreren Abschlüssen. */
+  peek: () => number
   /** Bricht ab, ohne einen Wert zu liefern. */
   cancel: () => void
 }
@@ -68,6 +70,7 @@ export function createActiveMeasurement(): ActiveMeasurement {
       live.delete(timer)
       return timer.stop(now())
     },
+    peek: () => timer.elapsed(now()),
     cancel: () => {
       live.delete(timer)
       timer.stop(now())

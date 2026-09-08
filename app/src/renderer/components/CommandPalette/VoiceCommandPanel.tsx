@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useVoiceCommandStore } from '../../stores/voiceCommandStore'
 import { getVoiceUiBridge } from '../../voice/uiBridge'
-import type { FollowUp } from '../../../shared/voiceCommands/types'
+import type { FollowUp, AnswerCard } from '../../../shared/voiceCommands/types'
 import './VoiceCommandPanel.css'
 
 type TFn = (key: any, params?: Record<string, string | number>) => string
@@ -18,6 +18,17 @@ interface Props {
  * regelmäßig; wer nicht sieht, was verstanden wurde, schreibt den Fehler der App zu.
  * Enter im korrigierten Feld erkennt neu.
  */
+/** Aufeinanderfolgende Zeilen derselben Gruppe zu einem Block zusammenfassen. */
+function groupLines(lines: AnswerCard['lines']): Array<{ name?: string; lines: AnswerCard['lines'] }> {
+  const blocks: Array<{ name?: string; lines: AnswerCard['lines'] }> = []
+  for (const line of lines) {
+    const last = blocks[blocks.length - 1]
+    if (last && last.name === line.group) last.lines.push(line)
+    else blocks.push({ name: line.group, lines: [line] })
+  }
+  return blocks
+}
+
 export const VoiceCommandPanel: React.FC<Props> = ({ t, onClose }) => {
   const state = useVoiceCommandStore(s => s.state)
   const submit = useVoiceCommandStore(s => s.submit)
@@ -199,25 +210,46 @@ export const VoiceCommandPanel: React.FC<Props> = ({ t, onClose }) => {
           über der Antwort sieht dann aus wie ein Fehler. */}
       {transcript ? TranscriptField : null}
       <div className="voice-card">
-        <div className="voice-card-title">{card.title}</div>
+        <div className="voice-card-head">
+          <div className="voice-card-title">{card.title}</div>
+          {card.stats && card.stats.length > 0 && (
+            <p className="voice-card-stats">
+              {card.stats.map((s, i) => (
+                <span key={i} className={s.tone === 'caveat' ? 'voice-card-stat-caveat' : undefined}><b>{s.value}</b> {s.label}</span>
+              ))}
+            </p>
+          )}
+        </div>
         {card.lines.length === 0 ? (
           <div className="voice-card-empty">{card.emptyText ?? t('voiceCommand.card.nothing')}</div>
         ) : (
-          <ul className="voice-card-lines">
-            {card.lines.map((line, i) => (
-              <React.Fragment key={i}>
-                {line.group && line.group !== card.lines[i - 1]?.group && (
-                  <li className="voice-card-group">{line.group}</li>
-                )}
-                <li className="voice-card-line">
-                  <span>{line.text}</span>
-                  {typeof line.dueIn === 'number' && line.dueIn < 0 && (
-                    <span className="voice-card-due">{t('voiceCommand.card.daysOverdue', { days: Math.abs(line.dueIn) })}</span>
-                  )}
-                </li>
-              </React.Fragment>
-            ))}
-          </ul>
+          // Gleiche Gruppe = ein Block mit eigener Fläche, wie die Blöcke der Leistungsauswertung.
+          groupLines(card.lines).map((block, b) => (
+            <div key={b} className={block.name ? 'voice-card-block' : 'voice-card-block voice-card-block-plain'}>
+              {block.name && <div className="voice-card-group">{block.name}</div>}
+              <ul className="voice-card-lines">
+                {block.lines.map((line, i) => (
+                  line.kind === 'row' ? (
+                    <li key={i} className="voice-card-row">
+                      <span className="voice-card-row-label">{line.label}</span>
+                      <span className="voice-card-row-text">{line.text}</span>
+                    </li>
+                  ) : line.kind === 'muted' ? (
+                    <li key={i} className="voice-card-muted">{line.text}</li>
+                  ) : line.kind === 'caveat' ? (
+                    <li key={i} className="voice-card-caveat">{line.text}</li>
+                  ) : (
+                    <li key={i} className="voice-card-line">
+                      <span>{line.text}</span>
+                      {typeof line.dueIn === 'number' && line.dueIn < 0 && (
+                        <span className="voice-card-due">{t('voiceCommand.card.daysOverdue', { days: Math.abs(line.dueIn) })}</span>
+                      )}
+                    </li>
+                  )
+                ))}
+              </ul>
+            </div>
+          ))
         )}
         {card.footnote && <div className="voice-card-footnote">{card.footnote}</div>}
         {card.followUps.length > 0 && (

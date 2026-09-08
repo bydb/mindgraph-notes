@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLlmTelemetry: () => ipcRenderer.invoke('llm-telemetry-get'),
   // Logbuch auf Platte, nach Zeitraum. Nur lesend — Anhängen gibt es vom Renderer aus nicht.
   getLlmTelemetryRange: (range: { from: number; to: number }) => ipcRenderer.invoke('llm-telemetry-range', range),
+  getLlmTelemetryOldestAt: () => ipcRenderer.invoke('llm-telemetry-oldest'),
   onLlmTelemetryRun: (callback: (run: unknown) => void) => {
     const handler = (_e: unknown, run: unknown) => callback(run)
     ipcRenderer.on('llm-telemetry-run', handler)
@@ -248,6 +249,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   /** Trägt NUR die Vordergrundzeit an einem vom Main geschriebenen Mail-Ereignis nach. */
   activityForeground: (vaultPath: string, id: string, foregroundMs: number) =>
     ipcRenderer.invoke('activity-foreground', vaultPath, id, foregroundMs),
+  activityJobForeground: (vaultPath: string, jobId: string, jobType: string, activeMs: number) =>
+    ipcRenderer.invoke('activity-job-foreground', vaultPath, jobId, jobType, activeMs),
+  activityCorrectTime: (vaultPath: string, targetId: string, extraMs: number) =>
+    ipcRenderer.invoke('activity-correct-time', vaultPath, targetId, extraMs),
   onActivityChanged: (callback: (payload: { vaultPath: string }) => void) => {
     const handler = (_e: unknown, payload: { vaultPath: string }) => callback(payload)
     ipcRenderer.on('activity-changed', handler)

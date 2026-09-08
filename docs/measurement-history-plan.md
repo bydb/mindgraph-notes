@@ -8,7 +8,7 @@ lassen, weil Geschichte nicht rückwirkend erfasst werden kann.
 
 Die App misst heute viel und zeigt fast nichts davon über den Tag hinaus. Die Token/s-Anzeige
 (`docs/voice-command-plan.md`, Nachtrag Telemetrie) hält die letzten 300 Aufrufe im Arbeitsspeicher
-und vergisst sie beim Neustart. Die Zeitbilanz hält 90 Tage, wird aber nur für „heute" ausgewertet.
+und vergisst sie beim Neustart. Die Zeitbilanz hielt 90 Tage (seit Paket 1 vom 08.09.2026 ein Jahr), wird aber nur für „heute" ausgewertet.
 Die Kosten eines Agentenlaufs werden berechnet und danach verworfen.
 
 Die Messgeschichte soll vier Fragen über einen frei wählbaren Zeitraum beantworten:
@@ -32,7 +32,7 @@ Referenzzeit, und die steht daneben.
 | Datenpfad | Inhalt | Ablage | Verbleib |
 |---|---|---|---|
 | `LlmRunMetrics` (`shared/llmTelemetry.ts`) | Modell, Modul, Backend, Token, Zeiten, Kaltstart, Kosten **je Aufruf** | Ringpuffer im RAM, Main und Renderer getrennt (`main/llm/telemetry.ts`, `llmTelemetryStore`) | 300 Aufrufe, weg beim Neustart |
-| `ActivityEvent` (`shared/activityLog.ts`) | Agentenläufe, Mail-Extraktionen, Übernahmen, aktive Zeit, Modellname | `userData/activity/<hash(vaultPath)>.json` (`main/activityLedger.ts`) | 90 Tage, höchstens 5000 Ereignisse |
+| `ActivityEvent` (`shared/activityLog.ts`) | Agentenläufe, Mail-Extraktionen, Übernahmen, aktive Zeit, Modellname | `userData/activity/<hash(vaultPath)>.json` (`main/activityLedger.ts`) | 90 Tage, höchstens 5000 Ereignisse (seit 08.09.2026: 365 Tage, 20 000) |
 | `RunCost` (`shared/llmCost.ts`) | Summe der Kosten und Token eines Agentenlaufs | Rückgabewert von `noteAgent/loop.ts`, **kein Abnehmer** | verworfen |
 
 Dazu drei Lücken, die jede Statistik heute schief machen:
@@ -433,6 +433,53 @@ Lücken, Punktdiagramm mit Beschriftung. Das ist mit SVG und einer kleinen Skale
 `userData`-Ordner der laufenden App `telemetry/<16 Hex>.jsonl` liegen und eine Zeile mit `module`,
 `model`, `backend` enthalten; nach einem Agentenlauf trägt jede Zeile dieses Laufs dieselbe `runId`
 wie das `agent-run-finished`-Ereignis in `activity/<hash>.json`.
+
+**Paket 1 „Historie ehrlich machen" (08.09.2026)** — Antwort auf das Codex-Review
+`docs/codex-collab/modell-leistung-demo-review.md`:
+
+- **F03 behoben**: `reference-changed` stand nicht in `KNOWN_KINDS`; der Ledger warf es beim Lesen weg
+  und der nächste Eintrag löschte es aus der Datei. Die Markierungen aus § 7 waren damit seit 0.11.3 nie
+  sichtbar. Test „kennt jede Art" (typgesichertes Beispiel je Ereignisart, durch JSON geschickt) und
+  Ledger-Roundtrip-Test halten die Liste mit dem Typ zusammen.
+- **F01 behoben**: `ActivitySummary.discardedRuns` — Läufe, deren Ergebnis nie übernommen wurde (verworfen,
+  gescheitert, abgebrochen, nie entschieden), mit ihrer aktiven Zeit. `estimateSavedMinutes` zieht sie bei
+  Arten MIT Referenz ab (`wastedRuns`/`wastedMs`/`wastedMinutes` je Zeile, `savedMinutes` ist netto); ohne
+  Referenz bleibt die Art „nicht bewertbar", ohne Messung zählt der Lauf als „nicht gemessen". Karte,
+  Statusleiste, Historie und Export zeigen „N Fehlversuche, −X min abgezogen". Zuordnung zum Tag des
+  Lauf-Endes.
+- **F04 behoben**: `HistorySection` abonniert `activity-changed` und `llm-telemetry-run`, lädt entprellt
+  (500 ms) nach und erneuert dabei die Zeitraumgrenzen.
+- **F05**: Aktivitätsprotokoll auf 365 Tage / 20 000 Ereignisse. Neuer Lese-IPC `llm-telemetry-oldest`
+  (`readTelemetryOldestAt`); die Ansicht sagt, ab wann Aufrufe bzw. Vorgänge im Logbuch stehen, sobald
+  das jünger ist als der gewählte Zeitraum.
+- **F06 Wortlaut**: „Keine API-Gebühr" statt „kostet nichts"; Kosten-Hinweis nennt, was NICHT enthalten ist.
+- **F02 sichtbar**: Fußnote „Vordergrundzeit, gedeckelt, keine Nacharbeit in anderen Programmen" unter dem
+  Zeitgewinn und im Export.
+- GUI-Gegenprobe erledigt (Dev-App, isoliertes Profil, gesätes Logbuch): vier Fälle in Statusleiste, Karte und
+  Historie; Referenzänderung live nachgeladen. Zwei Kartentexte dabei korrigiert: Die Rechnung zeigt brutto
+  (Referenz × Läufe − aktive Zeit), die Fehlversuch-Zeile nennt Abzug und Netto, die aktive Zeit wird aus der
+  Gleichung abgeleitet statt getrennt gerundet („4 − 1 = 4" war real). Regel: Auf der Karte gezeigte Zahlen
+  müssen aufgehen; Tests in `renderer/utils/impactText.test.ts`.
+**Paket 2 „Veranstaltungen in die Arbeitsbilanz" (08.09.2026)** — Details und Regeln im Review-Dokument
+(Abschnitt „Umsetzung Paket 2"): Host-Fähigkeit `activity`, Ereignisse `job-started`/`job-outcome`,
+Vorgangsarten `attendance-list`/`wp-post`/`ig-caption`, Gutschrift je (jobId, Kanal) einmal, aktive Zeit je
+Vorgang einmal, Nutzenbilanz-Block mit Zeitwert-Szenario. Nachbesserung nach Codex-Review F08–F11:
+Bewertung auf Vorgangsebene (`JobRun`), `job-abandoned` für aufgegebene Vorbereitungen, enger Nachtrag-IPC
+`activity-job-foreground` (nur anheben) für die nach dem Abschluss fertig gemessene Vordergrundzeit,
+USD-Saldo mit „≤"/„≈" aus den Ausgaben-Vorbehalten. GUI-Gegenprobe über das Chrome-DevTools-Protokoll
+bestanden (Fenster malte nicht — Compositor, nicht Code; Details im Review-Dokument).
+
+**Paket 3 „Korrekturen und Referenzqualität" (08.09.2026)** — `time-correction` (Nutzerangabe, nie Messung;
+Ledger prüft Ziel und 1 min–8 h), Formular unter dem Zeitgewinn, Ausweis überall als „nachgetragen";
+`impact.referenceSources` geschätzt/selbst gestoppt mit Ausweis an jeder Referenzzahl. GUI-geprüft. Details
+im Review-Dokument.
+
+Nachbesserung nach Codex-Review F12–F16: Zeitbuchung je Abschnitt referenzbewusst (`earlierChannels`),
+Nachtrag ersetzt keine fehlende Grundmessung, CSV mit Referenzquelle und Nachträgen, Instagram-Status am
+Vorgang, Aufgeben-Zeit zählt auch nach Teilerfolg.
+
+- Offen: Löschen eines Nachtrags; ausdrückliche „vollständige Gesamtzeit" als Nutzerangabe für ungemessene
+  Läufe; Nachträge aus der Sprachkarte; Commit/Release der drei Pakete.
 
 ## 14. Reihenfolge
 

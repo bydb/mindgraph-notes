@@ -29,6 +29,7 @@ function buildRegistry() {
     dialogSaveFile: async () => null,
     readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
+    recordActivity: async () => {},
   }
   const registry = new PluginRegistry(createHostFactory(services))
   registry.register([{ manifest, loadEntry: async () => ({ default: entry }) }])

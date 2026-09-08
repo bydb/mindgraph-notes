@@ -201,7 +201,7 @@ function stopWaiting(runId: string): void {
   if (!measurement) return
   const ms = measurement.end()
   // Wert festhalten, damit ihn die erste Entscheidung mitschicken kann.
-  waitTimers.set(runId, { begin: () => {}, end: () => ms, cancel: () => {} })
+  waitTimers.set(runId, { begin: () => {}, end: () => ms, peek: () => ms, cancel: () => {} })
 }
 
 function startReviewTimer(runId: string): void {
@@ -221,7 +221,7 @@ function takeReviewMs(runId: string): number | undefined {
 
 /** Feste Zahl als Messung ablegen — zum Zurücklegen nach einem gescheiterten Aufruf. */
 function keepMeasured(store: Map<string, ActiveMeasurement>, runId: string, ms: number): void {
-  store.set(runId, { begin: () => {}, end: () => ms, cancel: () => {} })
+  store.set(runId, { begin: () => {}, end: () => ms, peek: () => ms, cancel: () => {} })
 }
 
 /**

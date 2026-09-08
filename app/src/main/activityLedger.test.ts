@@ -13,8 +13,8 @@ import path from 'path'
 let userDataDir = ''
 vi.mock('electron', () => ({ app: { getPath: () => userDataDir } }))
 
-import { appendActivityEvent, readActivitySummary } from './activityLedger'
-import type { ActivityEvent } from '../shared/activityLog'
+import { appendActivityEvent, readActivitySummary, readActivityEvents, raiseJobActiveMs, appendTimeCorrection } from './activityLedger'
+import { ACTIVITY_RETENTION_DAYS, type ActivityEvent } from '../shared/activityLog'
 
 const VAULT = '/tmp/ein-vault'
 const NOW = Date.now()
@@ -80,12 +80,39 @@ describe('appendActivityEvent', () => {
     expect(summary.tasksCreated).toBe(5)
   })
 
-  it('räumt Einträge älter als 90 Tage beim nächsten Schreiben weg', async () => {
-    await appendActivityEvent(VAULT, { at: NOW - 95 * 86_400_000, kind: 'task-created', count: 7 })
+  it('räumt Einträge älter als die Aufbewahrungsfrist beim nächsten Schreiben weg', async () => {
+    await appendActivityEvent(VAULT, { at: NOW - (ACTIVITY_RETENTION_DAYS + 5) * 86_400_000, kind: 'task-created', count: 7 })
     await appendActivityEvent(VAULT, { at: NOW, kind: 'task-created', count: 1 })
     const [file] = await ledgerFiles()
     const parsed = JSON.parse(await fs.readFile(path.join(userDataDir, 'activity', file), 'utf-8'))
     expect(parsed).toHaveLength(1)
+  })
+
+  it('behält eine Referenzänderung über Schreiben und Lesen — sie ging bis 0.11.4 beim nächsten Eintrag verloren', async () => {
+    await appendActivityEvent(VAULT, { at: NOW - 60_000, kind: 'reference-changed', activityType: 'document', fromMinutes: 20, toMinutes: 30 })
+    await appendActivityEvent(VAULT, { at: NOW, kind: 'task-created', count: 1 })
+    const events = await readActivityEvents(VAULT)
+    expect(events.map(e => e.kind)).toEqual(['reference-changed', 'task-created'])
+  })
+
+  it('hebt die Vordergrundzeit eines Vorgangsabschlusses nur an, nie ab — und nur, wo ein Abschluss ist', async () => {
+    await appendActivityEvent(VAULT, { at: NOW, kind: 'job-outcome', jobId: 'tl-1', jobType: 'attendance-list', outcome: 'saved', pluginId: 'edoobox', activeMs: 10_000 })
+    expect(await raiseJobActiveMs(VAULT, 'tl-1', 'attendance-list', 25_000)).toBe(true)
+    expect(await raiseJobActiveMs(VAULT, 'tl-1', 'attendance-list', 5_000)).toBe(false)
+    expect(await raiseJobActiveMs(VAULT, 'tl-1', 'wp-post', 99_000)).toBe(false)
+    expect(await raiseJobActiveMs(VAULT, 'unbekannt', 'attendance-list', 99_000)).toBe(false)
+    const [e] = await readActivityEvents(VAULT)
+    expect(e).toMatchObject({ kind: 'job-outcome', activeMs: 25_000 })
+  })
+
+  it('nimmt eine Zeitkorrektur nur für bekannte Ziele und plausible Minuten an', async () => {
+    await appendActivityEvent(VAULT, { at: NOW, kind: 'agent-run-finished', runId: 'r1', durationMs: 1000, activityType: 'document', resultCount: 1, status: 'ok' })
+    expect(await appendTimeCorrection(VAULT, 'r1', 5 * 60_000)).toBe(true)
+    expect(await appendTimeCorrection(VAULT, 'erfunden', 5 * 60_000)).toBe(false)
+    expect(await appendTimeCorrection(VAULT, 'r1', 0)).toBe(false)
+    expect(await appendTimeCorrection(VAULT, 'r1', 9 * 60 * 60_000)).toBe(false)
+    const events = await readActivityEvents(VAULT)
+    expect(events.map(e => e.kind)).toEqual(['agent-run-finished', 'time-correction'])
   })
 
   it('meldet für einen unbekannten Vault eine leere Bilanz statt zu scheitern', async () => {

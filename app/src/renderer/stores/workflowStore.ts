@@ -148,7 +148,10 @@ function saveFiredLedger(vaultPath: string, ledger: Record<string, string>): voi
 // Plugin-Trigger (Antares-Mahnung, edoobox-Anmeldung) bringen ihre Formatierung im jeweiligen
 // Provider in der Vertikale mit (A-pre Schritt 4) — der Kern formatiert sie nicht mehr. ──
 function formatTask(note: Note, text: string, dueDate: Date): string {
-  const due = dueDate.toISOString().slice(0, 10)
+  // Lokales Datum, nicht UTC: `toISOString()` machte aus „heute 00:00 (MESZ)" den Vortag —
+  // der Seed sagte „Fällig: 2026-09-07", obwohl die Aufgabe am 08.09. fällig war (real).
+  const p = (n: number) => String(n).padStart(2, '0')
+  const due = `${dueDate.getFullYear()}-${p(dueDate.getMonth() + 1)}-${p(dueDate.getDate())}`
   return [
     'Heute fällige Aufgabe',
     `- Aufgabe: ${text}`,
@@ -186,18 +189,35 @@ function collectTodayDueTaskItems(notes: Note[]): WorkflowSeedItem[] {
 // kein Plugin). Externe Trigger (Antares-Mahnung, edoobox-Anmeldung) liefern Plugins
 // als WorkflowTriggerProvider über den Renderer-Slot. So dispatcht execute/runTrigger
 // generisch, ohne ein Plugin namentlich zu kennen (A-pre Schritt 4).
+/** Notizen mit Aufgaben, die nur als Cache-Stub (content: '') im Store liegen, nachladen —
+ *  sonst sieht der Trigger nach einem App-Start fast keine Notiz und meldet fälschlich
+ *  „Keine heute fälligen Aufgaben" (real passiert). Gleiche Technik wie dashboardData. */
+async function notesWithTaskContent(): Promise<Note[]> {
+  const { notes, vaultPath } = useNotesStore.getState()
+  const stubs = notes.filter(n => !n.content && n.taskStats && n.taskStats.total > n.taskStats.completed)
+  if (!vaultPath || stubs.length === 0) return notes
+  let loaded: Record<string, string | null> = {}
+  try {
+    loaded = await window.electronAPI.readFilesBatch(vaultPath, stubs.map(n => n.path)) as Record<string, string | null>
+  } catch (e) {
+    console.warn('[workflow] Aufgaben-Trigger: Notizen nachladen fehlgeschlagen:', e)
+    return notes
+  }
+  return notes.map(n => (!n.content && loaded[n.path] ? { ...n, content: loaded[n.path] as string } : n))
+}
+
 const tasksTriggerProvider: WorkflowTriggerProvider = {
   triggerActionId: 'tasks.dueSoon',
   manualEmptyMessage: 'Keine heute fälligen Aufgaben.',
   async collectManual(): Promise<WorkflowSeedItem | null> {
-    return collectTodayDueTaskItems(useNotesStore.getState().notes)[0] ?? null
+    return collectTodayDueTaskItems(await notesWithTaskContent())[0] ?? null
   },
   async collectEvent() {
     // Kein eigener Trigger → der Dispatch setzt 'event-external'. Provider-basierte Trigger
     // (Kern-Aufgaben wie Plugins) tragen generische Event-Provenienz; nur der Mail-Signalpfad
     // des Kerns mintet reichere Trigger (event-email/-reply/-ics).
     return {
-      items: collectTodayDueTaskItems(useNotesStore.getState().notes),
+      items: collectTodayDueTaskItems(await notesWithTaskContent()),
       emptyMessage: 'Keine heute fälligen Aufgaben.',
     }
   },
@@ -442,9 +462,15 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
     let seed: { text?: string; meta?: Record<string, unknown>; email?: WorkflowSeedItem['email'] } | null = null
     const manualProvider = triggerActionId ? getTriggerProviders().get(triggerActionId) : undefined
     if (manualProvider) {
-      const item = await manualProvider.collectManual()
-      if (!item) skipMsg = manualProvider.manualEmptyMessage ?? 'Keine passenden Daten für diesen Trigger.'
-      else seed = { text: item.text, meta: item.meta, email: item.email }
+      // Ein Provider darf werfen, wenn die Quelle gar nicht erreichbar ist (fehlende
+      // Zugangsdaten): dann steht der Grund im Lauf statt eines falschen „nichts gefunden".
+      try {
+        const item = await manualProvider.collectManual()
+        if (!item) skipMsg = manualProvider.manualEmptyMessage ?? 'Keine passenden Daten für diesen Trigger.'
+        else seed = { text: item.text, meta: item.meta, email: item.email }
+      } catch (e) {
+        skipMsg = e instanceof Error ? e.message : String(e)
+      }
     } else {
       seed = seedEmail ? { email: seedEmail } : null
     }

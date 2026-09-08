@@ -87,6 +87,14 @@ export interface AnswerLine {
   text: string
   /** Abschnittsüberschrift; gleiche Gruppe = ein Block. Für gemischte Antworten. */
   group?: string
+  /**
+   * Darstellung: `row` = Beschriftung links, Rechnung rechts (Zeitbilanz je Art);
+   * `muted` = Kontext in gedämpfter Schrift; `caveat` = Vorbehalt in Warnfarbe.
+   * Ohne Angabe eine normale Textzeile. Dieselbe Sprache wie die Leistungsauswertung.
+   */
+  kind?: 'text' | 'row' | 'muted' | 'caveat'
+  /** Beschriftung einer `row`-Zeile (z.B. die Tätigkeitsart). */
+  label?: string
   /** Für den Sprung in die Notiz. */
   noteId?: string
   /** Tage bis zur Fälligkeit; negativ = überfällig. */
@@ -95,6 +103,8 @@ export interface AnswerLine {
 
 export interface AnswerCard {
   title: string
+  /** Kennzahlen unter dem Titel — Zahl fett, Einheit dahinter, wie in der Leistungsauswertung. */
+  stats?: Array<{ value: string; label: string; tone?: 'caveat' }>
   lines: AnswerLine[]
   /** Leere Liste ist ein gültiger Zustand und muss als Text erklärt werden, nicht als Lücke. */
   emptyText?: string

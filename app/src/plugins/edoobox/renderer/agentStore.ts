@@ -6,9 +6,30 @@ import { wordpressService } from '../../../renderer/stores/wordpressServiceBridg
 import { useNotesStore } from '../../../renderer/stores/notesStore'
 import { edooboxClient } from './edooboxClient'
 import { useEventAgentBridge } from '../../../renderer/stores/eventAgentBridge'
+import { createActiveMeasurement, type ActiveMeasurement } from '../../../renderer/utils/activeTimeTracker'
 
 export interface MarketingPublishStatus {
   wordpress?: { postId: number; postUrl: string; status: string; publishedAt: string }
+  /** Instagram: vom Nutzer als verwendet markiert (Zwischenablage allein ist kein Nachweis). Gilt für GENAU diesen Vorgang. */
+  instagram?: { usedAt: string; jobId: string }
+}
+
+// Arbeitsbilanz: EINE Vorbereitung (Texte erzeugt) trägt eine Vorgangs-Kennung aus dem
+// Plugin-Main; WordPress-Übertragung und Instagram-Verwendung melden sie mit. Die aktive
+// Zeit läuft vom Klick „Generieren" bis zum jeweiligen Abschluss (Vordergrund, gedeckelt)
+// und wird je Vorgang einmal abgezogen — der Kern bucht sie beim ersten Kanal.
+let marketingMeasurement: ActiveMeasurement | null = null
+const marketingActiveMs = (): number | undefined => marketingMeasurement ? marketingMeasurement.peek() : undefined
+
+/**
+ * Nach einem Abschluss die inzwischen fertig gemessene Vordergrundzeit nachtragen: Der
+ * Kern schreibt den Abschluss, während die Messung hier noch läuft (Speicherdialog,
+ * HTTP-Antwort). Nur anheben, nie senken — der Kern erzwingt das (Review F08).
+ */
+async function raiseJobForeground(jobId: string, jobType: string, activeMs: number | undefined): Promise<void> {
+  const vaultPath = useNotesStore.getState().vaultPath
+  if (!vaultPath || typeof activeMs !== 'number') return
+  try { await window.electronAPI.activityJobForeground(vaultPath, jobId, jobType, activeMs) } catch { /* Bilanz darf nichts aufhalten */ }
 }
 
 type ImageSaveStatus = 'idle' | 'saved' | 'error'
@@ -55,6 +76,8 @@ interface AgentState {
   isGenerating: boolean
   isPublishing: boolean
   marketingPublishStatus: Record<string, MarketingPublishStatus> // offerId -> status
+  /** Vorgangs-Kennung der letzten Vorbereitung (aus dem Plugin-Main), null vor dem ersten Generieren. */
+  marketingJobId: string | null
   selectedImageBase64: string | null
   selectedImageFileName: string | null
 
@@ -88,6 +111,8 @@ interface AgentState {
   setGeneratedBlogPost: (text: string) => void
   setGeneratedIgCaption: (text: string) => void
   publishToWordpress: (offerId: string, title: string, content: string) => Promise<void>
+  /** Instagram-Text als verwendet markieren — Nutzerentscheidung, im Plugin-Main festgehalten. */
+  markIgUsed: (offerId: string) => Promise<boolean>
   selectImage: () => Promise<void>
   generateImage: (offer: EdooboxOfferDashboard) => Promise<void>
   downloadImage: () => Promise<void>
@@ -130,6 +155,7 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   isGenerating: false,
   isPublishing: false,
   marketingPublishStatus: {},
+  marketingJobId: null,
   selectedImageBase64: null,
   selectedImageFileName: null,
   isGeneratingImage: false,
@@ -336,7 +362,16 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
   },
 
   generateContent: async (offer: EdooboxOfferDashboard, bookingUrl?: string) => {
-    set({ isGenerating: true })
+    // Neue Vorbereitung = neuer Vorgang. Die alte wird mit ihrer bis dahin gemessenen Zeit
+    // aufgegeben — ein Fehlversuch ist Arbeitszeit (Review F09). Hatte sie schon einen
+    // Abschluss, ignoriert der Kern das Aufgeben, die Zeit ist dann bereits verbucht.
+    const previousJobId = get().marketingJobId
+    const previousMs = marketingActiveMs()
+    if (previousJobId) void edooboxClient.marketingAbandon(previousJobId, previousMs).catch(() => undefined)
+    set({ isGenerating: true, marketingJobId: null })
+    marketingMeasurement?.cancel()
+    marketingMeasurement = createActiveMeasurement()
+    marketingMeasurement.begin()
     try {
       const result = await edooboxClient.marketingGenerateContent({
         name: offer.name,
@@ -352,12 +387,19 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         set({
           generatedBlogPost: result.blogPost || '',
           generatedIgCaption: result.igCaption || '',
+          marketingJobId: result.jobId ?? null,
           isGenerating: false
         })
       } else {
+        // Gescheitert: Der Aufwand bis hierher ist ein Fehlversuch, kein Nichts.
+        if (result.jobId) void edooboxClient.marketingAbandon(result.jobId, marketingActiveMs()).catch(() => undefined)
+        marketingMeasurement?.cancel()
+        marketingMeasurement = null
         set({ isGenerating: false })
       }
     } catch {
+      marketingMeasurement?.cancel()
+      marketingMeasurement = null
       set({ isGenerating: false })
     }
   },
@@ -390,8 +432,14 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
         finalContent = `<p class="imagen-caption" style="font-size:0.85em;color:#666;margin-top:-0.5em;margin-bottom:1.5em;font-style:italic;">${imageGeneratedInfo}</p>\n${content}`
       }
 
-      const result = await wordpressService.publishPost(baseUrl, username, title, finalContent, defaultPostStatus, featuredMediaId)
+      const jobId = get().marketingJobId
+      const result = await wordpressService.publishPost(
+        baseUrl, username, title, finalContent, defaultPostStatus, featuredMediaId,
+        jobId ? { jobId, ...(marketingActiveMs() !== undefined ? { activeMs: marketingActiveMs() } : {}) } : undefined
+      )
       if (result.success) {
+        // Die Antwort hat gedauert — die Zeit bis jetzt gehört zum Vorgang.
+        if (jobId) await raiseJobForeground(jobId, 'wp-post', marketingActiveMs())
         set((state) => ({
           marketingPublishStatus: {
             ...state.marketingPublishStatus,
@@ -408,6 +456,21 @@ export const useAgentStore = create<AgentState>()((set, get) => ({
     } catch {
       set({ isPublishing: false })
     }
+  },
+
+  markIgUsed: async (offerId: string) => {
+    const jobId = get().marketingJobId
+    if (!jobId) return false
+    const activeMs = marketingActiveMs()
+    const res = await edooboxClient.marketingMarkUsed(jobId, activeMs)
+    if (!res.success) return false
+    set((state) => ({
+      marketingPublishStatus: {
+        ...state.marketingPublishStatus,
+        [offerId]: { ...state.marketingPublishStatus[offerId], instagram: { usedAt: new Date().toISOString(), jobId } }
+      }
+    }))
+    return true
   },
 
   selectImage: async () => {

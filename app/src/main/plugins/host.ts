@@ -10,6 +10,8 @@
 // Fehlt eine Capability im Manifest, existiert der Dienst hier gar nicht — nicht nur im Typ.
 
 import type { ModuleId as CompatModuleId } from '../../shared/modelCompatibility'
+import { pluginActivityEvent, type ActivityEvent } from '../../shared/activityLog'
+import type { RunCallTotals } from '../../shared/llmTelemetry'
 import type { PluginManifest } from '@mindgraph/plugin-api'
 import type { AnyPluginHost, UsbDeviceInfo } from '@mindgraph/plugin-api'
 import type { HostFactory } from './registry'
@@ -62,8 +64,15 @@ export interface HostServices {
   /** Modell-Auflösung + isHardLocked + isCloudModel-Gate stecken in dieser Primitive. */
   llmGenerate: (
     prompt: string,
-    opts: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number }
+    opts: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number; runId?: string }
   ) => Promise<string>
+  /**
+   * Tätigkeitsprotokoll (Arbeitsbilanz). Bekommt ein bereits geprüftes Ereignis mit der
+   * Plugin-ID des Aufrufers — die Prüfung liegt im Host (pluginActivityEvent), nicht hier.
+   */
+  recordActivity: (event: ActivityEvent) => Promise<void>
+  /** Modellverbrauch aller Aufrufe mit dieser runId (main/llm/telemetry.ts collectRunTotals). */
+  collectRunTotals?: (runId: string) => Promise<RunCallTotals | undefined>
   /** Roher fetch — die allowedHosts-Allowlist erzwingt der Host, nicht diese Primitive. */
   httpFetch: (url: string, init?: RequestInit) => Promise<Response>
   /** Basic-Auth-Request mit Credentials in den Connection-Options (Apache-Auth-Quirk, WordPress). */
@@ -160,8 +169,25 @@ export function createHostFactory(services: HostServices): HostFactory {
       host.llm = {
         generate: (
           prompt: string,
-          opts?: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number }
+          opts?: { module?: CompatModuleId; allowCloud?: boolean; temperature?: number; maxTokens?: number; runId?: string }
         ) => services.llmGenerate(prompt, opts ?? {}),
+      }
+    }
+
+    if (caps.has('activity')) {
+      host.activity = {
+        record: async (entry: unknown) => {
+          // Zeit und Plugin-ID setzt der Kern: Ein Plugin kann weder rückdatieren noch
+          // unter fremdem Namen schreiben. Ungültiges wird laut abgewiesen, nicht still
+          // verworfen — sonst fehlt ein Vorgang, und niemand merkt es.
+          const event = pluginActivityEvent(id, entry, Date.now())
+          if (!event) throw new Error(`Plugin '${id}': ungültiger Eintrag für das Tätigkeitsprotokoll`)
+          if (event.kind === 'job-started' && services.collectRunTotals) {
+            const llm = await services.collectRunTotals(event.jobId)
+            if (llm) event.llm = llm
+          }
+          await services.recordActivity(event)
+        },
       }
     }
 

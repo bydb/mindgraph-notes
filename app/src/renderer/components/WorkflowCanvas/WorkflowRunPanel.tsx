@@ -53,10 +53,16 @@ export function WorkflowRunPanel() {
             <span className="wf-run-step__label">{idx + 1}. {step.label}</span>
             <span className="wf-run-step__log">{step.log.join(' · ')}</span>
             {step.error && <span className="wf-run-step__err">{step.error}</span>}
-            {step.outputs && Object.entries(step.outputs).map(([port, val]) => {
-              const txt = outputText(val)
-              return txt ? <pre key={port} className="wf-run-step__out">{txt}</pre> : null
-            })}
+            {step.outputs && (() => {
+              // Ports wie `tasks` (Array) und `text` (Zeilen) tragen oft denselben Inhalt, und
+              // `summary` ist nur der Anfang von `context` — im Panel stand derselbe Text
+              // zweimal untereinander. Duplikate und Präfixe eines längeren Texts weglassen.
+              const entries = Object.entries(step.outputs).map(([port, val]) => [port, outputText(val)] as const).filter(([, txt]) => txt)
+              const shown = entries.filter(([port, txt], i) =>
+                !entries.some(([p2, t2], j) => j !== i && p2 !== port && t2.length >= txt.length && t2.startsWith(txt) && (t2 !== txt || j < i))
+              )
+              return shown.map(([port, txt]) => <pre key={port} className="wf-run-step__out">{txt}</pre>)
+            })()}
           </li>
         ))}
       </ol>

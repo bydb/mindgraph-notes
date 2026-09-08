@@ -34,6 +34,7 @@ function buildRegistry(overrides: Partial<HostServices> = {}) {
     dialogSaveFile: async () => null,
     readResource: async () => new Uint8Array(),
     emitWorkflow: async () => {},
+    recordActivity: async () => {},
     ...overrides,
   }
   const registry = new PluginRegistry(createHostFactory(services))
@@ -95,6 +96,68 @@ describe('edoobox-Plugin — Vertikale durch Registry + Host', () => {
       imageBase64: 'AQID',
     })).resolves.toEqual({ success: true, filePath: '/tmp/Jugend_Konferenz_.png' })
     expect(saved).toEqual({ defaultPath: 'Jugend_Konferenz_.png', bytes: [1, 2, 3] })
+  })
+
+  it('Teilnehmerliste: erfolgreiches Speichern vermerkt den Vorgang — gleicher Tag, gleiche Kennung', async () => {
+    const recorded: unknown[] = []
+    const { registry } = buildRegistry({
+      dialogSaveFile: async () => ({ path: '/tmp/liste.docx' }),
+      readResource: async () => { throw new Error('keine Vorlage im Test') },
+      recordActivity: async (e) => { recorded.push(e) },
+    })
+    await registry.activate('edoobox')
+    // Ohne Vorlage scheitert die Erzeugung — dann darf auch kein Vorgang vermerkt werden.
+    const fail = await registry.invoke('edoobox', 'edoobox.generateAttendanceList', {
+      data: { title: 'T', dates: [], participants: [] }, suggestedFileName: 'x.docx', jobKey: 'offer-1|2026-10-01', activeMs: 40_000,
+    }) as { success: boolean }
+    expect(fail.success).toBe(false)
+    expect(recorded).toHaveLength(0)
+  })
+
+  it('Instagram: „Als verwendet markieren" schreibt den Abschluss mit der Vorgangs-Kennung', async () => {
+    const recorded: Array<Record<string, unknown>> = []
+    const { registry } = buildRegistry({ recordActivity: async (e) => { recorded.push(e as Record<string, unknown>) } })
+    await registry.activate('edoobox')
+    expect(await registry.invoke('edoobox', 'edoobox.marketingMarkUsed', { jobId: 'mk-abc', activeMs: 1500 })).toEqual({ success: true })
+    expect(recorded[0]).toMatchObject({ kind: 'job-outcome', jobId: 'mk-abc', jobType: 'ig-caption', outcome: 'used', pluginId: 'edoobox', activeMs: 1500 })
+    // Eine Kennung mit Inhalt (Titel) wird abgewiesen, nicht still verkürzt.
+    const res = await registry.invoke('edoobox', 'edoobox.marketingMarkUsed', { jobId: 'Herbstakademie 2026' }) as { success: boolean }
+    expect(res.success).toBe(false)
+    expect(recorded).toHaveLength(1)
+  })
+
+  it('Marketing: Vorbereitung liefert eine jobId, reicht sie als runId an das Modell und vermerkt sie', async () => {
+    const recorded: Array<Record<string, unknown>> = []
+    const runIds: Array<string | undefined> = []
+    const { registry } = buildRegistry({
+      llmGenerate: async (_p, opts) => { runIds.push(opts.runId); return 'Text' },
+      recordActivity: async (e) => { recorded.push(e as Record<string, unknown>) },
+    })
+    await registry.activate('edoobox')
+    const res = await registry.invoke('edoobox', 'edoobox.marketingGenerateContent', {
+      offerData: { name: 'X', description: '', dateStart: '', dateEnd: '', location: '', maxParticipants: 0, speakers: [] },
+    }) as { success: boolean; jobId?: string }
+    expect(res.success).toBe(true)
+    expect(res.jobId).toMatch(/^mk-/)
+    expect(runIds).toEqual([res.jobId, res.jobId])
+    expect(recorded[0]).toMatchObject({ kind: 'job-started', jobId: res.jobId, jobKind: 'marketing', pluginId: 'edoobox' })
+  })
+
+  it('Marketing: eine gescheiterte Generierung liefert trotzdem die jobId und wird als Vorbereitung vermerkt (F09)', async () => {
+    const recorded: Array<Record<string, unknown>> = []
+    const { registry } = buildRegistry({
+      llmGenerate: async () => { throw new Error('Ollama nicht erreichbar') },
+      recordActivity: async (e) => { recorded.push(e as Record<string, unknown>) },
+    })
+    await registry.activate('edoobox')
+    const res = await registry.invoke('edoobox', 'edoobox.marketingGenerateContent', {
+      offerData: { name: 'X', description: '', dateStart: '', dateEnd: '', location: '', maxParticipants: 0, speakers: [] },
+    }) as { success: boolean; jobId?: string; error?: string }
+    expect(res.success).toBe(false)
+    expect(res.jobId).toMatch(/^mk-/)
+    expect(recorded[0]).toMatchObject({ kind: 'job-started', jobId: res.jobId })
+    expect(await registry.invoke('edoobox', 'edoobox.marketingAbandon', { jobId: res.jobId, activeMs: 2000 })).toEqual({ success: true })
+    expect(recorded[1]).toMatchObject({ kind: 'job-abandoned', jobId: res.jobId, activeMs: 2000, pluginId: 'edoobox' })
   })
 
   it('Events: leeres Laden ohne Datei, dann roundtrip über host.vault', async () => {

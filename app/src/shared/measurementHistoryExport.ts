@@ -18,6 +18,9 @@ export interface HistoryExportInput {
   referenceNote: string
 }
 
+/** Aus den Rohwerten gerundet, nicht als Summe gerundeter Zeilen. */
+const wastedMinutes = (saved: { lines: Array<{ wastedMs: number }> }) => Math.round(saved.lines.reduce((ms, l) => ms + l.wastedMs, 0) / 60_000)
+
 const csvEsc = (v: string) => /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 const csvNum = (v: number | null | undefined) => v === null || v === undefined || !Number.isFinite(v) ? '' : String(Math.round(v * 100) / 100).replace('.', ',')
 
@@ -44,14 +47,22 @@ export function historyToMarkdown(input: HistoryExportInput): string {
   }
   out.push('', `Gesamt Cloud: ${input.cost.total.cloudRuns ? formatCostCell(input.cost.total) : 'keine Cloud-Aufrufe'}${input.cost.total.unpricedRuns ? ` (${input.cost.total.unpricedRuns} ohne Preis — Untergrenze)` : ''}. Rechenzeit lokal: ${formatMinutes(input.cost.computeMsTotal)} min gemessen${input.cost.localRunsWithoutTiming ? `, ${input.cost.localRunsWithoutTiming} lokale Aufrufe ohne Zeiten` : ''}. Kein Strompreis, keine Schätzung.`, '')
 
-  out.push('## Zeitgewinn (geschätzt)', '')
-  out.push('| Zeitraum | Minuten | bewertete Läufe | nicht gemessen |')
-  out.push('|---|---|---|---|')
+  out.push('## Zeitgewinn (geschätzt, netto)', '')
+  out.push('| Zeitraum | Minuten | bewertete Läufe | Fehlversuche | davon abgezogen (min) | nicht gemessen |')
+  out.push('|---|---|---|---|---|---|')
   for (const b of input.saved.buckets) {
-    if (b.valuedRuns === 0 && b.saved.unmeasuredRuns === 0) { out.push(`| ${input.bucketLabel(b.bucket)} | — | | |`); continue }
-    out.push(`| ${input.bucketLabel(b.bucket)} | ${b.valuedRuns ? Math.round(b.saved.totalMinutes) : '—'} | ${b.valuedRuns} | ${b.saved.unmeasuredRuns || ''} |`)
+    const bewertet = b.valuedRuns + b.saved.wastedRuns
+    if (bewertet === 0 && b.saved.unmeasuredRuns === 0) { out.push(`| ${input.bucketLabel(b.bucket)} | — | | | | |`); continue }
+    out.push(`| ${input.bucketLabel(b.bucket)} | ${bewertet ? Math.round(b.saved.totalMinutes) : '—'} | ${b.valuedRuns} | ${b.saved.wastedRuns || ''} | ${b.saved.wastedRuns ? wastedMinutes(b.saved) : ''} | ${b.saved.unmeasuredRuns || ''} |`)
   }
-  out.push('', `Gesamt: ${Math.round(input.saved.total.totalMinutes)} Minuten aus ${input.saved.total.lines.reduce((n, l) => n + l.runs, 0)} bewerteten Läufen; ${input.saved.total.unmeasuredRuns} Läufe nicht gemessen. ${input.referenceNote}`)
+  const gesamt = input.saved.total
+  const jobs = input.saved.totalSummary.jobs
+  if (jobs.completedTotal || jobs.prepared) {
+    const teile = Object.entries(jobs.completed).flatMap(([type, byOutcome]) =>
+      Object.entries(byOutcome ?? {}).map(([outcome, n]) => `${type} ${outcome}: ${n}`))
+    out.push('', `Vorgänge aus Plugins: ${teile.join(', ') || 'keine'}${jobs.prepared ? `; ${jobs.prepared} vorbereitet ohne Abschluss (gezählt, nicht bewertet)` : ''}. Etiketten reichen nur so weit wie der Nachweis: gespeichert ist nicht gedruckt, verwendet ist nicht veröffentlicht.`)
+  }
+  out.push('', `Gesamt: ${Math.round(gesamt.totalMinutes)} Minuten aus ${gesamt.lines.reduce((n, l) => n + l.runs, 0)} bewerteten Läufen${gesamt.wastedRuns ? `, abzüglich ${wastedMinutes(gesamt)} Minuten aus ${gesamt.wastedRuns} Fehlversuchen ohne übernommenes Ergebnis` : ''}; ${gesamt.unmeasuredRuns} Läufe nicht gemessen${gesamt.correctedRuns ? `; ${Math.round(gesamt.correctedMs / 60_000)} Minuten bei ${gesamt.correctedRuns} Vorgängen manuell nachgetragen (Nutzerangabe, keine Messung)` : ''}. ${input.referenceNote}`)
   if (input.saved.referenceChanges.length) {
     out.push('', 'Referenz geändert: ' + input.saved.referenceChanges.map(c => `${new Date(c.at).toLocaleDateString()} ${c.activityType} ${c.fromMinutes ?? '—'} → ${c.toMinutes ?? '—'} min`).join('; '))
   }
@@ -88,8 +99,16 @@ export function historyToCsv(input: HistoryExportInput): string {
   }
   for (const b of input.saved.buckets) {
     const label = input.bucketLabel(b.bucket)
-    if (b.valuedRuns) out.push(['Zeitgewinn', label, 'Minuten (geschätzt)', csvNum(b.saved.totalMinutes), String(b.valuedRuns), b.saved.unmeasuredRuns ? `${b.saved.unmeasuredRuns} nicht gemessen` : ''].map(csvEsc).join(';'))
+    // Dieselben Vorbehalte wie im Markdown: Fehlversuche, Nachträge (Nutzerangabe), fehlende Messungen.
+    const hinweise = [
+      b.saved.wastedRuns ? `${b.saved.wastedRuns} Fehlversuche, ${wastedMinutes(b.saved)} min abgezogen` : '',
+      b.saved.correctedRuns ? `${Math.round(b.saved.correctedMs / 60_000)} min bei ${b.saved.correctedRuns} Vorgängen manuell nachgetragen (Nutzerangabe, keine Messung)` : '',
+      b.saved.unmeasuredRuns ? `${b.saved.unmeasuredRuns} nicht gemessen` : ''
+    ].filter(Boolean).join('; ')
+    if (b.valuedRuns + b.saved.wastedRuns) out.push(['Zeitgewinn', label, 'Minuten (geschätzt, netto)', csvNum(b.saved.totalMinutes), String(b.valuedRuns), hinweise].map(csvEsc).join(';'))
   }
+  // Referenzen samt Quelle gehören in JEDEN Export — eine Zahl ohne ihre Grundlage ist keine Aussage.
+  out.push(['Zeitgewinn', 'gesamt', 'Referenzen', '', '', input.referenceNote].map(csvEsc).join(';'))
   for (const s of input.performance) {
     s.points.forEach((p, i) => {
       if (p.outputTps === null) return

@@ -6,7 +6,7 @@
 import type { PluginManifest, JsonSchema } from '@mindgraph/plugin-api'
 
 /** as const → bindet das Capability-Tupel für definePluginMain im Main-Entry. */
-export const WORDPRESS_CAPABILITIES = ['http.fetch', 'secrets'] as const
+export const WORDPRESS_CAPABILITIES = ['http.fetch', 'secrets', 'activity'] as const
 
 const boolResult: JsonSchema = { type: 'boolean' }
 const str: JsonSchema = { type: 'string' }
@@ -97,7 +97,7 @@ export const manifest: PluginManifest = {
     },
     {
       id: 'wordpress.publishPost',
-      requiredCapabilities: ['http.fetch', 'secrets'],
+      requiredCapabilities: ['http.fetch', 'secrets', 'activity'],
       isWrite: true,
       inputSchema: {
         type: 'object',
@@ -108,6 +108,14 @@ export const manifest: PluginManifest = {
           content: { type: 'string' },
           status: { type: 'string' },
           featuredMediaId: { type: 'number' },
+          // Arbeitsbilanz: Vorgangs-Kennung des Aufrufers (edoobox-Marketing) + Vordergrundzeit.
+          // Der Abschluss wird HIER vermerkt, wo WordPress geantwortet hat — nicht im Renderer.
+          activity: {
+            type: 'object',
+            required: ['jobId'],
+            properties: { jobId: { type: 'string' }, activeMs: { type: 'number' } },
+            additionalProperties: false,
+          },
         },
         additionalProperties: false,
       },
