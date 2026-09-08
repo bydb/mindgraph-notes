@@ -15,7 +15,14 @@ permissions:
 
 jobs:
   build-macos:
-    runs-on: macos-latest
+    # Gepinnt auf macOS 15 (Sequoia), NICHT macos-latest: Seit dem Runner-Image
+    # macos-26 Version 20260831 (macOS 26.6) schlägt electron-builders temporäre
+    # Signier-Keychain fehl — `security set-key-partition-list` meldet
+    # "SecKeychainUnlock: The user name or passphrase you entered is not correct"
+    # für beide Architekturen (v0.11.5-beta, zwei Anläufe). Apple hat das
+    # Entsperren von Keychains außerhalb einer Login-Session in 26.6 gehärtet;
+    # auf GitHub-Runnern ist das nicht beeinflussbar. Image 20260728 lief noch.
+    runs-on: macos-15
     timeout-minutes: 45
     strategy:
       matrix:
