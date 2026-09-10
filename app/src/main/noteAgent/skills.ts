@@ -17,7 +17,8 @@ import { registerResult, registerDataset, getDataset, type AgentRun } from './ru
 import { formatCollectReport, type RowFilter, type RowFilterOp } from '../../shared/tableCollect'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
 import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
-import { markdownToDocx } from '../office/officeService'
+import { markdownToDocx, markdownToDocxBuffer } from '../office/officeService'
+import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from '../../shared/docxTemplateFill'
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
 import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
 import { webSearch } from '../webResearch/providers'
@@ -660,10 +661,23 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
 
   registry.register({
     name: 'write_docx',
-    description: 'Erzeugt eine Word-Datei aus Markdown im Staging. Parameter: file_name, markdown.',
+    description:
+      'Erzeugt eine Word-Datei aus Markdown im Staging. Parameter: file_name, markdown. ' +
+      'Optional template (vault-relativer Pfad zu einer .docx-Vorlage mit {{INHALT}}-Platzhalter, z. B. ein Briefkopf) — ' +
+      'dann landet das Markdown an der Stelle von {{INHALT}}, Kopf-/Fußzeile und Logo der Vorlage bleiben erhalten; ' +
+      'weitere {{PLATZHALTER}} der Vorlage füllst du über fields ({NAME: "Text"}). Welche Vorlage und welche Felder es gibt, sagt die Skill.',
     parameters: {
       type: 'object',
-      properties: { file_name: { type: 'string' }, markdown: { type: 'string' } },
+      properties: {
+        file_name: { type: 'string' },
+        markdown: { type: 'string' },
+        template: { type: 'string', description: 'Vault-relativer Pfad zur .docx-Vorlage mit {{INHALT}} (optional)' },
+        fields: {
+          type: 'object',
+          description: 'Werte für weitere {{PLATZHALTER}} der Vorlage, Schlüssel ohne Klammern (optional)',
+          additionalProperties: { type: 'string' }
+        }
+      },
       required: ['file_name', 'markdown']
     },
     isWrite: true,
@@ -679,6 +693,52 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         )
       }
       const fileName = sanitizeOutputFileName(rawName, '.docx')
+      const templateRel = requireString(args, 'template')
+
+      // Vorlagen-Modus: Textkörper rendern, in die Vorlage einsetzen (shared/docxTemplateFill).
+      // Keine KI-Kennzeichnungszeile — die Vorlage ist ein Briefpapier des Nutzers,
+      // die Provenienz steht wie bei fill_docx_form in der Ergebnis-Karte (sources).
+      if (templateRel) {
+        if (!templateRel.toLowerCase().endsWith('.docx')) return err('Vorlage muss eine .docx-Datei sein')
+        const rawFields = args.fields
+        const fields: Record<string, string> = {}
+        if (rawFields !== undefined && rawFields !== null) {
+          if (typeof rawFields !== 'object' || Array.isArray(rawFields)) {
+            return err('Parameter "fields" muss ein Objekt {NAME: "Text"} sein')
+          }
+          const entries = Object.entries(rawFields as Record<string, unknown>)
+          if (entries.length > MAX_TEMPLATE_FIELDS) return err(`Zu viele Felder (${entries.length}). Maximum: ${MAX_TEMPLATE_FIELDS}.`)
+          for (const [k, v] of entries) {
+            if (!/^[A-Za-z0-9_]+$/.test(k)) return err(`Feldname "${k}" ist ungültig — nur Buchstaben, Ziffern, Unterstrich`)
+            const text = v === null || v === undefined ? '' : String(v)
+            if (text.length > MAX_TEMPLATE_FIELD_CHARS) return err(`Feld "${k}" ist zu lang (max. ${MAX_TEMPLATE_FIELD_CHARS} Zeichen)`)
+            fields[k] = text
+          }
+        }
+        let templateBytes: Buffer
+        try {
+          const abs = resolveInVault(ctx.run.vaultPath, templateRel)
+          const st = await fs.stat(abs)
+          if (!st.isFile()) return err(`Vorlage "${templateRel}" ist keine Datei`)
+          if (st.size > MAX_FORM_TEMPLATE_BYTES) return err(`Vorlage ist zu groß (${Math.round(st.size / 1024 / 1024)} MB, max. 10 MB)`)
+          templateBytes = await fs.readFile(abs)
+        } catch (e) {
+          return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+        }
+        try {
+          const bodyBytes = await markdownToDocxBuffer(markdown, { directHeadings: true, blankLinesAsSpacing: true })
+          const result = await fillDocxTemplate(new Uint8Array(templateBytes), new Uint8Array(bodyBytes), fields)
+          ctx.run.sources.add(templateRel)
+          const words = markdown.split(/\s+/).length
+          const parts = [`${words} Wörter`, `Vorlage ${path.basename(templateRel)}`]
+          if (result.filled.length) parts.push(`Felder: ${result.filled.join(', ')}`)
+          if (result.unfilled.length) parts.push(`leer geblieben: ${result.unfilled.join(', ')}`)
+          return registerStagedResult(ctx, fileName, 'docx', Buffer.from(result.bytes), parts.join(', '))
+        } catch (e) {
+          return err(`Vorlage konnte nicht gefüllt werden: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
+
       // markdownToDocx schreibt selbst — in eine temp-Datei im Staging rendern lassen.
       const stagingPath = await writeStagingFile(ctx.run, fileName, '')
       // Provenienz explizit: das Agenten-Markdown trägt kein Frontmatter, aus dem

@@ -129,7 +129,7 @@ ARBEITSWEISE (strikt einhalten):
    - Angehängte Einzeldateien via read_attachment (exakte Bezeichnung aus der Liste unten; bei Vault-Dateien kann sie den relativen Pfad enthalten).
    - Fehlen dir Informationen für den Auftrag (Fakten, Zuordnungen, frühere Ereignisse), DURCHSUCHE den Vault: note_search mit 1-3 Stichworten aus dem Auftrag, dann note_read auf die relevanten Treffer. Die Suche umfasst ALLE Notizen des Nutzers, auch sein Tagesgedächtnis (Brain-Ordner mit Tageszusammenfassungen). Rate keine Fakten, die du per note_search nachschlagen kannst.
    - Den Zielordner via list_target_folder (Namenskollisionen, vorhandene Vorlagen) — er ist die Ablage für deine Ergebnisse, nicht die Datenquelle.
-2. SCHREIBE danach das Ergebnis (write_xlsx, write_docx, write_note; write_html für wissenschaftliche HTML-Seiten mit Formeln und Grafiken — oder fill_docx_form, wenn eine Skill eine Formular-Vorlage mit Feld→Zeilen-Zuordnung vorgibt). Höchstens ZWEI Dateien und jedes Format nur EINMAL — üblich ist eine Tabelle plus eine begleitende Notiz, wenn der Auftrag beides verlangt. Kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
+2. SCHREIBE danach das Ergebnis (write_xlsx, write_docx, write_note; write_html für wissenschaftliche HTML-Seiten mit Formeln und Grafiken — oder fill_docx_form, wenn eine Skill eine Formular-Vorlage mit Feld→Zeilen-Zuordnung vorgibt). Gibt eine Skill eine Briefkopf- oder Dokumentvorlage (.docx mit {{INHALT}}) vor, nutzt du write_docx MIT dem Parameter template und füllst die genannten Platzhalter über fields — nie ein Dokument ohne die Vorlage bauen. Höchstens ZWEI Dateien und jedes Format nur EINMAL — üblich ist eine Tabelle plus eine begleitende Notiz, wenn der Auftrag beides verlangt. Kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
 3. ANTWORTE zum Schluss mit 1-3 Sätzen, was du erzeugt hast und worauf der Nutzer achten sollte. Keine Rückfragen — triff sinnvolle Annahmen und benenne sie. Für Personendaten gilt das NICHT: dort wird nichts angenommen (siehe REGELN), sondern die Lücke genannt.
 
 REGELN:
@@ -359,7 +359,10 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
       const rows = Array.isArray(args.rows) ? args.rows.length : 0
       return `${pick('file_name')} (${rows} Zeilen)`
     }
-    case 'write_docx':
+    case 'write_docx': {
+      const tpl = pick('template')
+      return tpl ? `${pick('file_name')} (Vorlage ${tpl.split('/').pop()})` : pick('file_name')
+    }
     case 'write_html':
     case 'write_note': return pick('file_name')
     case 'fill_docx_form': {

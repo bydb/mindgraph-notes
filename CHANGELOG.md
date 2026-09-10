@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [Unreleased]
+
+### Neu
+
+- **Briefkopf-Vorlagen für den Notiz-Agenten.** `write_docx` nimmt jetzt optional eine Word-Vorlage aus dem Vault (`template`): Kopf- und Fußzeile, Logo, Seitenränder und Schriften der Vorlage bleiben exakt erhalten, das Markdown des Agenten landet an der Stelle des Platzhalters `{{INHALT}}`. Weitere Platzhalter wie `{{TITEL}}` in Kopfzeile oder Text füllt der Agent über `fields`; nicht gefüllte werden entfernt und in der Ergebnis-Karte genannt. Der Platzhalter-Absatz gibt Schrift, Größe und Absatzabstand des Fließtextes vor; Fett, Überschriften und Listen aus dem Markdown setzen sich darüber. Aufzählungen und nummerierte Listen werden in die Nummerierungen der Vorlage eingehängt (die docx-Bibliothek selbst kann das im Vorlagen-Modus nicht, deshalb eigene Zusammenführung in `shared/docxTemplateFill.ts`, mit Tests). Welche Vorlage und welche Felder es gibt, sagt die jeweilige Vault-Skill; Anlass war ein Anschreiben, das ohne Briefkopf herauskam, weil der Agent die Vorlage nicht nutzen konnte.
+
+### Behoben
+
+- **Sternchen in Listen und Überschriften.** Im Word-Export standen `**fett**`-Markierungen in Aufzählungspunkten und Überschriften wörtlich im Text; nur normale Absätze wurden ausgezeichnet. Jetzt gilt Fett und Kursiv überall.
+
 ## [0.11.5-beta] - 2026-09-08
 
 Zwei Stränge. Erstens zählen Veranstaltungen jetzt in der Arbeitsbilanz mit: Teilnehmerlisten, WordPress-Beiträge und Instagram-Texte werden als Vorgänge erfasst und nur so weit bewertet, wie ein Nachweis vorliegt. Zweitens wurden alle sieben Beispiel-Workflows des Workflow-Canvas in der laufenden App Klick für Klick durchgespielt; dabei kamen neun Fehler und Unschönheiten ans Licht, die alle behoben sind.

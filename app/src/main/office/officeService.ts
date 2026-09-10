@@ -111,9 +111,27 @@ export interface MarkdownToDocxOptions {
    * Frontmatter, das diese Funktion ohnehin abschneidet.
    */
   aiModel?: string
+  /**
+   * Überschriften als fett formatierte Absätze statt als Word-Stile „Heading n"
+   * setzen. Nötig im Vorlagen-Modus (shared/docxTemplateFill): eine Briefkopf-
+   * Vorlage kennt die generierten Stil-IDs nicht, direkte Formatierung wirkt überall.
+   */
+  directHeadings?: boolean
+  /**
+   * Eine Leerzeile trennt Absätze nur, statt einen Leerabsatz zu erzeugen; erst
+   * zwei Leerzeilen ergeben einen sichtbaren Abstandhalter. Für Vorlagen, deren
+   * Platzhalter-Absatz bereits einen Absatzabstand mitbringt — sonst doppelt.
+   */
+  blankLinesAsSpacing?: boolean
 }
 
 export async function markdownToDocx(markdownContent: string, outputPath: string, options?: MarkdownToDocxOptions): Promise<void> {
+  const buffer = await markdownToDocxBuffer(markdownContent, options)
+  await fs.writeFile(outputPath, buffer)
+}
+
+/** Markdown → DOCX-Bytes (ohne Datei). Grundlage für Export und Vorlagen-Modus. */
+export async function markdownToDocxBuffer(markdownContent: string, options?: MarkdownToDocxOptions): Promise<Buffer> {
   const docxLib = await import('docx')
   const { Document, Packer, Paragraph, HeadingLevel, TextRun, LevelFormat, AlignmentType, ShadingType, BorderStyle } = docxLib
 
@@ -188,6 +206,7 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
   const paragraphs: InstanceType<typeof Paragraph>[] = []
   let inCodeBlock = false
   let quoteBuffer: string[] = []
+  let blankRun = 0
 
   // Render the accumulated blockquote/callout lines as a shaded, left-bordered box.
   const flushQuote = () => {
@@ -254,9 +273,12 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
     flushQuote()
 
     if (!line) {
-      paragraphs.push(new Paragraph({ children: [] }))
+      blankRun++
+      // Vorlagen-Modus: erste Leerzeile = Absatztrenner, zweite = ein Abstandhalter, weitere nichts.
+      if (!options?.blankLinesAsSpacing || blankRun === 2) paragraphs.push(new Paragraph({ children: [] }))
       continue
     }
+    blankRun = 0
     const h = line.match(/^(#{1,6})\s+(.*)$/)
     if (h) {
       const level = h[1].length
@@ -268,17 +290,23 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
         5: HeadingLevel.HEADING_5,
         6: HeadingLevel.HEADING_6
       }
-      paragraphs.push(new Paragraph({ text: h[2], heading: headingMap[level] }))
+      // buildRuns statt `text`: sonst stehen **Sternchen** wörtlich in Überschriften und Listen.
+      if (options?.directHeadings) {
+        const size = level === 1 ? 28 : level === 2 ? 24 : 22 // halbe Punkt: 14 / 12 / 11 pt
+        paragraphs.push(new Paragraph({ children: buildRuns(h[2], { bold: true, size }) }))
+      } else {
+        paragraphs.push(new Paragraph({ children: buildRuns(h[2]), heading: headingMap[level] }))
+      }
       continue
     }
     const li = line.match(/^\s*[-*+]\s+(.*)$/)
     if (li) {
-      paragraphs.push(new Paragraph({ text: li[1], bullet: { level: 0 } }))
+      paragraphs.push(new Paragraph({ children: buildRuns(li[1]), bullet: { level: 0 } }))
       continue
     }
     const ol = line.match(/^\s*\d+\.\s+(.*)$/)
     if (ol) {
-      paragraphs.push(new Paragraph({ text: ol[1], numbering: { reference: 'default-numbering', level: 0 } }))
+      paragraphs.push(new Paragraph({ children: buildRuns(ol[1]), numbering: { reference: 'default-numbering', level: 0 } }))
       continue
     }
     paragraphs.push(new Paragraph({ children: buildRuns(line) }))
@@ -315,8 +343,7 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
     },
     sections: [{ properties: {}, children: paragraphs }]
   })
-  const buffer = await Packer.toBuffer(doc)
-  await fs.writeFile(outputPath, buffer)
+  return Packer.toBuffer(doc)
 }
 
 // -- Struktur-bewusster DOCX → Markdown Parser (Callouts, Listen, Überschriften, Bilder) --
