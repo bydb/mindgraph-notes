@@ -1,0 +1,281 @@
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PISA 2025 Deutschland – KI und Lernen (MindGraph Notes)</title><style>
+@page { size: 540pt 720pt; margin: 0; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:#e9e5dd; }
+body { font-family: 'Helvetica Neue', 'Inter', -apple-system, Helvetica, Arial, sans-serif; color:#1c1a17;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.page { position:relative; width:540pt; height:720pt; overflow:hidden; page-break-after:always; background:#f7f4ee;
+         display:flex; flex-direction:column; padding:26pt 32pt 20pt 32pt; margin:0 auto; }
+@media screen { .page { margin:16pt auto; box-shadow:0 4pt 20pt rgba(0,0,0,.12); } }
+.page:last-child { page-break-after:auto; }
+.bg { position:absolute; inset:0; z-index:0; pointer-events:none; }
+.bg .grain { position:absolute; inset:0; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.2 0 0 0 0 0.16 0 0 0 0 0.1 0 0 0 0.09 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>"); opacity:.5; }
+.bg .g1 { position:absolute; left:-120pt; top:-140pt; width:380pt; height:380pt; border-radius:50%; background:radial-gradient(circle, rgba(214,140,70,.22), transparent 68%); }
+.bg .g2 { position:absolute; right:-140pt; bottom:-160pt; width:420pt; height:420pt; border-radius:50%; background:radial-gradient(circle, rgba(16,105,107,.18), transparent 68%); }
+.hdr, .content, .ftr { position:relative; z-index:1; }
+.hdr { flex:none; display:flex; align-items:center; justify-content:space-between; }
+.brand { display:flex; align-items:center; gap:8pt; }
+.brand .wm { font-size:11pt; font-weight:700; letter-spacing:-.01em; line-height:1.05; }
+.brand .tag { font-size:6.8pt; color:#91897d; margin-top:1.5pt; }
+.content { flex:1; display:flex; flex-direction:column; gap:10pt; padding-top:26pt; min-height:0; }
+.content > * { flex:none; }
+.spacer { flex:1 1 0 !important; }
+.ftr { flex:none; display:flex; justify-content:space-between; align-items:baseline; font-size:6.8pt; color:#91897d; padding-top:10pt; }
+.ftr b { color:#5c574e; font-weight:700; }
+.pill { display:inline-block; font-size:7.4pt; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:4pt 9pt; border-radius:999pt; border:1px solid #e4dfd6; background:#ffffff; color:#5c574e; }
+.pill.petrol { background:#10696b; color:#fff; border-color:#10696b; }
+.pill.warm { background:rgba(214,140,70,.14); color:#9a5a20; border-color:rgba(214,140,70,.4); }
+.pill.problem { background:rgba(220,38,38,.09); color:#dc2626; border-color:rgba(220,38,38,.3); }
+.pill.loesung { background:rgba(21,128,61,.09); color:#15803d; border-color:rgba(21,128,61,.3); }
+.pill.info { background:rgba(37,111,209,.09); color:#256fd1; border-color:rgba(37,111,209,.3); }
+.pillrow { display:flex; gap:6pt; flex-wrap:wrap; }
+h1 { margin:0; font-family:Georgia,'Times New Roman',serif; font-weight:400; letter-spacing:-.02em; line-height:1.1; color:#1c1a17; font-size:26pt; }
+h1.xl { font-size:42pt; line-height:1.05; }
+h1.md { font-size:21pt; }
+h1 .ac { color:#10696b; } h1 .wa { color:#d68c46; }
+.lead { font-size:11.5pt; line-height:1.5; color:#5c574e; }
+.big { font-size:54pt; font-weight:800; letter-spacing:-.04em; line-height:1; color:#10696b; margin-top:6pt; }
+.card { background:#ffffff; border:1px solid #e4dfd6; border-radius:14pt; padding:12pt 14pt; box-shadow:0 2pt 6pt rgba(28,26,23,.05); }
+.card.tint { background:#fcfaf6; }
+.card.dark { background:#1c1a17; color:#f6f0e8; border-color:#1c1a17; }
+.card h3 { margin:0 0 4pt 0; font-size:11.5pt; font-weight:700; letter-spacing:-.01em; }
+.card h3.serif { font-family:Georgia,serif; font-weight:400; font-size:15pt; }
+.card p { margin:0; font-size:9.2pt; line-height:1.5; color:#5c574e; }
+.card.dark p { color:#c7bdb1; font-size:10pt; }
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:10pt; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10pt; }
+.stat { background:#ffffff; border:1px solid #e4dfd6; border-radius:12pt; padding:10pt 12pt; }
+.stat .v { font-size:21pt; font-weight:800; letter-spacing:-.03em; line-height:1; color:#1c1a17; }
+.stat .v.ac { color:#10696b; } .stat .v.wa { color:#d68c46; } .stat .v.pr { color:#dc2626; } .stat .v.in { color:#256fd1; }
+.stat .k { font-size:7.6pt; color:#91897d; margin-top:4pt; line-height:1.35; }
+.stat .d { font-size:7.4pt; font-weight:700; margin-top:3pt; color:#5c574e; }
+.lbl { font-size:8pt; color:#91897d; letter-spacing:.04em; text-transform:uppercase; font-weight:700; }
+.bar { display:flex; align-items:center; gap:8pt; margin-top:6pt; }
+.bar .bl { width:64pt; font-size:8.5pt; font-weight:700; color:#5c574e; }
+.bar .tr { flex:1; height:9pt; background:#efeae1; border-radius:999pt; overflow:hidden; }
+.bar .fi { height:100%; border-radius:999pt; }
+.bar .bv { width:34pt; text-align:right; font-size:9.5pt; font-weight:800; }
+.steps { display:flex; flex-direction:column; gap:11pt; }
+.step { display:flex; gap:12pt; align-items:flex-start; }
+.step .ic { flex:none; width:28pt; height:28pt; border-radius:50%; background:#10696b; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:10.5pt; }
+.step .ic.warm { background:#d68c46; } .step .ic.green { background:#15803d; } .step .ic.blue { background:#256fd1; } .step .ic.red { background:#dc2626; }
+.step h4 { margin:0 0 2pt 0; font-size:11pt; font-weight:700; letter-spacing:-.01em; }
+.step p { margin:0; font-size:9pt; line-height:1.45; color:#5c574e; }
+.callout { border-left:3pt solid #10696b; background:rgba(16,105,107,.10); border-radius:0 10pt 10pt 0; padding:9pt 12pt; font-size:9.8pt; line-height:1.45; color:#1c1a17; }
+.callout.warm { border-color:#d68c46; background:rgba(214,140,70,.14); }
+.callout.green { border-color:#15803d; background:rgba(21,128,61,.08); }
+.src { font-size:6.9pt; color:#91897d; line-height:1.4; margin-top:auto; }
+</style></head><body><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill ">PISA 2025 · Deutschland</span></div>
+<div class="content">
+<h1 class="xl" style="margin-top:30pt">KI ist da.<br><span class="ac">Was bleibt vom Denken?</span></h1>
+<div class="lead" style="font-size:12.5pt;margin-top:6pt">Was PISA 2025 über 15-Jährige in Deutschland zeigt, wie sie KI-Chatbots nutzen, und was daraus für den Unterricht folgt.</div>
+<div class="pillrow" style="margin-top:8pt"><span class="pill petrol">Befunde</span><span class="pill warm">Einordnung</span><span class="pill loesung">Folgen für den Unterricht</span></div>
+<div class="spacer"></div>
+<div style="font-size:8.6pt;color:#91897d">Vier Befunde, ein Zentrum: Wo findet die Denkarbeit statt?</div>
+<svg width="476pt" height="232pt" viewBox="0 0 476 232" style="display:block">
+<defs><filter id="sh" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#1c1a17" flood-opacity=".14"/></filter></defs>
+<g stroke-width="1.6" fill="none">
+<line x1="238" y1="116" x2="70" y2="50" stroke="#10696b"/><line x1="238" y1="116" x2="406" y2="50" stroke="#d68c46"/>
+<line x1="238" y1="116" x2="70" y2="184" stroke="#dc2626"/><line x1="238" y1="116" x2="406" y2="184" stroke="#256fd1"/></g>
+<g filter="url(#sh)">
+<g><circle cx="70" cy="50" r="40" fill="#ffffff" stroke="#10696b" stroke-width="2"/>
+<text x="70" y="48" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="9.5" font-weight="700" fill="#1c1a17">KI-Nutzung</text>
+<text x="70" y="60" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="7" fill="#91897d">50 % wöchentlich</text></g><g><circle cx="406" cy="50" r="40" fill="#ffffff" stroke="#d68c46" stroke-width="2"/>
+<text x="406" y="48" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="9.5" font-weight="700" fill="#1c1a17">Prüfen</text>
+<text x="406" y="60" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="7" fill="#91897d">59 % im Unterricht</text></g>
+<g><circle cx="70" cy="184" r="40" fill="#ffffff" stroke="#dc2626" stroke-width="2"/>
+<text x="70" y="182" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="9.5" font-weight="700" fill="#1c1a17">Ablenkung</text>
+<text x="70" y="194" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="7" fill="#91897d">33 % der Stunden</text></g><g><circle cx="406" cy="184" r="40" fill="#ffffff" stroke="#256fd1" stroke-width="2"/>
+<text x="406" y="182" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="9.5" font-weight="700" fill="#1c1a17">Handyregeln</text>
+<text x="406" y="194" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="7" fill="#91897d">64 % mit Verbot</text></g>
+<circle cx="238" cy="116" r="52" fill="#1c1a17"/><circle cx="238" cy="116" r="46" fill="none" stroke="#10696b" stroke-width="2"/>
+<text x="238" y="113" text-anchor="middle" font-family="Georgia, serif" font-size="15" fill="#fff">Denken</text>
+<text x="238" y="128" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial" font-size="7.5" fill="#c7bdb1">bleibt beim Lernenden</text></g></svg>
+<div class="src">Datenbasis: 6 659 Schüler:innen an 246 Schulen in Deutschland · Veröffentlichung 8. September 2026 · Stand dieses Dokuments: 10. September 2026</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>01</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill warm">Kontext</span></div>
+<div class="content">
+<h1>Der Kontext: <span class="ac">historische Tiefstände</span> in allen drei Bereichen.</h1>
+<div class="lead">Deutschland liegt 2025 in Naturwissenschaften, Lesen und Mathematik im OECD-Durchschnitt. Zugleich sind es die niedrigsten Werte seit Beginn von PISA im Jahr 2000. Vor diesem Hintergrund sind die KI-Befunde zu lesen.</div>
+<div class="grid3">
+<div class="stat"><div class="v ac">486</div><div class="k">Naturwissenschaften (Schwerpunkt)</div><div class="d">−7 zu 2022 · OECD 482</div></div>
+<div class="stat"><div class="v pr">465</div><div class="k">Lesen</div><div class="d">−15 zu 2022, signifikant</div></div>
+<div class="stat"><div class="v pr">464</div><div class="k">Mathematik</div><div class="d">−11 zu 2022, signifikant</div></div>
+<div class="stat"><div class="v wa">⅓</div><div class="k">erreicht in Lesen und Mathematik nicht das Mindestniveau (Stufe 2)</div><div class="d">Naturwissenschaften: 27 %</div></div>
+<div class="stat"><div class="v pr">125</div><div class="k">Punkte Abstand zwischen sozial begünstigten und benachteiligten Jugendlichen</div><div class="d">OECD: 85 Punkte</div></div>
+<div class="stat"><div class="v wa">52 %</div><div class="k">besuchen Schulen, deren Unterricht unter Lehrkräftemangel leidet</div><div class="d">OECD: 39 %</div></div>
+</div>
+<div class="card"><h3>KI trifft auf ein System unter Druck</h3>
+<p>Der Nationalbericht des ZIB beschreibt drei Entwicklungen: Mehr Jugendliche erreichen die Basiskompetenzen nicht, die Leistungen hängen eng mit der sozialen Herkunft zusammen, und Klassenführung sowie Unterstützung durch Lehrkräfte werden schlechter bewertet als im OECD-Schnitt. Chatbots kommen also in Klassenzimmer, in denen die Grundlagen bereits bröckeln. Umso mehr zählt, ob die Nutzung das eigene Denken fordert oder abnimmt.</p></div>
+<div class="callout warm">PISA misst Zusammenhänge, keine Ursachen. Alle Punktwerte auf den folgenden Seiten sind Korrelationen nach Kontrolle sozialer Merkmale. Sie belegen keine Wirkung.</div>
+<div class="src">Quellen: OECD, Band I, Tab. I.1; Ländernotiz Deutschland, S. 3, 7, 8; ZIB, PISA Kompakt Sonderausgabe (8.9.2026), S. 7 und 13.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>02</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill ">PISA 2025 · Deutschland</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill petrol">Befund 1 · KI als Lernhilfe</span></div>
+<div class="big">50 %</div>
+<h1 class="md">der 15-Jährigen in Deutschland nutzen KI-Chatbots <span class="ac">mindestens wöchentlich</span>, um sich beim Lernen helfen zu lassen.</h1>
+<div class="card"><div class="lbl">Wöchentliche Nutzung „um mir beim Lernen zu helfen“</div>
+<div class="bar"><div class="bl">Deutschland</div><div class="tr"><div class="fi" style="width:50%;background:#10696b"></div></div><div class="bv">50 %</div></div><div class="bar"><div class="bl">OECD</div><div class="tr"><div class="fi" style="width:46%;background:#8c8276"></div></div><div class="bv">46 %</div></div><div class="bar"><div class="bl">Schweiz</div><div class="tr"><div class="fi" style="width:55%;background:#d68c46"></div></div><div class="bv">55 %</div></div></div>
+<div class="grid2">
+<div class="card tint"><h3>Wofür die KI eingesetzt wird</h3><p>Mindestens wöchentlich: Text für Hausaufgaben entwerfen <b>36 %</b> (OECD 29 %), gelesenen Text zusammenfassen <b>36 %</b> (OECD 30 %), Vorabrecherche zu einem neuen Thema <b>31 %</b> (OECD 31 %).</p></div>
+<div class="card tint"><h3>Kaum jemand verzichtet</h3><p>Nur <b>9 %</b> nutzen KI nie oder fast nie für Schularbeiten (OECD 14 %). Beim Index der KI-Nutzung für schulische Aufgaben liegt Deutschland laut Nationalbericht signifikant über dem OECD- und dem EU-Schnitt.</p></div>
+</div>
+<div class="callout">Chatbots gehören für die Hälfte der Jugendlichen zum Lernalltag. Ob Schulen KI zulassen, entscheidet sich damit nicht mehr im Klassenzimmer. Offen ist nur noch, wie der Unterricht damit umgeht.</div>
+<div class="src">Quellen: OECD, Ländernotiz Deutschland, S. 9; OECD, Band I, Tab. I.6; ZIB, Nationaler Berichtsband, Kap. 12.1 (Tab. 12.1web). Selbstauskunft der Schüler:innen, Erhebung 2025.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>03</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill ">PISA 2025 · Deutschland</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill problem">Befund 2 · Nutzung und Leistung</span></div>
+<div class="big" style="color:#dc2626">−13</div>
+<h1 class="md">Punkte in Naturwissenschaften: Wer KI <span class="ac">häufiger für Schularbeiten</span> nutzt, schneidet in Deutschland im Schnitt schlechter ab.</h1>
+<div class="card"><h3>Die Analyse des ZIB</h3>
+<p>Für Deutschland wurde geprüft, wie die Häufigkeit der KI-Nutzung für schulische Aufgaben mit der naturwissenschaftlichen Kompetenz zusammenhängt. Soziale Herkunft, Zuwanderungshintergrund, Geschlecht und Schulart wurden herausgerechnet. Übrig bleibt ein signifikant negativer Zusammenhang von rund 13 Punkten. In der Schweiz fand der dortige Bericht keinen signifikanten Zusammenhang.</p></div>
+<div class="grid2">
+<div class="card tint"><h3>Der internationale Befund</h3><p>Nicht-Nutzer:innen liegen in den meisten Ländern vorn. Bei Nutzung „um zu lernen“ erreichen wöchentliche Nutzer:innen ähnliche Werte wie Nicht-Nutzer:innen. Moderate Nutzung schneidet etwas besser ab als seltene oder tägliche.</p></div>
+<div class="card tint"><h3>Die Deutung des ZIB</h3><p>Das ZIB spricht von möglicher „Inversion“: Denkprozesse werden an die KI abgegeben (ISAR-Modell, Bauer et al. 2025). Denkbar ist auch, dass vor allem leistungsschwächere Jugendliche zur KI greifen.</p></div>
+</div>
+<div class="callout warm">Der Zusammenhang belegt keine Ursache. Er zeigt: Häufige Nutzung ohne begleitenden Unterricht geht in Deutschland bislang mit schlechteren Leistungen einher.</div>
+<div class="src">Quellen: ZIB, Nationaler Berichtsband PISA 2025, Kap. 12.3 und 12.4, Abb. 12.4, Tab. 12.2web; OECD, Band I, Kap. 4, Abb. I.4.13, Tab. I.B1.4.61.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>04</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill ">PISA 2025 · Deutschland</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill warm">Befund 3 · Kritisches Prüfen</span></div>
+<div class="big" style="color:#d68c46">59 %</div>
+<h1 class="md">geben an, im Unterricht zumindest manchmal die <span class="wa">Qualität von KI-Informationen</span> zu beurteilen. Das ist weniger als im OECD-Schnitt.</h1>
+<div class="card"><div class="lbl">Im Unterricht KI-Informationen bewerten (manchmal, oft, sehr oft)</div>
+<div class="bar"><div class="bl">Deutschland</div><div class="tr"><div class="fi" style="width:59%;background:#d68c46"></div></div><div class="bv">59 %</div></div><div class="bar"><div class="bl">OECD</div><div class="tr"><div class="fi" style="width:63%;background:#8c8276"></div></div><div class="bv">63 %</div></div><div class="bar"><div class="bl">Schweiz</div><div class="tr"><div class="fi" style="width:69%;background:#10696b"></div></div><div class="bv">69 %</div></div></div>
+<div class="grid2">
+<div class="card tint"><h3>Prüfen im Unterricht zahlt sich aus</h3><p>Wer wöchentlich KI „zum Lernen“ nutzt <b>und</b> im Unterricht übt, KI-Antworten zu prüfen, erreicht etwas höhere Werte als Nicht-Nutzer:innen und seltene Nutzer:innen (OECD, Box I.4.2, Abb. I.4.14).</p></div>
+<div class="card tint"><h3>Nicht alle bekommen diese Übung</h3><p>Sozial benachteiligte Schüler:innen berichten seltener, dass sie KI-Informationen im Unterricht bewerten (Tab. I.B1.4.68). Die OECD sieht darin den Keim einer neuen sozialen Spaltung.</p></div>
+</div>
+<div class="callout">Der Wert beschreibt eine berichtete Lerngelegenheit, keine geprüfte Kompetenz. Ob Jugendliche KI-Antworten tatsächlich beurteilen können, misst PISA erst 2029.</div>
+<div class="src">Quellen: OECD, Band I, Tab. I.6 und Box I.4.2 (S. 240); Definition: Ländernotiz Deutschland, S. 2.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>05</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill ">PISA 2025 · Deutschland</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill problem">Befund 4 · Digitale Ablenkung</span></div>
+<div class="big" style="color:#dc2626">33 %</div>
+<h1 class="md">berichten, dass Mitschüler:innen in den meisten oder allen <span class="ac">Naturwissenschaftsstunden</span> durch digitale Geräte abgelenkt sind.</h1>
+<div class="grid3">
+<div class="stat"><div class="v pr">33 %</div><div class="k">Ablenkung in den meisten oder allen Stunden</div><div class="d">OECD: 28 %</div></div>
+<div class="stat"><div class="v pr">−8</div><div class="k">Punkte in Naturwissenschaften bei berichteter Ablenkung</div><div class="d">OECD: −11 Punkte</div></div>
+<div class="stat"><div class="v wa">0,8 h</div><div class="k">Freizeitnutzung digitaler Geräte pro Schultag</div><div class="d">OECD: 1,1 h · Lernen: 1,7 h</div></div>
+</div>
+<div class="card"><h3>Ablenkung und Disziplin hängen zusammen</h3>
+<p>Der Leistungsunterschied gilt nach Kontrolle des sozioökonomischen Profils von Schüler:innen und Schulen. Wer digitale Geräte häufiger im Unterricht nutzt, berichtet auch häufiger von Ablenkung. Die Schuldisziplin hat sich in Deutschland seit 2015 nicht signifikant verändert, im OECD-Schnitt dagegen verbessert. 34 % sagen, dass Mitschüler:innen der Lehrkraft nicht zuhören (OECD 29 %).</p></div>
+<div class="callout warm">Das Gerät, auf dem der Chatbot läuft, ist zugleich die Ablenkungsquelle. KI im Unterricht braucht darum feste Phasen, in denen das Gerät geöffnet ist, und Phasen, in denen es geschlossen bleibt.</div>
+<div class="src">Quellen: OECD, Ländernotiz Deutschland, S. 9 und 10; OECD, Band I, Tab. I.6, Abb. I.4.7 bis I.4.9. Zusammenhang, kein Kausalbeleg.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>06</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill ">PISA 2025 · Deutschland</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill info">Befund 5 · Handyregeln</span></div>
+<div class="big" style="color:#256fd1">64 %</div>
+<h1 class="md">besuchen Schulen mit Handyverbot. Das Verbot senkt die Ablenkung. <span class="ac">Bessere Leistungen folgen daraus nicht von selbst.</span></h1>
+<div class="grid3">
+<div class="stat"><div class="v in">64 %</div><div class="k">an Schulen mit Handyverbot auf dem Gelände</div><div class="d">OECD: 49 % · DE 2022: 59 %</div></div>
+<div class="stat"><div class="v in">−22 %</div><div class="k">geringere Wahrscheinlichkeit berichteter Ablenkung bei Verbot</div><div class="d">OECD: −13 %</div></div>
+<div class="stat"><div class="v in">80 %</div><div class="k">an Schulen mit fachspezifischen Regeln für digitale Geräte</div><div class="d">OECD: 71 %</div></div>
+</div>
+<div class="card"><h3>Was die OECD zu Verboten festhält</h3>
+<p>Verbote und fachspezifische Leitlinien gehen mit weniger Ablenkung und weniger Freizeitnutzung in der Schule einher. Auf Systemebene hängt die Ausweitung von Verboten seit 2022 jedoch nicht mit Leistungsveränderungen zusammen. Länder mit vielen Verboten haben 2025 sogar tendenziell niedrigere Werte. Die OECD liest das als Reaktion leistungsschwächerer Systeme, nicht als Folge der Verbote.</p></div>
+<div class="callout">Ein Verbot schafft Aufmerksamkeit. Was der Unterricht mit dieser Aufmerksamkeit anfängt, entscheidet über den Lernerfolg. Ohne fordernde Aufgaben bleibt von der Regel eine ruhigere Stunde und sonst nichts.</div>
+<div class="src">Quellen: OECD, Ländernotiz Deutschland, S. 9; OECD, Band I, Kap. 4 (S. 234–235), Abb. I.4.10, Tab. I.B1.4.49, I.B1.4.187, I.B1.4.189.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>07</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill warm">Zwischenfazit</span></div>
+<div class="content">
+<h1>Fünf Befunde, <span class="ac">ein Muster.</span></h1>
+<div class="lead">Jugendliche in Deutschland nutzen KI viel und weitgehend ohne Anleitung.</div>
+<div class="steps">
+<div class="step"><div class="ic ">1</div><div><h4>Die KI ist Alltag, der Unterricht hinkt hinterher.</h4><p>50 % nutzen KI wöchentlich zum Lernen, 36 % lassen Hausaufgabentexte entwerfen. Nur 59 % üben im Unterricht, KI-Antworten zu prüfen.</p></div></div>
+<div class="step"><div class="ic red">2</div><div><h4>Häufige Nutzung geht mit schlechteren Leistungen einher.</h4><p>Rund 13 Punkte weniger in Naturwissenschaften. Die naheliegende Deutung: Die KI übernimmt die Denkarbeit, die Jugendlichen lernen weniger.</p></div></div>
+<div class="step"><div class="ic warm">3</div><div><h4>Prüfen hilft, erreicht aber nicht alle.</h4><p>Wer KI nutzt und das Prüfen übt, schneidet etwas besser ab. Benachteiligte Jugendliche bekommen diese Gelegenheit seltener.</p></div></div>
+<div class="step"><div class="ic blue">4</div><div><h4>Regeln senken die Ablenkung, mehr Lernen bringen sie allein nicht.</h4><p>64 % haben ein Handyverbot, trotzdem berichten 33 % von Ablenkung in fast jeder Stunde. Die Schuldisziplin bleibt unverändert.</p></div></div>
+<div class="step"><div class="ic green">5</div><div><h4>Die Technik bremst.</h4><p>Beim Zugang zu funktionierenden digitalen Medien liegt Deutschland deutlich unter OECD-Schnitt (Index −0,30 gegenüber 0,02). Nur bei guter Zugangsqualität hängt digitale Nutzung positiv mit Leistung zusammen.</p></div></div>
+</div>
+<div class="card dark"><h3 class="serif">Die Frage vor jeder Stunde</h3>
+<p>Welche Denkarbeit soll bei den Lernenden bleiben? Eine Begründung, eine Quellenprüfung, ein eigener Lösungsweg. Von dieser Antwort her wird die Aufgabe geplant, das Werkzeug kommt danach.</p></div>
+<div class="src">Quellen: siehe Seiten 3 bis 7; Zugangsqualität: ZIB, Nationaler Berichtsband, Kap. 12.1 und 12.3.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>08</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill loesung">Folgen für den Unterricht</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill loesung">Folge 1 · Im Unterricht</span></div>
+<h1>Denkarbeit sichtbar machen: <span class="ac">erst selbst, dann KI, dann prüfen.</span></h1>
+<div class="lead">Der Dreischritt setzt dort an, wo der negative Zusammenhang entsteht. Die KI soll das eigene Denken herausfordern, statt es zu ersetzen.</div>
+<div class="steps">
+<div class="step"><div class="ic green">1</div><div><h4>Eigene Antwort zuerst festhalten.</h4><p>Schriftlich und mit Begründung, bevor ein Gerät geöffnet wird. Dieses Dokument fließt in die Bewertung ein. So entsteht die Auseinandersetzung mit dem Stoff, die die OECD als Kern des Lernens beschreibt.</p></div></div>
+<div class="step"><div class="ic green">2</div><div><h4>KI gezielt zum Vergleich heranziehen.</h4><p>Mit einem konkreten Prüfauftrag: Wo weicht die KI von mir ab? Welche Behauptung hat einen Beleg, welche nicht? Genau diese Übung berichten in Deutschland nur 59 % der Jugendlichen.</p></div></div>
+<div class="step"><div class="ic green">3</div><div><h4>Prüfen, begründen, überarbeiten.</h4><p>Die eigene Antwort wird korrigiert oder verteidigt, in jedem Fall begründet. Zum Schluss folgt eine verwandte Aufgabe ohne KI. Sie zeigt, ob etwas hängen geblieben ist.</p></div></div>
+</div>
+<div class="card tint"><h3>Aufgabenformate, die dazu passen</h3>
+<p>Begründungsaufgaben statt Ergebnisaufgaben · Fehleranalyse einer KI-Antwort · Eigene Daten erheben und deuten (Experiment, Umfrage) · Transferaufgaben mit lokalem Bezug · Mündliche Verteidigung der eigenen Lösung · Leistungsnachweise, die ohne KI bearbeitet werden</p></div>
+<div class="callout green">Dieser Vorschlag stammt nicht aus PISA und wurde dort nicht geprüft. Er folgt der Unterscheidung des ISAR-Modells (Bauer et al. 2025), auf das sich das ZIB bezieht: Die KI soll das Denken erweitern („Augmentation“), nicht übernehmen („Inversion“).</div>
+<div class="src">Bezug: ZIB, Nationaler Berichtsband, Kap. 12.4; OECD, Band I, Editorial und Box I.4.2.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>09</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill loesung">Folgen für den Unterricht</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill loesung">Folge 2 · Im Fach und in der Schule</span></div>
+<h1>KI-Antworten prüfen gehört <span class="ac">in jedes Fach und zu jeder Schülerin, jedem Schüler.</span></h1>
+<div class="lead">Deutschland liegt beim Prüfen von KI-Informationen unter dem OECD-Schnitt, und sozial benachteiligte Jugendliche erhalten diese Gelegenheit seltener. Wer das dem Zufall überlässt, vergrößert die Schere.</div>
+<div class="grid2">
+<div class="card"><h3>Im Fachunterricht</h3><p>Jede Fachschaft legt fest, wie KI-Antworten in ihrem Fach geprüft werden: Quellen in Geschichte, Rechenwege in Mathematik, Versuchsdeutungen in Naturwissenschaften, Textbelege in Deutsch. Bewertet wird auch die Prüfung, nicht allein das Ergebnis.</p></div>
+<div class="card"><h3>An allen Schularten</h3><p>An nicht-gymnasialen Schularten fehlen deutlich mehr Jugendlichen die Basiskompetenzen. Gerade dort brauchen KI-Prüfroutinen feste Vorlagen und sprachliche Hilfen, damit sie nicht an der Lesekompetenz scheitern.</p></div>
+</div>
+<div class="card tint"><h3>Eine Prüfroutine in vier Schritten</h3>
+<p><b>Behauptung</b> markieren → <b>Beleg</b> suchen (Buch, Versuch, zweite Quelle) → <b>Lücke</b> benennen, wo die KI nichts belegt oder erfindet → <b>Urteil</b> in einem Satz: Was übernehme ich, was nicht, und warum?</p></div>
+<div class="callout">Die OECD-Daten stützen diesen Weg: Regelmäßige KI-Nutzung mit begleitetem Prüfen geht mit etwas besseren Ergebnissen einher als Nicht-Nutzung. Ohne das Prüfen kehrt sich das Bild um.</div>
+<div class="src">Quellen: OECD, Band I, Box I.4.2, Tab. I.B1.4.68 bis I.B1.4.70; ZIB, PISA Kompakt Sonderausgabe, S. 13 (Schularten).</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>10</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill loesung">Folgen für den Unterricht</span></div>
+<div class="content">
+<div class="pillrow"><span class="pill loesung">Folge 3 · Schulleitung und Bildungspolitik</span></div>
+<h1>Regeln, Technik, Fortbildung: <span class="ac">was den Rahmen ausmacht.</span></h1>
+<div class="lead">Nicht die Häufigkeit der Nutzung unterscheidet Schulen, an denen digitale Medien mit besseren Leistungen einhergehen, von den anderen. Es sind die Bedingungen, unter denen genutzt wird.</div>
+<div class="steps">
+<div class="step"><div class="ic blue">A</div><div><h4>Geräteregeln, die im Unterricht gelebt werden</h4><p>Handyverbot und fachspezifische Leitlinien senken die Ablenkung nachweislich. Wirksam werden sie, wenn Lehrkräfte die Phasen mit und ohne Gerät konsequent setzen. Dazu gehört eine Klassenführung, die Schüler:innen in Deutschland bislang schlechter bewerten als im OECD-Schnitt.</p></div></div>
+<div class="step"><div class="ic blue">B</div><div><h4>Funktionierende Technik vor mehr Geräten</h4><p>Nur bei hoher Qualität des Zugangs, also verlässlicher Technik, Support und geschulten Lehrkräften, hängt digitale Nutzung positiv mit Leistung zusammen. Deutschland liegt hier bei −0,30 gegenüber 0,02 im OECD-Schnitt. Der Digitalpakt 2.0 muss deshalb Wartung, Support und Fortbildung finanzieren und nicht allein Hardware.</p></div></div>
+<div class="step"><div class="ic blue">C</div><div><h4>Eine abgestimmte Digital- und KI-Strategie</h4><p>Das ZIB rät, Insellösungen zu vermeiden und Lernressourcen, Datenschutz, Qualifizierung, curriculare Einbettung und Support dauerhaft zusammenzuführen, etwa über länderübergreifende digitale Zentren nach niederländischem Vorbild (NOLAI).</p></div></div>
+</div>
+<div class="callout warm">PISA 2029 misst erstmals Medien- und KI-Kompetenz als eigenen Bereich. Was Schulen bis dahin an Prüfroutinen aufbauen, wird sich dort zeigen.</div>
+<div class="src">Quellen: OECD, Band I, Kap. 4 (Abb. I.4.10); ZIB, Nationaler Berichtsband, Kap. 12.1, 12.3, 12.4 und Handlungsoptionen Teil IV; ZIB, PISA Kompakt Sonderausgabe, S. 13 und 14.</div></div>
+<div class="ftr"><div>Quellen: OECD (2026) PISA 2025 Band I &amp; Ländernotiz DE · ZIB (2026) Nationaler Berichtsband</div><div><b>11</b> / 12</div></div>
+</section><section class="page">
+<div class="bg"><div class="grain"></div><div class="g1"></div><div class="g2"></div></div>
+<div class="hdr"><div class="brand"><svg width="22pt" height="22pt" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10696b"/><g fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round"><path d="M16 16V7.5M16 16 8 23M16 16l8 7M8 23h16"/></g><g fill="#fff"><circle cx="16" cy="16" r="3"/><circle cx="16" cy="7.5" r="2.3"/><circle cx="8" cy="23" r="2.3"/><circle cx="24" cy="23" r="2.3"/></g></svg><div><div class="wm">MindGraph Notes</div><div class="tag">Zeigt dir, was heute wichtig ist.</div></div></div><span class="pill petrol">Fazit</span></div>
+<div class="content">
+<h1 class="xl" style="font-size:34pt">Welche Denkarbeit soll bei den <span class="ac">Lernenden bleiben?</span></h1>
+<div class="lead" style="font-size:14pt;line-height:1.5">Eine Begründung?<br>Eine Quellenprüfung?<br>Ein eigener Lösungsweg?</div>
+<div class="card dark" style="padding:16pt 18pt"><h3 class="serif" style="font-size:16pt">Von dieser Denkarbeit her wird die Aufgabe geplant.</h3>
+<p>Dann bleibt die KI ein Werkzeug zum Denken. Die OECD formuliert es in ihrem Editorial so: ein Gerüst, keine Krücke.</p></div>
+<div class="card"><h3>Quellen</h3>
+<p style="font-size:8.4pt">OECD (2026): PISA 2025 Results (Volume I): Future-Ready Students. Paris. doi.org/10.1787/73451bc5-en<br>
+OECD (2026): PISA 2025 Ergebnisse (Band I) – Ländernotiz Deutschland. doi.org/10.1787/8a1ce578-de<br>
+Greiff, S. et al. (Hrsg.) (2026): PISA 2025. Nationaler Berichtsband. ZIB, TU München. Kap. 12: Digitale Lernbedingungen.<br>
+ZIB (2026): PISA Kompakt Sonderausgabe – Bildung im Spannungsfeld von Innovation und Transformation.<br>
+Bauer, E. et al. (2025): ISAR-Modell, zitiert nach ZIB, Kap. 12.4.</p></div>
+<div class="card tint"><p style="font-size:8.4pt">Alle Leistungszusammenhänge in diesem Dokument sind Korrelationen nach Kontrolle sozialer Merkmale, keine Ursachen. Die Vorschläge auf den Seiten 9 bis 11 sind Ableitungen, die PISA nicht geprüft hat. Erstellt mit KI-Unterstützung, Zahlen gegen die Originalquellen geprüft. Stand: 10. September 2026.</p></div>
+<div class="src">Vorlage: Carousel „PISA 2025 und KI: Was bleibt vom Denken?“ (Schweiz-Version, Digitales Pausenbrot). Deutschland-Adaption im Design von MindGraph Notes.</div></div>
+<div class="ftr"><div>MindGraph Notes · mindgraph-notes.de · Open Source · Lokal · Kostenlos</div><div><b>12</b> / 12</div></div>
+</section></body></html>
