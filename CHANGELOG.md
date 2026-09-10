@@ -2,7 +2,9 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [Unreleased]
+## [0.11.6-beta] - 2026-09-10
+
+Ein Strang: Der Notiz-Agent kann Word-Dokumente auf einer Vorlage aus dem Vault erzeugen. Anlass war ein Anschreiben des Medienzentrums, das ohne Briefkopf herauskam, weil der Agent die Vorlage nicht nutzen konnte.
 
 ### Neu
 

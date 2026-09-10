@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.5-beta",
+    "softwareVersion": "0.11.6-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Veranstaltungen in der Arbeitsbilanz, Workflows durchgepr&uuml;ft &middot; v0.11.5</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Briefe auf dem eigenen Briefkopf: Word-Vorlagen f&uuml;r den Notiz-Agenten &middot; v0.11.6</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.5 &middot; Arbeitsbilanz mit Veranstaltungen</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Teilnehmerlisten, WordPress-Beitr&auml;ge und Instagram-Texte z&auml;hlen jetzt in der Zeitbilanz mit, mit Nachweis statt Behauptung. Und die sieben Beispiel-Workflows liefern fertige Entw&uuml;rfe und Pr&uuml;fnotizen.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Die Arbeitsbilanz bewertet jeden Vorgang nur so weit, wie er belegt ist: gespeichert, ver&ouml;ffentlicht, verwendet. Fehlversuche und aufgegebene Vorbereitungen werden abgezogen, Nacharbeit l&auml;sst sich nachtragen und bleibt als Nutzerangabe erkennbar. Die Workflow-Beispiele wurden Klick f&uuml;r Klick durchgespielt und an neun Stellen nachgebessert.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.6 &middot; Word-Vorlagen f&uuml;r den Agenten</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Notiz-Agent schreibt Einladungen, Anschreiben und Absichtserkl&auml;rungen jetzt direkt auf deinen Briefkopf. Die Word-Vorlage liegt im Vault, der Agent f&uuml;llt nur den Text.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Eine Word-Datei mit Logo, Kopfzeile und dem Platzhalter {{INHALT}} gen&uuml;gt: Der Agent setzt seinen Text an diese Stelle, Kopf- und Fu&szlig;zeile, R&auml;nder und Schriften bleiben exakt erhalten. Weitere Platzhalter wie {{TITEL}} f&uuml;llt er aus der Skill-Anleitung. Aufz&auml;hlungen und nummerierte Listen werden echte Word-Listen im Stil der Vorlage.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Veranstaltungen in der Arbeitsbilanz</b><p data-i18n="release.c1">Teilnehmerliste, WordPress-Beitrag und Instagram-Text z&auml;hlen als Vorg&auml;nge &mdash; mit Etikett aus dem Nachweis, Referenzzeit je Art und einer Nutzenbilanz in Worten.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Nacharbeit nachtragen, Referenz benennen</b><p data-i18n="release.c2">Vergessene Minuten lassen sich nachtragen und bleiben als Nutzerangabe markiert; jede Referenzzeit sagt, ob sie gesch&auml;tzt oder selbst gestoppt ist.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Workflows durchgepr&uuml;ft</b><p data-i18n="release.c3">Antwortentwurf &ouml;ffnet sich zuverl&auml;ssig, Pr&uuml;fergebnisse landen als Notiz im Vault, Aufgaben werden aus Empf&auml;ngersicht extrahiert, fehlende Zugangsdaten werden benannt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Briefkopf-Vorlagen aus dem Vault</b><p data-i18n="release.c1">write_docx nimmt eine .docx-Vorlage mit {{INHALT}}-Absatz entgegen. Der Platzhalter-Absatz gibt Schrift und Absatzabstand vor, Fett, &Uuml;berschriften und Listen aus dem Text setzen sich dar&uuml;ber.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Felder f&uuml;llen, Rest r&auml;umt sich auf</b><p data-i18n="release.c2">Platzhalter in Kopfzeile oder Text werden aus der Skill gef&uuml;llt, nicht gef&uuml;llte verschwinden und stehen in der Ergebnis-Karte. Von Word zerlegte Platzhalter werden erkannt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Word-Export ohne Sternchen</b><p data-i18n="release.c3">Fett und kursiv gelten jetzt auch in Aufz&auml;hlungspunkten und &Uuml;berschriften; bisher standen die Markierungen dort w&ouml;rtlich im Dokument.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Veranstaltungen in der Arbeitsbilanz, Workflows durchgepr&uuml;ft &middot; v{vs}",
+        "hero.release": "Briefe auf dem eigenen Briefkopf: Word-Vorlagen f&uuml;r den Notiz-Agenten &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Arbeitsbilanz mit Veranstaltungen",
-        "release.heading": "Was ist neu — <em>Teilnehmerlisten, WordPress-Beiträge und Instagram-Texte zählen jetzt in der Zeitbilanz mit, mit Nachweis statt Behauptung. Und die sieben Beispiel-Workflows liefern fertige Entwürfe und Prüfnotizen.</em>",
-        "release.lead": "Die Arbeitsbilanz bewertet jeden Vorgang nur so weit, wie er belegt ist: Teilnehmerliste gespeichert, Beitrag als Entwurf oder veröffentlicht, Instagram-Text ausdrücklich als verwendet markiert. Fehlversuche und aufgegebene Vorbereitungen werden abgezogen, ohne Referenz wird gezählt, aber nicht bewertet. Nacharbeit lässt sich nachtragen und bleibt überall als Nutzerangabe erkennbar. Die sieben Workflow-Beispiele wurden in der laufenden App Klick für Klick durchgespielt und an neun Stellen nachgebessert.",
-        "release.c1h": "Veranstaltungen in der Arbeitsbilanz",
-        "release.c1": "Teilnehmerliste, WordPress-Beitrag und Instagram-Text zählen als Vorgänge in der Zeitbilanz. Jeder bekommt sein Etikett aus dem Nachweis: gespeichert, Entwurf oder veröffentlicht je nach Antwort von WordPress, verwendet nur per Klick. Gutschrift gibt es je Vorgang einmal gegen die selbst eingetragene Referenzzeit; die aktive Zeit wird einmal abgezogen. Ein neuer Block Nutzenbilanz fasst die Ergebnisse in Worten zusammen, mit Zeitwert als Szenario zum eigenen Stundensatz und ohne Wechselkurs.",
-        "release.c2h": "Nacharbeit nachtragen, Referenz benennen",
-        "release.c2": "Die Fensterzeit erfasst keine Nacharbeit in anderen Programmen. Unter dem Zeitgewinn steht deshalb ein Formular, mit dem sich Minuten an einen Lauf oder Vorgang nachtragen lassen. Die Rohmessung bleibt, der Nachtrag wird auf der Karte, in der Historie und im Export als Nutzerangabe ausgewiesen, nie als Messung. Jede Referenzzeit trägt außerdem ihre Quelle: geschätzt oder selbst gestoppt. Fehlversuche zählen als Abzug, auch bei Vorgängen, die aufgegeben wurden.",
-        "release.c3h": "Workflows durchgeprüft",
-        "release.c3": "Alle sieben Beispiel-Workflows wurden in der App durchgespielt. Der Antwortentwurf öffnet sich jetzt zuverlässig im Mailfenster und endet ohne erfundene Unterschrift, die Aufgabenliste beschreibt, was der Empfänger tun muss, jedes Prüfergebnis landet als Notiz im Inbox-Ordner und öffnet sich, der Aufgaben-Auslöser findet fällige Aufgaben auch nach dem Programmstart, und ohne Antares- oder edoobox-Zugangsdaten steht der Grund im Lauf statt eines leeren Ergebnisses.",
+        "release.label": "Release {vs} · Word-Vorlagen für den Agenten",
+        "release.heading": "Was ist neu — <em>Der Notiz-Agent schreibt Einladungen, Anschreiben und Absichtserklärungen jetzt direkt auf deinen Briefkopf. Die Word-Vorlage liegt im Vault, der Agent füllt nur den Text.</em>",
+        "release.lead": "Eine Word-Datei mit Logo, Kopfzeile und dem Platzhalter {{INHALT}} genügt: Der Agent setzt seinen Text an diese Stelle, Kopf- und Fußzeile, Ränder und Schriften bleiben exakt erhalten. Weitere Platzhalter wie {{TITEL}} füllt er aus der Skill-Anleitung. Aufzählungen und nummerierte Listen werden echte Word-Listen im Stil der Vorlage. Anlass war ein Anschreiben, das ohne Briefkopf herauskam, weil der Agent die Vorlage nicht nutzen konnte.",
+        "release.c1h": "Briefkopf-Vorlagen aus dem Vault",
+        "release.c1": "write_docx nimmt eine .docx-Vorlage aus dem Vault entgegen, in der ein Absatz {{INHALT}} steht. Kopf- und Fußzeile, Logo, Seitenränder und Schriften der Vorlage bleiben exakt erhalten, das Markdown des Agenten landet an der Stelle des Platzhalters. Der Platzhalter-Absatz gibt Schrift, Größe und Absatzabstand des Fließtextes vor; Fett, Überschriften und Listen aus dem Text setzen sich darüber. Aufzählungen und nummerierte Listen werden in die Nummerierungen der Vorlage eingehängt.",
+        "release.c2h": "Felder füllen, Rest räumt sich auf",
+        "release.c2": "Weitere Platzhalter wie {{TITEL}} dürfen überall stehen, in der Kopfzeile, der Fußzeile oder im Text. Der Agent füllt sie über den Parameter fields, die Formatierung des Platzhalters bleibt. Nicht gefüllte Platzhalter werden entfernt und in der Ergebnis-Karte genannt. Platzhalter, die Word beim Bearbeiten in mehrere Läufe zerlegt hat, werden wieder zusammengezogen. Welche Vorlage und welche Felder es gibt, sagt die jeweilige Vault-Skill; die App selbst kennt keine Formulare.",
+        "release.c3h": "Word-Export ohne Sternchen",
+        "release.c3": "Im Word-Export standen **fett**-Markierungen in Aufzählungspunkten und Überschriften wörtlich im Text, nur normale Absätze wurden ausgezeichnet. Jetzt gilt Fett und Kursiv überall. Im Vorlagen-Modus trennt eine Leerzeile Absätze, statt einen Leerabsatz zu erzeugen, weil die Vorlage den Absatzabstand bereits mitbringt; zwei Leerzeilen ergeben einen sichtbaren Abstandhalter.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Events in the work ledger, workflows verified end to end &middot; v{vs}",
+        "hero.release": "Letters on your own letterhead: Word templates for the note agent &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Events in the work ledger",
-        "release.heading": "What’s new — <em>Attendance lists, WordPress posts and Instagram captions now count in the time ledger, with evidence instead of claims. And the seven example workflows deliver finished drafts and review notes.</em>",
-        "release.lead": "The work ledger credits a job only as far as it is proven: attendance list saved, post as draft or published, Instagram caption explicitly marked as used. Failed attempts and abandoned preparations are deducted; without a reference time a job is counted but not valued. Rework can be added afterwards and stays visible as a user entry everywhere. The seven workflow examples were played through click by click in the running app and improved in nine places.",
-        "release.c1h": "Events in the work ledger",
-        "release.c1": "Attendance list, WordPress post and Instagram caption count as jobs in the time ledger. Each gets its label from the evidence: saved, draft or published depending on WordPress’s answer, used only by click. Credit is given once per job against your own reference time; active time is deducted once. A new benefit summary puts the results into words, with time value as a scenario at your own hourly rate and no exchange rate.",
-        "release.c2h": "Add rework, name the reference",
-        "release.c2": "Window time does not capture rework in other programs. Below the time saved there is now a form to add minutes to a run or job. The raw measurement stays; the correction is shown on the card, in the history and in the export as a user entry, never as a measurement. Every reference time also carries its source: estimated or self-timed. Failed attempts count as a deduction, including jobs that were abandoned.",
-        "release.c3h": "Workflows verified",
-        "release.c3": "All seven example workflows were played through in the app. The reply draft now reliably opens in the mail window and ends without an invented signature, the task list describes what the recipient has to do, every review result lands as a note in the inbox folder and opens, the task trigger finds due tasks even right after startup, and without Antares or edoobox credentials the run states the reason instead of an empty result.",
+        "release.label": "Release {vs} · Word templates for the agent",
+        "release.heading": "What’s new — <em>The note agent now writes invitations, letters and letters of intent straight onto your letterhead. The Word template lives in the vault; the agent only fills in the text.</em>",
+        "release.lead": "A Word file with logo, header and the placeholder {{INHALT}} is all it takes: the agent puts its text there, while header, footer, margins and fonts stay exactly as they are. Further placeholders such as {{TITEL}} are filled from the skill instructions. Bullet and numbered lists become real Word lists in the template’s style. The trigger was a letter that came out without letterhead because the agent had no way to use the template.",
+        "release.c1h": "Letterhead templates from the vault",
+        "release.c1": "write_docx accepts a .docx template from the vault containing a paragraph {{INHALT}}. Header, footer, logo, margins and fonts of the template stay exactly as they are; the agent’s Markdown lands where the placeholder was. The placeholder paragraph sets font, size and paragraph spacing of the body text; bold, headings and lists from the text take precedence. Bullet and numbered lists are hooked into the template’s own numbering definitions.",
+        "release.c2h": "Fill fields, the rest cleans up",
+        "release.c2": "Further placeholders such as {{TITEL}} may appear anywhere: header, footer or body. The agent fills them via the fields parameter and the placeholder’s formatting is kept. Unfilled placeholders are removed and listed on the result card. Placeholders that Word split into several runs while editing are stitched back together. Which template and which fields exist is stated by the vault skill; the app itself knows no forms.",
+        "release.c3h": "Word export without stray asterisks",
+        "release.c3": "In the Word export, **bold** markers in bullet points and headings appeared literally in the text; only plain paragraphs were formatted. Bold and italic now apply everywhere. In template mode a blank line separates paragraphs instead of producing an empty one, since the template already brings its own paragraph spacing; two blank lines give a visible spacer.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
