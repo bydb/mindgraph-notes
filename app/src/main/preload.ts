@@ -598,8 +598,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-list-folders', account),
   emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) =>
     ipcRenderer.invoke('email-move', payload),
-  emailFetch: (vaultPath: string, accounts: object[], lastFetchedAt: Record<string, string>, maxPerAccount: number) =>
-    ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount),
+  emailFetch: (vaultPath: string, accounts: object[], lastFetchedAt: Record<string, string>, maxPerAccount: number, mode?: 'incremental' | 'full') =>
+    ipcRenderer.invoke('email-fetch', vaultPath, accounts, lastFetchedAt, maxPerAccount, mode),
+  emailSetFlags: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; folder: string; uid: number; add?: string[]; remove?: string[] }) =>
+    ipcRenderer.invoke('email-set-flags', payload),
+  emailStageForwardAttachments: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; folder: string; uid: number }) =>
+    ipcRenderer.invoke('email-stage-forward-attachments', payload),
+  emailDiscardStagedAttachments: (paths: string[]) =>
+    ipcRenderer.invoke('email-discard-staged-attachments', paths),
+  emailDeleteLocal: (vaultPath: string, ids: string[]) =>
+    ipcRenderer.invoke('email-delete-local', vaultPath, ids),
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean, cloud?: { model: string } | null) =>
     ipcRenderer.invoke('email-analyze', vaultPath, model, emailIds, lowPowerMode, cloud),
   emailRelevanceConfigLoad: (vaultPath: string) =>

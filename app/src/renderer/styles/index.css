@@ -11989,6 +11989,190 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 11px;
   line-height: 1.45;
 }
+/* Versandergebnis und Abruffehler: Leisten oberhalb der Liste. Erfolg gruen und
+   fluechtig, Erfolg-mit-Warnung amber und bleibend, Abruffehler rot und bleibend. */
+.inbox-send-result,
+.inbox-fetch-errors {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+.inbox-send-result {
+  background: color-mix(in srgb, #2e9e5b 12%, var(--bg-secondary, transparent));
+  border-bottom-color: color-mix(in srgb, #2e9e5b 35%, var(--border-color));
+}
+.inbox-send-result.has-warning {
+  background: color-mix(in srgb, #d98324 14%, var(--bg-secondary, transparent));
+  border-bottom-color: color-mix(in srgb, #d98324 40%, var(--border-color));
+}
+.inbox-fetch-errors {
+  background: color-mix(in srgb, #e5484d 12%, var(--bg-secondary, transparent));
+  border-bottom-color: color-mix(in srgb, #e5484d 35%, var(--border-color));
+}
+.inbox-send-result-text,
+.inbox-fetch-errors-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inbox-send-result-text strong,
+.inbox-fetch-errors-text strong {
+  font-size: 11.5px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+.inbox-send-result-text span,
+.inbox-fetch-errors-text span {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+.inbox-banner-close {
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px;
+}
+.inbox-banner-close:hover {
+  color: var(--text-primary);
+}
+/* Suche laeuft ueber alle Mails: das muss man sehen, sonst wundert man sich
+   ueber Treffer aus anderen Ordnern. */
+.inbox-search-scope {
+  padding: 4px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--accent-color) 6%, transparent);
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+/* Entwuerfe-Leiste */
+.inbox-drafts {
+  border-bottom: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--accent-color) 5%, transparent);
+}
+.inbox-drafts-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.inbox-drafts-toggle:hover { color: var(--text-primary); }
+.inbox-drafts-chevron { font-size: 10px; }
+.inbox-drafts-list { padding: 0 8px 6px; display: flex; flex-direction: column; gap: 2px; }
+.inbox-draft-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+.inbox-draft-row:hover { background: color-mix(in srgb, var(--accent-color) 10%, transparent); }
+.inbox-draft-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+.inbox-draft-subject { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-draft-meta { font-size: 10.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Auf dem Server nicht mehr vorhanden */
+.inbox-email-item.missing { opacity: 0.6; }
+.inbox-email-item.missing .inbox-email-subject { text-decoration: line-through; text-decoration-color: var(--text-muted); }
+.inbox-missing-badge {
+  margin-top: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, #e5484d 35%, var(--border-color));
+  background: color-mix(in srgb, #e5484d 10%, var(--bg-secondary, transparent));
+  color: var(--text-secondary);
+  font-size: 11.5px;
+}
+/* Weiterleiten: Stand der Originalanhaenge */
+.inbox-compose-forward-note {
+  margin: 0 4px 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: color-mix(in srgb, var(--accent-color) 6%, transparent);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.inbox-compose-forward-note.is-warning {
+  border-color: color-mix(in srgb, #d98324 40%, var(--border-color));
+  background: color-mix(in srgb, #d98324 12%, var(--bg-secondary, transparent));
+}
+.inbox-compose-discard { color: #e5484d; }
+/* Loeschen / lokale Kopie entfernen */
+.inbox-action-btn--danger { color: #e5484d; }
+.inbox-action-btn--danger:hover { background: color-mix(in srgb, #e5484d 12%, var(--bg-primary)); }
+.inbox-store-conflict-action.is-danger {
+  border-color: color-mix(in srgb, #e5484d 55%, transparent);
+  color: #e5484d;
+}
+.inbox-store-conflict-action.is-danger:hover { background: color-mix(in srgb, #e5484d 14%, var(--bg-primary)); }
+.inbox-remove-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 6px 0;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, #e5484d 35%, var(--border-color));
+  background: color-mix(in srgb, #e5484d 10%, var(--bg-secondary, transparent));
+  font-size: 11.5px;
+  color: var(--text-primary);
+}
+.inbox-remove-confirm-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.inbox-missing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid color-mix(in srgb, #e5484d 35%, var(--border-color));
+  background: color-mix(in srgb, #e5484d 10%, var(--bg-secondary, transparent));
+}
+.inbox-missing-banner-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.inbox-missing-banner-text strong { font-size: 11.5px; color: var(--text-primary); }
+.inbox-missing-banner-text span { font-size: 11px; line-height: 1.45; color: var(--text-secondary); }
+/* Reply-To-Umleitung im Compose-Fenster: die Antwort geht nicht an den Absender. */
+.inbox-compose-redirect {
+  margin: 0 4px 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, #d98324 40%, var(--border-color));
+  background: color-mix(in srgb, #d98324 12%, var(--bg-secondary, transparent));
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
 /* Schreibkonflikt der Mailliste: bewusst auffaelliger als der Rueckstand-Hinweis.
    Hier stehen ungespeicherte Aenderungen auf dem Spiel — das darf man nicht
    uebersehen. Warnfarbe ueber den Amber-Akzent, nicht ueber Rot: Es ist kein

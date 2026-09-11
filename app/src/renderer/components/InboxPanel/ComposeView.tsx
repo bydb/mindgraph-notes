@@ -9,17 +9,20 @@ import type { ComposeAttachment } from '../../../shared/types'
 
 export const ComposeView: React.FC = () => {
   const { t } = useTranslation()
-  const { composeState, setComposeState, sendEmail, isSending, setCurrentView } = useEmailStore()
+  const { composeState, setComposeState, sendEmail, isSending, closeCompose, discardDraft, draftSaveError } = useEmailStore()
   const { email: emailSettings, languageTool: ltSettings } = useUIStore()
   const { vaultPath } = useNotesStore()
   const { searchContacts } = useContactStore()
 
   const bodyRef = useRef<HTMLTextAreaElement>(null)
+  const subjectRef = useRef<HTMLInputElement>(null)
+  const [confirmEmptySubject, setConfirmEmptySubject] = useState(false)
   const [toInput, setToInput] = useState('')
   const [ccInput, setCcInput] = useState('')
-  const [sendStatus, setSendStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  // Nur der Fehlerpfad lebt hier. Bei Erfolg baut der Store das Fenster sofort ab;
+  // Erfolg und „nicht unter Gesendet abgelegt" zeigt die Inbox (lastSendResult).
+  const [sendStatus, setSendStatus] = useState<'idle' | 'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
-  const [sendWarning, setSendWarning] = useState('')
   const [signatureImageUrl, setSignatureImageUrl] = useState<string | null>(null)
   const [ltChecking, setLtChecking] = useState(false)
   const [ltCorrectionCount, setLtCorrectionCount] = useState(0)
@@ -47,10 +50,16 @@ export const ComposeView: React.FC = () => {
   }, [emailSettings.signatureImagePath])
   const [toSuggestions, setToSuggestions] = useState<ReturnType<typeof searchContacts>>([])
   const [ccSuggestions, setCcSuggestions] = useState<ReturnType<typeof searchContacts>>([])
+  const [bccSuggestions, setBccSuggestions] = useState<ReturnType<typeof searchContacts>>([])
   const [showToDropdown, setShowToDropdown] = useState(false)
   const [showCcDropdown, setShowCcDropdown] = useState(false)
+  const [showBccDropdown, setShowBccDropdown] = useState(false)
+  const [bccInput, setBccInput] = useState('')
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [confirmMissingAttachments, setConfirmMissingAttachments] = useState(false)
   const toDropdownRef = useRef<HTMLDivElement>(null)
   const ccDropdownRef = useRef<HTMLDivElement>(null)
+  const bccDropdownRef = useRef<HTMLDivElement>(null)
 
   // Kontakte bei jedem Öffnen neu aufbauen — sonst fehlen seit dem letzten
   // Build gesendete/abgerufene Adressen (Liste ist flüchtig, kein Cache nötig)
@@ -62,6 +71,14 @@ export const ComposeView: React.FC = () => {
 
   const account = emailSettings.accounts.find(a => a.id === composeState.accountId)
   const hasSmtp = account?.smtpHost
+  // Weiterleitung: solange Originalanhänge laden, ist Senden gesperrt (UI und
+  // Store). Fehlen danach Dateien, braucht der Versand eine bewusste Freigabe.
+  const forwardLoading = composeState.forwardAttachments?.status === 'loading'
+  const forwardIncomplete = !!composeState.forwardAttachments && (
+    composeState.forwardAttachments.status === 'failed' ||
+    (composeState.forwardAttachments.status === 'done' && (composeState.forwardAttachments.skipped?.length ?? 0) > 0)
+  )
+  const sendBlocked = isSending || !hasSmtp || composeState.to.length === 0 || forwardLoading
 
   const parseEmailInput = (input: string): { name: string; address: string } | null => {
     const trimmed = input.trim()
@@ -96,6 +113,25 @@ export const ComposeView: React.FC = () => {
     }
   }, [ccInput, composeState, setComposeState])
 
+  const handleAddBcc = useCallback(() => {
+    const parsed = parseEmailInput(bccInput)
+    if (parsed) {
+      setComposeState({
+        ...composeState,
+        bcc: [...(composeState.bcc || []), parsed]
+      })
+      setBccInput('')
+      setShowBccDropdown(false)
+    }
+  }, [bccInput, composeState, setComposeState])
+
+  const handleRemoveBcc = useCallback((index: number) => {
+    setComposeState({
+      ...composeState,
+      bcc: (composeState.bcc || []).filter((_, i) => i !== index)
+    })
+  }, [composeState, setComposeState])
+
   const handleRemoveTo = useCallback((index: number) => {
     setComposeState({
       ...composeState,
@@ -110,18 +146,32 @@ export const ComposeView: React.FC = () => {
     })
   }, [composeState, setComposeState])
 
-  const handleSelectContact = useCallback((email: string, name: string, field: 'to' | 'cc') => {
+  const handleSelectContact = useCallback((email: string, name: string, field: 'to' | 'cc' | 'bcc') => {
     const recipient = { name, address: email }
     if (field === 'to') {
       setComposeState({ ...composeState, to: [...composeState.to, recipient] })
       setToInput('')
       setShowToDropdown(false)
-    } else {
+    } else if (field === 'cc') {
       setComposeState({ ...composeState, cc: [...(composeState.cc || []), recipient] })
       setCcInput('')
       setShowCcDropdown(false)
+    } else {
+      setComposeState({ ...composeState, bcc: [...(composeState.bcc || []), recipient] })
+      setBccInput('')
+      setShowBccDropdown(false)
     }
   }, [composeState, setComposeState])
+
+  const handleBccInputChange = (value: string) => {
+    setBccInput(value)
+    if (value.length >= 2) {
+      setBccSuggestions(searchContacts(value))
+      setShowBccDropdown(true)
+    } else {
+      setShowBccDropdown(false)
+    }
+  }
 
   const handleToInputChange = (value: string) => {
     setToInput(value)
@@ -249,26 +299,27 @@ export const ComposeView: React.FC = () => {
     setLtChecking(false)
   }, [composeState, ltSettings, setComposeState])
 
-  const handleSend = useCallback(async () => {
-    if (!vaultPath || !composeState.to.length) return
+  const handleSend = useCallback(async (allowEmptySubject = false, allowMissingAttachments = false) => {
+    if (!vaultPath || !composeState.to.length || isSending || !hasSmtp || forwardLoading) return
+    if (!composeState.subject.trim() && !allowEmptySubject) {
+      setConfirmEmptySubject(true)
+      return
+    }
+    setConfirmEmptySubject(false)
+    if (forwardIncomplete && !allowMissingAttachments) {
+      setConfirmMissingAttachments(true)
+      return
+    }
+    setConfirmMissingAttachments(false)
     setSendStatus('idle')
     setErrorMsg('')
-    setSendWarning('')
 
     const result = await sendEmail(vaultPath)
-    if (result.success) {
-      setSendStatus('success')
-      if (result.appendWarning) {
-        setSendWarning(result.appendWarning)
-        setTimeout(() => { setSendStatus('idle'); setSendWarning('') }, 6000)
-      } else {
-        setTimeout(() => setSendStatus('idle'), 2000)
-      }
-    } else {
+    if (!result.success) {
       setSendStatus('error')
       setErrorMsg(result.error || t('inbox.compose.error'))
     }
-  }, [vaultPath, composeState, sendEmail, t])
+  }, [vaultPath, composeState, isSending, hasSmtp, forwardLoading, forwardIncomplete, sendEmail, t])
 
   const getSourceIcon = (sources: string[]) => {
     const icons: string[] = []
@@ -278,7 +329,7 @@ export const ComposeView: React.FC = () => {
     return icons.join('')
   }
 
-  const renderSuggestionDropdown = (suggestions: ReturnType<typeof searchContacts>, show: boolean, field: 'to' | 'cc', ref: React.RefObject<HTMLDivElement | null>) => {
+  const renderSuggestionDropdown = (suggestions: ReturnType<typeof searchContacts>, show: boolean, field: 'to' | 'cc' | 'bcc', ref: React.RefObject<HTMLDivElement | null>) => {
     if (!show || suggestions.length === 0) return null
     return (
       <div className="inbox-compose-dropdown" ref={ref}>
@@ -314,6 +365,33 @@ export const ComposeView: React.FC = () => {
               <option key={acc.id} value={acc.id}>{acc.name || acc.user}</option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* Reply-To-Umleitung sichtbar machen: Antwort geht NICHT an den Absender. */}
+      {composeState.replyRedirect && (
+        <div className="inbox-compose-redirect" role="note">
+          {t('inbox.compose.replyRedirect')
+            .replace('{replyTo}', composeState.replyRedirect.replyTo)
+            .replace('{from}', composeState.replyRedirect.from)}
+        </div>
+      )}
+
+      {/* Weiterleiten: Stand der Originalanhänge. Was nicht mitgeht, wird gesagt —
+          eine Mail darf keine Anhänge behaupten, die sie nicht hat. */}
+      {composeState.forwardAttachments && composeState.forwardAttachments.status === 'loading' && (
+        <div className="inbox-compose-forward-note" role="status">{t('inbox.compose.forwardLoading')}</div>
+      )}
+      {composeState.forwardAttachments && composeState.forwardAttachments.status === 'done' && (composeState.forwardAttachments.skipped?.length ?? 0) > 0 && (
+        <div className="inbox-compose-forward-note is-warning" role="alert">
+          {t('inbox.compose.forwardSkipped').replace('{names}', composeState.forwardAttachments.skipped!.join(', '))}
+        </div>
+      )}
+      {composeState.forwardAttachments && composeState.forwardAttachments.status === 'failed' && (
+        <div className="inbox-compose-forward-note is-warning" role="alert">
+          {t('inbox.compose.forwardFailed')
+            .replace('{names}', (composeState.forwardAttachments.skipped || []).join(', ') || '?')
+            .replace('{error}', composeState.forwardAttachments.error || '')}
         </div>
       )}
 
@@ -391,14 +469,55 @@ export const ComposeView: React.FC = () => {
         </div>
       </div>
 
+      {/* BCC field */}
+      <div className="inbox-compose-row">
+        <label>{t('inbox.compose.bcc')}:</label>
+        <div className="inbox-compose-recipients-wrapper">
+          <div className="inbox-compose-recipients">
+            {(composeState.bcc || []).map((r, i) => (
+              <span key={i} className="inbox-compose-chip">
+                {r.name || r.address}
+                <button onClick={() => handleRemoveBcc(i)}>&times;</button>
+              </span>
+            ))}
+            <input
+              type="text"
+              value={bccInput}
+              onChange={e => handleBccInputChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  e.preventDefault()
+                  if (showBccDropdown && bccSuggestions.length > 0) {
+                    handleSelectContact(bccSuggestions[0].email, bccSuggestions[0].name, 'bcc')
+                  } else {
+                    handleAddBcc()
+                  }
+                }
+                if (e.key === 'Escape') setShowBccDropdown(false)
+              }}
+              onBlur={() => {
+                setTimeout(() => setShowBccDropdown(false), 200)
+                handleAddBcc()
+              }}
+              placeholder=""
+            />
+          </div>
+          {renderSuggestionDropdown(bccSuggestions, showBccDropdown, 'bcc', bccDropdownRef)}
+        </div>
+      </div>
+
       {/* Subject */}
       <div className="inbox-compose-row">
         <label>{t('inbox.compose.subject')}:</label>
         <input
           type="text"
           className="inbox-compose-subject"
+          ref={subjectRef}
           value={composeState.subject}
-          onChange={e => setComposeState({ ...composeState, subject: e.target.value })}
+          onChange={e => {
+            setConfirmEmptySubject(false)
+            setComposeState({ ...composeState, subject: e.target.value })
+          }}
         />
       </div>
 
@@ -542,10 +661,16 @@ export const ComposeView: React.FC = () => {
               </span>
               <button
                 className="inbox-compose-attachment-remove"
-                onClick={() => setComposeState({
-                  ...composeState,
-                  attachments: composeState.attachments!.filter((_, idx) => idx !== i)
-                })}
+                onClick={() => {
+                  // Zwischengespeicherte Weiterleitungs-Anhänge gleich mit wegräumen.
+                  if (att.path.includes('forward-attachments')) {
+                    void window.electronAPI.emailDiscardStagedAttachments([att.path])
+                  }
+                  setComposeState({
+                    ...composeState,
+                    attachments: composeState.attachments!.filter((_, idx) => idx !== i)
+                  })
+                }}
                 title={t('inbox.compose.removeAttachment')}
               >
                 &times;
@@ -573,23 +698,63 @@ export const ComposeView: React.FC = () => {
           <span className="inbox-compose-error">{errorMsg}</span>
         </div>
       )}
-      {sendStatus === 'success' && (
-        <div style={{ padding: '0 4px' }}>
-          <span className="inbox-compose-success">{t('inbox.compose.sent')}</span>
-          {sendWarning && (
-            <div style={{ marginTop: 4, fontSize: 12, color: '#b87a00' }}>
-              ⚠️ {sendWarning}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Actions */}
+      {confirmEmptySubject && (
+        <div role="alert" className="inbox-compose-warning">
+          {t('inbox.compose.emptySubjectWarning')}
+          <div className="inbox-compose-actions">
+            <button
+              className="inbox-compose-cancel"
+              autoFocus
+              onClick={() => {
+                setConfirmEmptySubject(false)
+                subjectRef.current?.focus()
+              }}
+            >
+              {t('inbox.compose.addSubject')}
+            </button>
+            <button
+              className="inbox-compose-send"
+              disabled={sendBlocked}
+              onClick={() => handleSend(true)}
+            >
+              {t('inbox.compose.sendWithoutSubject')}
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmMissingAttachments && (
+        <div role="alert" className="inbox-compose-warning">
+          {t('inbox.compose.missingAttachmentsWarning').replace(
+            '{names}',
+            (composeState.forwardAttachments?.skipped || []).join(', ') || '?'
+          )}
+          <div className="inbox-compose-actions">
+            <button className="inbox-compose-cancel" autoFocus onClick={() => setConfirmMissingAttachments(false)}>
+              {t('inbox.compose.keep')}
+            </button>
+            <button
+              className="inbox-compose-send"
+              disabled={sendBlocked}
+              onClick={() => handleSend(true, true)}
+            >
+              {t('inbox.compose.sendWithoutAttachments')}
+            </button>
+          </div>
+        </div>
+      )}
+      {draftSaveError && (
+        <div role="alert" className="inbox-compose-warning">
+          {t('inbox.compose.draftSaveFailed').replace('{error}', draftSaveError)}
+        </div>
+      )}
       <div className="inbox-compose-actions">
         <button
           className="inbox-compose-send"
-          onClick={handleSend}
-          disabled={isSending || !hasSmtp || composeState.to.length === 0}
+          onClick={() => handleSend()}
+          disabled={sendBlocked}
+          title={forwardLoading ? t('inbox.compose.forwardLoading') : undefined}
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />
@@ -599,14 +764,36 @@ export const ComposeView: React.FC = () => {
         </button>
         <button
           className="inbox-compose-cancel"
-          onClick={() => {
-            setComposeState(null)
-            setCurrentView('list')
-          }}
+          onClick={() => closeCompose()}
+          title={t('inbox.compose.closeHint')}
         >
-          {t('inbox.detail.back')}
+          {t('inbox.compose.close')}
         </button>
+        {composeState.draftId && !confirmDiscard && (
+          <button
+            className="inbox-compose-cancel inbox-compose-discard"
+            onClick={() => setConfirmDiscard(true)}
+          >
+            {t('inbox.compose.discard')}
+          </button>
+        )}
       </div>
+      {confirmDiscard && (
+        <div role="alert" className="inbox-compose-warning">
+          <span>{t('inbox.compose.discardConfirm')}</span>
+          <div className="inbox-compose-actions">
+            <button className="inbox-compose-cancel" onClick={() => setConfirmDiscard(false)}>
+              {t('inbox.compose.keep')}
+            </button>
+            <button
+              className="inbox-compose-send inbox-compose-discard"
+              onClick={() => { if (composeState.draftId) void discardDraft(composeState.draftId) }}
+            >
+              {t('inbox.compose.discardYes')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

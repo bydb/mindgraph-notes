@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useEmailStore } from '../../stores/emailStore'
 import { collectOwnAddresses, collectReplyAllRecipients } from '../../../shared/emailReply'
+import { findTrashFolder } from '../../../shared/emailFolders'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
 import { useIsModuleEnabled } from '../../utils/modules'
@@ -116,6 +117,19 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     isAnalyzing,
     fetchProgress,
     pendingBacklog,
+    lastSendResult,
+    clearLastSendResult,
+    lastFetchErrors,
+    clearFetchErrors,
+    lastSuccessfulFetchAt,
+    lastFetchedAt,
+    closeCompose,
+    drafts,
+    openDraft,
+    discardDraft,
+    searchEmails,
+    setSeen,
+    removeLocalEmails,
     storeConflict,
     reloadAfterStoreConflict,
     analysisProgress,
@@ -129,7 +143,6 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     setSelectedEmail,
     currentView,
     setCurrentView,
-    setComposeState,
     startReply,
     startReplyAll,
     startForward,
@@ -325,14 +338,12 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
 
   const filteredEmails = getFilteredEmails()
 
-  // Suchfilter anwenden
-  const displayEmails = searchQuery
-    ? filteredEmails.filter(e =>
-        e.from.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.from.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        e.subject.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : filteredEmails
+  // Suche: über ALLE Mails (alle Ordner, ohne Relevanz-/Ungelesen-Filter) in
+  // Absender, Empfänger, Betreff und Text. Vorher nur Absender+Betreff der
+  // bereits gefilterten Liste — eine gesendete Mail war damit unauffindbar.
+  const isSearching = searchQuery.trim().length > 0
+  const displayEmails = isSearching ? searchEmails(searchQuery) : filteredEmails
+  const [showDrafts, setShowDrafts] = useState(false)
 
   const selectedEmail = selectedEmailId
     ? emails.find(e => e.id === selectedEmailId)
@@ -517,6 +528,26 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
       })
   }, [selectedEmail, folders])
 
+  // Papierkorb des Kontos — ohne erkannten Papierkorb gibt es keinen Löschen-Knopf.
+  const trashFolder = useMemo(
+    () => selectedEmail ? findTrashFolder(folders[selectedEmail.accountId]) : null,
+    [selectedEmail, folders]
+  )
+  const [seenError, setSeenError] = useState('')
+  const handleToggleSeen = useCallback(async (emailId: string, seen: boolean) => {
+    if (!vaultPath) return
+    setSeenError('')
+    const res = await setSeen(vaultPath, emailId, seen)
+    if (!res.success) {
+      setSeenError(res.error || 'Markierung fehlgeschlagen')
+      setTimeout(() => setSeenError(''), 5000)
+    }
+  }, [vaultPath, setSeen])
+  const [confirmRemoveLocal, setConfirmRemoveLocal] = useState(false)
+  const [confirmRemoveMissing, setConfirmRemoveMissing] = useState(false)
+  useEffect(() => { setConfirmRemoveLocal(false) }, [selectedEmailId])
+  const missingInView = useMemo(() => filteredEmails.filter(e => e.missingOnServer), [filteredEmails])
+
   const handleMove = useCallback(async (destination: string) => {
     if (!vaultPath || !selectedEmail) return
     setShowMoveDropdown(false)
@@ -563,6 +594,25 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     if (!vaultPath || isFetching) return
     await fetchEmails(vaultPath, true)
   }, [vaultPath, isFetching, fetchEmails])
+
+  // Erfolgsmeldung ohne Warnung verschwindet von selbst; MIT Warnung („nicht
+  // unter Gesendet abgelegt") bleibt sie, bis der Nutzer sie wegklickt.
+  useEffect(() => {
+    if (!lastSendResult || lastSendResult.appendWarning) return
+    const timer = setTimeout(clearLastSendResult, 5000)
+    return () => clearTimeout(timer)
+  }, [lastSendResult, clearLastSendResult])
+
+  const accountLabel = useCallback((accountId: string) => {
+    const acc = emailSettings.accounts.find(a => a.id === accountId)
+    return acc ? (acc.name || acc.user) : accountId
+  }, [emailSettings.accounts])
+
+  const lastSuccessLabel = useCallback((accountId: string) => {
+    const iso = lastSuccessfulFetchAt[accountId] || lastFetchedAt[accountId]
+    if (!iso) return t('inbox.fetchNeverSucceeded')
+    return t('inbox.fetchLastSuccess').replace('{time}', new Date(iso).toLocaleString())
+  }, [lastSuccessfulFetchAt, lastFetchedAt, t])
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -708,11 +758,8 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 </div>
                 <button
                   className="inbox-panel-close"
-                  data-tooltip={t('panel.close')}
-                  onClick={() => {
-                    setComposeState(null)
-                    setCurrentView(selectedEmailId ? 'detail' : 'list')
-                  }}
+                  data-tooltip={t('inbox.compose.closeHint')}
+                  onClick={() => closeCompose()}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -755,6 +802,9 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                 <span className="inbox-email-from">{selectedEmail.from.name || selectedEmail.from.address}</span>
                 <span className="inbox-email-date">{formatDate(selectedEmail.date)}</span>
               </div>
+              {selectedEmail.missingOnServer && (
+                <div className="inbox-missing-badge" role="note">{t('inbox.missingOnServer')}</div>
+              )}
               {(selectedEmail.to?.length > 0 || (selectedEmail.cc?.length ?? 0) > 0) && (
                 <div className="inbox-email-to">
                   {selectedEmail.to?.length > 0 && (
@@ -928,6 +978,55 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
                     <span className="inbox-action-label">{selectedEmail.analysis?.replyHandled ? t('inbox.markUnhandled') : t('inbox.markHandled')}</span>
                   </button>
                 )}
+                {/* Gelesen/Ungelesen: eigenständige Aktion, wirkt auch auf dem Server. */}
+                {(() => {
+                  const isSeen = selectedEmail.flags.includes('\\Seen')
+                  const label = isSeen ? t('inbox.markUnread') : t('inbox.markRead')
+                  return (
+                    <button
+                      className="inbox-action-btn"
+                      onClick={() => void handleToggleSeen(selectedEmail.id, !isSeen)}
+                      data-tooltip={label}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="4" width="20" height="16" rx="2" />
+                        {isSeen ? <path d="M2 8l10 6 10-6" /> : <circle cx="18" cy="8" r="3" fill="currentColor" stroke="none" />}
+                      </svg>
+                      <span className="inbox-action-label">{label}</span>
+                    </button>
+                  )
+                })()}
+                {/* Löschen = Verschieben in den erkannten Papierkorb. Rückgängig über „Verschieben". */}
+                {trashFolder && selectedEmail.uid > 0 && !selectedEmail.missingOnServer && (selectedEmail.folder || 'INBOX') !== trashFolder.path && (
+                  <button
+                    className="inbox-action-btn inbox-action-btn--danger"
+                    onClick={() => handleMove(trashFolder.path)}
+                    disabled={moveStatus === 'moving'}
+                    data-tooltip={t('inbox.delete.tooltip').replace('{folder}', trashFolder.name || trashFolder.path)}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                      <path d="M10 11v6M14 11v6" />
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                    </svg>
+                    <span className="inbox-action-label">{t('inbox.delete')}</span>
+                  </button>
+                )}
+                {/* Nur noch lokal: auf dem Server verschwunden oder nie dort (keine UID). */}
+                {(selectedEmail.missingOnServer || selectedEmail.uid === 0) && !confirmRemoveLocal && (
+                  <button
+                    className="inbox-action-btn inbox-action-btn--danger"
+                    onClick={() => setConfirmRemoveLocal(true)}
+                    data-tooltip={t('inbox.removeLocal.tooltip')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                    </svg>
+                    <span className="inbox-action-label">{t('inbox.removeLocal')}</span>
+                  </button>
+                )}
                 {/* Move-to-folder */}
                 {selectedEmail.uid > 0 && (
                   <div className="inbox-move-wrapper">
@@ -978,6 +1077,24 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               </div>
               {moveStatus === 'error' && (
                 <div className="inbox-move-error" role="alert">{moveError}</div>
+              )}
+              {seenError && (
+                <div className="inbox-move-error" role="alert">{seenError}</div>
+              )}
+              {confirmRemoveLocal && (
+                <div className="inbox-remove-confirm" role="alert">
+                  <span>{t('inbox.removeLocal.confirm')}</span>
+                  <div className="inbox-remove-confirm-actions">
+                    <button type="button" className="inbox-store-conflict-action" onClick={() => setConfirmRemoveLocal(false)}>{t('inbox.compose.keep')}</button>
+                    <button
+                      type="button"
+                      className="inbox-store-conflict-action is-danger"
+                      onClick={() => { if (vaultPath) void removeLocalEmails(vaultPath, [selectedEmail.id]); setConfirmRemoveLocal(false) }}
+                    >
+                      {t('inbox.removeLocal.yes')}
+                    </button>
+                  </div>
+                </div>
               )}
               {eventError && (
                 <div className="inbox-event-error" role="alert">{eventError}</div>
@@ -1414,6 +1531,34 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
           <span>{t('inbox.onlyRelevant')}</span>
         </label>
       </div>
+      {isSearching && (
+        <div className="inbox-search-scope">{t('inbox.searchScope').replace('{n}', String(emails.length))}</div>
+      )}
+      {/* Entwürfe: automatisch gesichert, hier wieder aufnehmbar oder ausdrücklich zu löschen. */}
+      {drafts.length > 0 && (
+        <div className="inbox-drafts">
+          <button type="button" className="inbox-drafts-toggle" onClick={() => setShowDrafts(v => !v)} aria-expanded={showDrafts}>
+            {drafts.length === 1 ? t('inbox.drafts.one') : t('inbox.drafts.many').replace('{n}', String(drafts.length))}
+            <span className="inbox-drafts-chevron">{showDrafts ? '▾' : '▸'}</span>
+          </button>
+          {showDrafts && (
+            <div className="inbox-drafts-list">
+              {drafts.map(d => (
+                <div key={d.id} className="inbox-draft-row">
+                  <button type="button" className="inbox-draft-open" onClick={() => { openDraft(d.id); setShowDrafts(false) }} title={t('inbox.drafts.open')}>
+                    <span className="inbox-draft-subject">{d.compose.subject || t('inbox.sendResult.noSubject')}</span>
+                    <span className="inbox-draft-meta">
+                      {d.compose.to[0] ? `${t('inbox.detail.to')}: ${d.compose.to[0].name || d.compose.to[0].address}` : ''}
+                      {d.compose.to[0] ? ' · ' : ''}{formatDate(d.updatedAt)}
+                    </span>
+                  </button>
+                  <button type="button" className="inbox-banner-close" onClick={() => void discardDraft(d.id)} title={t('inbox.drafts.delete')}>✕</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Progress */}
       {isFetching && fetchProgress && (
@@ -1423,6 +1568,63 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
             <div className="inbox-progress-bar">
               <div style={{ width: `${(fetchProgress.current / fetchProgress.total) * 100}%` }} />
             </div>
+          )}
+        </div>
+      )}
+      {/* Versandergebnis: lebt hier, nicht im Compose-Fenster — das ist nach
+          Erfolg schon abgebaut. Vorher hatte die Warnung „gesendet, aber nicht
+          unter Gesendet abgelegt" keinen sichtbaren Ort. */}
+      {lastSendResult && (
+        <div className={`inbox-send-result${lastSendResult.appendWarning ? ' has-warning' : ''}`} role="status">
+          <div className="inbox-send-result-text">
+            <strong>{t('inbox.sendResult.sent').replace('{subject}', lastSendResult.subject || t('inbox.sendResult.noSubject'))}</strong>
+            {lastSendResult.appendWarning && <span>{lastSendResult.appendWarning}</span>}
+          </div>
+          <button type="button" className="inbox-banner-close" onClick={clearLastSendResult} title={t('common.close')}>✕</button>
+        </div>
+      )}
+      {/* Abruffehler je Konto: Passwort fehlt, Anmeldung abgelehnt, Zeitueberschreitung.
+          Vorher stand danach „Abruf fertig, 0 neu" — auch wenn kein Konto erreichbar war. */}
+      {!isFetching && lastFetchErrors.length > 0 && (
+        <div className="inbox-fetch-errors" role="alert">
+          <div className="inbox-fetch-errors-text">
+            <strong>{t('inbox.fetchErrorsTitle')}</strong>
+            {lastFetchErrors.map((e, i) => (
+              <span key={`${e.accountId}-${e.folder}-${i}`}>
+                {e.accountId ? `${accountLabel(e.accountId)}${e.folder && e.folder !== 'INBOX' ? ` (${e.folder})` : ''}: ` : ''}{e.error}
+                {e.accountId ? ` — ${lastSuccessLabel(e.accountId)}` : ''}
+              </span>
+            ))}
+          </div>
+          <button type="button" className="inbox-banner-close" onClick={clearFetchErrors} title={t('common.close')}>✕</button>
+        </div>
+      )}
+      {/* Auf dem Server verschwundene Mails: sichtbar behandeln, nie still loeschen. */}
+      {!isSearching && missingInView.length > 0 && (
+        <div className="inbox-missing-banner" role="status">
+          <div className="inbox-missing-banner-text">
+            <strong>
+              {missingInView.length === 1
+                ? t('inbox.missingBanner.one')
+                : t('inbox.missingBanner.many').replace('{n}', String(missingInView.length))}
+            </strong>
+            <span>{confirmRemoveMissing ? t('inbox.missingBanner.confirm').replace('{n}', String(missingInView.length)) : t('inbox.missingBanner.hint')}</span>
+          </div>
+          {confirmRemoveMissing ? (
+            <div className="inbox-remove-confirm-actions">
+              <button type="button" className="inbox-store-conflict-action" onClick={() => setConfirmRemoveMissing(false)}>{t('inbox.compose.keep')}</button>
+              <button
+                type="button"
+                className="inbox-store-conflict-action is-danger"
+                onClick={() => { if (vaultPath) void removeLocalEmails(vaultPath, missingInView.map(e => e.id)); setConfirmRemoveMissing(false) }}
+              >
+                {t('inbox.removeLocal.yes')}
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="inbox-store-conflict-action" onClick={() => setConfirmRemoveMissing(true)}>
+              {t('inbox.missingBanner.remove')}
+            </button>
           )}
         </div>
       )}
@@ -1509,10 +1711,15 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
             {displayEmails.map(email => (
               <div
                 key={email.id}
-                className={`inbox-email-item ${!email.flags.includes('\\Seen') ? 'unread' : ''} ${email.sent ? 'sent' : ''} ${selectedEmailId === email.id ? 'selected' : ''}`}
+                className={`inbox-email-item ${!email.flags.includes('\\Seen') ? 'unread' : ''} ${email.sent ? 'sent' : ''} ${email.missingOnServer ? 'missing' : ''} ${selectedEmailId === email.id ? 'selected' : ''}`}
+                title={email.missingOnServer ? t('inbox.missingOnServer') : undefined}
                 onClick={() => {
                   setSelectedEmail(email.id)
                   setCurrentView('detail')
+                  // Opt-in: Gelesen-Zeichen auch auf dem Server setzen.
+                  if (emailSettings.markSeenOnOpen && vaultPath && !email.flags.includes('\\Seen')) {
+                    void setSeen(vaultPath, email.id, true)
+                  }
                 }}
               >
                 <div className="inbox-email-avatar">

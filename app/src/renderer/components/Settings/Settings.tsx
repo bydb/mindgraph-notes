@@ -5919,6 +5919,15 @@ LIMIT 10
                     </div>
 
                     <div className="settings-row">
+                      <label title={t('settings.email.markSeenOnOpenHint')}>{t('settings.email.markSeenOnOpen')}</label>
+                      <input
+                        type="checkbox"
+                        checked={emailSettings.markSeenOnOpen}
+                        onChange={e => setEmail({ markSeenOnOpen: e.target.checked })}
+                      />
+                    </div>
+
+                    <div className="settings-row">
                       <label title={t('settings.email.lowPowerModeHint')}>{t('settings.email.lowPowerMode')}</label>
                       <input
                         type="checkbox"

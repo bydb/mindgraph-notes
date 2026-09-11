@@ -2,6 +2,30 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.7-beta] - 2026-09-11
+
+Ein Strang: der Mailclient. Ein unabhängiges Funktionsreview (Codex) fand sechzehn Schwachstellen, vom falschen Absenderkonto bis zu Anhängen, die still fehlten. Alle sind behoben, in drei Paketen: Versandvertrauen, nichts verlieren und alles finden, Abgleich mit dem Server und Papierkorb. Dazu eine Nachprüfung der Umsetzung mit sechs weiteren Befunden, ebenfalls behoben. Alles ist lokal geprüft (1882 Tests); die Gegenprobe gegen echte Mailserver ist der Zweck dieses Releases.
+
+### Neu
+
+- **Antworten vom richtigen Konto, an das richtige Ziel.** Antworten, Allen antworten, Weiterleiten und „Als Antwort verwenden" aus dem KI-Chat gehen vom Konto aus, auf dem die Mail ankam; vorher war es immer das erste Konto. Der Reply-To-Header wird beim Abruf gespeichert und beim Antworten bevorzugt; weicht das Ziel vom Absender ab, zeigt das Fenster „Antwort geht an X (Reply-To). Absender war Y." Für schon vorhandene Mails wird Reply-To beim nächsten Aktualisieren nachgetragen.
+- **Versandergebnis und Abruffehler haben einen Ort.** Nach dem Senden erscheint eine Leiste über der Liste; bleibt die Kopie im Gesendet-Ordner aus, bleibt die Warnung stehen, bis man sie wegklickt. Vorher verschwand sie mit dem Fenster. Fehlt einem Konto das Passwort oder scheitert die Verbindung, steht das als rote Leiste mit dem letzten erfolgreichen Abruf; vorher hieß es „Abruf fertig, 0 neu".
+- **Entwürfe gehen nicht mehr verloren.** Jeder angefasste Entwurf wird pro Vault gesichert. Schließen behält ihn, ein unangefasstes Fenster wird still verworfen. Eine Leiste „N Entwürfe" öffnet sie wieder, auch nach Neustart. „Verwerfen" fragt nach, Senden räumt auf. Es gibt keine Obergrenze, die still löscht; scheitert das Sichern, sagt das Fenster es.
+- **Weiterleiten nimmt die Originalanhänge mit.** Sie werden vom Server geholt und als Dateien angehängt. Was nicht mitgeht, steht mit Namen im Fenster; Senden ist gesperrt, solange sie laden, und braucht eine bewusste Freigabe, wenn Dateien fehlen. Ein unterbrochener Download läuft beim Wiederöffnen des Entwurfs weiter.
+- **BCC-Feld** mit Kontaktvorschlägen. Die Adressen gehen mit, stehen aber weder in den Kopfzeilen noch in der lokalen Kopie.
+- **Suche über alles.** Absender, Empfänger, Betreff und Text, in allen Ordnern und ohne Relevanzfilter. Eine Zeile sagt, dass die Filter pausiert sind. Vorher fand das Feld nur Absender und Betreff der schon gefilterten Liste; eine gesendete Mail war unauffindbar.
+- **Abgleich mit dem Server.** Aktualisieren arbeitet über das ganze Aufbewahrungsfenster und übernimmt für bekannte Mails, was anderswo passiert ist: gelesen, verschoben (auch die Server-Kennung), gelöscht. Gelöschte werden durchgestrichen angezeigt, nie automatisch entfernt. Der Abgleich bleibt strikt je Konto; dieselbe Mail in einem zweiten Konto verändert nichts.
+- **Gelesen/Ungelesen** als eigene Aktion, wirkt auch auf dem Server. Neue Einstellung „Beim Öffnen als gelesen markieren", standardmäßig aus.
+- **Löschen in den Papierkorb.** Der Knopf erscheint nur, wenn das Konto einen Papierkorb hat (IMAP-Kennzeichen oder bekannte Namen). Löschen ist ein Verschieben, rückgängig über „Verschieben". Verschwundene Mails lassen sich nach Rückfrage entfernen, einzeln oder gesammelt, mit Grabstein in der Maildatei, damit sie nicht vom Zweitgerät zurückkommen. Erstellte Notizen bleiben.
+
+### Behoben
+
+- **Anhänge fehlten still.** Eine nicht mehr erreichbare Anhangdatei wurde beim Senden übersprungen; die Mail ging mit „siehe Anhang" und ohne Anhang raus. Jetzt bricht der Versand ab und nennt die Datei.
+- **„Aktualisieren" holte nur drei Tage.** Der manuelle Abruf übergab einen leeren Merker, den der Hauptprozess als Ersteinrichtung las. Jetzt gilt das konfigurierte Aufbewahrungsfenster; ältere durchgefallene Mails kommen mit dem Kontingent herein.
+- **Eigene gesendete Mails ohne Server-Kennung.** Die Kopie im Gesendet-Ordner liefert ihre Kennung (APPENDUID) zurück; alte Kopien bekommen sie beim nächsten Abruf. Damit lassen sie sich verschieben und ihre Anhänge laden.
+- **Entwurf im falschen Vault.** Ein Vault-Wechsel innerhalb der Sicherungsverzögerung schrieb den Entwurf unter den neuen Vault. Die Sicherung trägt ihren Vault jetzt selbst; beim Wechsel wird der alte abgeschlossen.
+- **Fehler beim Gelesen-Markieren** werden angezeigt; der lokale Stand wird zurückgenommen, wenn der Server ablehnt.
+
 ## [0.11.6-beta] - 2026-09-10
 
 Ein Strang: Der Notiz-Agent kann Word-Dokumente auf einer Vorlage aus dem Vault erzeugen. Anlass war ein Anschreiben des Medienzentrums, das ohne Briefkopf herauskam, weil der Agent die Vorlage nicht nutzen konnte.

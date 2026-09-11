@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.6-beta",
+    "softwareVersion": "0.11.7-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Briefe auf dem eigenen Briefkopf: Word-Vorlagen f&uuml;r den Notiz-Agenten &middot; v0.11.6</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Posteingang: Entw&uuml;rfe, Papierkorb, Serverabgleich und verl&auml;ssliche Antworten &middot; v0.11.7</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.6 &middot; Word-Vorlagen f&uuml;r den Agenten</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Notiz-Agent schreibt Einladungen, Anschreiben und Absichtserkl&auml;rungen jetzt direkt auf deinen Briefkopf. Die Word-Vorlage liegt im Vault, der Agent f&uuml;llt nur den Text.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Eine Word-Datei mit Logo, Kopfzeile und dem Platzhalter {{INHALT}} gen&uuml;gt: Der Agent setzt seinen Text an diese Stelle, Kopf- und Fu&szlig;zeile, R&auml;nder und Schriften bleiben exakt erhalten. Weitere Platzhalter wie {{TITEL}} f&uuml;llt er aus der Skill-Anleitung. Aufz&auml;hlungen und nummerierte Listen werden echte Word-Listen im Stil der Vorlage.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.7 &middot; Der Posteingang wird verl&auml;sslich</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Posteingang verh&auml;lt sich jetzt wie ein Mailprogramm, dem man vertrauen kann: richtiges Absenderkonto, Reply-To, gesicherte Entw&uuml;rfe, Papierkorb und Abgleich mit dem Server.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Ein unabh&auml;ngiges Funktionsreview des Mailclients fand sechzehn Schwachstellen, vom falschen Absenderkonto bis zu Anh&auml;ngen, die still fehlten. Alle sind behoben: Antworten gehen vom richtigen Konto an das Reply-To-Ziel, nichts geht ohne angek&uuml;ndigte Anh&auml;nge raus, Entw&uuml;rfe &uuml;berleben Schlie&szlig;en und Neustart, die Suche findet alles, und Aktualisieren gleicht Gelesen, Verschoben und Gel&ouml;scht mit dem Server ab.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Briefkopf-Vorlagen aus dem Vault</b><p data-i18n="release.c1">write_docx nimmt eine .docx-Vorlage mit {{INHALT}}-Absatz entgegen. Der Platzhalter-Absatz gibt Schrift und Absatzabstand vor, Fett, &Uuml;berschriften und Listen aus dem Text setzen sich dar&uuml;ber.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Felder f&uuml;llen, Rest r&auml;umt sich auf</b><p data-i18n="release.c2">Platzhalter in Kopfzeile oder Text werden aus der Skill gef&uuml;llt, nicht gef&uuml;llte verschwinden und stehen in der Ergebnis-Karte. Von Word zerlegte Platzhalter werden erkannt.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Word-Export ohne Sternchen</b><p data-i18n="release.c3">Fett und kursiv gelten jetzt auch in Aufz&auml;hlungspunkten und &Uuml;berschriften; bisher standen die Markierungen dort w&ouml;rtlich im Dokument.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Versandvertrauen</b><p data-i18n="release.c1">Antworten, Weiterleiten und KI-Entw&uuml;rfe nutzen das Konto, auf dem die Mail ankam, und beachten Reply-To. Fehlt ein Anhang, geht nichts raus. Versandergebnis und Abruffehler je Konto stehen sichtbar &uuml;ber der Liste.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Entw&uuml;rfe, Anh&auml;nge, BCC, Suche</b><p data-i18n="release.c2">Angefasste Entw&uuml;rfe werden automatisch gesichert und lassen sich wieder &ouml;ffnen. Weiterleiten nimmt die Originalanh&auml;nge mit. Ein BCC-Feld ist da. Die Suche geht &uuml;ber Absender, Empf&auml;nger, Betreff und Text in allen Ordnern.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Abgleich und Papierkorb</b><p data-i18n="release.c3">Aktualisieren &uuml;bernimmt Gelesen, Verschoben und Gel&ouml;scht vom Server, ohne selbst etwas zu l&ouml;schen. Gelesen/Ungelesen l&auml;sst sich setzen, L&ouml;schen verschiebt in den Papierkorb des Kontos.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Briefe auf dem eigenen Briefkopf: Word-Vorlagen f&uuml;r den Notiz-Agenten &middot; v{vs}",
+        "hero.release": "Posteingang: Entw&uuml;rfe, Papierkorb, Serverabgleich und verl&auml;ssliche Antworten &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Word-Vorlagen für den Agenten",
-        "release.heading": "Was ist neu — <em>Der Notiz-Agent schreibt Einladungen, Anschreiben und Absichtserklärungen jetzt direkt auf deinen Briefkopf. Die Word-Vorlage liegt im Vault, der Agent füllt nur den Text.</em>",
-        "release.lead": "Eine Word-Datei mit Logo, Kopfzeile und dem Platzhalter {{INHALT}} genügt: Der Agent setzt seinen Text an diese Stelle, Kopf- und Fußzeile, Ränder und Schriften bleiben exakt erhalten. Weitere Platzhalter wie {{TITEL}} füllt er aus der Skill-Anleitung. Aufzählungen und nummerierte Listen werden echte Word-Listen im Stil der Vorlage. Anlass war ein Anschreiben, das ohne Briefkopf herauskam, weil der Agent die Vorlage nicht nutzen konnte.",
-        "release.c1h": "Briefkopf-Vorlagen aus dem Vault",
-        "release.c1": "write_docx nimmt eine .docx-Vorlage aus dem Vault entgegen, in der ein Absatz {{INHALT}} steht. Kopf- und Fußzeile, Logo, Seitenränder und Schriften der Vorlage bleiben exakt erhalten, das Markdown des Agenten landet an der Stelle des Platzhalters. Der Platzhalter-Absatz gibt Schrift, Größe und Absatzabstand des Fließtextes vor; Fett, Überschriften und Listen aus dem Text setzen sich darüber. Aufzählungen und nummerierte Listen werden in die Nummerierungen der Vorlage eingehängt.",
-        "release.c2h": "Felder füllen, Rest räumt sich auf",
-        "release.c2": "Weitere Platzhalter wie {{TITEL}} dürfen überall stehen, in der Kopfzeile, der Fußzeile oder im Text. Der Agent füllt sie über den Parameter fields, die Formatierung des Platzhalters bleibt. Nicht gefüllte Platzhalter werden entfernt und in der Ergebnis-Karte genannt. Platzhalter, die Word beim Bearbeiten in mehrere Läufe zerlegt hat, werden wieder zusammengezogen. Welche Vorlage und welche Felder es gibt, sagt die jeweilige Vault-Skill; die App selbst kennt keine Formulare.",
-        "release.c3h": "Word-Export ohne Sternchen",
-        "release.c3": "Im Word-Export standen **fett**-Markierungen in Aufzählungspunkten und Überschriften wörtlich im Text, nur normale Absätze wurden ausgezeichnet. Jetzt gilt Fett und Kursiv überall. Im Vorlagen-Modus trennt eine Leerzeile Absätze, statt einen Leerabsatz zu erzeugen, weil die Vorlage den Absatzabstand bereits mitbringt; zwei Leerzeilen ergeben einen sichtbaren Abstandhalter.",
+        "release.label": "Release {vs} · Der Posteingang wird verlässlich",
+        "release.heading": "Was ist neu — <em>Der Posteingang verhält sich jetzt wie ein Mailprogramm, dem man vertrauen kann: richtiges Absenderkonto, Reply-To, gesicherte Entwürfe, Papierkorb und Abgleich mit dem Server.</em>",
+        "release.lead": "Ein unabhängiges Funktionsreview des Mailclients fand sechzehn Schwachstellen, vom falschen Absenderkonto bis zu Anhängen, die still fehlten. Alle sind behoben: Antworten gehen vom richtigen Konto an das Reply-To-Ziel, nichts geht ohne angekündigte Anhänge raus, Entwürfe überleben Schließen und Neustart, die Suche findet alles, und Aktualisieren gleicht Gelesen, Verschoben und Gelöscht mit dem Server ab. Löschen verschiebt in den Papierkorb des Kontos; verschwundene Mails werden angezeigt, nie still entsorgt.",
+        "release.c1h": "Versandvertrauen",
+        "release.c1": "Antworten, Allen antworten, Weiterleiten und „Als Antwort verwenden“ aus dem KI-Chat gehen vom Konto aus, auf dem die Mail ankam; vorher war es immer das erste Konto. Ein Reply-To-Header wird beachtet und die Umleitung im Fenster angezeigt. Fehlt eine gewählte Anhangdatei, bricht der Versand ab, statt sie still wegzulassen. Nach dem Senden erscheint das Ergebnis über der Liste, auch die Warnung, wenn die Kopie nicht im Gesendet-Ordner landen konnte. Abruffehler eines Kontos, etwa ein abgelaufenes Passwort, stehen als rote Leiste mit dem letzten erfolgreichen Abruf.",
+        "release.c2h": "Entwürfe, Anhänge, BCC, Suche",
+        "release.c2": "Jeder angefasste Entwurf wird automatisch gesichert; Schließen behält ihn, nur Verwerfen und Senden entfernen ihn. Eine Leiste „N Entwürfe“ öffnet sie wieder, auch nach Neustart. Weiterleiten holt die Originalanhänge vom Server und hängt sie als Dateien an; was nicht mitgeht, wird gesagt, und Senden ist gesperrt, solange sie laden. Ein BCC-Feld ist da. Die Suche geht über Absender, Empfänger, Betreff und Text in allen Ordnern; die Filter pausieren dabei sichtbar.",
+        "release.c3h": "Abgleich und Papierkorb",
+        "release.c3": "Aktualisieren arbeitet über das ganze Aufbewahrungsfenster und übernimmt für bekannte Mails, was anderswo passiert ist: gelesen, verschoben, gelöscht. Gelöschte werden durchgestrichen angezeigt und erst auf Wunsch entfernt, mehrgeräte-sicher. Gelesen/Ungelesen lässt sich setzen, optional schon beim Öffnen. Löschen verschiebt in den erkannten Papierkorb des Kontos; ohne Papierkorb gibt es den Knopf nicht. Eigene gesendete Mails bekommen ihre Server-Kennung und lassen sich verschieben.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Letters on your own letterhead: Word templates for the note agent &middot; v{vs}",
+        "hero.release": "Inbox: drafts, trash, server sync and reliable replies &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Word templates for the agent",
-        "release.heading": "What’s new — <em>The note agent now writes invitations, letters and letters of intent straight onto your letterhead. The Word template lives in the vault; the agent only fills in the text.</em>",
-        "release.lead": "A Word file with logo, header and the placeholder {{INHALT}} is all it takes: the agent puts its text there, while header, footer, margins and fonts stay exactly as they are. Further placeholders such as {{TITEL}} are filled from the skill instructions. Bullet and numbered lists become real Word lists in the template’s style. The trigger was a letter that came out without letterhead because the agent had no way to use the template.",
-        "release.c1h": "Letterhead templates from the vault",
-        "release.c1": "write_docx accepts a .docx template from the vault containing a paragraph {{INHALT}}. Header, footer, logo, margins and fonts of the template stay exactly as they are; the agent’s Markdown lands where the placeholder was. The placeholder paragraph sets font, size and paragraph spacing of the body text; bold, headings and lists from the text take precedence. Bullet and numbered lists are hooked into the template’s own numbering definitions.",
-        "release.c2h": "Fill fields, the rest cleans up",
-        "release.c2": "Further placeholders such as {{TITEL}} may appear anywhere: header, footer or body. The agent fills them via the fields parameter and the placeholder’s formatting is kept. Unfilled placeholders are removed and listed on the result card. Placeholders that Word split into several runs while editing are stitched back together. Which template and which fields exist is stated by the vault skill; the app itself knows no forms.",
-        "release.c3h": "Word export without stray asterisks",
-        "release.c3": "In the Word export, **bold** markers in bullet points and headings appeared literally in the text; only plain paragraphs were formatted. Bold and italic now apply everywhere. In template mode a blank line separates paragraphs instead of producing an empty one, since the template already brings its own paragraph spacing; two blank lines give a visible spacer.",
+        "release.label": "Release {vs} · An inbox you can trust",
+        "release.heading": "What’s new — <em>The inbox now behaves like a mail client you can trust: the right sending account, Reply-To, saved drafts, trash and a real sync with the server.</em>",
+        "release.lead": "An independent functional review of the mail client found sixteen weak spots, from the wrong sending account to attachments that silently went missing. All are fixed: replies go from the right account to the Reply-To target, nothing leaves without the attachments it announces, drafts survive closing and restarts, search finds everything, and Refresh syncs read, moved and deleted state with the server. Delete moves to the account’s trash; vanished mails are shown, never silently discarded.",
+        "release.c1h": "Trust in sending",
+        "release.c1": "Reply, Reply all, Forward and “Use as reply” from the AI chat send from the account the mail arrived on; before, it was always the first account. A Reply-To header is honoured and the redirect is shown in the compose window. If a chosen attachment file is missing, sending stops instead of silently dropping it. After sending, the result appears above the list, including the warning when the copy could not be stored in the Sent folder. Fetch errors per account, such as an expired password, show as a red bar with the last successful fetch.",
+        "release.c2h": "Drafts, attachments, BCC, search",
+        "release.c2": "Every touched draft is saved automatically; closing keeps it, only Discard and Send remove it. A “N drafts” bar reopens them, even after a restart. Forward fetches the original attachments from the server and attaches them as files; whatever cannot come along is stated, and Send is locked while they load. There is a BCC field. Search covers sender, recipients, subject and body across all folders; filters visibly pause meanwhile.",
+        "release.c3h": "Sync and trash",
+        "release.c3": "Refresh works across the whole retention window and picks up what happened elsewhere to known mails: read, moved, deleted. Deleted ones are shown struck through and removed only on request, safely across devices. Read/unread can be set, optionally on opening. Delete moves to the account’s detected trash folder; without one there is no button. Your own sent mails get their server ID and can be moved.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

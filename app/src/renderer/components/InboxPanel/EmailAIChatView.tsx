@@ -18,8 +18,7 @@ export const EmailAIChatView: React.FC = () => {
     emails,
     addAiChatMessage,
     setAiChatLoading,
-    setComposeState,
-    setCurrentView
+    startReply
   } = useEmailStore()
   const { ollama } = useUIStore()
   const { notes } = useNotesStore()
@@ -128,21 +127,12 @@ export const EmailAIChatView: React.FC = () => {
     sendMessage(text)
   }, [sendMessage])
 
+  // Über denselben Weg wie „Antworten": Ursprungskonto, Reply-To, Thread-Header.
+  // Vorher baute der Chat den Entwurf selbst — mit accounts[0] und from.
   const handleUseDraft = useCallback((content: string) => {
     if (!chatEmail) return
-    const { email: emailSettings } = useUIStore.getState()
-    const account = emailSettings.accounts[0]
-    const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
-    setComposeState({
-      to: [{ name: chatEmail.from.name, address: chatEmail.from.address }],
-      subject: chatEmail.subject.startsWith('Re:') ? chatEmail.subject : `Re: ${chatEmail.subject}`,
-      body: content + sig,
-      inReplyTo: chatEmail.id,
-      references: chatEmail.id,
-      accountId: account?.id || ''
-    })
-    setCurrentView('compose')
-  }, [chatEmail, setComposeState, setCurrentView])
+    startReply(chatEmail, content)
+  }, [chatEmail, startReply])
 
   const renderMarkdown = (text: string) => {
     return sanitizeHtml(

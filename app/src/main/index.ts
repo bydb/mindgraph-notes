@@ -23,6 +23,7 @@ import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, saniti
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
 import { checkTtsLength } from '../shared/ttsLimits'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../shared/emailFetchWindow'
+import { diffKnownMessages, type KnownLocalMessage, type KnownMessageUpdate } from '../shared/emailSync'
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
@@ -150,7 +151,7 @@ import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } fro
 import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
-import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors } from '../shared/emailMerge'
+import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
@@ -10418,6 +10419,192 @@ ipcMain.handle('email-fetch-attachments', async (
   }
 })
 
+// Flags einer Mail auf dem Server setzen/entfernen (\Seen fuer Gelesen/Ungelesen).
+// Vorher gab es keinen Weg dorthin: Oeffnen in MindGraph liess die Mail in
+// jedem anderen Client ungelesen.
+ipcMain.handle('email-set-flags', async (
+  _event,
+  payload: {
+    accountId: string
+    host: string
+    port: number
+    user: string
+    tls: boolean
+    folder: string
+    uid: number
+    add?: string[]
+    remove?: string[]
+  }
+) => {
+  try {
+    if (!payload.uid || !payload.folder) {
+      return { success: false, error: 'Unvollständige Parameter' }
+    }
+    const allowed = new Set(['\\Seen', '\\Flagged'])
+    const add = (payload.add || []).filter(f => allowed.has(f))
+    const remove = (payload.remove || []).filter(f => allowed.has(f))
+    if (add.length === 0 && remove.length === 0) {
+      return { success: false, error: 'Keine zulässigen Flags' }
+    }
+    const { ImapFlow } = await import('imapflow')
+    const password = await loadEmailPassword(payload.accountId)
+    if (!password) {
+      return { success: false, error: 'Kein Passwort gespeichert' }
+    }
+    const client = new ImapFlow({
+      host: payload.host,
+      port: payload.port,
+      secure: payload.tls,
+      auth: { user: payload.user, pass: password },
+      logger: false,
+      socketTimeout: 15000,
+      greetingTimeout: 10000
+    })
+    client.on('error', () => { /* ignore */ })
+    try {
+      await client.connect()
+      const lock = await client.getMailboxLock(payload.folder)
+      try {
+        if (add.length > 0) await client.messageFlagsAdd(String(payload.uid), add, { uid: true })
+        if (remove.length > 0) await client.messageFlagsRemove(String(payload.uid), remove, { uid: true })
+        return { success: true }
+      } finally {
+        lock.release()
+      }
+    } finally {
+      try { await client.logout() } catch { /* ignore */ }
+    }
+  } catch (error) {
+    console.error('[Email] Set flags failed:', error instanceof Error ? error.message : error)
+    return { success: false, error: error instanceof Error ? error.message : 'Markierung fehlgeschlagen' }
+  }
+})
+
+// Weiterleiten mit Originalanhaengen: die Anhaenge der Quellmail werden in ein
+// Zwischenverzeichnis unter userData geschrieben und als normale Datei-Anhaenge
+// an den Entwurf gehaengt. Vorher standen im weitergeleiteten Text nur die
+// NAMEN der Anhaenge — die Mail behauptete Anhaenge, die nicht mitgingen.
+const FORWARD_STAGING_DIRNAME = 'forward-attachments'
+const forwardStagingRoot = (): string => path.join(app.getPath('userData'), FORWARD_STAGING_DIRNAME)
+
+ipcMain.handle('email-stage-forward-attachments', async (
+  _event,
+  payload: {
+    accountId: string
+    host: string
+    port: number
+    user: string
+    tls: boolean
+    folder: string
+    uid: number
+  }
+) => {
+  try {
+    if (!payload.uid || !payload.folder) {
+      return { success: false, error: 'Unvollständige Parameter' }
+    }
+    const { ImapFlow } = await import('imapflow')
+    const password = await loadEmailPassword(payload.accountId)
+    if (!password) {
+      return { success: false, error: 'Kein Passwort gespeichert' }
+    }
+    const client = new ImapFlow({
+      host: payload.host,
+      port: payload.port,
+      secure: payload.tls,
+      auth: { user: payload.user, pass: password },
+      logger: false,
+      socketTimeout: 30000,
+      greetingTimeout: 10000
+    })
+    client.on('error', () => { /* ignore */ })
+    try {
+      await client.connect()
+      const lock = await client.getMailboxLock(payload.folder)
+      try {
+        let source: Buffer | null = null
+        for await (const msg of client.fetch({ uid: String(payload.uid) }, { source: true, uid: true })) {
+          if (msg.source) source = msg.source as Buffer
+        }
+        if (!source) {
+          return { success: false, error: 'Nachricht nicht gefunden' }
+        }
+        const { simpleParser } = await import('mailparser')
+        const parsed = await simpleParser(source)
+        const MAX_FORWARD_BYTES = 30 * 1024 * 1024
+        const { randomUUID } = await import('crypto')
+        const dir = path.join(forwardStagingRoot(), randomUUID())
+        await fs.mkdir(dir, { recursive: true })
+        const staged: Array<{ path: string; filename: string; size: number }> = []
+        const skipped: string[] = []
+        const usedNames = new Set<string>()
+        const list = (parsed.attachments || []) as Array<{ filename?: string; contentType?: string; size?: number; content?: Buffer; contentDisposition?: string; cid?: string }>
+        for (let idx = 0; idx < list.length; idx++) {
+          const a = list[idx]
+          // Inline-Bilder (Signaturen, cid-Referenzen) sind keine Anhaenge im Sinne des Nutzers.
+          if (a.contentDisposition === 'inline' && a.cid) continue
+          const name = attachmentNameFor(a.filename, a.contentType, idx)
+          const buf = a.content
+          const size = a.size ?? (buf ? buf.length : 0)
+          if (!buf || size > MAX_FORWARD_BYTES) {
+            skipped.push(name)
+            continue
+          }
+          // Dateiname entschaerfen: nur Basisname, keine Pfadtrenner, eindeutig im Verzeichnis.
+          let safe = path.basename(name).replace(/[\\/:*?"<>|]/g, '_').trim() || `anhang-${idx + 1}`
+          if (usedNames.has(safe.toLowerCase())) {
+            const ext = path.extname(safe)
+            safe = `${path.basename(safe, ext)}-${idx + 1}${ext}`
+          }
+          usedNames.add(safe.toLowerCase())
+          const target = path.join(dir, safe)
+          await fs.writeFile(target, buf)
+          staged.push({ path: target, filename: name, size })
+        }
+        return { success: true, attachments: staged, skipped }
+      } finally {
+        lock.release()
+      }
+    } finally {
+      try { await client.logout() } catch { /* ignore */ }
+    }
+  } catch (error) {
+    console.error('[Email] Stage forward attachments failed:', error instanceof Error ? error.message : error)
+    return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht übernommen werden' }
+  }
+})
+
+// Zwischengespeicherte Weiterleitungs-Anhaenge aufraeumen (nach Senden oder
+// Verwerfen). Loescht NUR innerhalb des Staging-Verzeichnisses — ein
+// beliebiger Pfad aus dem Renderer wird abgewiesen.
+ipcMain.handle('email-discard-staged-attachments', async (_event, paths: string[]) => {
+  let removed = 0
+  try {
+    const root = await fs.realpath(forwardStagingRoot()).catch(() => null)
+    if (!root) return { success: true, removed: 0 }
+    for (const p of Array.isArray(paths) ? paths : []) {
+      if (typeof p !== 'string') continue
+      let real: string
+      try { real = await fs.realpath(p) } catch { continue }
+      if (!real.startsWith(root + path.sep)) continue
+      try {
+        await fs.unlink(real)
+        removed++
+        // Leeres Sitzungsverzeichnis mitnehmen.
+        const dir = path.dirname(real)
+        if (dir !== root) {
+          const rest = await fs.readdir(dir)
+          if (rest.length === 0) await fs.rmdir(dir)
+        }
+      } catch { /* schon weg */ }
+    }
+    return { success: true, removed }
+  } catch (error) {
+    console.warn('[Email] Discard staged attachments failed:', error instanceof Error ? error.message : error)
+    return { success: false, removed }
+  }
+})
+
 // Einen (bereits via email-fetch-attachments geholten) Anhang über einen Speichern-Dialog ablegen.
 ipcMain.handle('email-save-attachment', async (_event, filename: string, contentBase64: string) => {
   try {
@@ -10626,8 +10813,40 @@ ipcMain.handle('email-save', async (_event, vaultPath: string, data: { emails: o
   }
 })
 
+// Lokale Kopien entfernen — MIT Grabstein. Ohne ihn kehrt die Mail beim
+// naechsten Abgleich vom Zweitgeraet zurueck (shared/emailMerge.ts, Regel 5).
+// Gedacht fuer Mails, die auf dem Server nicht mehr existieren
+// (`missingOnServer`) oder nie dort lagen (lokale Kopie ohne UID). Ein noch
+// vorhandener Server-Datensatz sticht den Grabstein beim naechsten Abruf —
+// dann ist die Mail echt wieder da, und das ist richtig so.
+const EMAIL_TOMBSTONE_RETENTION_DAYS = 90
+ipcMain.handle('email-delete-local', async (_event, vaultPath: string, ids: string[]) => {
+  try {
+    assertApprovedVault(vaultPath, 'email-delete-local')
+    const wanted = new Set((Array.isArray(ids) ? ids : []).filter((id): id is string => typeof id === 'string' && id.length > 0))
+    if (wanted.size === 0) return { success: true, removed: 0 }
+    const written = await mutateEmailStore(vaultPath, (fresh) => {
+      const before = fresh.emails.length
+      const emails = fresh.emails.filter(e => !(typeof e.id === 'string' && wanted.has(e.id)))
+      if (emails.length === before) return null
+      const nowIso = new Date().toISOString()
+      const deleted: Record<string, string> = { ...((fresh.deleted as Record<string, string> | undefined) || {}) }
+      for (const id of wanted) deleted[id] = nowIso
+      return {
+        data: { ...fresh, emails, deleted: pruneTombstones(deleted, EMAIL_TOMBSTONE_RETENTION_DAYS) },
+        result: before - emails.length
+      }
+    })
+    if (written.damaged) return { success: false, removed: 0, error: written.damaged }
+    return { success: true, removed: written.result ?? 0, revision: written.revision }
+  } catch (error) {
+    console.error('[Email] Delete local failed:', error)
+    return { success: false, removed: 0, error: error instanceof Error ? error.message : 'Entfernen fehlgeschlagen' }
+  }
+})
+
 // Emails per IMAP abrufen
-ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<{ id: string; host: string; port: number; user: string; tls: boolean; folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => {
+ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<{ id: string; host: string; port: number; user: string; tls: boolean; folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number, mode: 'incremental' | 'full' = 'incremental') => {
   try {
     assertApprovedVault(vaultPath, 'email-fetch')
     const { ImapFlow } = await import('imapflow')
@@ -10637,28 +10856,38 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     // Bestehenden Stand nur zum Erkennen schon bekannter Mails laden. Was am
     // Ende geschrieben wird, entscheidet ein FRISCHER Lesevorgang — der Abruf
     // laeuft minutenlang, und in dieser Zeit kann sich die Datei aendern.
-    const existingEmails: Array<{ id: string; folder?: string }> =
-      (await loadEmailStore(vaultPath, { deviceId })).data.emails as Array<{ id: string; folder?: string }>
+    const existingEmails: KnownLocalMessage[] =
+      (await loadEmailStore(vaultPath, { deviceId })).data.emails as unknown as KnownLocalMessage[]
 
     const existingIds = new Set(existingEmails.map(e => e.id))
-    const existingFolders = new Map(existingEmails.map(e => [e.id, e.folder]))
     const newEmails: object[] = []
     const updatedLastFetchedAt = { ...lastFetchedAt }
-    const folderUpdates: Array<{ id: string; folder: string }> = []
+    // Aenderungen an BEKANNTEN Mails (Flags, Ordner, verschwunden) — aus den
+    // Umschlaegen des Fensters bestimmt, siehe shared/emailSync.ts. Vorher gab
+    // es nur einen Ordner-Zweig, der nie erreicht wurde.
+    const knownUpdates: KnownMessageUpdate[] = []
     let totalProcessed = 0
     // Wie viele unbekannte Mails diesmal liegen blieben — der Renderer meldet es,
     // damit der Rueckstand nicht wieder still passiert.
     let totalSkipped = 0
+    // Ergebnis je Konto/Ordner. Ein Konto, das nicht erreichbar ist, darf den
+    // Abruf der anderen nicht kippen — aber es darf auch nicht still bleiben.
+    // Vorher: Passwort fehlt → continue, Verbindungsfehler → console.error,
+    // Rueckgabe trotzdem success=true. Der Nutzer sah „0 neu" und hielt das
+    // Postfach fuer leer.
+    const accountResults: Array<{ accountId: string; folder: string; ok: boolean; error?: string; imported: number }> = []
 
     for (const account of accounts) {
       const fetchFolder = (account.folder && account.folder.trim()) || 'INBOX'
       const fetchKey = fetchFolder === 'INBOX' ? account.id : `${account.id}::${fetchFolder}`
+      let importedForAccount = 0
       try {
         // Passwort laden
         const password = await loadEmailPassword(account.id)
 
         if (!password) {
           console.warn(`[Email] No password for account ${account.id}`)
+          accountResults.push({ accountId: account.id, folder: fetchFolder, ok: false, error: 'Kein Passwort gespeichert', imported: 0 })
           continue
         }
 
@@ -10689,29 +10918,46 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
           // Per-Folder lastFetched, mit Legacy-Fallback auf account-id (INBOX).
           const lastFetchedRaw = lastFetchedAt[fetchKey] || (fetchFolder === 'INBOX' ? lastFetchedAt[account.id] : undefined)
           const lastFetched = lastFetchedRaw ? new Date(lastFetchedRaw) : null
-          // Bei Ersteinrichtung (kein lastFetched): nur letzte 3 Tage laden
+          // Bei Ersteinrichtung (kein lastFetched): nur letzte 3 Tage laden.
+          // `full` (manuelles Aktualisieren): das ganze Aufbewahrungsfenster —
+          // nur so kommen Flag-/Ordneraenderungen bekannter Mails und aeltere,
+          // bisher durchgefallene Mails herein. Vorher deutete ein leerer
+          // Merker das als Ersteinrichtung (3 Tage), der Kommentar sagte „30".
           const initialFetchLimit = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
-          const sinceDate = lastFetched
-            ? (lastFetched > retainLimit ? lastFetched : retainLimit)
-            : initialFetchLimit
+          const sinceDate = mode === 'full'
+            ? retainLimit
+            : lastFetched
+              ? (lastFetched > retainLimit ? lastFetched : retainLimit)
+              : initialFetchLimit
 
           // Erst die Umschläge des ganzen Zeitfensters holen (ohne Text, daher
           // billig) — nur so lässt sich VOR der Kappung erkennen, welche Mails
           // schon bekannt sind. Vorher belegten die immer gleichen neuesten
           // (bekannten) Nachrichten das Kontingent, und ältere unbekannte kamen
           // nie an die Reihe. Siehe shared/emailFetchWindow.ts.
-          const candidates: FetchCandidate[] = []
+          const candidates: Array<FetchCandidate & { flags: string[]; replyTo?: Array<{ name: string; address: string }> }> = []
           for await (const msg of client.fetch(
             { since: sinceDate },
-            { envelope: true, uid: true }
+            { envelope: true, uid: true, flags: true }
           )) {
+            const candidateReplyTo = (msg.envelope?.replyTo || [])
+              .map((t: { name?: string; address?: string }) => ({ name: t.name || '', address: t.address || '' }))
+              .filter((r: { address: string }) => r.address)
             candidates.push({
               uid: msg.uid,
               // Dieselbe Regel wie beim Verarbeiten weiter unten — sonst passen
               // die Kennungen nicht zusammen und alles gilt als unbekannt.
-              messageId: msg.envelope?.messageId || `${account.id}-${msg.uid}`
+              messageId: msg.envelope?.messageId || `${account.id}-${msg.uid}`,
+              flags: Array.from(msg.flags || []),
+              replyTo: candidateReplyTo.length > 0 ? candidateReplyTo : undefined
             })
           }
+          // Bekannte Mails abgleichen: extern gelesen/verschoben/geloescht.
+          knownUpdates.push(...diffKnownMessages(existingEmails, candidates, {
+            accountId: account.id,
+            folder: fetchFolder,
+            sinceIso: sinceDate.toISOString()
+          }))
           const selection = selectFetchBatch(candidates, existingIds, maxPerAccount)
           const selectedUids = selection.selectedUids
           if (selection.skippedCount > 0) {
@@ -10743,10 +10989,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
             const messageId = msg.envelope?.messageId || `${account.id}-${msg.uid}`
 
             if (existingIds.has(messageId)) {
-              // Bekannte Mail kann den Folder gewechselt haben — Folder-Feld aktualisieren.
-              if (existingFolders.get(messageId) !== fetchFolder) {
-                folderUpdates.push({ id: messageId, folder: fetchFolder })
-              }
+              // Bekannte Mails sind oben ueber diffKnownMessages abgeglichen.
               continue
             }
 
@@ -10808,6 +11051,11 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               name: t.name || '',
               address: t.address || ''
             }))
+            // Reply-To: Antworten gehen bevorzugt hierhin (Formular-, Ticket-,
+            // Listenmails). Nur speichern, wenn eine Adresse drinsteht.
+            const replyTo = (msg.envelope?.replyTo || [])
+              .map((t: { name?: string; address?: string }) => ({ name: t.name || '', address: t.address || '' }))
+              .filter((r: { address: string }) => r.address)
 
             newEmails.push({
               id: messageId,
@@ -10821,6 +11069,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               from: { name: from.name || '', address: from.address || '' },
               to,
               cc: cc.length > 0 ? cc : undefined,
+              replyTo: replyTo.length > 0 ? replyTo : undefined,
               subject: msg.envelope?.subject || '(Kein Betreff)',
               date: msg.envelope?.date ? new Date(msg.envelope.date).toISOString() : new Date().toISOString(),
               snippet: bodyText.substring(0, 200),
@@ -10836,6 +11085,7 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
 
             totalProcessed++
             importedThisRound++
+            importedForAccount++
             sendEmailWindowEvent('email-fetch-progress', { current: i + 1, total: messages.length, status: `Nachricht ${i + 1}/${messages.length}` })
           }
 
@@ -10855,8 +11105,11 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
         }
 
         try { await client.logout() } catch { /* ignore logout errors */ }
+        accountResults.push({ accountId: account.id, folder: fetchFolder, ok: true, imported: importedForAccount })
       } catch (error) {
-        console.error(`[Email] Fetch failed for account ${account.id}:`, error instanceof Error ? error.message : error)
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`[Email] Fetch failed for account ${account.id}:`, message)
+        accountResults.push({ accountId: account.id, folder: fetchFolder, ok: false, error: message, imported: importedForAccount })
       }
     }
 
@@ -10865,17 +11118,24 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
     // verlieren, was waehrend des Abrufs dazukam (Erledigt-Toggle, fertige
     // Analysen, ein Sync-Update vom Zweitgeraet). Deshalb frisch lesen und nur
     // das Eigene daraufsetzen.
-    const folderUpdateMap = new Map(folderUpdates.map(u => [u.id, u.folder]))
+    const knownUpdateMap = new Map(knownUpdates.map(u => [u.id, u]))
     const written = await mutateEmailStore(vaultPath, (fresh) => {
-      const freshEmails = fresh.emails as Array<{ id?: string; folder?: string }>
+      const freshEmails = fresh.emails as Array<{ id?: string; folder?: string; flags?: string[]; uid?: number; replyTo?: unknown; missingOnServer?: boolean }>
 
-      // Folder-Updates fuer bereits bekannte Mails anwenden (z.B. wenn eine Mail
-      // auf dem Server verschoben wurde).
-      const merged = folderUpdateMap.size === 0
+      // Abgleich bekannter Mails anwenden: Flags, Ordner/UID, verschwunden.
+      const merged = knownUpdateMap.size === 0
         ? [...freshEmails]
         : freshEmails.map(e => {
-            const next = e.id ? folderUpdateMap.get(e.id) : undefined
-            return next && next !== e.folder ? { ...e, folder: next } : e
+            const u = e.id ? knownUpdateMap.get(e.id) : undefined
+            if (!u) return e
+            const next = { ...e }
+            if (u.flags) next.flags = u.flags
+            if (u.folder) next.folder = u.folder
+            if (u.uid) next.uid = u.uid
+            if (u.replyTo) next.replyTo = u.replyTo
+            if (u.missingOnServer === true) next.missingOnServer = true
+            if (u.missingOnServer === false) delete next.missingOnServer
+            return next
           })
 
       // Neu geholte Mails anhaengen, die im frischen Bestand noch fehlen.
@@ -10906,14 +11166,30 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
       // Die geholten Mails konnten nicht abgelegt werden. Als Erfolg zu melden
       // waere die schlimmste Variante: Der Nutzer sieht „Abruf fertig" und eine
       // Liste, in der nichts angekommen ist.
-      return { success: false, newCount: 0, totalCount: 0, error: written.damaged }
+      return { success: false, newCount: 0, totalCount: 0, error: written.damaged, accountResults }
+    }
+
+    // Kein einziges Konto erreichbar und nichts angekommen: das ist kein
+    // erfolgreicher Abruf, auch wenn die Datei sauber geschrieben wurde.
+    const added = written.result?.added ?? 0
+    if (accountResults.length > 0 && accountResults.every(r => !r.ok) && added === 0) {
+      return {
+        success: false,
+        newCount: 0,
+        totalCount: written.result?.total ?? 0,
+        error: accountResults.length === 1
+          ? (accountResults[0].error || 'Konto nicht erreichbar')
+          : 'Kein Konto erreichbar',
+        accountResults
+      }
     }
 
     return {
       success: true,
-      newCount: written.result?.added ?? 0,
+      newCount: added,
       totalCount: written.result?.total ?? 0,
-      skippedCount: totalSkipped
+      skippedCount: totalSkipped,
+      accountResults
     }
   } catch (error) {
     console.error('[Email] Fetch error:', error)
@@ -12070,6 +12346,7 @@ ipcMain.handle('email-render-html', async (_event, body: string) => {
 ipcMain.handle('email-send', async (_event, composeData: {
   to: { name: string; address: string }[]
   cc?: { name: string; address: string }[]
+  bcc?: { name: string; address: string }[]
   subject: string
   body: string
   inReplyTo?: string
@@ -12104,6 +12381,22 @@ ipcMain.handle('email-send', async (_event, composeData: {
       return { success: false, error: 'SMTP-Host nicht konfiguriert' }
     }
 
+    // Anhaenge VOR dem Versand pruefen. Vorher wurde eine nicht mehr erreichbare
+    // Datei still uebersprungen — die Mail ging mit „siehe Anhang" und ohne
+    // Anhang raus. Fehlt eine, geht nichts raus; der Nutzer entfernt oder
+    // waehlt neu.
+    const missingAttachments: string[] = []
+    for (const att of composeData.attachments || []) {
+      try {
+        await fs.access(att.path)
+      } catch {
+        missingAttachments.push(att.filename || path.basename(att.path))
+      }
+    }
+    if (missingAttachments.length > 0) {
+      return { success: false, error: `Anhang nicht gefunden: ${missingAttachments.join(', ')}` }
+    }
+
     const transporter = nodemailer.default.createTransport({
       host: account.smtpHost,
       port: account.smtpPort || 587,
@@ -12124,14 +12417,9 @@ ipcMain.handle('email-send', async (_event, composeData: {
     // Signatur-Bild als CID-Attachment einbetten
     const attachments: Array<{ filename: string; path: string; cid?: string }> = []
 
-    // File-Anhaenge hinzufuegen
-    if (composeData.attachments && composeData.attachments.length > 0) {
-      for (const att of composeData.attachments) {
-        try {
-          await fs.access(att.path)
-          attachments.push({ filename: att.filename, path: att.path })
-        } catch { /* Datei nicht gefunden, ueberspringen */ }
-      }
+    // File-Anhaenge hinzufuegen (Existenz ist oben bereits geprueft)
+    for (const att of composeData.attachments || []) {
+      attachments.push({ filename: att.filename, path: att.path })
     }
     if (composeData.signatureImagePath) {
       try {
@@ -12164,7 +12452,8 @@ ipcMain.handle('email-send', async (_event, composeData: {
         from: senderAddress,
         to: [
           ...composeData.to.map(r => r.address),
-          ...(composeData.cc || []).map(r => r.address)
+          ...(composeData.cc || []).map(r => r.address),
+          ...(composeData.bcc || []).map(r => r.address)
         ]
       },
       to: composeData.to.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', '),
@@ -12176,6 +12465,12 @@ ipcMain.handle('email-send', async (_event, composeData: {
 
     if (composeData.cc && composeData.cc.length > 0) {
       mailOptions.cc = composeData.cc.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', ')
+    }
+    // BCC: nodemailer setzt die Empfaenger in den SMTP-Umschlag, laesst die
+    // Kopfzeile aber weg (auch im streamTransport fuer die IMAP-Kopie — dort
+    // waere `keepBcc` noetig, das bewusst nicht gesetzt ist).
+    if (composeData.bcc && composeData.bcc.length > 0) {
+      mailOptions.bcc = composeData.bcc.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', ')
     }
     if (composeData.inReplyTo) {
       mailOptions.inReplyTo = composeData.inReplyTo
@@ -12196,6 +12491,7 @@ ipcMain.handle('email-send', async (_event, composeData: {
     // Send-Erfolg NICHT umkehren — die Mail ist schon zugestellt.
     let appendWarning: string | undefined
     let sentMailbox: string | undefined
+    let sentUid: number | undefined
 
     if (account.imapHost && account.imapPort && account.id) {
       try {
@@ -12226,9 +12522,13 @@ ipcMain.handle('email-send', async (_event, composeData: {
             if (!target) {
               appendWarning = 'Mail gesendet, aber kein "Gesendet"-Ordner gefunden.'
             } else {
-              await imapClient.append(target, rawMessage, ['\\Seen'])
+              const appended = await imapClient.append(target, rawMessage, ['\\Seen'])
               sentMailbox = target
-              console.log(`[Email] Appended to IMAP folder: ${target}`)
+              // APPENDUID (RFC 4315): die UID der Kopie. Ohne sie stand die lokale
+              // Kopie mit uid 0 da und liess sich nie verschieben oder mit Anhaengen oeffnen.
+              const appendedUid = appended && typeof appended === 'object' ? (appended as { uid?: unknown }).uid : undefined
+              if (typeof appendedUid === 'number' && appendedUid > 0) sentUid = appendedUid
+              console.log(`[Email] Appended to IMAP folder: ${target}${sentUid ? ` (uid ${sentUid})` : ''}`)
             }
           } finally {
             try { await imapClient.logout() } catch { /* ignore */ }
@@ -12243,7 +12543,7 @@ ipcMain.handle('email-send', async (_event, composeData: {
       appendWarning = 'Mail gesendet, aber IMAP-Daten fehlen — Kopie im Gesendet-Ordner uebersprungen.'
     }
 
-    return { success: true, messageId: info.messageId || explicitMessageId, appendWarning, sentMailbox }
+    return { success: true, messageId: info.messageId || explicitMessageId, appendWarning, sentMailbox, sentUid }
   } catch (error) {
     console.error('[Email] Send failed:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Senden fehlgeschlagen' }

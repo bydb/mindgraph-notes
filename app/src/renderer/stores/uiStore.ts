@@ -361,6 +361,9 @@ export interface EmailSettings {
   signatureImagePath: string
   /** IMAP-Folder pro Account (accountId → Folder-Pfad). Fehlend = 'INBOX'. */
   activeFolders: Record<string, string>
+  /** Öffnen einer Mail setzt \\Seen auf dem Server. Opt-in: manche nutzen das
+   *  Ungelesen-Zeichen bewusst als Merker. */
+  markSeenOnOpen: boolean
 }
 
 // WordPress-Plugin Settings (Publishing). Ehemals „Marketing"-Namespace der edoobox-
@@ -1132,7 +1135,8 @@ const defaultState = {
     analysisModel: '',
     signature: '',
     signatureImagePath: '',
-    activeFolders: {}
+    activeFolders: {},
+    markSeenOnOpen: false
   },
 
   // Generische Plugin-Config (A-pre Schritt 3) — antares/edoobox/marketing/remarkable leben hier

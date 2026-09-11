@@ -1,7 +1,9 @@
 import { create } from 'zustand'
-import type { EmailMessage, EmailFilter, EmailFetchResult, EmailFolder, ComposeEmail, EmailSendResult } from '../../shared/types'
+import type { EmailMessage, EmailFilter, EmailFetchResult, EmailFolder, ComposeEmail, EmailSendResult, ComposeAttachment } from '../../shared/types'
 import { isSentMail } from '../../shared/emailRelevance'
-import { collectOwnAddresses, collectReplyAllRecipients } from '../../shared/emailReply'
+import { collectOwnAddresses, collectReplyAllRecipients, resolveReplyAccountId, resolveReplyTarget } from '../../shared/emailReply'
+import { emailMatchesQuery } from '../../shared/emailSearch'
+import { loadDrafts, saveDraft, removeDraft, draftHasContent, newDraftId, type EmailDraft } from '../utils/emailDrafts'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 import { createActiveMeasurement } from '../utils/activeTimeTracker'
@@ -35,6 +37,20 @@ interface EmailState {
   // Compose
   composeState: ComposeEmail | null
   isSending: boolean
+  /** Ergebnis des letzten Versands — lebt AUSSERHALB des Compose-Fensters.
+   *  Das Fenster wird nach Erfolg sofort abgebaut; eine Warnung („gesendet,
+   *  aber nicht unter Gesendet abgelegt") hatte dort nie einen sichtbaren Ort. */
+  lastSendResult: { at: string; subject: string; appendWarning?: string } | null
+  /** Konten, deren letzter Abruf fehlschlug (Passwort fehlt, Anmeldung
+   *  abgelehnt, Zeitüberschreitung). Leer nach einem Abruf ohne Kontofehler. */
+  lastFetchErrors: Array<{ accountId: string; folder: string; error: string }>
+  /** Zeitpunkt des letzten erfolgreichen Abrufs je Konto (nur diese Sitzung). */
+  lastSuccessfulFetchAt: Record<string, string>
+  /** Gesicherte Entwürfe (localStorage pro Vault, siehe utils/emailDrafts.ts). */
+  drafts: EmailDraft[]
+  /** Letzter Fehler beim Sichern eines Entwurfs (Speicher voll/gesperrt).
+   *  Wird angezeigt, statt eine Sicherung zu behaupten, die es nicht gibt. */
+  draftSaveError: string | null
   // AI Chat
   aiChatMessages: Array<{ role: 'user' | 'assistant'; content: string }>
   aiChatEmailId: string | null
@@ -70,10 +86,31 @@ interface EmailState {
   setComposeState: (state: ComposeEmail | null) => void
   setCurrentView: (view: 'list' | 'detail' | 'compose' | 'aiChat') => void
   sendEmail: (vaultPath: string) => Promise<EmailSendResult>
-  startReply: (email: EmailMessage) => void
+  clearLastSendResult: () => void
+  clearFetchErrors: () => void
+  /** `bodyOverride`: fertiger Antworttext (z.B. aus dem KI-Chat) statt Zitat
+   *  des Originals — Konto, Empfänger, Reply-To und Thread-Header laufen über
+   *  denselben Weg wie eine normale Antwort. */
+  startReply: (email: EmailMessage, bodyOverride?: string) => void
   startReplyAll: (email: EmailMessage) => void
   startForward: (email: EmailMessage) => void
   startNewEmail: () => void
+  /** Compose schließen: angefasster Entwurf bleibt gesichert, unangefasster
+   *  wird still verworfen. Kein Textverlust mehr durch X oder „Zurück". */
+  closeCompose: () => void
+  /** Entwurf ausdrücklich verwerfen (aus dem Compose-Fenster oder der Liste). */
+  discardDraft: (draftId: string) => Promise<void>
+  openDraft: (draftId: string) => void
+  /** Gelesen/Ungelesen — lokal sofort, auf dem Server wenn die Mail eine UID hat.
+   *  Schlägt der Server fehl, wird lokal zurückgenommen (kein Stand, der nur
+   *  hier gilt und beim nächsten Abgleich wieder kippt). */
+  setSeen: (vaultPath: string, emailId: string, seen: boolean) => Promise<{ success: boolean; error?: string }>
+  /** Suche über ALLE Mails (alle Ordner, ohne Relevanz-/Ungelesen-Filter):
+   *  Absender, Empfänger, Betreff, Text. */
+  searchEmails: (query: string) => EmailMessage[]
+  /** Lokale Kopien entfernen (Grabstein im Main-Prozess). Für Mails, die auf
+   *  dem Server nicht mehr existieren oder nie dort lagen. Kein Server-Zugriff. */
+  removeLocalEmails: (vaultPath: string, ids: string[]) => Promise<{ success: boolean; removed: number; error?: string }>
   // AI Chat actions
   setAiChatEmail: (emailId: string | null) => void
   addAiChatMessage: (msg: { role: 'user' | 'assistant'; content: string }) => void
@@ -81,10 +118,11 @@ interface EmailState {
 }
 
 /** Gemeinsame Reply-Basis (Zitat, Betreff, Signatur, Thread-Header) für Antworten/Allen antworten. */
-function buildReplyDraft(email: EmailMessage): Omit<ComposeEmail, 'to' | 'cc'> {
+function buildReplyDraft(email: EmailMessage, bodyOverride?: string): Omit<ComposeEmail, 'to' | 'cc'> {
   const { email: emailSettings } = useUIStore.getState()
-  const account = emailSettings.accounts[0]
+  const accountId = resolveReplyAccountId(email, emailSettings.accounts)
   const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
+  const { redirect } = resolveReplyTarget(email)
 
   // Original-Email zitieren
   const date = email.date ? new Date(email.date).toLocaleString() : ''
@@ -95,11 +133,114 @@ function buildReplyDraft(email: EmailMessage): Omit<ComposeEmail, 'to' | 'cc'> {
 
   return {
     subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
-    body: sig + quotedHeader + quotedBody,
+    body: bodyOverride !== undefined ? bodyOverride + sig : sig + quotedHeader + quotedBody,
     inReplyTo: email.id,
     references: email.id,
-    accountId: account?.id || ''
+    accountId,
+    replyRedirect: redirect
   }
+}
+
+// Vault, unter dem Entwürfe abgelegt werden — gesetzt beim Laden der Mailliste.
+let draftVaultPath = ''
+// Die ausstehende Sicherung trägt ihren Vault SELBST. Vorher las der Timer das
+// globale draftVaultPath — ein Vault-Wechsel innerhalb der 400 ms schrieb den
+// Entwurf aus Vault A unter Vault B.
+let pendingDraftSave: { vault: string; draftId: string; timer: ReturnType<typeof setTimeout> } | null = null
+
+/** Sicherung sofort schreiben (Vault-Wechsel, Schließen, Senden). */
+function flushPendingDraftSave(): void {
+  if (!pendingDraftSave) return
+  const { vault, draftId, timer } = pendingDraftSave
+  clearTimeout(timer)
+  pendingDraftSave = null
+  const current = useEmailStore.getState().composeState
+  if (!current || current.draftId !== draftId || !draftHasContent(current)) return
+  applyDraftWrite(vault, saveDraft(window.localStorage, vault, current))
+}
+
+function applyDraftWrite(vault: string, res: ReturnType<typeof saveDraft>): void {
+  const patch: Partial<EmailState> = { draftSaveError: res.ok ? null : (res.error || 'Entwurf konnte nicht gesichert werden') }
+  if (vault === draftVaultPath) patch.drafts = res.drafts
+  useEmailStore.setState(patch)
+}
+
+function persistDraftSoon(compose: ComposeEmail): void {
+  const vault = draftVaultPath
+  if (!vault || !compose.draftId || !draftHasContent(compose)) return
+  if (pendingDraftSave) clearTimeout(pendingDraftSave.timer)
+  const draftId = compose.draftId
+  pendingDraftSave = {
+    vault,
+    draftId,
+    timer: setTimeout(() => {
+      pendingDraftSave = null
+      const current = useEmailStore.getState().composeState
+      if (!current || current.draftId !== draftId) return
+      applyDraftWrite(vault, saveDraft(window.localStorage, vault, current))
+    }, 400)
+  }
+}
+
+/** Entwurf anhängen/aktualisieren — im offenen Fenster ODER in der Ablage des
+ *  Vaults, falls das Fenster inzwischen geschlossen wurde. Liefert false, wenn
+ *  der Entwurf nirgends mehr existiert (verworfen oder unangefasst geschlossen). */
+function updateDraftAnywhere(vault: string, draftId: string, mutate: (c: ComposeEmail) => ComposeEmail): boolean {
+  const state = useEmailStore.getState()
+  const open = state.composeState
+  if (open && open.draftId === draftId && vault === draftVaultPath) {
+    const next = mutate(open)
+    useEmailStore.setState({ composeState: next })
+    if (draftHasContent(next)) persistDraftSoon(next)
+    return true
+  }
+  const stored = loadDrafts(window.localStorage, vault).find(d => d.id === draftId)
+  if (!stored) return false
+  applyDraftWrite(vault, saveDraft(window.localStorage, vault, mutate(stored.compose)))
+  return true
+}
+
+/** Originalanhänge einer Weiterleitung vom Server holen und an den Entwurf
+ *  hängen. Läuft auch weiter, wenn das Fenster zwischendurch geschlossen wird:
+ *  dann landet das Ergebnis im gesicherten Entwurf. Wird beim Wiederöffnen
+ *  eines Entwurfs mit Status „loading" erneut angestoßen. */
+function runForwardStaging(vault: string, draftId: string, email: EmailMessage): void {
+  const { email: emailSettings } = useUIStore.getState()
+  const account = emailSettings.accounts.find(a => a.id === email.accountId)
+  const finish = (fa: NonNullable<ComposeEmail['forwardAttachments']>, attachments?: ComposeAttachment[]) => {
+    const kept = updateDraftAnywhere(vault, draftId, c => ({
+      ...c,
+      forwardAttachments: { ...fa, sourceEmailId: email.id },
+      attachments: attachments && attachments.length > 0 ? [...(c.attachments || []), ...attachments] : c.attachments
+    }))
+    // Entwurf existiert nicht mehr (verworfen): geladene Dateien wieder wegräumen.
+    if (!kept && attachments && attachments.length > 0) {
+      void window.electronAPI.emailDiscardStagedAttachments(attachments.map(a => a.path))
+    }
+  }
+  if (!account) { finish({ status: 'failed', error: 'Account nicht gefunden', skipped: email.attachmentNames }); return }
+  if (!email.uid) { finish({ status: 'failed', error: 'Mail hat keine IMAP-UID', skipped: email.attachmentNames }); return }
+  void window.electronAPI.emailStageForwardAttachments({
+    accountId: account.id,
+    host: account.host,
+    port: account.port,
+    user: account.user,
+    tls: account.tls,
+    folder: email.folder || 'INBOX',
+    uid: email.uid
+  }).then(res => {
+    if (!res.success) { finish({ status: 'failed', error: res.error, skipped: email.attachmentNames }); return }
+    finish({ status: 'done', names: (res.attachments || []).map(a => a.filename), skipped: res.skipped }, res.attachments)
+  }).catch(err => {
+    finish({ status: 'failed', error: err instanceof Error ? err.message : String(err), skipped: email.attachmentNames })
+  })
+}
+
+/** Pfade zwischengespeicherter Weiterleitungs-Anhänge (unter userData) aufräumen. */
+async function discardStagedAttachments(compose: ComposeEmail | null | undefined): Promise<void> {
+  const paths = (compose?.attachments || []).map(a => a.path).filter(p => p.includes('forward-attachments'))
+  if (paths.length === 0) return
+  try { await window.electronAPI.emailDiscardStagedAttachments(paths) } catch { /* Aufräumen ist Kür */ }
 }
 
 export const useEmailStore = create<EmailState>()((set, get) => ({
@@ -121,12 +262,33 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   foldersError: {},
   composeState: null,
   isSending: false,
+  lastSendResult: null,
+  lastFetchErrors: [],
+  lastSuccessfulFetchAt: {},
+  drafts: [],
+  draftSaveError: null,
   aiChatMessages: [],
   aiChatEmailId: null,
   isAiChatLoading: false,
   currentView: 'list' as const,
 
   loadEmails: async (vaultPath: string, skipAutoActions?: boolean) => {
+    if (draftVaultPath !== vaultPath) {
+      // Vault-Wechsel: erst den alten Vault abschließen — ausstehende Sicherung
+      // schreiben und ein offenes Compose-Fenster dort ablegen (oder, wenn
+      // unangefasst, verwerfen). Sonst wandert der Entwurf in den neuen Vault.
+      if (draftVaultPath) {
+        flushPendingDraftSave()
+        const open = get().composeState
+        if (open?.draftId) {
+          if (draftHasContent(open)) saveDraft(window.localStorage, draftVaultPath, open)
+          else { removeDraft(window.localStorage, draftVaultPath, open.draftId); void discardStagedAttachments(open) }
+        }
+        if (open) set({ composeState: null, currentView: 'list' })
+      }
+      draftVaultPath = vaultPath
+      set({ drafts: loadDrafts(window.localStorage, vaultPath), draftSaveError: null })
+    }
     try {
       const data = await window.electronAPI.emailLoad(vaultPath)
 
@@ -248,8 +410,12 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     })
 
     try {
-      // Bei forceRefresh: lastFetchedAt ignorieren → volle 30 Tage
-      const fetchSince = forceRefresh ? {} : get().lastFetchedAt
+      // Manuell (forceRefresh) = ganzes Aufbewahrungsfenster: Abgleich bekannter
+      // Mails (Flags/Ordner/verschwunden) und ältere unbekannte Mails im Rahmen
+      // des Kontingents. Automatik = ab dem Abruf-Merker. Der Merker geht immer
+      // mit — vorher wurde `{}` übergeben und Main las das als Ersteinrichtung
+      // mit drei Tagen Fenster.
+      const mode = forceRefresh ? 'full' : 'incremental'
       // Jeder Account fetchet seinen aktiven Folder (Default INBOX).
       const accountsWithFolder = email.accounts.map(a => ({
         ...a,
@@ -258,9 +424,25 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       const result = await window.electronAPI.emailFetch(
         vaultPath,
         accountsWithFolder,
-        fetchSince,
-        email.maxEmailsPerFetch
+        get().lastFetchedAt,
+        email.maxEmailsPerFetch,
+        mode
       )
+
+      // Teilfehler sichtbar machen — unabhängig davon, ob der Gesamtabruf
+      // als Erfolg gilt. Ein Konto mit abgelaufenem Passwort darf nicht hinter
+      // „0 neu" verschwinden.
+      const perAccount = result.accountResults || []
+      const nowIso = new Date().toISOString()
+      const successes: Record<string, string> = { ...get().lastSuccessfulFetchAt }
+      for (const r of perAccount) if (r.ok) successes[r.accountId] = nowIso
+      const errors = perAccount
+        .filter(r => !r.ok)
+        .map(r => ({ accountId: r.accountId, folder: r.folder, error: r.error || 'Abruf fehlgeschlagen' }))
+      if (!result.success && result.error && errors.length === 0) {
+        errors.push({ accountId: '', folder: '', error: result.error })
+      }
+      set({ lastFetchErrors: errors, lastSuccessfulFetchAt: successes })
 
       if (result.success) {
         set({ pendingBacklog: result.skippedCount || 0 })
@@ -277,6 +459,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       return result
     } catch (error) {
       console.error('[EmailStore] Fetch failed:', error)
+      set({ lastFetchErrors: [{ accountId: '', folder: '', error: 'Abruf fehlgeschlagen' }] })
       return { success: false, newCount: 0, totalCount: 0, error: 'Abruf fehlgeschlagen' }
     } finally {
       set({ isFetching: false, fetchProgress: null })
@@ -749,13 +932,24 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   // Compose actions
-  setComposeState: (state) => set({ composeState: state }),
+  setComposeState: (state: ComposeEmail | null) => {
+    if (!state) { set({ composeState: null }); return }
+    // Jede Änderung über diesen Weg ist eine Nutzeränderung: Entwurf gilt als angefasst.
+    const next = state.pristine ? { ...state, pristine: false } : state
+    set({ composeState: next })
+    persistDraftSoon(next)
+  },
 
   setCurrentView: (view) => set({ currentView: view }),
 
   sendEmail: async (vaultPath: string) => {
     const { composeState, emails } = get()
     if (!composeState) return { success: false, error: 'Kein Entwurf' }
+    // Solange Originalanhänge noch geladen werden, geht nichts raus — sonst
+    // ginge die Weiterleitung ohne die Dateien, die sie ankündigt.
+    if (composeState.forwardAttachments?.status === 'loading') {
+      return { success: false, error: 'Anhänge werden noch geladen' }
+    }
 
     const { email: emailSettings } = useUIStore.getState()
     const account = emailSettings.accounts.find(a => a.id === composeState.accountId)
@@ -785,7 +979,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         // (Sent/Gesendet). Damit erscheint sie nur im Sent-Folder, nicht in jedem.
         const sentEmail: EmailMessage = {
           id: result.messageId || `sent-${Date.now()}`,
-          uid: 0,
+          uid: result.sentUid || 0,
           accountId: composeState.accountId,
           folder: result.sentMailbox || 'Sent',
           from: { name: '', address: account.user },
@@ -797,9 +991,26 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           bodyText: composeState.body,
           flags: ['\\Seen'],
           fetchedAt: new Date().toISOString(),
-          sent: true
+          sent: true,
+          // Eigene Anhänge in der lokalen Kopie festhalten — die Anhang-Anzeige
+          // prüft diese Felder; APPENDUID allein macht sie nicht sichtbar.
+          hasAttachments: (composeState.attachments?.length ?? 0) > 0 || undefined,
+          attachmentNames: composeState.attachments && composeState.attachments.length > 0
+            ? composeState.attachments.map(a => a.filename)
+            : undefined
         }
-        set({ emails: [...emails, sentEmail], composeState: null, currentView: 'list' })
+        if (pendingDraftSave) { clearTimeout(pendingDraftSave.timer); pendingDraftSave = null }
+        const drafts = composeState.draftId
+          ? removeDraft(window.localStorage, vaultPath, composeState.draftId)
+          : get().drafts
+        set({
+          emails: [...emails, sentEmail],
+          composeState: null,
+          currentView: 'list',
+          drafts,
+          lastSendResult: { at: new Date().toISOString(), subject: composeState.subject, appendWarning: result.appendWarning }
+        })
+        void discardStagedAttachments(composeState)
         await get().saveEmails(vaultPath)
       }
       return result
@@ -810,11 +1021,17 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     }
   },
 
-  startReply: (email: EmailMessage) => {
+  clearLastSendResult: () => set({ lastSendResult: null }),
+  clearFetchErrors: () => set({ lastFetchErrors: [] }),
+
+  startReply: (email: EmailMessage, bodyOverride?: string) => {
     set({
       composeState: {
-        ...buildReplyDraft(email),
-        to: [{ name: email.from.name, address: email.from.address }]
+        ...buildReplyDraft(email, bodyOverride),
+        to: resolveReplyTarget(email).to.map(r => ({ name: r.name, address: r.address })),
+        draftId: newDraftId(),
+        // Ein KI-Entwurf ist bereits Inhalt, der verloren gehen könnte.
+        pristine: bodyOverride === undefined
       },
       currentView: 'compose'
     })
@@ -827,7 +1044,9 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       composeState: {
         ...buildReplyDraft(email),
         to,
-        cc: cc.length > 0 ? cc : undefined
+        cc: cc.length > 0 ? cc : undefined,
+        draftId: newDraftId(),
+        pristine: true
       },
       currentView: 'compose'
     })
@@ -835,28 +1054,36 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
   startForward: (email: EmailMessage) => {
     const { email: emailSettings } = useUIStore.getState()
-    const account = emailSettings.accounts[0]
+    const accountId = resolveReplyAccountId(email, emailSettings.accounts)
     const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
 
     const date = email.date ? new Date(email.date).toLocaleString() : ''
     const sender = email.from.name ? `${email.from.name} <${email.from.address}>` : email.from.address
     const toLine = (email.to || []).map(r => r.name ? `${r.name} <${r.address}>` : r.address).join(', ')
-    const attachLine = email.attachmentNames && email.attachmentNames.length > 0
-      ? `\nAnhänge: ${email.attachmentNames.join(', ')}`
-      : ''
-    const header = `\n\n---------- Weitergeleitete Nachricht ----------\nVon: ${sender}\nDatum: ${date}\nBetreff: ${email.subject}\nAn: ${toLine}${attachLine}\n\n`
+    const header = `\n\n---------- Weitergeleitete Nachricht ----------\nVon: ${sender}\nDatum: ${date}\nBetreff: ${email.subject}\nAn: ${toLine}\n\n`
     const originalText = (email.bodyText || email.snippet || '').trim()
     const subject = /^fwd?:\s/i.test(email.subject) ? email.subject : `Fwd: ${email.subject}`
+    const draftId = newDraftId()
+    const hasAttachments = !!(email.hasAttachments || (email.attachmentNames && email.attachmentNames.length > 0))
 
     set({
       composeState: {
         to: [],
         subject,
         body: sig + header + originalText,
-        accountId: account?.id || ''
+        accountId,
+        draftId,
+        pristine: true,
+        // Originalanhänge werden vom Server geholt und als Dateien angehängt.
+        // Vorher standen nur ihre Namen im Text — die Mail behauptete Anhänge,
+        // die nicht mitgingen. Ohne Anhänge gibt es nichts zu laden.
+        forwardAttachments: hasAttachments ? { status: 'loading', sourceEmailId: email.id } : undefined
       },
       currentView: 'compose'
     })
+
+    if (!hasAttachments) return
+    runForwardStaging(draftVaultPath, draftId, email)
   },
 
   startNewEmail: () => {
@@ -868,10 +1095,125 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         to: [],
         subject: '',
         body: sig,
-        accountId: account?.id || ''
+        accountId: account?.id || '',
+        draftId: newDraftId(),
+        pristine: true
       },
       currentView: 'compose'
     })
+  },
+
+  closeCompose: () => {
+    const { composeState, selectedEmailId } = get()
+    if (pendingDraftSave) { clearTimeout(pendingDraftSave.timer); pendingDraftSave = null }
+    let drafts = get().drafts
+    let draftSaveError: string | null = null
+    if (composeState?.draftId && draftVaultPath) {
+      if (draftHasContent(composeState)) {
+        const res = saveDraft(window.localStorage, draftVaultPath, composeState)
+        drafts = res.drafts
+        draftSaveError = res.ok ? null : (res.error || 'Entwurf konnte nicht gesichert werden')
+      } else {
+        drafts = removeDraft(window.localStorage, draftVaultPath, composeState.draftId)
+        void discardStagedAttachments(composeState)
+      }
+    }
+    set({ composeState: null, drafts, draftSaveError, currentView: selectedEmailId ? 'detail' : 'list' })
+  },
+
+  discardDraft: async (draftId: string) => {
+    const { composeState, drafts, selectedEmailId } = get()
+    const stored = drafts.find(d => d.id === draftId)?.compose
+    if (pendingDraftSave?.draftId === draftId) { clearTimeout(pendingDraftSave.timer); pendingDraftSave = null }
+    const next = draftVaultPath ? removeDraft(window.localStorage, draftVaultPath, draftId) : drafts.filter(d => d.id !== draftId)
+    const closing = composeState?.draftId === draftId
+    set(closing
+      ? { drafts: next, composeState: null, currentView: selectedEmailId ? 'detail' : 'list' }
+      : { drafts: next })
+    await discardStagedAttachments(closing ? composeState : stored)
+  },
+
+  openDraft: (draftId: string) => {
+    const draft = get().drafts.find(d => d.id === draftId)
+    if (!draft) return
+    set({ composeState: { ...draft.compose, draftId, pristine: false }, currentView: 'compose' })
+    // Unterbrochener Anhang-Download (Fenster/App geschlossen): fortsetzen.
+    const fa = draft.compose.forwardAttachments
+    if (fa?.status === 'loading') {
+      const source = fa.sourceEmailId ? get().emails.find(e => e.id === fa.sourceEmailId) : undefined
+      if (source) runForwardStaging(draftVaultPath, draftId, source)
+      else set({ composeState: { ...get().composeState!, forwardAttachments: { ...fa, status: 'failed', error: 'Quellmail nicht mehr vorhanden' } } })
+    }
+  },
+
+  setSeen: async (vaultPath: string, emailId: string, seen: boolean) => {
+    const { emails } = get()
+    const email = emails.find(e => e.id === emailId)
+    if (!email) return { success: false, error: 'Mail nicht gefunden' }
+    const hasSeen = email.flags.includes('\\Seen')
+    if (hasSeen === seen) return { success: true }
+    const withFlag = (flags: string[]) => seen ? [...flags, '\\Seen'] : flags.filter(f => f !== '\\Seen')
+    set({ emails: emails.map(e => e.id === emailId ? { ...e, flags: withFlag(e.flags) } : e) })
+    get().updateUnreadRelevantCount()
+
+    if (email.uid > 0) {
+      const { email: emailSettings } = useUIStore.getState()
+      const account = emailSettings.accounts.find(a => a.id === email.accountId)
+      if (account) {
+        try {
+          const res = await window.electronAPI.emailSetFlags({
+            accountId: account.id,
+            host: account.host,
+            port: account.port,
+            user: account.user,
+            tls: account.tls,
+            folder: email.folder || 'INBOX',
+            uid: email.uid,
+            add: seen ? ['\\Seen'] : undefined,
+            remove: seen ? undefined : ['\\Seen']
+          })
+          if (!res.success) {
+            set({ emails: get().emails.map(e => e.id === emailId ? { ...e, flags: email.flags } : e) })
+            get().updateUnreadRelevantCount()
+            return { success: false, error: res.error }
+          }
+        } catch (error) {
+          set({ emails: get().emails.map(e => e.id === emailId ? { ...e, flags: email.flags } : e) })
+          get().updateUnreadRelevantCount()
+          return { success: false, error: error instanceof Error ? error.message : 'Markierung fehlgeschlagen' }
+        }
+      }
+    }
+    await get().saveEmails(vaultPath)
+    return { success: true }
+  },
+
+  removeLocalEmails: async (vaultPath: string, ids: string[]) => {
+    if (ids.length === 0) return { success: true, removed: 0 }
+    try {
+      const res = await window.electronAPI.emailDeleteLocal(vaultPath, ids)
+      if (!res.success) return { success: false, removed: 0, error: res.error }
+      const gone = new Set(ids)
+      const { selectedEmailId } = get()
+      set({
+        emails: get().emails.filter(e => !gone.has(e.id)),
+        storeRevision: res.revision ?? get().storeRevision,
+        ...(selectedEmailId && gone.has(selectedEmailId) ? { selectedEmailId: null, currentView: 'list' as const } : {})
+      })
+      get().updateUnreadRelevantCount()
+      return { success: true, removed: res.removed }
+    } catch (error) {
+      console.error('[EmailStore] removeLocalEmails failed:', error)
+      return { success: false, removed: 0, error: error instanceof Error ? error.message : 'Entfernen fehlgeschlagen' }
+    }
+  },
+
+  searchEmails: (query: string) => {
+    const q = query.trim()
+    if (!q) return []
+    return get().emails
+      .filter(e => emailMatchesQuery(e, q))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   },
 
   // AI Chat actions

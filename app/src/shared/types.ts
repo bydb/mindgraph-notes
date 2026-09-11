@@ -1055,7 +1055,12 @@ export interface ElectronAPI {
   emailConnect: (account: EmailAccount) => Promise<{ success: boolean; error?: string }>;
   emailListFolders: (account: EmailAccount) => Promise<{ success: boolean; folders: EmailFolder[]; error?: string }>;
   emailMove: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; sourceFolder: string; uid: number; destinationFolder: string }) => Promise<{ success: boolean; newUid?: number; destinationFolder?: string; error?: string }>;
-  emailFetch: (vaultPath: string, accounts: Array<EmailAccount & { folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number) => Promise<EmailFetchResult>;
+  emailFetch: (vaultPath: string, accounts: Array<EmailAccount & { folder?: string }>, lastFetchedAt: Record<string, string>, maxPerAccount: number, mode?: EmailFetchMode) => Promise<EmailFetchResult>;
+  emailSetFlags: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; folder: string; uid: number; add?: string[]; remove?: string[] }) => Promise<{ success: boolean; error?: string }>;
+  emailStageForwardAttachments: (payload: { accountId: string; host: string; port: number; user: string; tls: boolean; folder: string; uid: number }) => Promise<{ success: boolean; attachments?: ComposeAttachment[]; skipped?: string[]; error?: string }>;
+  emailDiscardStagedAttachments: (paths: string[]) => Promise<{ success: boolean; removed: number }>;
+  /** Lokale Kopien entfernen (mit Grabstein, damit sie nicht vom Zweitgerät zurückkommen). */
+  emailDeleteLocal: (vaultPath: string, ids: string[]) => Promise<{ success: boolean; removed: number; revision?: string; error?: string }>;
   emailAnalyze: (vaultPath: string, model: string, emailIds?: string[], lowPowerMode?: boolean, cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null) => Promise<{ success: boolean; analyzed: number; failed?: number; total?: number; lastError?: string | null; error?: string }>;
   emailRelevanceConfigLoad: (vaultPath: string) => Promise<{ success: boolean; config?: RelevanceConfig; hasBlock?: boolean; notePath?: string; error?: string }>;
   emailRelevanceConfigSave: (vaultPath: string, config: RelevanceConfig) => Promise<{ success: boolean; notePath?: string; error?: string }>;
@@ -1459,6 +1464,10 @@ export interface EmailMessage {
   /** CC-Empfänger aus dem IMAP-Envelope. Fehlt bei Mails, die vor Einführung
    *  des Felds gefetcht wurden — Anzeige und Reply-All behandeln undefined wie []. */
   cc?: { name: string; address: string }[]
+  /** Reply-To-Header aus dem IMAP-Envelope. Antworten gehen bevorzugt hierhin
+   *  (Formularsysteme, Ticketsysteme, Listen). Fehlt bei älteren Mails — dann
+   *  gilt wie bisher `from`. */
+  replyTo?: { name: string; address: string }[]
   subject: string
   date: string            // ISO
   snippet: string         // Erste ~200 Zeichen
@@ -1477,6 +1486,10 @@ export interface EmailMessage {
   /** In-Reply-To-Header: Message-ID der Mail, auf die diese antwortet.
    *  Für den Reply-Received-Trigger (Match gegen gesendete Message-IDs). */
   inReplyTo?: string
+  /** Beim letzten Abgleich war die Mail in ihrem Ordner auf dem Server nicht
+   *  mehr vorhanden (extern gelöscht oder verschoben). Nur Markierung — die
+   *  lokale Kopie bleibt, bis der Nutzer entscheidet. */
+  missingOnServer?: boolean
   /** References-Header: Kette der Message-IDs im Thread (normalisiert als Array). */
   references?: string[]
   /** Vom User manuell zugewiesener Projektordner (vault-relativer Pfad).
@@ -1575,12 +1588,36 @@ export interface ComposeAttachment {
 export interface ComposeEmail {
   to: { name: string; address: string }[]
   cc?: { name: string; address: string }[]
+  /** Blindkopie: geht mit, steht aber weder in den Kopfzeilen der Mail noch
+   *  in der lokalen Kopie. */
+  bcc?: { name: string; address: string }[]
   subject: string
   body: string
   inReplyTo?: string
   references?: string
   accountId: string
   attachments?: ComposeAttachment[]
+  /** Gesetzt, wenn die Antwort wegen eines Reply-To-Headers NICHT an den
+   *  Absender geht. Das Compose-Fenster zeigt die Umleitung an — bei
+   *  Formularmails erwünscht, bei manipulierten Mails soll man es sehen. */
+  replyRedirect?: { replyTo: string; from: string }
+  /** Kennung in der Entwurfsablage (localStorage pro Vault). */
+  draftId?: string
+  /** true, solange der Nutzer nichts geändert hat. Unangefasste Entwürfe
+   *  werden beim Schließen still verworfen, angefasste behalten. */
+  pristine?: boolean
+  /** Weiterleiten: Stand der Übernahme der Originalanhänge. `names` = was
+   *  übernommen wurde; `skipped` = was (zu groß, nicht ladbar) NICHT mitgeht
+   *  und deshalb sichtbar genannt wird. */
+  forwardAttachments?: {
+    status: 'loading' | 'done' | 'failed'
+    names?: string[]
+    skipped?: string[]
+    error?: string
+    /** Quellmail, damit ein unterbrochener Download beim Wiederöffnen des
+     *  Entwurfs fortgesetzt werden kann. */
+    sourceEmailId?: string
+  }
 }
 
 export interface EmailSendResult {
@@ -1589,7 +1626,16 @@ export interface EmailSendResult {
   error?: string
   appendWarning?: string  // Send erfolgreich, aber Speichern im Gesendet-Ordner schlug fehl
   sentMailbox?: string    // Name des verwendeten Sent-Folders bei erfolgreichem Append
+  /** UID der Kopie im Gesendet-Ordner (APPENDUID). Damit lässt sich die
+   *  eigene Mail später verschieben und ihre Anhänge laden — vorher stand
+   *  die lokale Kopie dauerhaft mit uid 0 da. */
+  sentUid?: number
 }
+
+/** `incremental` = ab dem Abruf-Merker (Automatik); `full` = das ganze
+ *  Aufbewahrungsfenster: Umschlagabgleich bekannter Mails (Flags, Ordner,
+ *  Verschwinden) und unbekannte ältere Mails im Rahmen des Kontingents. */
+export type EmailFetchMode = 'incremental' | 'full'
 
 /** Antwort von `emailLoad`. `revision` ist der Inhalts-Hash der geladenen Datei;
  *  sie muss bei jedem Speichern als Basis mitgegeben werden, damit ein
@@ -1636,6 +1682,20 @@ export interface EmailFetchResult {
    *  Rückstand nicht wieder still bleibt. */
   skippedCount?: number
   error?: string
+  /** Ergebnis je Konto/Ordner. Ein fehlendes Passwort oder ein Verbindungsfehler
+   *  eines Kontos kippt den Gesamtabruf nicht — er muss aber sichtbar werden.
+   *  Vorher stand danach „Abruf fertig, 0 neu", auch wenn kein Konto erreichbar war. */
+  accountResults?: EmailFetchAccountResult[]
+}
+
+export interface EmailFetchAccountResult {
+  accountId: string
+  folder: string
+  ok: boolean
+  /** Kurzer Fehlertext (Passwort fehlt, Anmeldung abgelehnt, Zeitüberschreitung …). */
+  error?: string
+  /** Wie viele Mails aus diesem Konto/Ordner diesmal neu übernommen wurden. */
+  imported: number
 }
 
 /** Persistenter Kontakt-Speicher ({vault}/.mindgraph/contacts.json).
