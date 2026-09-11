@@ -130,7 +130,7 @@
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",
     "turndown-plugin-gfm": "^1.0.2",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "vite": "^7.3.1",
     "vitest": "^4.1.8"
   },
