@@ -49,10 +49,9 @@ app/packages/plugin-api/dist/
 
 # Vertriebs- und Vortragsmaterial gehoert nicht in ein oeffentliches Code-Repo.
 #
-# pitch/   Infografiken, One-Pager, QR-Codes, Build-Skripte. Darunter der
-#          Einkaufs-Pitch mit echten Firmennamen aus fiktiven Testszenarien -
-#          oeffentlich wuerde das so aussehen, als bestuende eine
-#          Geschaeftsbeziehung.
+# pitch/   Infografiken, One-Pager, QR-Codes, Praesentationen, Build-Skripte.
+#          Enthaelt Material fuer einzelne Gespraechspartner - oeffentlich
+#          wuerde das so aussehen, als bestuende eine Geschaeftsbeziehung.
 # outputs/ Vortrags-Builds und Debug-Skripte. Enthalten Klarnamen, konkrete
 #          Veranstaltungsorte und fremde Kanal-Analytics aus Screenshots.
 #
