@@ -361,6 +361,9 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
 
       {/* Sichtbarer Moduswechsel: der Zielordner eskaliert die Leiste vom Block-Diff
           zum Agent-Loop mit Datei-Outputs — das darf nicht nur im Tooltip stehen. */}
+      {!agentMode && !proposal && (
+        <div className="ai-bar-agent-mode-hint ai-bar-mode-hint-plain">{t('aiBar.modeHintNoTarget')}</div>
+      )}
       {agentMode && (
         <div className="ai-bar-agent-mode-hint">
           {t('aiBar.agent.modeHintBefore')}<strong>{targetFolder.split('/').pop()}</strong>{t('aiBar.agent.modeHintAfter')}

@@ -24,7 +24,7 @@ import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
-import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink } from '../../utils/linkExtractor'
+import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink, findNoteForWikilink } from '../../utils/linkExtractor'
 import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, parsePluginEmbedSize } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
@@ -855,7 +855,10 @@ const calloutIcons: Record<string, string> = {
 function processCallouts(content: string): string {
   // Callout Pattern: > [!type](+|-) optional title
   // Gefolgt von > content lines
-  const calloutRegex = /^>\s*\[!(\w+)\]([+-])?(?:\s+(.+))?\n((?:>.*\n?)*)/gm
+  // `[ \t]+` statt `\s+`: `\s` frisst den Zeilenumbruch, dann wurde bei einem Callout
+  // ohne eigenen Titel die erste Inhaltszeile samt „> " zum Titel (sichtbar als
+  // „! > erste Zeile …" im Lesen-Modus).
+  const calloutRegex = /^>\s*\[!(\w+)\]([+-])?(?:[ \t]+(.+))?\n((?:>.*\n?)*)/gm
 
   const result = content.replace(calloutRegex, (_match, type, foldModifier, customTitle, body) => {
     const calloutType = type.toLowerCase()
@@ -992,6 +995,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Macher-Leiste: Anweisung → KI-Vorschlag als Block-Diff → Übernehmen/Verwerfen.
   const [aiBarOpen, setAiBarOpen] = useState(false)
   const [aiPhase, setAiPhase] = useState<'idle' | 'generating' | 'review'>('idle')
+  const aiGenerationRef = useRef(0)
   const [aiProposal, setAiProposal] = useState<(AiProposalMeta & { from: number; to: number; newText: string }) | null>(null)
   // Ambienter Copilot: Tag-Vorschläge auf Knopf → bestätigen ins Frontmatter.
   const [aiTagSuggestions, setAiTagSuggestions] = useState<string[]>([])
@@ -1958,15 +1962,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (effectiveNoteId) useNoteAgentStore.getState().dismissRun(effectiveNoteId)
   }, [effectiveNoteId])
 
-  // Entscheidung 12: Notizwechsel während 'running' bricht den Lauf ab —
-  // Review-Karten bleiben dagegen ihrer Notiz zugeordnet.
-  const prevAgentNoteRef = useRef<string | null>(null)
-  useEffect(() => {
-    const prev = prevAgentNoteRef.current
-    prevAgentNoteRef.current = effectiveNoteId ?? null
-    if (isSecondary || !prev || prev === effectiveNoteId) return
-    useNoteAgentStore.getState().cancelRun(prev)
-  }, [effectiveNoteId, isSecondary])
+  // Entscheidung 12 (revidiert 09/2026): Ein Notizwechsel bricht den Lauf NICHT
+  // mehr ab. Ein Agentenlauf dauert mit einem lokalen 27B-Modell rund zehn Minuten;
+  // wer währenddessen eine Quelle nachliest, verlor vorher Lauf und Ergebnis ohne
+  // Vorwarnung. Lauf und Karten bleiben an ihre Notiz
+  // gebunden und erscheinen dort wieder, sobald sie geöffnet wird.
 
   // „Mit KI bearbeiten" (z.B. aus dem PDF-Viewer): sobald die Ziel-Notiz aktiv ist,
   // die Datei als Kontext anhängen und die Macher-Leiste öffnen.
@@ -2023,6 +2023,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (action === 'custom' && !customPrompt) return
 
     setAiPhase('generating')
+    // Abbrechen stoppt die Anfrage nicht, nur die Anzeige. Eine später eintreffende
+    // Antwort darf dann nicht mehr als Vorschlag aufspringen — sonst legt sie sich
+    // mitten in einen laufenden Agentenlauf und verdeckt dessen Protokoll.
+    const generation = ++aiGenerationRef.current
     try {
       const req = {
         model,
@@ -2041,6 +2045,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           ? await window.electronAPI.lmstudioGenerate({ ...req, port: ollama.lmStudioPort })
           : await window.electronAPI.ollamaGenerate(req)
       const result = response as AIResult
+      if (generation !== aiGenerationRef.current) return
       if (!result.success || !result.result) {
         // Fehler sichtbar machen (z.B. fail-closed bei nicht lesbarer Kontext-Datei).
         if (result.error && effectiveNoteId) useNoteAgentStore.getState().setAttachError(effectiveNoteId, result.error)
@@ -2095,6 +2100,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [aiProposal, viewMode])
 
   const aiDiscardProposal = useCallback(() => {
+    aiGenerationRef.current += 1
     setAiProposal(null)
     setAiPhase('idle')
   }, [])
@@ -2615,12 +2621,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       const fragment = e.detail.fragment || ''
       if (!linkText) return
 
-      const linkedNote = notes.find(n => {
-        const titleLower = n.title.toLowerCase()
-        const linkLower = linkText.toLowerCase()
-        const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
-        return titleLower === linkLower || fileNameWithoutExt === linkLower
-      })
+      const linkedNote = findNoteForWikilink(linkText, notes)
       if (!linkedNote) {
         // Kein Notiz-Treffer: Plugin-Datei (z.B. [[skizze.excalidraw]]) im Plugin-Editor öffnen
         const pluginFile = resolvePluginFileLink(linkText, fileTree)
@@ -3410,13 +3411,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       const fragment = wikilinkEl.getAttribute('data-fragment') || ''
 
       if (linkText) {
-        // Find note by title or filename
-        const linkedNote = notes.find(n => {
-          const titleLower = n.title.toLowerCase()
-          const linkLower = linkText.toLowerCase()
-          const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
-          return titleLower === linkLower || fileNameWithoutExt === linkLower
-        })
+        // Pfad, Titel oder Dateiname — Links mit Ordnerpfad müssen genauso öffnen.
+        const linkedNote = findNoteForWikilink(linkText, notes)
 
         if (linkedNote) {
           // In sekundärem Panel: Note dort öffnen, sonst im primären

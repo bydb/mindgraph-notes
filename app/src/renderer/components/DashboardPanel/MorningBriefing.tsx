@@ -5,6 +5,7 @@ import { useEmailStore } from '../../stores/emailStore'
 import { useEventAgentBridge } from '../../stores/eventAgentBridge'
 import { useTranslation } from '../../utils/translations'
 import { buildDashboardSnapshot, formatRelativeDay, collectWeekFocus, collectFocusTasks, proposeTimeBlocks, type DashboardSnapshot } from '../../utils/dashboardData'
+import { taskDisplayText } from '../../../shared/taskExtractor'
 import './MorningBriefing.css'
 
 interface MorningBriefingProps {
@@ -120,7 +121,7 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
                   <ul className="briefing-card-list">
                     {weekFocus.tasks.map(task => (
                       <li key={`${task.noteId}-${task.line}`} className={task.reason === 'critical' || task.reason === 'overdue' ? 'overdue' : ''}>
-                        {task.text}
+                        {taskDisplayText(task.text)}
                       </li>
                     ))}
                     {weekFocus.appointments.slice(0, 4).map((item, i) => (
@@ -138,7 +139,7 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
                   <ul className="briefing-card-list">
                     {timeBlocks.map((b, i) => (
                       <li key={`tb-${i}`} className="block">
-                        <strong>{formatTime(b.start.toISOString())}–{formatTime(b.end.toISOString())}</strong> — {b.task.text}
+                        <strong>{formatTime(b.start.toISOString())}–{formatTime(b.end.toISOString())}</strong> — {taskDisplayText(b.task.text)}
                       </li>
                     ))}
                   </ul>
@@ -154,10 +155,10 @@ export const MorningBriefing: React.FC<MorningBriefingProps> = ({ onClose, onOpe
                   </div>
                   <ul className="briefing-card-list">
                     {snapshot.tasks.overdue.slice(0, 2).map(task => (
-                      <li key={`${task.noteId}-${task.line}`} className="overdue">{task.text}</li>
+                      <li key={`${task.noteId}-${task.line}`} className="overdue">{taskDisplayText(task.text)}</li>
                     ))}
                     {snapshot.tasks.today.slice(0, 3).map(task => (
-                      <li key={`${task.noteId}-${task.line}`}>{task.text}</li>
+                      <li key={`${task.noteId}-${task.line}`}>{taskDisplayText(task.text)}</li>
                     ))}
                   </ul>
                 </div>

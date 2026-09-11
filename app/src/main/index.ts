@@ -4366,7 +4366,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     }
 
     // Cloud-Läufe: Ausgabegrenze setzen und OpenRouter pro Request auf Zero Data
-    // Retention festlegen. Im Beschaffungs-Härtetest endete ein Cloud-Lauf mitten im
+    // Retention festlegen. In einem Praxistest endete ein Cloud-Lauf mitten im
     // letzten Abschnitt, weil ohne max_tokens der Anbieter-Default greift.
     //
     // BEWUSST NUR CLOUD. Ollama setzt von sich aus kein num_predict, die Ausgabe ist

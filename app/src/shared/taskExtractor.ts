@@ -71,6 +71,22 @@ function isOverdue(date: Date): boolean {
  * Anzahl Tage bis zum Fälligkeitsdatum, gerechnet auf Tagesgrenzen (00:00).
  * Negative Werte = überfällig, 0 = heute, positive Werte = in der Zukunft.
  */
+/**
+ * Aufgabentext für die Anzeige: Wikilinks werden auf ihren sichtbaren Namen reduziert.
+ * `[[200 - Angebote/Muster GmbH Angebot|Muster GmbH]]` → `Muster GmbH`,
+ * `[[Ordner/Notiz#Abschnitt]]` → `Notiz`. Der Rohtext bleibt in der Datei unverändert —
+ * das ist nur die Darstellung im Aufgaben-Panel, Dashboard und Briefing. Vorher
+ * stand die Klammersyntax roh in der Aufgabenliste.
+ */
+export function taskDisplayText(text: string): string {
+  return text.replace(/\\*\[\\*\[([^\]|]*?)(?:\|([^\]]*))?\\*\]\\*\]/g, (_m, target: string, alias?: string) => {
+    if (alias && alias.trim()) return alias.trim()
+    const noFragment = target.split('#')[0].trim()
+    const last = noFragment.split('/').pop() || noFragment
+    return last.replace(/\.md$/i, '')
+  })
+}
+
 export function daysUntilDue(due: Date, now: Date = new Date()): number {
   const dueStart = new Date(due.getFullYear(), due.getMonth(), due.getDate()).getTime()
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()

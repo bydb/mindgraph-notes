@@ -24,6 +24,41 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose, initi
   const resultsRef = useRef<HTMLDivElement>(null)
 
   const { notes, selectNote } = useNotesStore()
+  const vaultPath = useNotesStore(s => s.vaultPath)
+  const [loadingContent, setLoadingContent] = useState(false)
+  const loadingRef = useRef(false)
+
+  // Nach einem Start aus dem Notes-Cache haben die Notizen `content: ''` — die
+  // Volltextsuche fand dann still nur, was seit dem Start geöffnet wurde (ein
+  // Treffer statt elf für denselben Begriff). Beim Öffnen der Suche
+  // werden fehlende Inhalte deshalb einmal in Paketen nachgeladen; die Treffer
+  // aktualisieren sich, sobald ein Paket da ist.
+  useEffect(() => {
+    if (!isOpen || !vaultPath || loadingRef.current) return
+    const stubs = useNotesStore.getState().notes.filter(n => !n.content && n.path.toLowerCase().endsWith('.md'))
+    if (stubs.length === 0) return
+    loadingRef.current = true
+    setLoadingContent(true)
+    void (async () => {
+      try {
+        const CHUNK = 250
+        for (let i = 0; i < stubs.length; i += CHUNK) {
+          const chunk = stubs.slice(i, i + CHUNK)
+          const loaded = await window.electronAPI.readFilesBatch(vaultPath, chunk.map(n => n.path)) as Record<string, string | null>
+          const store = useNotesStore.getState()
+          store.setNotes(store.notes.map(n => {
+            const c = n.content ? null : loaded[n.path]
+            return typeof c === 'string' && c ? { ...n, content: c } : n
+          }))
+        }
+      } catch (err) {
+        console.error('[QuickSearch] Inhalte nachladen fehlgeschlagen', err)
+      } finally {
+        loadingRef.current = false
+        setLoadingContent(false)
+      }
+    })()
+  }, [isOpen, vaultPath])
 
   // Fokus auf Input wenn geöffnet
   useEffect(() => {
@@ -195,7 +230,7 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose, initi
         <div className="quick-search-results" ref={resultsRef}>
           {results.length === 0 ? (
             <div className="quick-search-empty">
-              {t('quickSearch.noResults')}
+              {loadingContent ? t('quickSearch.loadingContent') : t('quickSearch.noResults')}
             </div>
           ) : (
             results.map((result, index) => (

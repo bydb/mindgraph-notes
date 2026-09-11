@@ -54,6 +54,8 @@ export interface AgentRunUiState {
   text: string
   errorText: string
   hitMaxIterations: boolean
+  /** Startzeitpunkt (Renderer-Uhr) — für die laufende Zeitanzeige im Panel. */
+  startedAt: number | null
   web?: AgentUiWeb
   // Provenienz des Laufs: Modell + Datenweg (lokal vs. Cloud-Provider-Label) —
   // beim Start festgehalten, damit die Review-Karten sie anzeigen können.
@@ -87,6 +89,7 @@ export const EMPTY_AGENT_RUN: AgentRunUiState = {
   text: '',
   errorText: '',
   hitMaxIterations: false,
+  startedAt: null,
   model: '',
   cloudLabel: null
 }
@@ -340,6 +343,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
           ...EMPTY_AGENT_RUN,
           runId,
           phase: 'running',
+          startedAt: Date.now(),
           model: params.cloud ? params.cloud.model : params.model,
           cloudLabel: params.cloudLabel
         }

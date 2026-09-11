@@ -68,6 +68,23 @@ export function extractTags(content: string): string[] {
   return [...new Set(tags)]
 }
 
+/**
+ * Wikilink → Notiz für Klicks im Editor. Erst der volle vault-relative Pfad
+ * (`[[100 - Projekte/110 - Tablet/_STATUS]]`, mit oder ohne `.md`), dann Titel,
+ * dann Dateiname, zuletzt die unscharfe Pfadsuche aus `resolveLink`.
+ * Vorher wurde ein Link mit Ordnerpfad im Lesen-Modus still ignoriert: Der Klick
+ * markierte nur den Linktext, die Notiz öffnete sich nicht (in Vaults, die
+ * ausschließlich pfadbasiert verlinken, fällt das sofort auf).
+ */
+export function findNoteForWikilink(linkText: string, allNotes: Note[]): Note | null {
+  const raw = linkText.trim().replace(/^\/+/, '')
+  if (!raw) return null
+  const wanted = raw.toLowerCase().replace(/\.md$/, '')
+  const byPath = allNotes.find(n => n.path.toLowerCase().replace(/\.md$/, '') === wanted)
+  if (byPath) return byPath
+  return resolveLink(raw, allNotes)
+}
+
 export function resolveLink(linkText: string, allNotes: Note[]): Note | null {
   const normalizedLink = linkText.toLowerCase()
 

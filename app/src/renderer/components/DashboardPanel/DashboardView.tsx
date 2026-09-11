@@ -33,6 +33,7 @@ import {
 import { ErrorBoundary } from '../ErrorBoundary'
 import { ProjectStatusWidget } from '../ProjectStatusPanel/ProjectStatusWidget'
 import { ActiveModelBadge } from '../Shared/ActiveModelBadge'
+import { taskDisplayText } from '../../../shared/taskExtractor'
 import './DashboardView.css'
 
 type TFn = (key: TranslationKey, params?: Record<string, string | number>) => string
@@ -1020,7 +1021,7 @@ const TaskRow: React.FC<{ task: DashboardTask; onClick: () => void; showDate?: b
   <div className={`dv-task-row${task.isCritical ? ' dv-task-urgent' : ''}`} onClick={onClick}>
     <div className="dv-task-checkbox"/>
     <div className="dv-task-body">
-      <div className="dv-task-text">{task.text}</div>
+      <div className="dv-task-text">{taskDisplayText(task.text)}</div>
       <div className="dv-task-meta">
         <span>{getDisplayTitle(task.noteTitle)}</span>
         {task.dueDate && (

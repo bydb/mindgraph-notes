@@ -131,6 +131,14 @@ const buildNoteKindIndex = (notes: ReturnType<typeof useNotesStore.getState>['no
   return index
 }
 
+// Dateien im Ordner samt Unterordnern. Vorher zählte nur die oberste Ebene: Ein Ordner,
+// der nur Unterordner enthält, stand mit „0" da und sah leer aus.
+const countFilesDeep = (entry: FileEntry): number => {
+  let n = 0
+  for (const child of entry.children ?? []) n += child.isDirectory ? countFilesDeep(child) : 1
+  return n
+}
+
 const countNoteKinds = (index: NoteKindIndex): Record<NoteKindId, number> => {
   const counts: Record<NoteKindId, number> = { problem: 0, solution: 0, info: 0 }
   index.forEach(kindId => {
@@ -1395,7 +1403,7 @@ const FileItem: React.FC<FileItemProps> = ({
               <span className="file-name" onDoubleClick={handleDoubleClick}>{entry.name}</span>
             )}
             {entry.children && !isEditing && (
-              <span className="file-count">{entry.children.filter(c => !c.isDirectory).length}</span>
+              <span className="file-count">{countFilesDeep(entry)}</span>
             )}
           </>
         ) : (
@@ -2077,7 +2085,11 @@ export const FileTree: React.FC<FileTreeProps> = ({ entries, level = 0, onDrop, 
     const root = notesRootFolder.trim().replace(/^\/+|\/+$/g, '')
     if (!root) return notes
     const prefix = `${root}/`
-    return notes.filter(n => n.path === root || n.path.startsWith(prefix))
+    const scoped = notes.filter(n => n.path === root || n.path.startsWith(prefix))
+    // Passt der eingestellte Stammordner auf keine einzige Notiz (Tippfehler, anderer
+    // Vault), dann vault-weit zählen statt still „0 / 0 / 0" zu zeigen — das las sich
+    // nach einem Update wie Datenverlust.
+    return scoped.length > 0 ? scoped : notes
   }, [notes, notesRootFolder])
   const scopedKindIndex = useMemo(() => buildNoteKindIndex(scopedNotes), [scopedNotes])
   const kindCounts = useMemo(() => countNoteKinds(scopedKindIndex), [scopedKindIndex])

@@ -6,7 +6,7 @@
 // Auftrag ausdrücklich geforderte Anzahl von Entwürfen.
 //
 // Bewusst NICHT geprüft wird, ob Hauptabschnitte doppelt vorkommen. Das war im
-// Beschaffungs-Härtetest zwar zu sehen, ist aber beim Überfliegen sofort sichtbar —
+// Praxistest zwar zu sehen, ist aber beim Überfliegen sofort sichtbar —
 // und eine Vergleichsvorlage mit „## Bewertung" je Anbieter wäre ein Fehlalarm, der
 // einen mehrminütigen Lauf kostet. Das Tor blockiert nur, was still durchrutscht.
 //

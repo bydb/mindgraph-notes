@@ -21942,6 +21942,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 .model-picker-caret { flex-shrink: 0; color: var(--text-muted); font-size: 10px; }
 
+.model-picker-list.model-picker-list--up {
+  top: auto;
+  bottom: calc(100% + 4px);
+}
+
 .model-picker-list {
   /* Die Liste ist bewusst NICHT an die Breite des Felds gekoppelt (kein right: 0).
      Das Feld ist in der Macher-Leiste schmal; waere die Liste genauso schmal, waeren

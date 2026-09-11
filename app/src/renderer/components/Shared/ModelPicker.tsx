@@ -40,6 +40,9 @@ export function ModelPicker({
 }: Props) {
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
+  // Liste nach oben aufklappen, wenn unter dem Feld kein Platz ist. In der
+  // Macher-Leiste am unteren Fensterrand war sonst nur der erste Eintrag sichtbar.
+  const [openUp, setOpenUp] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   // Build the full option list (placeholder first, then models).
@@ -64,6 +67,8 @@ export function ModelPicker({
     if (open) {
       const idx = options.findIndex(o => o.value === value)
       setHighlight(idx >= 0 ? idx : 0)
+      const rect = rootRef.current?.getBoundingClientRect()
+      if (rect) setOpenUp(window.innerHeight - rect.bottom < 330 && rect.top > window.innerHeight - rect.bottom)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -108,7 +113,7 @@ export function ModelPicker({
         <span className="model-picker-caret" aria-hidden>▾</span>
       </button>
       {open && (
-        <ul className="model-picker-list" role="listbox" aria-label={ariaLabel}>
+        <ul className={`model-picker-list${openUp ? ' model-picker-list--up' : ''}`} role="listbox" aria-label={ariaLabel}>
           {options.map((o, i) => (
             <li
               key={o.value || '__placeholder__'}

@@ -48,9 +48,27 @@ export function useAgentFinalText(run: AgentRunUiState): string {
   }
 }
 
+/** „m:ss" seit Laufstart — tickt jede Sekunde, solange der Lauf läuft. */
+function useElapsedLabel(startedAt: number | null, running: boolean): string {
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => {
+    if (!running) return
+    const id = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [running])
+  if (!startedAt) return ''
+  const total = Math.max(0, Math.floor((now - startedAt) / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
 export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, onDismiss, onRemember }: Props) {
   const { t } = useTranslation()
   const finalText = useAgentFinalText(run)
+  // Ein Lauf mit lokalem 27B-Modell dauert real zehn Minuten. Ohne Uhr sieht das
+  // wie ein Hänger aus; mit Uhr sieht man, dass etwas passiert und wie lange schon.
+  const elapsed = useElapsedLabel(run.startedAt, run.phase === 'running')
 
   // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
   const [rememberText, setRememberText] = useState('')
@@ -136,7 +154,10 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
       )}
       {run.phase === 'running' && (
         <div className="ai-bar-agent-row">
-          <span className="ai-bar-agent-working">{t('aiBar.agent.working')}</span>
+          <span className="ai-bar-agent-working">
+            {t('aiBar.agent.working')}{elapsed ? ` ${t('aiBar.agent.elapsed')} ${elapsed}` : ''}
+            {run.steps.length > 0 ? ` · ${run.steps.length} ${t('aiBar.agent.stepsLabel')}` : ''}
+          </span>
           <button type="button" className="ai-bar-cancel" onClick={onCancel}>{t('aiBar.cancel')}</button>
         </div>
       )}

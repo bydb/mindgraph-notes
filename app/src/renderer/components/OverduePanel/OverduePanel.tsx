@@ -9,6 +9,7 @@ import { PanelHeader, PanelHeaderIconButton } from '../Shared/PanelHeader'
 import { IconClock, IconPlus, IconCalendar, IconSparkle } from '../Shared/Icons'
 import { cloudProviderForSentinel } from '../../../shared/llmBackend'
 import { isTaskPathExcluded } from '../../../shared/taskFolderFilter'
+import { taskDisplayText } from '../../../shared/taskExtractor'
 
 interface TaskEntry extends ExtractedTask {
   noteId: string
@@ -176,7 +177,7 @@ const TaskCard: React.FC<{
               onClick={() => setEditingText(true)}
               title={t('tasks.clickToEdit')}
             >
-              {task.text || <em className="overdue-item-empty">{t('tasks.emptyText')}</em>}
+              {task.text ? taskDisplayText(task.text) : <em className="overdue-item-empty">{t('tasks.emptyText')}</em>}
             </span>
           )}
         </div>
