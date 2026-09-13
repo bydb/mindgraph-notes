@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.7-beta",
+    "softwareVersion": "0.11.8-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Posteingang: Entw&uuml;rfe, Papierkorb, Serverabgleich und verl&auml;ssliche Antworten &middot; v0.11.7</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Einstellungen neu gebaut: ein System, Auto-Save, Status mit n&auml;chstem Schritt &middot; v0.11.8</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.7 &middot; Der Posteingang wird verl&auml;sslich</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Posteingang verh&auml;lt sich jetzt wie ein Mailprogramm, dem man vertrauen kann: richtiges Absenderkonto, Reply-To, gesicherte Entw&uuml;rfe, Papierkorb und Abgleich mit dem Server.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Ein unabh&auml;ngiges Funktionsreview des Mailclients fand sechzehn Schwachstellen, vom falschen Absenderkonto bis zu Anh&auml;ngen, die still fehlten. Alle sind behoben: Antworten gehen vom richtigen Konto an das Reply-To-Ziel, nichts geht ohne angek&uuml;ndigte Anh&auml;nge raus, Entw&uuml;rfe &uuml;berleben Schlie&szlig;en und Neustart, die Suche findet alles, und Aktualisieren gleicht Gelesen, Verschoben und Gel&ouml;scht mit dem Server ab.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.8 &middot; Einstellungen aus einem Guss</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Alle 22 Einstellungsseiten folgen einem System: Karten mit Status und n&auml;chstem Schritt, Auto-Save statt Speichern-Kn&ouml;pfen, Erkl&auml;rungen zum Aufklappen.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Die Einstellungen waren &uuml;ber Jahre gewachsen: drei Zeilenformen, nackte Browser-Felder, ein &bdquo;Speichern&ldquo;-Knopf pro Feld und Status ohne Weg zur L&ouml;sung. Jetzt sitzt jeder Dienst in einer Karte mit Statuschip und Handlung, Schl&uuml;ssel speichern sich beim Verlassen des Felds, ausgeschaltete Module lassen sich direkt dort einschalten, und die Navigation klappt inaktive Gruppen ein. Dazu ein Hilfe-Guide auf aktuellem Stand und ein experimenteller Shell-Zugriff f&uuml;r den Notiz-Agenten, vom Betriebssystem eingez&auml;unt.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Versandvertrauen</b><p data-i18n="release.c1">Antworten, Weiterleiten und KI-Entw&uuml;rfe nutzen das Konto, auf dem die Mail ankam, und beachten Reply-To. Fehlt ein Anhang, geht nichts raus. Versandergebnis und Abruffehler je Konto stehen sichtbar &uuml;ber der Liste.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Entw&uuml;rfe, Anh&auml;nge, BCC, Suche</b><p data-i18n="release.c2">Angefasste Entw&uuml;rfe werden automatisch gesichert und lassen sich wieder &ouml;ffnen. Weiterleiten nimmt die Originalanh&auml;nge mit. Ein BCC-Feld ist da. Die Suche geht &uuml;ber Absender, Empf&auml;nger, Betreff und Text in allen Ordnern.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Abgleich und Papierkorb</b><p data-i18n="release.c3">Aktualisieren &uuml;bernimmt Gelesen, Verschoben und Gel&ouml;scht vom Server, ohne selbst etwas zu l&ouml;schen. Gelesen/Ungelesen l&auml;sst sich setzen, L&ouml;schen verschiebt in den Papierkorb des Kontos.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Ein Baukasten f&uuml;r alle Seiten</b><p data-i18n="release.c1">Seitenkopf, Sektionen mit &bdquo;3 von 5 aktiv&ldquo;, Zeilen mit Hinweis links und Control rechts, Segment-Schalter, Chips. Textfelder &uuml;bernehmen beim Verlassen oder mit Enter; Geheimnisse zeigen nur die letzten vier Zeichen. Der Modul-Tab kennt den Verbindungszustand und filtert nach &bdquo;Einrichtung n&ouml;tig&ldquo;.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Hilfe und Agent</b><p data-i18n="release.c2">Der Hilfe-Guide erkl&auml;rt jetzt Gehirn, Notiz-Agent und Skills, Macher-Leiste, Sprachbefehle, Zeitbilanz und die Cloud-Anbieter, mit Spr&uuml;ngen in die passende Einstellung. Ein Notizwechsel bricht einen laufenden Agentenlauf nicht mehr ab; die Volltextsuche findet auch Notizen, die seit dem Start nicht ge&ouml;ffnet waren.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Shell-Zugriff, experimentell</b><p data-i18n="release.c3">Der Notiz-Agent darf nach Freigabe pro Lauf Befehle ausf&uuml;hren, in einer Sandbox des Betriebssystems: nur Anh&auml;nge lesen, nur im Arbeitsordner schreiben, kein Netz. Standardm&auml;&szlig;ig aus, derzeit nur macOS; ohne Sandbox startet die Shell nicht.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Posteingang: Entw&uuml;rfe, Papierkorb, Serverabgleich und verl&auml;ssliche Antworten &middot; v{vs}",
+        "hero.release": "Einstellungen neu gebaut: ein System, Auto-Save, Status mit n&auml;chstem Schritt &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Der Posteingang wird verlässlich",
-        "release.heading": "Was ist neu — <em>Der Posteingang verhält sich jetzt wie ein Mailprogramm, dem man vertrauen kann: richtiges Absenderkonto, Reply-To, gesicherte Entwürfe, Papierkorb und Abgleich mit dem Server.</em>",
-        "release.lead": "Ein unabhängiges Funktionsreview des Mailclients fand sechzehn Schwachstellen, vom falschen Absenderkonto bis zu Anhängen, die still fehlten. Alle sind behoben: Antworten gehen vom richtigen Konto an das Reply-To-Ziel, nichts geht ohne angekündigte Anhänge raus, Entwürfe überleben Schließen und Neustart, die Suche findet alles, und Aktualisieren gleicht Gelesen, Verschoben und Gelöscht mit dem Server ab. Löschen verschiebt in den Papierkorb des Kontos; verschwundene Mails werden angezeigt, nie still entsorgt.",
-        "release.c1h": "Versandvertrauen",
-        "release.c1": "Antworten, Allen antworten, Weiterleiten und „Als Antwort verwenden“ aus dem KI-Chat gehen vom Konto aus, auf dem die Mail ankam; vorher war es immer das erste Konto. Ein Reply-To-Header wird beachtet und die Umleitung im Fenster angezeigt. Fehlt eine gewählte Anhangdatei, bricht der Versand ab, statt sie still wegzulassen. Nach dem Senden erscheint das Ergebnis über der Liste, auch die Warnung, wenn die Kopie nicht im Gesendet-Ordner landen konnte. Abruffehler eines Kontos, etwa ein abgelaufenes Passwort, stehen als rote Leiste mit dem letzten erfolgreichen Abruf.",
-        "release.c2h": "Entwürfe, Anhänge, BCC, Suche",
-        "release.c2": "Jeder angefasste Entwurf wird automatisch gesichert; Schließen behält ihn, nur Verwerfen und Senden entfernen ihn. Eine Leiste „N Entwürfe“ öffnet sie wieder, auch nach Neustart. Weiterleiten holt die Originalanhänge vom Server und hängt sie als Dateien an; was nicht mitgeht, wird gesagt, und Senden ist gesperrt, solange sie laden. Ein BCC-Feld ist da. Die Suche geht über Absender, Empfänger, Betreff und Text in allen Ordnern; die Filter pausieren dabei sichtbar.",
-        "release.c3h": "Abgleich und Papierkorb",
-        "release.c3": "Aktualisieren arbeitet über das ganze Aufbewahrungsfenster und übernimmt für bekannte Mails, was anderswo passiert ist: gelesen, verschoben, gelöscht. Gelöschte werden durchgestrichen angezeigt und erst auf Wunsch entfernt, mehrgeräte-sicher. Gelesen/Ungelesen lässt sich setzen, optional schon beim Öffnen. Löschen verschiebt in den erkannten Papierkorb des Kontos; ohne Papierkorb gibt es den Knopf nicht. Eigene gesendete Mails bekommen ihre Server-Kennung und lassen sich verschieben.",
+        "release.label": "Release {vs} · Einstellungen aus einem Guss",
+        "release.heading": "Was ist neu — <em>Alle 22 Einstellungsseiten folgen einem System: Karten mit Status und nächstem Schritt, Auto-Save statt Speichern-Knöpfen, Erklärungen zum Aufklappen.</em>",
+        "release.lead": "Die Einstellungen waren über Jahre gewachsen: drei Zeilenformen, nackte Browser-Felder, ein „Speichern“-Knopf pro Feld und Status ohne Weg zur Lösung. Jetzt sitzt jeder Dienst in einer Karte mit Statuschip und Handlung, Schlüssel speichern sich beim Verlassen des Felds, ausgeschaltete Module lassen sich direkt dort einschalten, und die Navigation klappt inaktive Gruppen ein. Dazu ein Hilfe-Guide auf aktuellem Stand und ein experimenteller Shell-Zugriff für den Notiz-Agenten, vom Betriebssystem eingezäunt.",
+        "release.c1h": "Ein Baukasten für alle Seiten",
+        "release.c1": "Seitenkopf, Sektionen mit „3 von 5 aktiv“, Zeilen mit Hinweis links und Control rechts, Segment-Schalter, Chips. Textfelder übernehmen beim Verlassen oder mit Enter; Geheimnisse zeigen nur die letzten vier Zeichen. Der Modul-Tab kennt den Verbindungszustand jedes Dienstes und filtert nach „Einrichtung nötig“; ausgeschaltete Module lassen sich auf ihrer Konfigurationsseite direkt einschalten.",
+        "release.c2h": "Hilfe und Agent",
+        "release.c2": "Der Hilfe-Guide (⌘/) erklärt jetzt Gehirn, Notiz-Agent und Skills, Macher-Leiste, Sprachbefehle, Zeitbilanz, Kategorien und die Cloud-Anbieter, mit Sprüngen in die passende Einstellung; 405 tote Texte der alten Hilfe sind entfernt. Ein Notizwechsel bricht einen laufenden Agentenlauf nicht mehr ab, das Panel zeigt Laufzeit und Schrittzahl. Die Volltextsuche lädt fehlende Inhalte nach, Wikilinks mit Ordnerpfad öffnen in allen Modi.",
+        "release.c3h": "Shell-Zugriff, experimentell",
+        "release.c3": "Der Notiz-Agent darf nach zweistufiger Freigabe (Modul plus Schalter pro Lauf) Befehle und Skripte ausführen, in einer Sandbox des Betriebssystems: nur Anhänge lesen, nur im Arbeitsordner schreiben, kein Netz. Vor jeder Freigabe läuft ein Selbsttest; ohne Sandbox startet die Shell nicht. Standardmäßig aus, derzeit nur macOS. Modelle mit bekannter Anfälligkeit für eingeschleuste Anweisungen bleiben gesperrt.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Inbox: drafts, trash, server sync and reliable replies &middot; v{vs}",
+        "hero.release": "Settings rebuilt: one system, auto-save, status with a next step &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · An inbox you can trust",
-        "release.heading": "What’s new — <em>The inbox now behaves like a mail client you can trust: the right sending account, Reply-To, saved drafts, trash and a real sync with the server.</em>",
-        "release.lead": "An independent functional review of the mail client found sixteen weak spots, from the wrong sending account to attachments that silently went missing. All are fixed: replies go from the right account to the Reply-To target, nothing leaves without the attachments it announces, drafts survive closing and restarts, search finds everything, and Refresh syncs read, moved and deleted state with the server. Delete moves to the account’s trash; vanished mails are shown, never silently discarded.",
-        "release.c1h": "Trust in sending",
-        "release.c1": "Reply, Reply all, Forward and “Use as reply” from the AI chat send from the account the mail arrived on; before, it was always the first account. A Reply-To header is honoured and the redirect is shown in the compose window. If a chosen attachment file is missing, sending stops instead of silently dropping it. After sending, the result appears above the list, including the warning when the copy could not be stored in the Sent folder. Fetch errors per account, such as an expired password, show as a red bar with the last successful fetch.",
-        "release.c2h": "Drafts, attachments, BCC, search",
-        "release.c2": "Every touched draft is saved automatically; closing keeps it, only Discard and Send remove it. A “N drafts” bar reopens them, even after a restart. Forward fetches the original attachments from the server and attaches them as files; whatever cannot come along is stated, and Send is locked while they load. There is a BCC field. Search covers sender, recipients, subject and body across all folders; filters visibly pause meanwhile.",
-        "release.c3h": "Sync and trash",
-        "release.c3": "Refresh works across the whole retention window and picks up what happened elsewhere to known mails: read, moved, deleted. Deleted ones are shown struck through and removed only on request, safely across devices. Read/unread can be set, optionally on opening. Delete moves to the account’s detected trash folder; without one there is no button. Your own sent mails get their server ID and can be moved.",
+        "release.label": "Release {vs} · Settings from a single mould",
+        "release.heading": "What’s new — <em>All 22 settings pages follow one system: cards with status and a next step, auto-save instead of save buttons, explanations that fold open.</em>",
+        "release.lead": "The settings had grown over years: three row styles, bare browser inputs, a “Save” button per field and status without a path to a fix. Now every service sits in a card with a status chip and an action, keys save when you leave the field, disabled modules can be switched on right where they are configured, and the navigation folds inactive groups away. Plus an up-to-date help guide and an experimental shell access for the note agent, fenced in by the operating system.",
+        "release.c1h": "One kit for every page",
+        "release.c1": "Page header, sections with “3 of 5 active”, rows with the hint on the left and the control on the right, segmented switches, chips. Text fields commit on blur or Enter; secrets show only their last four characters. The modules tab knows the connection state of every service and filters by “needs setup”; disabled modules can be enabled right on their configuration page.",
+        "release.c2h": "Help and agent",
+        "release.c2": "The help guide (⌘/) now explains Brain, note agent and skills, maker bar, voice commands, time balance, categories and the cloud providers, with jumps to the matching setting; 405 dead strings of the old help are gone. Switching notes no longer aborts a running agent run, and the panel shows elapsed time and step count. Full-text search loads missing content on demand, wikilinks with folder paths open in every mode.",
+        "release.c3h": "Shell access, experimental",
+        "release.c3": "After a two-step approval (module plus a switch per run) the note agent may execute commands and scripts inside an operating-system sandbox: read attachments only, write only in the run’s work folder, no network. A self-test runs before every approval; without a sandbox the shell does not start. Off by default, macOS only for now. Models with known susceptibility to injected instructions stay locked out.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

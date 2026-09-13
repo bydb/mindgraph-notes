@@ -2,6 +2,45 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.8-beta] - 2026-09-13
+
+Drei Stränge. Erstens die Einstellungen: alle 22 Seiten folgen jetzt einem System, nach einem Design-Prototyp gebaut. Zweitens der Hilfe-Guide, der seit Mai nicht mehr zur App passte. Drittens der Notiz-Agent: neun Bedienfehler behoben und, als Experiment, ein Shell-Zugriff mit Schutzgrenzen des Betriebssystems.
+
+### Einstellungen
+
+- **Ein Baukasten für alle Seiten.** Seitenkopf mit Untertitel, Sektionen mit Meta („3 von 5 aktiv"), Karten, Zeilen mit Hinweis links und Control rechts, Segment-Schalter, Chips, Aufklapper für lange Erklärungen. Vorher gab es drei verschiedene Zeilenformen und nackte Browser-Felder.
+- **Auto-Save statt Speichern-Knöpfen.** Textfelder übernehmen beim Verlassen oder mit Enter und zeigen kurz „Gespeichert". Schlüssel und Passwörter erscheinen nach dem Speichern nur noch als Punkte mit den letzten vier Zeichen. Bewusste Ausnahme: die E-Mail-Relevanzregeln behalten einen gemeinsamen Speichern-Knopf, damit ein halb getippter Domainname nicht sofort als Regel in die Notiz landet.
+- **Status mit nächstem Schritt.** Jeder externe Dienst (Zotero, OpenAlex, Docling, Vision-OCR, LanguageTool, Readwise, E-Mail-Konten, edoobox, Antares, WordPress, reMarkable, Telegram) sitzt in einer Karte mit Statuschip und „Prüfen"/„Verbindung testen". Bei Störung steht eine Diagnose mit „Erneut prüfen" in der Karte statt nur „Nicht verbunden".
+- **Module und Konfiguration verlinken sich beidseitig.** Der Modul-Tab kennt den Verbindungszustand, zeigt „Verbunden · Einstellungen →" oder „Nicht verbunden · Einrichten →" und filtert nach „Alle · Aktiv · Einrichtung nötig". Ist ein Modul aus, steht auf seiner Konfigurationsseite eine gestrichelte Karte mit „Modul einschalten".
+- **KI & Modelle** hat einen Status-Kopf mit Backend-Wahl, Aktualisieren und Hauptschalter statt drei Zeilen mit demselben Inhalt. Cloud-Anbieter kollabieren auf den Kopf, solange sie aus sind; OpenRouter und LLMBase teilen sich eine Karte. Der verwaiste „Key speichern"-Kasten der Bild-Generierung ist weg.
+- **Navigation** klappt inaktive Gruppen ein, alle Gruppen sind ohne Scrollen sichtbar. Die Gruppe der aktiven Seite lässt sich per Klick einklappen; ein Seitenwechsel scrollt den Inhalt nach oben.
+- **Sync** mit Status-Kopf und „Jetzt synchronisieren"; Protokoll und gelöschte Dateien als Listen, Erzwingen und Deaktivieren mit Hinweis. **E-Mail**: ein Konto ist eine Karte mit Verbindungstest. **Zugangsdaten**: jeder Eintrag mit Chip „Gesetzt" oder „Fehlt" und Sprung zur Seite.
+- **Tastenkürzel-Seite korrigiert.** Code ist ⌘` (nicht ⌘⇧K), Link ⌘K und Macher-Leiste ⌘⇧A ergänzt, das nicht existierende Durchgestrichen-Kürzel entfernt.
+- Intern: Settings.tsx von 6291 auf 1955 Zeilen; jede Seite ist eine eigene Datei, die Bausteine liegen in `SettingsUI.tsx`, die Übersetzungen der Seiten in `utils/i18n/settingsPages.ts`.
+
+### Hilfe-Guide
+
+- **Inhalte auf Stand 09/2026, Deutsch und Englisch.** Neu erklärt: Gehirn, Notiz-Agent und Skills, Macher-Leiste, Sprache und Sprachbefehle, Modelle und Cloud-Anbieter, Kategorien und Zettel, Zeitbilanz, Workflow Canvas, Medienzentrum-Plugins. Korrigiert: Backends (kein „Claude API" mehr), Research mit OpenAlex, Telegram als experimentell. Jedes Thema springt in die passende Einstellung oder den passenden Tab.
+- Farben aus den App-Tokens, damit die Hilfe zu Akzentfarbe und Dark Mode passt. 405 tote Texte einer noch älteren Tab-Hilfe aus der Übersetzungsdatei entfernt.
+
+### Notiz-Agent
+
+- **Ein Notizwechsel bricht einen laufenden Lauf nicht mehr ab.** Lauf und Ergebniskarten bleiben an ihre Notiz gebunden; das Panel zeigt „seit m:ss · N Schritte". Ein Lauf mit lokalem 27B-Modell dauert real 9 bis 13 Minuten, wer währenddessen eine Quelle nachlas, verlor vorher alles ohne Warnung.
+- **Shell-Zugriff, experimentell.** Nach zweistufiger Freigabe (Modul „Agent-Shell" plus Schalter pro Lauf und nativer Dialog) darf der Agent Befehle und Skripte ausführen, in einer Sandbox des Betriebssystems: nur Anhänge lesen (wahlweise der ganze Vault), nur im Arbeitsordner des Laufs schreiben, kein Netz (wahlweise erlaubt). Vor jeder Freigabe läuft ein Selbsttest; ohne Sandbox startet die Shell nicht. Standardmäßig aus, derzeit nur macOS. Modelle, die im Notiz-Agenten Pfade erfinden oder in einem schadensrelevanten Modul auf eingeschleuste Anweisungen hereinfallen, bleiben gesperrt. Shell-Läufe zählen in der Arbeitsbilanz als eigene Tätigkeitsart, gezählt, nie bewertet.
+- Umgebungsprobe nach der Freigabe: das Modell erfährt, welche Interpreter und Python-Bibliotheken sich tatsächlich importieren lassen. Vorher suchte es das Python mit pandas vier Iterationen lang auf dem falschen Pfad.
+
+### Behoben
+
+- **Volltextsuche fand nur seit dem Start geöffnete Notizen.** Nach einem Start aus dem Cache lädt sie fehlende Inhalte in Paketen nach.
+- **Wikilinks mit Ordnerpfad** (`[[100 - Projekte/…/_STATUS|Alias]]`) öffnen jetzt in Lesen- und Schreiben-Modus; vorher markierte der Klick nur den Text.
+- Callout ohne eigenen Titel: die erste Inhaltszeile wurde samt „> " zum Titel.
+- Aufgabenpanel, Dashboard und Briefing zeigen Wikilinks als Notiznamen statt als Klammern.
+- Ordnerzähler zählt Unterordner mit; Farbfilter-Zähler fallen auf vault-weit zurück, wenn der Stammordner auf keine Notiz passt.
+- Die Modell-Liste klappt nach oben auf, wenn unter dem Feld kein Platz ist.
+- Eine verspätete Antwort eines abgebrochenen Vorschlags wird verworfen, statt sich über das Agent-Protokoll zu legen.
+- Hinweis in der Macher-Leiste, was ohne und mit Zielordner passiert („Vorschlag" gegen „Agent").
+- Tooltips über den Farbkreisen in den Einstellungen wurden von der Karte abgeschnitten.
+
 ## [0.11.7-beta] - 2026-09-11
 
 Ein Strang: der Mailclient. Ein unabhängiges Funktionsreview (Codex) fand sechzehn Schwachstellen, vom falschen Absenderkonto bis zu Anhängen, die still fehlten. Alle sind behoben, in drei Paketen: Versandvertrauen, nichts verlieren und alles finden, Abgleich mit dem Server und Papierkorb. Dazu eine Nachprüfung der Umsetzung mit sechs weiteren Befunden, ebenfalls behoben. Alles ist lokal geprüft (1882 Tests); die Gegenprobe gegen echte Mailserver ist der Zweck dieses Releases.
