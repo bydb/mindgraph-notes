@@ -6,6 +6,7 @@
 import { randomBytes } from 'crypto'
 import type { WebResearchConfig, WebResearchPhase, WebFetchRecord } from '../../shared/webResearch'
 import type { CollectedTable } from '../../shared/tableCollect'
+import type { ShellState } from './shellExecution'
 
 export type AgentRunStatus = 'running' | 'done' | 'cancelled' | 'error'
 
@@ -28,7 +29,7 @@ export interface AgentResultEntry {
   resultId: string
   stagingPath: string // absolut, ausschließlich Main-seitig
   suggestedName: string
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg'
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg' | 'pdf' | 'pptx'
   summary: string
   sources: string[]
   consumed: boolean
@@ -92,6 +93,8 @@ export interface AgentRun {
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
   // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
   imageGen?: boolean
+  // Nur nach nativer Main-Freigabe gesetzt, nie aus Renderer-Parametern kopieren.
+  shell?: ShellState
   // Stil-Block(s) aus einer angehängten HTML-Seite, die dieser Lauf gelesen hat.
   // Beim Korrigieren einer Seite lässt das Modell den CSS-Block gern weg — er ist
   // lang und ändert sich nicht. Die Seite rendert dann komplett ohne Layout (real

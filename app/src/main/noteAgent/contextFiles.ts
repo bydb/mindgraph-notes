@@ -198,6 +198,19 @@ export function getContextAttachmentInfos(senderId: number, ids: string[]): Cont
   return out
 }
 
+// Nur für den bereits freigegebenen Shell-Lauf, keine Renderer-IPC. Skripte
+// brauchen die echten Eingabepfade; dabei dieselbe erneute Pfadprüfung wie Leser.
+export async function getShellAttachmentPaths(senderId: number, ids: string[]): Promise<Array<{ name: string; path: string }>> {
+  const map = registryBySender.get(senderId)
+  const result: Array<{ name: string; path: string }> = []
+  for (const id of ids) {
+    const entry = map?.get(id)
+    if (!entry) throw new Error('Shell-Kontext enthält einen nicht mehr verfügbaren Anhang')
+    result.push({ name: entry.name, path: await assertEntryReadable(entry) })
+  }
+  return result
+}
+
 // Roh-Lesen eines einzelnen Anhangs für den read_attachment-Skill — ohne den
 // Delimiter-Rahmen (den setzt der Loop-Kontext), aber mit denselben Budgets.
 export async function readAttachmentRaw(

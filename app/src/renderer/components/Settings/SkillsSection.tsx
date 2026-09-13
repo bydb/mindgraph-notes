@@ -124,7 +124,7 @@ export function SkillsSection({ onClose }: Props) {
       return
     }
     setInstallStatus(
-      `${t('settings.skills.installed')}: ${res.folderName}${res.skippedScripts ? ` — ${t('settings.skills.scriptsSkipped')}` : ''}`
+      `${t('settings.skills.installed')}: ${res.folderName}${res.includedScripts ? ` — ${t('settings.skills.scriptsIncluded')}` : ''}`
     )
     await reload()
   }

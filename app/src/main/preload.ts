@@ -216,6 +216,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     lmStudioPort?: number
     cloud?: { model: string } | null
     webResearch?: { enabled: boolean } | null
+    shellAccess?: boolean
     /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
     instructionMs?: number
     /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */

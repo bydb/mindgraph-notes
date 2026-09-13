@@ -42,9 +42,9 @@ export const ImageGenerationSection: React.FC = () => {
   }
 
   return (
-    <>
-      <h4 className="settings-section-title">{t('settings.ai.imageGen.title')}</h4>
-      <p className="settings-hint">{t('settings.ai.imageGen.description')}</p>
+    <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border, #e5e7eb)' }}>
+      <label style={{ fontWeight: 600 }}>{t('settings.ai.imageGen.title')}</label>
+      <p className="settings-hint" style={{ fontSize: '11px', margin: 0 }}>{t('settings.ai.imageGen.description')}</p>
 
       <div className="settings-row">
         <label>{t('settings.ai.imageGen.apiKey')}</label>
@@ -71,6 +71,6 @@ export const ImageGenerationSection: React.FC = () => {
         </div>
       )}
       <p className="settings-hint">{t('settings.ai.imageGen.privacyHint')}</p>
-    </>
+    </div>
   )
 }

@@ -19,9 +19,9 @@ import { isRunCallTotals, type RunCallTotals } from './llmTelemetry'
  * ist ohne Inhaltskenntnis nicht ableitbar. Wer sie lesen will, vergibt sie selbst,
  * indem er für diese Art eine Referenzzeit hinterlegt.
  */
-export type ActivityType = 'table-merge' | 'document' | 'summary' | 'web-research' | 'email-tasks' | 'other'
+export type ActivityType = 'table-merge' | 'document' | 'summary' | 'web-research' | 'email-tasks' | 'shell' | 'other'
 
-export const ACTIVITY_TYPES: ActivityType[] = ['table-merge', 'document', 'summary', 'web-research', 'email-tasks', 'other']
+export const ACTIVITY_TYPES: ActivityType[] = ['table-merge', 'document', 'summary', 'web-research', 'email-tasks', 'shell', 'other']
 
 /**
  * Vorgangsarten aus Plugins (Paket 2 der Arbeitsbilanz, docs/codex-collab/
@@ -52,6 +52,17 @@ export function isJobType(type: ValuedType): type is JobType {
 }
 
 /**
+ * Arten OHNE Referenzzeit: gezählt, nie bewertet. `shell` fasst zu Verschiedenes zusammen
+ * (Umwandlung, Berechnung, Systembefehl) — eine einzige Vergleichsminute wäre eine
+ * Schätzung, die als Messung gelesen würde. Die Einstellungen bieten dafür kein Feld,
+ * und die Bilanz ignoriert eine Referenz, die trotzdem in der Datei steht.
+ */
+export const UNREFERENCED_TYPES: ValuedType[] = ['shell']
+export function isReferenceable(type: ValuedType): boolean {
+  return !UNREFERENCED_TYPES.includes(type)
+}
+
+/**
  * Stabile, inhaltsfreie Kennung aus Teilen (FNV-1a, zweimal mit verschiedenem Start).
  * Für die Teilnehmerliste: gleiche Veranstaltung, gleiche Termine, gleicher Tag = derselbe
  * Vorgang. Ein zweiter Export am selben Tag ist keine zweite Arbeit; am Folgetag (neue
@@ -71,7 +82,7 @@ export function stableJobId(parts: string[]): string {
 }
 
 /** Formate, die der Agent als Ergebnis anbieten kann (Spiegel von AgentResultEntry['kind']). */
-export type ResultFormat = 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg'
+export type ResultFormat = 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg' | 'pdf' | 'pptx'
 
 export type ActivityEvent =
   | {
@@ -388,6 +399,8 @@ export function pruneActivityEvents(events: ActivityEvent[], nowMs: number): Act
 export function deriveActivityType(tools: Iterable<string>): ActivityType {
   const used = new Set(tools)
   if (used.has('collect_table') || used.has('write_xlsx')) return 'table-merge'
+  // Shell-Lauf ohne strukturierte Tabellenverarbeitung: eigene Art, kein Raten der Aufgabe.
+  if (used.has('shell_execute') || used.has('shell_stage_file')) return 'shell'
   if (used.has('web_search') || used.has('web_fetch')) return 'web-research'
   if (used.has('write_docx') || used.has('fill_docx_form') || used.has('write_html')) return 'document'
   if (used.has('write_note')) return 'summary'
@@ -988,7 +1001,7 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
   for (const type of VALUED_TYPES) {
     const bucket = byType.get(type)
     if (!bucket) continue
-    const ref = reference[type]
+    const ref = isReferenceable(type) ? reference[type] : undefined
     if (typeof ref !== 'number' || ref <= 0) {
       if (!unpriced.includes(type)) unpriced.push(type)
       continue

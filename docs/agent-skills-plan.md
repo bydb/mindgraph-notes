@@ -81,9 +81,13 @@ Bewertungsraster. Das ist eine Community-Chance, kein Katalog-Import-Problem.
 - Frontmatter: `name`, `description` (Pflicht, Spec-konform); MindGraph-Erweiterung
   `enabled: true|false` ODER Aktivierung separat in `vault-settings.json` (sauberer,
   Datei bleibt 100% Spec-konform) — Empfehlung: vault-settings.
-- **`scripts/` wird NICHT ausgeführt.** Der Notiz-Agent hat bewusst keinen
-  Code-/Shell-Zugriff; Skills sind reine Anleitungen. Enthält ein importierter Skill
-  Scripts, wird das beim Import angezeigt und die Scripts werden ignoriert.
+- **`scripts/` wird beim Import NICHT ausgeführt und nicht mitkopiert.** Skills sind
+  reine Anleitungen. Enthält ein importierter Skill Scripts, wird das beim Import
+  angezeigt und die Scripts werden ignoriert. *Ergänzung 09/2026:* Es gibt inzwischen
+  einen optionalen Shell-Zugriff des Notiz-Agenten (Modul „Agent-Shell", default aus,
+  Freigabe pro Lauf im Main) — der ist eine eigene Fähigkeit mit eigener Sperre und
+  ändert nichts daran, dass Skill-Skripte inaktiv bleiben. Siehe CLAUDE.md
+  „Notiz-Agent: optionaler Shell-Zugriff".
   `references/`-Dateien sind in Stufe 3 über den bestehenden Kontext-Reader lesbar.
 
 ### 2. Integration in den Agent-Loop (Progressive Disclosure)

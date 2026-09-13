@@ -4,6 +4,7 @@ import {
   ACTIVITY_RETENTION_DAYS,
   impactBadge,
   deriveActivityType,
+  isReferenceable,
   estimateSavedMinutes,
   isActivityEvent,
   localDayRange,
@@ -56,6 +57,21 @@ describe('deriveActivityType', () => {
   it('fällt auf other zurück statt zu raten', () => {
     expect(deriveActivityType(['note_search'])).toBe('other')
     expect(deriveActivityType([])).toBe('other')
+  })
+
+  it('ordnet einen Shell-Lauf als shell ein, nicht als Tabellenarbeit oder Sonstiges', () => {
+    // Fachlich vielleicht dieselbe Aufgabe wie collect_table — aber das weiß nur der
+    // Mensch. Die App rät nicht, sie nennt das Werkzeug.
+    expect(deriveActivityType(['shell_execute', 'shell_stage_file'])).toBe('shell')
+    expect(deriveActivityType(['shell_execute', 'write_note'])).toBe('shell')
+    // Strukturierte Tabellenverarbeitung bleibt kennzeichnend, auch wenn die Shell mithalf.
+    expect(deriveActivityType(['shell_execute', 'collect_table', 'write_xlsx'])).toBe('table-merge')
+  })
+
+  it('shell ist gezählt, aber nie bewertbar — es gibt dafür keine Referenzzeit', () => {
+    expect(isReferenceable('shell')).toBe(false)
+    expect(isReferenceable('table-merge')).toBe(true)
+    expect(isReferenceable('wp-post')).toBe(true)
   })
 })
 

@@ -5,6 +5,7 @@ import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel, type AgentPreviewResponse } from '../Agent/AgentRunPanel'
+import { ShellAccessToggle } from '../Agent/ShellAccessToggle'
 import type { AgentRunUiState } from '../../stores/noteAgentStore'
 import { HumanIcon } from '../Shared/HumanIcon'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
@@ -36,6 +37,7 @@ export interface AiProposalMeta {
 }
 
 interface Props {
+  scopeId?: string
   open: boolean
   onOpenChange: (v: boolean) => void
   phase: 'idle' | 'generating' | 'review'
@@ -67,7 +69,7 @@ interface Props {
   onTargetFolderChange: (rel: string | null) => void
   // Lauf-Zustand aus dem noteAgentStore (Protokoll, Ergebnis-Karten, Provenienz).
   agentRun: AgentRunUiState
-  onAgentRun: (instruction: string, opts: { webResearch: boolean; instructionMs?: number }) => void
+  onAgentRun: (instruction: string, opts: { webResearch: boolean; shellAccess?: boolean; instructionMs?: number }) => void | Promise<void>
   onAgentCancel: () => void
   onAgentAccept: (resultId: string) => void
   onAgentDiscard: (resultId: string) => void
@@ -96,14 +98,17 @@ const PRESETS = [
   { id: 'tone', key: 'aiBar.preset.tone' as const },
 ]
 
-export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentRun, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember }: Props) {
+export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGenerate, onAccept, onDiscard, tagSuggestions, tagsLoading, onSuggestTags, onAcceptTag, onDismissTag, model, models, onModelChange, getModelLabel, attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, attachError, targetFolder, onTargetFolderChange, agentRun, onAgentRun, onAgentCancel, onAgentAccept, onAgentDiscard, onAgentPreview, onAgentDismiss, onRemember }: Props) {
   const { t } = useTranslation()
   const agentPhase = agentRun.phase
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const webResearchModule = useIsModuleEnabled('web-research')
+  const shellModule = useIsModuleEnabled('agent-shell')
   const webResearchConfig = useUIStore(s => s.webResearchConfig)
   const setWebResearchConfig = useUIStore(s => s.setWebResearchConfig)
   const [webResearchArmed, setWebResearchArmed] = useState(false)
+  const [shellArmed, setShellArmed] = useState(false)
+  const [starting, setStarting] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
   // Zielordner-Picker (Modus B)
@@ -121,7 +126,8 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   // Cloud-Sentinel (OpenRouter/LLMBase) oder gehostetes Ollama-Cloud-Modell (`:cloud`/`-cloud`).
   const cloudSelected = cloudProviderForSentinel(model) !== null || isCloudModel(model)
   const agentMode = !!targetFolder
-  const busy = phase === 'generating' || agentPhase === 'running'
+  const busy = phase === 'generating' || agentPhase === 'running' || starting
+  useEffect(() => { setShellArmed(false) }, [scopeId, open, targetFolder, shellModule])
 
   // Config-Spiegel (0d) einmal laden, sobald das Modul aktiv ist — die Leiste braucht Provider
   // + „konfiguriert?" für Tooltip und Warnung (P2-1).
@@ -172,14 +178,19 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
   // Aktive Zeit am Auftrag — dieselbe Messung wie im Agent-Tab.
   const compose = useComposeMeasurement()
 
-  const submit = () => {
+  const submit = async () => {
     if (busy) return
     // Modus B: Zielordner verknüpft → Agent-Loop statt Block-Diff (implizite Eskalation).
     if (agentMode) {
       if (!instruction.trim()) return
       // webResearch nur, wenn Modul an, scharfgestellt UND konfiguriert — nie „scharf-aber-
       // unkonfiguriert" an den Main geben (der Lauf würde sonst scheitern).
-      onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured, instructionMs: compose.take() })
+      const shellAccess = shellArmed
+      setShellArmed(false)
+      setStarting(true)
+      try {
+        await onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured, shellAccess, instructionMs: compose.take() })
+      } finally { setStarting(false) }
       return
     }
     if (!preset && !instruction.trim()) return
@@ -323,11 +334,15 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
             {targetFolder && (
               <span className="ai-bar-chip ai-bar-context-chip ai-bar-target-chip">
                 <span className="ai-bar-context-chip-name" title={targetFolder}>
-                  <FolderGlyph /> {targetFolder.split('/').pop()}
+                  <FolderGlyph /> <span className="ai-bar-target-chip-label">{t('aiBar.target.label')}:</span> {targetFolder.split('/').pop()}
                 </span>
                 <button type="button" className="ai-bar-chip-x" onClick={() => onTargetFolderChange(null)} disabled={busy} aria-label={t('aiBar.target.remove')}>×</button>
               </span>
             )}
+            {shellModule && agentMode && <ShellAccessToggle enabled={shellArmed} disabled={busy} onChange={enabled => {
+              setShellArmed(enabled)
+              if (enabled) setWebResearchArmed(false)
+            }} />}
             {/* Webrecherche pro Lauf scharfstellen (Globus). NUR im Agent-Modus sichtbar
                 (Zielordner gesetzt). Nicht konfiguriert → NICHT scharfstellen, sondern in die
                 Einstellungen springen („Jetzt einrichten"); sonst würde der Lauf im Main scheitern. */}
@@ -343,6 +358,7 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
                     return
                   }
                   setWebResearchArmed(v => !v)
+                  setShellArmed(false)
                 }}
                 disabled={busy}
                 title={webResearchArmed
@@ -364,11 +380,13 @@ export function AiActionBar({ open, onOpenChange, phase, proposal, onGenerate, o
       {!agentMode && !proposal && (
         <div className="ai-bar-agent-mode-hint ai-bar-mode-hint-plain">{t('aiBar.modeHintNoTarget')}</div>
       )}
-      {agentMode && (
+      {agentMode && !shellArmed && !agentRun.shellAccess && (
         <div className="ai-bar-agent-mode-hint">
           {t('aiBar.agent.modeHintBefore')}<strong>{targetFolder.split('/').pop()}</strong>{t('aiBar.agent.modeHintAfter')}
         </div>
       )}
+
+      {shellArmed && <div className="ai-bar-cloud-hint">{t('aiBar.shell.hint')}</div>}
 
       {/* Modus B + Cloud: ehrlicher Hinweis — auch vom Agenten GELESENE Notizen gehen
           im Verlauf an den Anbieter, nicht nur die Anhänge (Entscheidung 7). */}

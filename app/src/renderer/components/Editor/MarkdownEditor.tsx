@@ -1894,7 +1894,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (effectiveNoteId) useNoteAgentStore.getState().setTargetFolder(effectiveNoteId, rel)
   }, [effectiveNoteId])
 
-  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean; instructionMs?: number }) => {
+  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean; shellAccess?: boolean; instructionMs?: number }) => {
     if (!effectiveNoteId || !vaultPath || !agentTargetFolder) return
     // Cloud-Routing nur mit eigenem 'note-agent'-Opt-in (Entscheidung 7): der
     // Cloud-Eintrag im Picker allein reicht nicht — der gewählte Provider muss
@@ -1929,6 +1929,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       cloud,
       cloudLabel,
       webResearch: !!opts?.webResearch,
+      shellAccess: opts?.shellAccess === true,
       instructionMs: opts?.instructionMs
     })
   }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, selectedNote, t])
@@ -5467,6 +5468,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       )}
       {!isSecondary && (
         <AiActionBar
+          scopeId={effectiveNoteId || undefined}
           open={aiBarOpen}
           onOpenChange={setAiBarOpen}
           phase={aiPhase}

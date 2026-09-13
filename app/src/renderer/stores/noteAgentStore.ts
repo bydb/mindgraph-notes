@@ -61,6 +61,7 @@ export interface AgentRunUiState {
   // beim Start festgehalten, damit die Review-Karten sie anzeigen können.
   model: string
   cloudLabel: string | null
+  shellAccess?: boolean
   // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
   // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
   rememberSuggestion?: string
@@ -113,6 +114,7 @@ export interface AgentStartParams {
   cloud: { model: string; provider: CloudProviderId } | null
   cloudLabel: string | null
   webResearch: boolean
+  shellAccess?: boolean
   /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
   instructionMs?: number
   /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
@@ -326,6 +328,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       lmStudioPort: params.lmStudioPort,
       cloud: params.cloud,
       webResearch: params.webResearch ? { enabled: true } : null,
+      shellAccess: params.shellAccess === true,
       instructionMs: params.instructionMs,
       comparisonCaseId: params.comparisonCaseId
     })
@@ -345,7 +348,8 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
           phase: 'running',
           startedAt: Date.now(),
           model: params.cloud ? params.cloud.model : params.model,
-          cloudLabel: params.cloudLabel
+          cloudLabel: params.cloudLabel,
+          shellAccess: params.shellAccess === true
         }
       }))
     }))

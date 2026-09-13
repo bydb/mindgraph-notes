@@ -728,6 +728,7 @@ export interface ElectronAPI {
     lmStudioPort?: number;
     cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null;
     webResearch?: { enabled: boolean } | null;
+    shellAccess?: boolean;
     instructionMs?: number;
     comparisonCaseId?: string;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
@@ -741,7 +742,7 @@ export interface ElectronAPI {
   // Agent-Skills Stufe 2: Katalog + Import
   noteSkillsCatalog: () => Promise<{ skills: NoteAgentCatalogSkill[]; error?: string }>;
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
-  noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; skippedScripts?: boolean; error?: string }>;
+  noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; includedScripts?: boolean; error?: string }>;
   noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;

@@ -10,6 +10,7 @@ import {
   getModelVerdict,
   greenModelsForModule,
   isHardLocked,
+  shellLockReason,
   isCloudModel,
   isMlxModel,
   getModelRamGb,
@@ -288,5 +289,36 @@ describe('checkModelRamFit — Weak-HW-Warnung', () => {
     expect(fit.modelRamGb).toBe(6)
     // auf 16 GB passt es klar
     expect(checkModelRamFit('ministral-3:8b', 16).fits).toBe(true)
+  })
+})
+
+// Shell-Zugriff des Notiz-Agenten: eigene Regel, weil die Matrix-Sperre dort nie greift
+// (note-agent nicht damageRelevant; task-extraction ohne roten Eintrag, Stand 2026-09-13).
+// Die Tests laufen gegen die ECHTEN Matrixdaten — ändert sich ein Verdict, müssen sie
+// bewusst angefasst werden.
+describe('shellLockReason (Shell-Zugriff des Notiz-Agenten)', () => {
+  it('SICHERHEIT: die bisherige Matrix-Sperre kann für note-agent nie feuern', () => {
+    // Belegt die Lücke, gegen die shellLockReason gebaut wurde.
+    expect(MODULES.find(m => m.id === 'note-agent')?.damageRelevant).toBe(false)
+    expect(isHardLocked('llama3.1:8b', 'note-agent')).toBe(false)
+    expect(MODEL_COMPATIBILITY.modules['task-extraction'] && Object.values(MODEL_COMPATIBILITY.modules['task-extraction']).some(v => v.verdict === 'red')).toBe(false)
+  })
+
+  it('sperrt Modelle, die im Notiz-Agenten rot sind (erfinden Pfade/Inhalte)', () => {
+    expect(getModelVerdict('qwen3.5:0.8b', 'note-agent').verdict).toBe('red')
+    expect(shellLockReason('qwen3.5:0.8b')).toMatch(/Notiz-Agenten/)
+  })
+
+  it('sperrt Modelle mit gemessener Prompt-Injection — auch als LM-Studio-ID', () => {
+    expect(shellLockReason('llama3.1:8b')).not.toBeNull()
+    expect(shellLockReason('lmstudio-community/Meta-Llama-3.1-8B-Instruct-GGUF')).not.toBeNull()
+    expect(shellLockReason('mlx-community/Llama-3.1-8B-Instruct-4bit')).not.toBeNull()
+  })
+
+  it('lässt grüne und untested Modelle zu — der Nutzer entscheidet im Freigabedialog', () => {
+    expect(getModelVerdict('qwen3.6:27b-mlx', 'note-agent').verdict).toBe('green')
+    expect(shellLockReason('qwen3.6:27b-mlx')).toBeNull()
+    expect(getModelVerdict('voellig-unbekannt:7b', 'note-agent').verdict).toBe('untested')
+    expect(shellLockReason('voellig-unbekannt:7b')).toBeNull()
   })
 })

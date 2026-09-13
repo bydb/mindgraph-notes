@@ -147,7 +147,7 @@ import {
 import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/runner'
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
-import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud } from '../shared/modelCompatibility'
+import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud, shellLockReason } from '../shared/modelCompatibility'
 import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
@@ -183,7 +183,7 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, type WebRunState } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState } from './noteAgent/runRegistry'
 import { randomBytes } from 'crypto'
 import { loadComparisons, updateComparisons, mainRandom } from './comparisonStore'
 import { createCampaign, createCase, startWork, markResultReady, addSession, correctSession, setAccepted, closeCase, abortCase, markNotMeasurable, endCampaign } from '../shared/comparison/model'
@@ -194,6 +194,10 @@ import { readActivityEvents, recordActivity, appendActivityEvent, readActivitySu
 import { VALUED_TYPES, deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
+import { authorizeShell, probeShellEnvironment, stopAgentShellProcesses } from './noteAgent/shellExecution'
+import { sandboxAvailability as shellSandboxAvailability } from './noteAgent/shellSandbox'
+import { normalizeShellGuardrails, describeShellGuardrails } from '../shared/shellGuardrails'
+import { getShellAttachmentPaths } from './noteAgent/contextFiles'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
@@ -4276,6 +4280,8 @@ interface NoteAgentRunParams {
   // Webrecherche für diesen Lauf (Globus-Toggle) — nur { enabled }, die Provider-Config
   // liegt Main-seitig (0d). Der Main seedet die erlaubte URL-Liste aus dem Auftrag (0f).
   webResearch?: { enabled: boolean } | null
+  // Nur Anfrage. Die tatsächliche Freigabe entsteht unten durch einen nativen Dialog.
+  shellAccess?: boolean
   // Aktive Zeit, die der Nutzer mit dem Formulieren verbracht hat (Wirkungsbilanz).
   // Renderer-Messung: nur bei Fenster im Vordergrund, gedeckelt.
   instructionMs?: number
@@ -4316,9 +4322,34 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     if (!params.instruction?.trim()) {
       return { success: false, error: 'Keine Anweisung angegeben' }
     }
+    if (params.shellAccess === true && params.webResearch?.enabled) {
+      return { success: false, error: 'Shell-Zugriff und Webrecherche-Modus können nicht im selben Lauf aktiviert werden.' }
+    }
+    if (params.shellAccess === true) {
+      // Zweistufiges Opt-in wie bei der Webrecherche, HIER durchgesetzt und nicht nur im
+      // Renderer: Stufe 1 ist das Modul (ui-settings.json, Main-seitige Kopie der
+      // Einstellungen), Stufe 2 der Schalter pro Lauf plus nativer Dialog.
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      if (ui.agentShellEnabled !== true) {
+        return { success: false, error: 'Shell-Zugriff ist nicht freigeschaltet (Einstellungen → Module → „Agent-Shell“).' }
+      }
+      // Fail-closed: ohne erzwingbare Schutzgrenzen keine Shell — vor dem Dialog, damit der
+      // Nutzer nicht erst bestätigt und dann eine Ablehnung liest.
+      const sandbox = shellSandboxAvailability()
+      if (!sandbox.ok) return { success: false, error: sandbox.reason }
+      // Eigene Modellregel (shellLockReason): die Matrix-Sperre unten kann für
+      // `note-agent` nie feuern, mit Shell fehlt aber die Prüfung vor der Wirkung.
+      if (!params.cloud?.model) {
+        const reason = shellLockReason(params.model)
+        if (reason) return { success: false, error: `Modell "${params.model}" bekommt keine Shell: ${reason}.` }
+      }
+    }
 
-    // Hard-Lock (Matrix) + Capability-Gate — nur für lokale Modelle; OpenRouter/
+    // Matrix-Sperre + Capability-Gate — nur für lokale Modelle; OpenRouter/
     // LLMBase normalisieren Tool-Calls über die OpenAI-kompatible API.
+    // Ehrlich: `note-agent` ist nicht damageRelevant, isHardLocked liefert hier heute
+    // IMMER false (rot warnt nur in der UI). Der Aufruf bleibt, damit die Sperre ohne
+    // weitere Änderung greift, sobald das Modul nach Wiederholungs-Runs damageRelevant wird.
     const localBackend = params.localBackend === 'lmstudio' ? 'lmstudio' : 'ollama'
     if (!params.cloud?.model) {
       if (isModelHardLocked(params.model, 'note-agent')) {
@@ -4468,6 +4499,40 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     const releaseStayAwake = acquireStayAwake('Notiz-Agent-Lauf')
     void (async () => {
       try {
+        if (params.shellAccess === true) {
+          // Schutzgrenzen aus der Main-Kopie der Einstellungen — nie aus den Renderer-Params.
+          const guardrails = normalizeShellGuardrails((await loadUISettings().catch(() => ({} as Record<string, unknown>))).agentShell)
+          const readPaths = guardrails.readScope === 'vault'
+            ? [run.vaultPath]
+            : (await getShellAttachmentPaths(run.senderId, run.attachmentIds)).map(a => a.path)
+          await authorizeShell(run, async () => {
+            if (sender.isDestroyed()) return false
+            const owner = BrowserWindow.fromWebContents(sender)
+            if (!owner || owner.isDestroyed()) return false
+            const choice = await dialog.showMessageBox(owner, {
+              type: 'warning',
+              title: 'Shell-Zugriff für diesen Agent-Lauf',
+              message: 'Shell-Befehle und Skripte für diesen Lauf erlauben?',
+              detail: `Modell: ${run.model}\nVault: ${run.vaultPath}\nAuftrag: ${run.instruction}\n\nSchutzgrenzen (vom System erzwungen, Einstellungen → Agent-Shell): ${describeShellGuardrails(guardrails)}.\nLesbar: ${readPaths.length ? readPaths.join(', ') : '(keine Anhänge)'} sowie Systempfade. Dein Benutzerordner und die .mindgraph-Daten bleiben unlesbar. Geschrieben wird nur im Arbeitsordner; Ergebnisse übernimmst du selbst.\n\nDer Agent darf für diesen Auftrag ohne weitere Einzelbestätigung Befehle ausführen. Bei Cloud-Modellen werden Befehlsausgaben an den Modellanbieter gesendet.\n\nDie Freigabe gilt nur für diesen Lauf.`,
+              buttons: ['Abbrechen', 'Für diesen Lauf erlauben'],
+              defaultId: 0, cancelId: 0, noLink: true
+            })
+            return choice.response === 1 && !sender.isDestroyed()
+          }, async () => {
+            let cwd = await assertSafePath(run.vaultPath, 'note-agent-shell-work')
+            for (const part of ['.mindgraph', 'agent-staging', run.runId, 'shell-work']) {
+              cwd = await assertSafePath(path.join(cwd, part), 'note-agent-shell-work')
+              await fs.mkdir(cwd, { recursive: true })
+            }
+            return assertSafePath(cwd, 'note-agent-shell-work')
+          }, { guardrails, readPaths })
+          // Umgebung einmal ermitteln und dem Modell nennen — sonst sucht es selbst
+          // (real: vier Iterationen für „welches Python, welche Bibliotheken").
+          const environment = await probeShellEnvironment(run)
+          if (!sender.isDestroyed()) sender.send('note-agent-progress', {
+            runId: run.runId, seq: nextSeq(run), skill: 'shell_access', summary: `Shell-Zugriff für diesen Lauf erlaubt — Sandbox aktiv, Selbsttest bestanden. ${describeShellGuardrails(guardrails)}. Umgebung: ${environment}`
+          })
+        }
         const res = await runNoteAgentLoop({
           run,
           noteContent: params.noteContent || '',
@@ -14006,6 +14071,7 @@ ipcMain.handle('scheduler-status', async () => {
 // Cleanup bei App-Beendigung
 app.on('before-quit', () => {
   isQuitting = true
+  stopAgentShellProcesses()
 
   // Sync Engine stoppen
   if (syncEngine) {

@@ -40,6 +40,32 @@ const run = (web?: WebRunState) => runWithChatOptions(web, {})
 
 beforeEach(() => mockChat.mockReset())
 
+describe('Shell-Allowlist des Harness', () => {
+  it('enthält standardmäßig keine Shell-Werkzeuge', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    await run()
+    const names = mockChat.mock.calls[0][1].map((t: { name: string }) => t.name)
+    expect(names).not.toContain('shell_execute')
+    expect(names).not.toContain('shell_stage_file')
+  })
+
+  it('bietet sie erst mit Main-seitiger Freigabe an und nennt die erzwungenen Schutzgrenzen', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun()
+    agentRun.shell = { cwd: '/tmp/work', commands: 0, guardrails: { readScope: 'attachments', network: false }, profilePath: '/tmp/sandbox.sb', tmpDir: '/tmp/work/tmp' }
+    await runNoteAgentLoop({ run: agentRun, noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {} })
+    const names = mockChat.mock.calls[0][1].map((t: { name: string }) => t.name)
+    expect(names).toContain('shell_execute')
+    expect(names).toContain('shell_stage_file')
+    const prompt = mockChat.mock.calls[0][0][0].content
+    expect(prompt).toContain('SCHUTZGRENZEN')
+    expect(prompt).toContain('Lesen: nur Anhänge · Schreiben: nur Arbeitsordner · Netz: gesperrt')
+    expect(prompt).toContain('Kein Netz')
+    expect(prompt).not.toContain('KEINE Sandbox')
+    expect(prompt).not.toContain('Du kannst nichts direkt im Vault ändern')
+  })
+})
+
 describe('Agent-Ausführungsprofil', () => {
   it('setzt von sich aus kein Profil — auch nicht für Thinking-Modelle', async () => {
     mockChat.mockResolvedValue(noToolCalls)

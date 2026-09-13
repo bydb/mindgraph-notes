@@ -16,6 +16,7 @@ import { useTranslation } from '../../utils/translations'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel } from './AgentRunPanel'
+import { ShellAccessToggle } from './ShellAccessToggle'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
 import { useIsModuleEnabled } from '../../utils/modules'
@@ -45,6 +46,7 @@ export function AgentView({ tabId }: Props) {
   const vaultPath = useNotesStore(s => s.vaultPath)
   const ollama = useUIStore(s => s.ollama)
   const webResearchModule = useIsModuleEnabled('web-research')
+  const shellModule = useIsModuleEnabled('agent-shell')
   const webResearchConfig = useUIStore(s => s.webResearchConfig)
   const setWebResearchConfig = useUIStore(s => s.setWebResearchConfig)
 
@@ -55,6 +57,9 @@ export function AgentView({ tabId }: Props) {
   const [models, setModels] = useState<Array<{ name: string }>>([])
   const [localModel, setLocalModel] = useState('')
   const [webArmed, setWebArmed] = useState(false)
+  const [shellArmed, setShellArmed] = useState(false)
+  const [starting, setStarting] = useState(false)
+  useEffect(() => { setShellArmed(false) }, [tabId, vaultPath, shellModule])
 
   // Cloud-Routing: hier zählt ausschließlich das 'note-agent'-Opt-in — der Tab kann
   // nichts anderes als Agent-Läufe starten.
@@ -127,7 +132,7 @@ export function AgentView({ tabId }: Props) {
   // Läuft eine Vergleichskampagne und ist ein Fall zugerechnet, wandern die gemessenen
   // Zeiten dieses Laufs zusätzlich als Arbeitssitzungen in den Fall.
   const comparisonCaseId = useComparisonStore(s => s.activeCaseId)
-  const busy = run.phase === 'running'
+  const busy = run.phase === 'running' || starting
   const canRun = !!vaultPath && !!scope.targetFolder && !!instruction.trim() && !busy
 
   const submit = async () => {
@@ -138,7 +143,10 @@ export function AgentView({ tabId }: Props) {
       cloud = { model: activeCloudRoute.model, provider: activeCloudRoute.provider }
       cloudLabel = activeCloudRoute.label
     }
-    await store().startRun(tabId, {
+    setStarting(true)
+    const shellAccess = shellArmed
+    setShellArmed(false)
+    try { await store().startRun(tabId, {
       vaultPath,
       // Der Lauf hat keine Ausgangsnotiz — die Tab-ID ist die Kennung, der Inhalt leer.
       noteId: tabId,
@@ -150,9 +158,10 @@ export function AgentView({ tabId }: Props) {
       cloud,
       cloudLabel,
       webResearch: webResearchModule && webArmed && webConfigured,
+      shellAccess,
       instructionMs: compose.take(),
       comparisonCaseId: comparisonCaseId ?? undefined
-    })
+    }) } finally { setStarting(false) }
   }
 
   if (!ollama.enabled) {
@@ -243,7 +252,7 @@ export function AgentView({ tabId }: Props) {
               {scope.targetFolder && (
                 <span className="ai-bar-chip ai-bar-context-chip ai-bar-target-chip">
                   <span className="ai-bar-context-chip-name" title={scope.targetFolder}>
-                    <FolderGlyph /> {scope.targetFolder.split('/').pop()}
+                    <FolderGlyph /> <span className="ai-bar-target-chip-label">{t('aiBar.target.label')}:</span> {scope.targetFolder.split('/').pop()}
                   </span>
                   <button type="button" className="ai-bar-chip-x" onClick={() => store().setTargetFolder(tabId, null)} disabled={busy} aria-label={t('aiBar.target.remove')}>×</button>
                 </span>
@@ -258,6 +267,7 @@ export function AgentView({ tabId }: Props) {
                       return
                     }
                     setWebArmed(v => !v)
+                    setShellArmed(false)
                   }}
                   disabled={busy}
                   title={webArmed ? t('aiBar.web.armed') : webConfigured ? `${t('aiBar.web.hint')} (${webProviderLabel})` : t('aiBar.web.setup')}
@@ -266,6 +276,10 @@ export function AgentView({ tabId }: Props) {
                   <GlobeGlyph /> {t('aiBar.web.label')}
                 </button>
               )}
+              {shellModule && <ShellAccessToggle enabled={shellArmed} disabled={busy} onChange={enabled => {
+                setShellArmed(enabled)
+                if (enabled) setWebArmed(false)
+              }} />}
             </>
           }
         />
@@ -273,6 +287,7 @@ export function AgentView({ tabId }: Props) {
         {/* Ohne Zielordner kann der Agent nichts ablegen — das ist die Vorbedingung,
             nicht nur eine Empfehlung. */}
         {!scope.targetFolder && <div className="ai-bar-agent-mode-hint">{t('agentTab.needTarget')}</div>}
+        {shellArmed && <div className="ai-bar-cloud-hint">{t('aiBar.shell.hint')}</div>}
         {scope.targetFolder && cloudSelected && <div className="ai-bar-cloud-hint">{t('aiBar.agent.cloudHint')}</div>}
         {webArmed && (
           <div className="ai-bar-cloud-hint">

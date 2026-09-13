@@ -16,6 +16,7 @@ export const ACTIVITY_TYPE_LABEL_KEY: Record<ValuedType, TranslationKey> = {
   summary: 'voiceCommand.activityType.summary',
   'web-research': 'voiceCommand.activityType.webResearch',
   'email-tasks': 'voiceCommand.activityType.emailTasks',
+  shell: 'voiceCommand.activityType.shell',
   other: 'voiceCommand.activityType.other',
   'attendance-list': 'voiceCommand.activityType.attendanceList',
   'wp-post': 'voiceCommand.activityType.wpPost',

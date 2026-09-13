@@ -19,6 +19,7 @@ import { PresentationSection } from './PresentationSection'
 import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
+import { AgentShellSection } from './AgentShellSection'
 import { ImageGenerationSection } from './ImageGenerationSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
@@ -28,7 +29,7 @@ import { isCloudProviderReady, cloudProviderForSentinel, CLOUD_PROVIDER_META, ty
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { ensureTransformersModel, isTransformersModelReady } from '../../utils/voice/transformersStt'
-import { VALUED_TYPES, type ValuedType } from '../../../shared/activityLog'
+import { VALUED_TYPES, isReferenceable, type ValuedType } from '../../../shared/activityLog'
 import { writeClipboardText } from '../../utils/clipboard'
 import { ExternalLink } from '../Shared/ExternalLink'
 
@@ -630,6 +631,7 @@ const MODULE_CONFIG_TABS: Record<string, Tab> = {
   'mz-suite': 'agents',
   'smart-connections': 'ai',
   'web-research': 'ai',
+  'agent-shell': 'ai',
   'image-generation': 'ai'
 }
 
@@ -1783,6 +1785,7 @@ const ReferenceMinutesRows: React.FC<{ t: TabTFn }> = ({ t }) => {
     summary: t('voiceCommand.activityType.summary'),
     'web-research': t('voiceCommand.activityType.webResearch'),
     'email-tasks': t('voiceCommand.activityType.emailTasks'),
+    shell: t('voiceCommand.activityType.shell'),
     other: t('voiceCommand.activityType.other'),
     'attendance-list': t('voiceCommand.activityType.attendanceList'),
     'wp-post': t('voiceCommand.activityType.wpPost'),
@@ -1791,7 +1794,7 @@ const ReferenceMinutesRows: React.FC<{ t: TabTFn }> = ({ t }) => {
 
   return (
     <>
-      {VALUED_TYPES.map(type => (
+      {VALUED_TYPES.filter(isReferenceable).map(type => (
         <div className="settings-row" key={type}>
           <label>{labels[type]}</label>
           <input
@@ -4064,9 +4067,12 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   />
                 </div>
 
+                {/* Gruppenüberschrift wie bei „KI-Funktionen": vorher hingen fünf optionale Dienste ohne Titel unter der Modell-Matrix, jeder mit eigenem Überschriftenstil. */}
+                <h3>{t('settings.integrations.extensions')}</h3>
                 <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
                 <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
                 {isModuleEnabled('web-research') && <div data-settings-anchor="ai-webresearch"><WebResearchSection /></div>}
+                {isModuleEnabled('agent-shell') && <div data-settings-anchor="ai-agentshell"><AgentShellSection /></div>}
                 {isModuleEnabled('image-generation') && <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>}
 
                 <div className="settings-row">

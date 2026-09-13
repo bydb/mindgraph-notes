@@ -1,6 +1,6 @@
 // Skills des Notiz-Agenten (Phase 2) — Instanziierung der generischen ToolRegistry.
-// isWrite bedeutet hier: schreibt ins Staging (harmlos) — die Vertrauensgrenze ist
-// die Übernahme durch den Nutzer (Ergebnis-Karten), NICHT ein Confirm-Flow.
+// Standard-Writer nutzen Staging + Review. Die optionale Shell hat eine eigene
+// native Freigabe pro Lauf und darf direkte Nebenwirkungen haben.
 // Entscheidung 11: Write-Skills nehmen strukturierte Daten, nie Binärformate vom LLM.
 
 import { promises as fs } from 'fs'
@@ -29,6 +29,7 @@ import {
   type WebSearchHit
 } from '../../shared/webResearch'
 import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
+import { shellExecuteTool, shellStageFileTool } from './shellTools'
 
 export interface NoteAgentContext {
   senderId: number
@@ -258,6 +259,8 @@ async function registerStagedResult(
 
 export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   const registry = new ToolRegistry<NoteAgentContext>()
+  registry.register(shellExecuteTool)
+  registry.register(shellStageFileTool)
 
   registry.register({
     name: 'read_attachment',
@@ -510,11 +513,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const body = await readSkillBody(ctx.run.vaultPath, skill.folderName)
       ctx.run.sources.add(`Skill: ${skill.name}`)
       // references/assets sichtbar machen (Stufe 3) — gelesen wird per read_skill_file.
-      const files = await listSkillFiles(ctx.run.vaultPath, skill.folderName)
+      const files = await listSkillFiles(ctx.run.vaultPath, skill.folderName, !!ctx.run.shell)
       const filesNote = files.length
         ? `\n\n[Zusatzdateien dieses Skills — bei Bedarf mit read_skill_file lesen: ${files.join(', ')}]`
         : ''
-      return { ok: true, content: body + filesNote, display: `use_skill: ${skill.name}` }
+      const shellNote = ctx.run.shell ? `\nSkill-Ordner für Shell-Befehle: ${JSON.stringify(path.join(ctx.run.vaultPath, 'Skills', skill.folderName))}. Skripte vor der Ausführung mit read_skill_file prüfen.` : ''
+      return { ok: true, content: body + filesNote + shellNote, display: `use_skill: ${skill.name}` }
     }
   })
 
@@ -539,6 +543,11 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         ctx.run.skills.find(s => s.name.toLowerCase() === skillName.toLowerCase() || s.folderName.toLowerCase() === skillName.toLowerCase())
       if (!skill) return err(`Skill "${skillName}" nicht gefunden`)
       const abs = await resolveSkillFile(ctx.run.vaultPath, skill.folderName, fileRel)
+      if (ctx.run.shell && /\.(py|js|mjs|cjs|ts|sh|bash|ps1|r)$/i.test(abs)) {
+        const stat = await fs.stat(abs)
+        if (!stat.isFile() || stat.size > 64_000) return err('Skript ist zu groß (höchstens 64 KB)')
+        return { ok: true, content: await fs.readFile(abs, 'utf8') }
+      }
       const content = await extractFileContentRaw(abs)
       return { ok: true, content, display: `read_skill_file: ${skill.name}/${fileRel}` }
     }

@@ -21597,6 +21597,17 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   cursor: pointer;
 }
 .ai-bar-context-oschooser:hover { color: var(--text-primary); }
+/* Ziel-Chip vom Anhang-Chip unterscheidbar halten: gleiche Form, aber Präfix
+   „Ziel:" und Akzentrahmen. Vorher sahen beide identisch aus und ein Klick
+   auf das × des einen entfernte den anderen (real, 12.09.2026). */
+.ai-bar-target-chip {
+  border-style: dashed;
+  border-color: var(--accent-color);
+}
+.ai-bar-target-chip-label {
+  color: var(--accent-color);
+  font-weight: 600;
+}
 .ai-bar-context-chip-name {
   padding: 3px 9px;
   background: var(--accent-subtle);
@@ -22259,3 +22270,117 @@ body.presentation-mode *::after {
   color: var(--color-danger);
   border-radius: var(--radius-sm);
 }
+
+/* Agent-Shell: Schutzgrenzen — sicherheitsrelevant, deshalb eigene Karte mit Akzentkante,
+   Status-Pille und einer Zeile „Aktive Grenzen" statt Fließtext zwischen zwei Diensten
+   (ging im KI-Tab real unter, 13.09.2026). */
+.settings-guard-card {
+  margin: 20px 0 8px;
+  padding: 18px 18px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 40%, var(--border-color));
+  border-left: 4px solid var(--accent-color);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent-color) 4%, var(--bg-primary));
+}
+.settings-guard-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.settings-guard-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.settings-guard-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.settings-guard-pill {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.settings-guard-pill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.settings-guard-pill.is-on { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
+.settings-guard-pill.is-off { color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 14%, transparent); }
+.settings-guard-active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  font-size: 13px;
+}
+.settings-guard-active-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--accent-color);
+}
+.settings-guard-active-value { font-weight: 600; color: var(--text-primary); }
+.settings-guard-card .settings-row select { flex-shrink: 0; min-width: 210px; }
+.settings-guard-fixed { margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
+.settings-guard-fixed-title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+}
+.settings-guard-fixed ul { margin: 0; padding-left: 18px; line-height: 1.55; }
+.settings-guard-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  color: var(--text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Klassen, die die Bild-Generierung schon nutzte, die aber nie definiert waren — Key-Feld
+   und „Key speichern" erschienen als rohe Browser-Elemente. */
+.settings-row input.settings-input {
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 14px;
+  min-width: 240px;
+}
+.settings-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.settings-btn:hover { background: var(--bg-tertiary); }

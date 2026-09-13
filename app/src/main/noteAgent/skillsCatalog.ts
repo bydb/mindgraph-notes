@@ -70,12 +70,12 @@ export async function installCatalogSkill(vaultPath: string, id: string): Promis
 }
 
 // Import vom Rechner: einzelne .md-Datei ODER ein Skill-Ordner mit SKILL.md.
-// scripts/-Verzeichnisse werden bewusst nicht mitkopiert (der Notiz-Agent führt
-// keinen Code aus) — der Aufrufer zeigt das dem Nutzer an.
+// Skripte werden als Dateien bewahrt. Import ist KEINE Ausführungsfreigabe;
+// diese verlangt der Agent separat und nativ pro Shell-Lauf.
 export async function importSkillFromPath(
   vaultPath: string,
   chosenPath: string
-): Promise<{ relPath: string; folderName: string; skippedScripts: boolean }> {
+): Promise<{ relPath: string; folderName: string; includedScripts: boolean }> {
   const st = await fs.stat(chosenPath)
 
   if (st.isFile()) {
@@ -96,7 +96,7 @@ export async function importSkillFromPath(
     }
     await fs.mkdir(dir, { recursive: true })
     await fs.copyFile(chosenPath, path.join(dir, 'SKILL.md'))
-    return { relPath: `${SKILLS_DIRNAME}/${folderName}/SKILL.md`, folderName, skippedScripts: false }
+    return { relPath: `${SKILLS_DIRNAME}/${folderName}/SKILL.md`, folderName, includedScripts: false }
   }
 
   // Ordner-Import: muss eine SKILL.md enthalten.
@@ -110,7 +110,7 @@ export async function importSkillFromPath(
     if (e instanceof Error && e.message.includes('existiert bereits')) throw e
   }
 
-  let skippedScripts = false
+  let includedScripts = false
   const copyDir = async (src: string, dest: string): Promise<void> => {
     await fs.mkdir(dest, { recursive: true })
     for (const entry of await fs.readdir(src, { withFileTypes: true })) {
@@ -119,8 +119,7 @@ export async function importSkillFromPath(
       const to = path.join(dest, entry.name)
       if (entry.isDirectory()) {
         if (entry.name === 'scripts') {
-          skippedScripts = true
-          continue
+          includedScripts = true
         }
         await copyDir(from, to)
       } else if (entry.isFile()) {
@@ -129,5 +128,5 @@ export async function importSkillFromPath(
     }
   }
   await copyDir(chosenPath, targetDir)
-  return { relPath: `${SKILLS_DIRNAME}/${folderName}/SKILL.md`, folderName, skippedScripts }
+  return { relPath: `${SKILLS_DIRNAME}/${folderName}/SKILL.md`, folderName, includedScripts }
 }

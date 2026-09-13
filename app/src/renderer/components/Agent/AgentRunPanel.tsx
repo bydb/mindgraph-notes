@@ -135,6 +135,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
 
   return (
     <div className="ai-bar-agent">
+      {run.shellAccess && <div className="ai-bar-cloud-hint">{t('aiBar.shell.runHint')}</div>}
       {/* Provenienz: Modell + Datenweg des Laufs (analog zum Block-Diff-Kopf) */}
       {run.model && (
         <div className="ai-bar-agent-prov" title={run.model}>
@@ -148,7 +149,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
       {run.steps.length > 0 && (
         <div className="ai-bar-agent-steps">
           {run.steps.map(s => (
-            <div key={s.seq} className="ai-bar-agent-step">{s.seq}. {s.skill}{s.summary ? ` — ${s.summary}` : ''}</div>
+            <div key={s.seq} className="ai-bar-agent-step" style={s.skill === 'shell_execute' ? { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflowY: 'auto' } : undefined}>{s.seq}. {s.skill}{s.summary ? ` — ${s.summary}` : ''}</div>
           ))}
         </div>
       )}

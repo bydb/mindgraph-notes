@@ -1,3 +1,4 @@
+import { DEFAULT_SHELL_GUARDRAILS, type ShellGuardrails } from '../../shared/shellGuardrails'
 import { create } from 'zustand'
 import type { ValuedType, ReferenceMinutes, ReferenceSources, ReferenceSource } from '../../shared/activityLog'
 import type { UpdateInfo } from '../../shared/types'
@@ -579,6 +580,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
   { id: 'project-rag',      label: 'Projekt-RAG',      description: 'Projektordner semantisch befragen — On-demand-Index, Embedding & Antwort lokal', category: 'ai' },
   { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' },
+  { id: 'agent-shell',      label: 'Agent-Shell',      description: 'Der Notiz-Agent darf nach Freigabe pro Lauf Befehle und Skripte ausführen — in einer Sandbox mit Schutzgrenzen (nur Anhänge lesen, nur Arbeitsordner schreiben, kein Netz); experimentell, derzeit macOS', category: 'ai' },
   { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Nano Banana erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und Notiz-Agenten', category: 'ai' }
 ]
 
@@ -706,6 +708,11 @@ interface UIState {
   flashcardsEnabled: boolean
   workflowCanvasEnabled: boolean
   webResearchEnabled: boolean
+  // Shell-Zugriff des Notiz-Agenten (experimentell): erste Stufe des Opt-ins; die zweite
+  // ist der Schalter pro Lauf. Der Main prüft dieses Flag in ui-settings.json selbst.
+  agentShellEnabled: boolean
+  // Schutzgrenzen der Shell (shared/shellGuardrails.ts). Der Main liest sie aus ui-settings.json.
+  agentShell: ShellGuardrails
   // Spiegel der Main-seitigen Webrecherche-Config (0d) — nur zum Anzeigen in der KI-Leiste
   // (Provider-Tooltip, „konfiguriert?"). NICHT persistiert; wird per IPC geladen/aktualisiert.
   webResearchConfig: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null
@@ -865,6 +872,8 @@ interface UIState {
   setFlashcardsEnabled: (enabled: boolean) => void
   setWorkflowCanvasEnabled: (enabled: boolean) => void
   setWebResearchEnabled: (enabled: boolean) => void
+  setAgentShellEnabled: (enabled: boolean) => void
+  setAgentShell: (patch: Partial<ShellGuardrails>) => void
   setImageGenerationEnabled: (enabled: boolean) => void
   setWebResearchConfig: (config: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
@@ -1037,6 +1046,8 @@ const defaultState = {
   flashcardsEnabled: true,
   workflowCanvasEnabled: false,
   webResearchEnabled: false,
+  agentShellEnabled: false,
+  agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
   webResearchConfig: null,
   imageGenerationEnabled: false,
   semanticScholarEnabled: true,
@@ -1254,7 +1265,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'imageGenerationEnabled', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'agentShellEnabled', 'agentShell', 'imageGenerationEnabled', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1363,6 +1374,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setFlashcardsEnabled: (enabled) => set({ flashcardsEnabled: enabled }),
   setWorkflowCanvasEnabled: (enabled) => set({ workflowCanvasEnabled: enabled }),
   setWebResearchEnabled: (enabled) => set({ webResearchEnabled: enabled }),
+  setAgentShellEnabled: (enabled) => set({ agentShellEnabled: enabled }),
+  setAgentShell: (patch) => set((state) => ({ agentShell: { ...DEFAULT_SHELL_GUARDRAILS, ...state.agentShell, ...patch } })),
   setImageGenerationEnabled: (enabled) => set({ imageGenerationEnabled: enabled }),
   setWebResearchConfig: (config) => set({ webResearchConfig: config }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),

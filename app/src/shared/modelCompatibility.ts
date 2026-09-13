@@ -860,6 +860,27 @@ export function isHardLocked(model: string, moduleId: ModuleId): boolean {
   return v.verdict === 'red'
 }
 
+// Shell-Zugriff des Notiz-Agenten: eigene Regel, weil KEINE Matrix-Sperre greift —
+// `note-agent` ist nicht damageRelevant (Ergebnis geht durch Staging + Review), und in
+// `task-extraction` gibt es keinen roten Eintrag (Stand 2026-09-13). Mit Shell fällt
+// die Prüfung VOR der Wirkung weg, deshalb fail-closed gegen zwei belegte Befunde:
+//   (a) rot im Notiz-Agenten — erfindet Pfade/Inhalte, schreibt Platzhalter. Mit Shell
+//       wird ein erfundener Pfad zu einem echten Befehl mit Benutzerrechten.
+//   (b) rot in einem schadensrelevanten Modul — dort wurde Prompt-Injection gemessen
+//       (z.B. llama3.1:8b im Dashboard). Anhänge und Befehlsausgaben sind untrusted.
+// Untested bleibt erlaubt: der Nutzer sieht Warnung + nativen Freigabedialog und
+// entscheidet. Liefert den Grund (für die Fehlermeldung) oder null.
+export function shellLockReason(model: string): string | null {
+  if (getModelVerdict(model, 'note-agent').verdict === 'red') {
+    return 'rot im Notiz-Agenten (erfindet Pfade oder Inhalte) — mit Shell würde daraus ein echter Befehl'
+  }
+  const injected = MODULES.find(m => m.damageRelevant && getModelVerdict(model, m.id).verdict === 'red')
+  if (injected) {
+    return `rot im Modul „${injected.id}“ (Prompt-Injection gemessen) — Anhänge und Befehlsausgaben sind untrusted`
+  }
+  return null
+}
+
 // ─── RAM-Bedarf eines Modells ────────────────────────────────────────────────
 // Genutzt für die Weak-HW-Warnung: ein Modell, das nicht in den verfügbaren RAM
 // passt, drückt Ollama ins Swap → das ganze (8-GB-)System friert ein (Hang).

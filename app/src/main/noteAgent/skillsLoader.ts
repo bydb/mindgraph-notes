@@ -1,7 +1,7 @@
 // Agent-Skills Stufe 1 (docs/agent-skills-plan.md): Vault-Skills im offenen
 // SKILL.md-Standard (agentskills.io) — <vault>/Skills/<ordner>/SKILL.md.
-// Skills sind reine Markdown-Anleitungen des Nutzers (KEIN Code; scripts/ wird
-// bewusst nicht ausgeführt). Identität für Aktivierung ist der Ordnername;
+// Skripte bleiben ohne die separate Shell-Freigabe eines Laufs inaktiv.
+// Identität für Aktivierung ist der Ordnername;
 // der Anzeigename kommt aus dem Frontmatter. Deaktivierte Skills stehen in
 // vault-settings.json unter `skillsDisabled` (SKILL.md bleibt spec-rein).
 
@@ -135,7 +135,7 @@ export async function setSkillEnabled(vaultPath: string, folderName: string, ena
 
 // Zusatzdateien eines Skills (references/, assets/ — Spec-Layout), max. 2 Ebenen.
 // use_skill listet sie auf; gelesen wird per read_skill_file.
-export async function listSkillFiles(vaultPath: string, folderName: string): Promise<string[]> {
+export async function listSkillFiles(vaultPath: string, folderName: string, includeScripts = false): Promise<string[]> {
   const base = path.join(vaultPath, SKILLS_DIRNAME, path.basename(folderName))
   const out: string[] = []
   const walk = async (dir: string, prefix: string, depth: number): Promise<void> => {
@@ -150,7 +150,7 @@ export async function listSkillFiles(vaultPath: string, folderName: string): Pro
       if (d.name.startsWith('.') || out.length >= 20) continue
       if (d.isSymbolicLink()) continue // R03: Symlinks nicht anbieten (read_skill_file lehnt sie ohnehin ab)
       if (d.isDirectory()) {
-        if (d.name === 'scripts') continue // wird bewusst nicht ausgeführt/angeboten
+        if (d.name === 'scripts' && !includeScripts) continue
         await walk(path.join(dir, d.name), `${prefix}${d.name}/`, depth + 1)
       } else if (d.isFile() && d.name !== 'SKILL.md') {
         out.push(`${prefix}${d.name}`)
