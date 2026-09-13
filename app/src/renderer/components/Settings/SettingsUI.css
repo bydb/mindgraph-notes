@@ -43,14 +43,18 @@
   color: var(--text-muted);
 }
 
-/* Karte: ein Rahmen, ein Radius, Inhalt als Zeilen mit Hairlines dazwischen */
+/* Karte: ein Rahmen, ein Radius, Inhalt als Zeilen mit Hairlines dazwischen.
+   KEIN overflow: hidden — es hat die Tooltips (title → data-tooltip) der Farbkreise
+   abgeschnitten (real 13.09.2026: „Balken über der Farbe"). Die Rundung bekommen
+   stattdessen erstes und letztes Kind. */
 .sui-card {
   border: 1px solid var(--border-color);
   border-radius: 14px;
   background: var(--bg-content);
   margin-bottom: 10px;
-  overflow: hidden;
 }
+.sui-card > :first-child { border-top-left-radius: 13px; border-top-right-radius: 13px; }
+.sui-card > :last-child { border-bottom-left-radius: 13px; border-bottom-right-radius: 13px; }
 .sui-card.is-dashed {
   border-style: dashed;
 }
@@ -579,6 +583,8 @@
   font-family: inherit;
 }
 .settings-nav-section-label.is-collapsible:hover { opacity: 1; color: var(--text-primary); }
+.settings-nav-section-label.is-collapsible:focus { outline: none; }
+.settings-nav-section-label.is-collapsible:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; border-radius: 6px; }
 .settings-nav-section-label.is-collapsible > span:first-child {
   white-space: nowrap;
   overflow: hidden;

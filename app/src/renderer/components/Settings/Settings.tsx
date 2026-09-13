@@ -1419,8 +1419,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
             {/* Vault (immer ganz oben, wenn geladen) */}
             {vaultPath && renderNavItem({ id: 'vault', label: t('settings.tab.vault'), icon: NAV_ICONS.vault })}
             {navGroups.map(group => {
+              // Gruppe der aktiven Seite ist standardmäßig offen, lässt sich aber per Klick einklappen
+              // (undefined = Standard, true/false = ausdrückliche Wahl; Seitenwechsel setzt zurück).
               const hasActive = group.items.some(i => i.id === activeTab)
-              const open = hasActive || !!openNavGroups[group.id]
+              const open = openNavGroups[group.id] ?? hasActive
               return (
                 <React.Fragment key={group.id}>
                   <button

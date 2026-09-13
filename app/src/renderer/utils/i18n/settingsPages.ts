@@ -28,6 +28,8 @@ export const de = {
   'settings.tools.stripHow': 'So funktioniert es',
   // Tastenkürzel
   'settings.shortcuts.subtitle': 'Referenz. Das globale Kürzel der Schnellerfassung änderst du unter Schnellerfassung.',
+  'settings.shortcuts.link': 'Link einfügen',
+  'settings.shortcuts.aiBar': 'Macher-Leiste (KI-Vorschlag als Diff)',
   // Dataview
   'settings.dataview.subtitle': 'Referenz: Notizen nach Metadaten abfragen und als Liste oder Tabelle darstellen.',
   // Templates
@@ -184,6 +186,8 @@ export const en: Record<keyof typeof de, string> = {
   'settings.editor.groupGraph': 'MindGraph & file tree',
   'settings.tools.stripHow': 'How it works',
   'settings.shortcuts.subtitle': 'Reference. The global quick-capture shortcut is changed under Quick capture.',
+  'settings.shortcuts.link': 'Insert link',
+  'settings.shortcuts.aiBar': 'Maker bar (AI proposal as diff)',
   'settings.dataview.subtitle': 'Reference: query notes by metadata and show them as a list or table.',
   'settings.templates.subtitle': 'Templates for new notes. Insert with ⌘⇧T.',
   'settings.remarkable.subtitle': 'Exchange documents with the reMarkable tablet over USB.',

@@ -28,8 +28,9 @@ export const ShortcutsTab: React.FC<{ t: TabTFn }> = ({ t }) => (
       <Row label={t('settings.shortcuts.switchView')}><Keys keys={['Cmd', 'E']} /></Row>
       <Row label={t('settings.shortcuts.bold')}><Keys keys={['Cmd', 'B']} /></Row>
       <Row label={t('settings.shortcuts.italic')}><Keys keys={['Cmd', 'I']} /></Row>
-      <Row label={t('settings.shortcuts.code')}><Keys keys={['Cmd', 'Shift', 'K']} /></Row>
-      <Row label={t('settings.shortcuts.strikethrough')}><Keys keys={['Cmd', 'Shift', 'X']} /></Row>
+      <Row label={t('settings.shortcuts.code')}><Keys keys={['Cmd', '`']} /></Row>
+      <Row label={t('settings.shortcuts.link')}><Keys keys={['Cmd', 'K']} /></Row>
+      <Row label={t('settings.shortcuts.aiBar')}><Keys keys={['Cmd', 'Shift', 'A']} /></Row>
     </Card>
 
     <SectionTitle title={t('settings.shortcuts.wikilinks')} />
