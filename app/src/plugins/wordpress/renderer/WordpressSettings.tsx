@@ -1,16 +1,20 @@
 // WordPress-Einstellungen — die Settings-Hälfte des WordPress-Plugins (Renderer).
 //
-// War früher die „Marketing"-Sektion im edoobox/Agenten-Tab von Settings.tsx; jetzt im
-// Plugin und über den generischen SETTINGS_SECTION_SLOT gemountet → eigener dynamischer
-// Tab `plugin:wordpress`. Config (baseUrl/username/defaultPostStatus/enabled) läuft über
-// die generische Plugin-Config-API; das App-Passwort über die Plugin-Secrets
-// (wordpress.save/loadCredentials). Self-Gating: bei deaktiviertem Modul nur der Hinweis.
+// Über den generischen SETTINGS_SECTION_SLOT gemountet → eigener dynamischer Tab
+// `plugin:wordpress`. Config (baseUrl/username/defaultPostStatus/enabled) läuft über die
+// generische Plugin-Config-API; das App-Passwort über die Plugin-Secrets
+// (wordpress.save/loadCredentials). Self-Gating: bei deaktiviertem Modul nur die
+// gestrichelte Karte mit Sprung zum Modul-Tab.
+//
+// Redesign 09/2026: eine Dienst-Karte mit Status-Chip und „Verbindung testen"; das
+// Anwendungspasswort wird beim Verlassen des Felds gespeichert.
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from '../../../renderer/utils/translations'
 import { usePluginConfig } from '../../../renderer/plugins/config'
 import { WORDPRESS_DEFAULTS } from '../../../renderer/stores/uiStore'
 import { wordpressClient } from './wordpressClient'
+import { PageHeader, Card, ServiceHead, IconTile, Row, Note, Button, TextInput, SecretField, Segmented } from '../../../renderer/components/Settings/SettingsUI'
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'failed'
 
@@ -24,7 +28,6 @@ export default function WordpressSettings({ onGoToModules }: { onGoToModules?: (
   const [testStatus, setTestStatus] = useState<TestStatus>('idle')
   const [testError, setTestError] = useState<string | null>(null)
 
-  // Hinterlegtes App-Passwort beim Mounten laden (für die Anzeige im Formular).
   useEffect(() => {
     wordpressClient.loadCredentials()
       .then(creds => {
@@ -36,134 +39,80 @@ export default function WordpressSettings({ onGoToModules }: { onGoToModules?: (
       .catch(() => {})
   }, [])
 
+  const runTest = async () => {
+    setTestError(null)
+    if (!wordpress.baseUrl || !wordpress.username || !appPassword) {
+      setTestStatus('failed')
+      setTestError(t('settings.wordpress.fillAll'))
+      return
+    }
+    // Erst speichern, dann testen (der Check zieht das Passwort aus den Secrets)
+    await wordpressClient.saveCredentials(appPassword)
+    setCredsSaved(true)
+    setTestStatus('testing')
+    const result = await wordpressClient.check(wordpress.baseUrl, wordpress.username)
+    setTestStatus(result.success ? 'success' : 'failed')
+    setTestError(result.success ? null : (result.error || null))
+  }
+
+  const icon = <IconTile bg="#21759b" text="W" serif />
+
   return (
-    <>
-      <h4 className="settings-section-title">{t('settings.wordpress.title')}</h4>
-      <p className="settings-hint">{t('settings.wordpress.description')}</p>
-
-      {!wordpress.enabled && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
-            padding: '8px 12px',
-            margin: '8px 0 12px',
-            background: 'var(--bg-secondary)',
-            border: '1px dashed var(--border-color)',
-            borderRadius: 'var(--radius-md, 6px)',
-            fontSize: '12px',
-            color: 'var(--text-secondary)'
-          }}
-        >
-          <span>{t('settings.moduleGate.disabledHint')}</span>
-          <button
-            className="settings-btn-secondary"
-            onClick={onGoToModules}
-            style={{ padding: '4px 10px', fontSize: '12px', whiteSpace: 'nowrap' }}
-          >
-            {t('settings.moduleGate.goToModules')} →
-          </button>
-        </div>
-      )}
-
-      {wordpress.enabled && (
-        <>
-          <div className="settings-row">
-            <label>{t('settings.wordpress.url')}</label>
-            <input
-              type="url"
-              value={wordpress.baseUrl}
-              onChange={e => setWordpress({ baseUrl: e.target.value })}
-              placeholder="https://meine-seite.de"
-              className="settings-input"
-            />
-          </div>
-
-          <div className="settings-row">
-            <label>{t('settings.wordpress.user')}</label>
-            <input
-              type="text"
-              value={wordpress.username}
-              onChange={e => setWordpress({ username: e.target.value })}
-              placeholder="admin"
-              className="settings-input"
-            />
-          </div>
-
-          <div className="settings-row">
-            <label>{t('settings.wordpress.appPassword')}</label>
-            <input
-              type="password"
-              value={appPassword}
-              onChange={e => { setAppPassword(e.target.value); setCredsSaved(false) }}
+    <div className="settings-section">
+      <PageHeader title={t('settings.wordpress.title')} subtitle={t('settings.wordpress.description')} />
+      {!wordpress.enabled ? (
+        <Card dashed>
+          <ServiceHead
+            icon={icon}
+            name={t('settings.wordpress.title')}
+            desc={t('settings.moduleGate.disabledHint')}
+            dimmed
+            actions={<Button onClick={onGoToModules}>{t('settings.plugins.goToModules')}</Button>}
+          />
+        </Card>
+      ) : (
+        <Card>
+          <ServiceHead
+            icon={icon}
+            name={wordpress.baseUrl ? wordpress.baseUrl.replace(/^https?:\/\//, '') : t('settings.wordpress.title')}
+            desc="WordPress · REST API"
+            status={
+              testStatus === 'success' ? { tone: 'ok', label: t('settings.wordpress.connected') }
+                : testStatus === 'testing' ? { tone: 'checking', label: t('settings.wordpress.testing') }
+                  : testStatus === 'failed' ? { tone: 'off', label: t('settings.wordpress.failed') }
+                    : credsSaved ? { tone: 'warn', label: t('settings.edoobox.notTested') } : null
+            }
+            actions={<Button onClick={() => void runTest()} disabled={testStatus === 'testing'}>{t('settings.wordpress.testConnection')}</Button>}
+          />
+          {testError && <Note tone="warn" action={t('settings.integ.recheck')} onAction={() => void runTest()}>{testError}</Note>}
+          <Row label={t('settings.wordpress.url')}>
+            <TextInput type="url" value={wordpress.baseUrl} onCommit={v => setWordpress({ baseUrl: v })} placeholder="https://meine-seite.de" />
+          </Row>
+          <Row label={t('settings.wordpress.user')}>
+            <TextInput value={wordpress.username} onCommit={v => setWordpress({ username: v })} placeholder="admin" />
+          </Row>
+          <Row label={t('settings.wordpress.appPassword')} hint={t('settings.edoobox.keyHint')}>
+            <SecretField
+              saved={credsSaved && !!appPassword}
+              suffix={appPassword ? appPassword.replace(/\s+/g, '').slice(-4) : null}
+              onSave={async v => {
+                setAppPassword(v)
+                setCredsSaved(await wordpressClient.saveCredentials(v))
+              }}
+              onRemove={() => { setAppPassword(''); setCredsSaved(false) }}
               placeholder="xxxx xxxx xxxx xxxx"
-              className="settings-input"
             />
-          </div>
-
-          <div className="settings-row" style={{ gap: '8px' }}>
-            <button
-              className="settings-btn"
-              onClick={async () => {
-                if (appPassword) {
-                  const saved = await wordpressClient.saveCredentials(appPassword)
-                  setCredsSaved(saved)
-                }
-              }}
-            >
-              {credsSaved ? t('settings.wordpress.saved') : t('settings.wordpress.save')}
-            </button>
-            <button
-              className="settings-btn"
-              disabled={testStatus === 'testing'}
-              onClick={async () => {
-                setTestError(null)
-                if (!wordpress.baseUrl || !wordpress.username || !appPassword) {
-                  setTestStatus('failed')
-                  setTestError(t('settings.wordpress.fillAll'))
-                  return
-                }
-                // Erst speichern, dann testen (der Check zieht das Passwort aus den Secrets)
-                await wordpressClient.saveCredentials(appPassword)
-                setCredsSaved(true)
-                setTestStatus('testing')
-                const result = await wordpressClient.check(wordpress.baseUrl, wordpress.username)
-                setTestStatus(result.success ? 'success' : 'failed')
-                setTestError(result.success ? null : (result.error || null))
-              }}
-            >
-              {testStatus === 'testing'
-                ? t('settings.wordpress.testing')
-                : t('settings.wordpress.testConnection')}
-            </button>
-            {testStatus === 'success' && (
-              <span className="status-connected">{t('settings.wordpress.connected')}</span>
-            )}
-            {testStatus === 'failed' && (
-              <span className="status-disconnected">{t('settings.wordpress.failed')}</span>
-            )}
-          </div>
-          {testError && (
-            <div className="settings-row">
-              <span className="settings-error-detail">{testError}</span>
-            </div>
-          )}
-
-          <div className="settings-row">
-            <label>{t('settings.wordpress.defaultStatus')}</label>
-            <select
+          </Row>
+          <Row label={t('settings.wordpress.defaultStatus')}>
+            <Segmented
+              options={[{ value: 'draft' as const, label: t('settings.wordpress.statusDraft') }, { value: 'publish' as const, label: t('settings.wordpress.statusPublish') }]}
               value={wordpress.defaultPostStatus}
-              onChange={e => setWordpress({ defaultPostStatus: e.target.value as 'draft' | 'publish' })}
-              className="settings-select"
-            >
-              <option value="draft">{t('settings.wordpress.statusDraft')}</option>
-              <option value="publish">{t('settings.wordpress.statusPublish')}</option>
-            </select>
-          </div>
-        </>
+              onChange={v => setWordpress({ defaultPostStatus: v })}
+              ariaLabel={t('settings.wordpress.defaultStatus')}
+            />
+          </Row>
+        </Card>
       )}
-    </>
+    </div>
   )
 }

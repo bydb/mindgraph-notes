@@ -4,23 +4,14 @@ import {
   DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST, DEFAULT_REPLY_HISTORY,
   type VipSender, type DomainRule, type KeywordRule,
 } from '../../../shared/emailRelevance'
+import { Card, Row, Note, Button } from './SettingsUI'
 
 // Settings-Sicht auf den email-relevance-config-Block der Instruktions-Notiz.
 // Die Notiz bleibt Single-Source (synct mit + direkt editierbar); dieses Formular
 // liest und schreibt denselben Block per IPC.
-
-const inputStyle: React.CSSProperties = { padding: '4px 8px', fontSize: '13px' }
-const weightStyle: React.CSSProperties = { ...inputStyle, width: '52px', textAlign: 'center' }
-const rowStyle: React.CSSProperties = { display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '4px', flexWrap: 'wrap' }
-const removeBtn: React.CSSProperties = {
-  border: '1px solid var(--border-color)', background: 'transparent', color: 'var(--text-muted)',
-  borderRadius: '4px', width: '24px', height: '24px', cursor: 'pointer', lineHeight: '1', flexShrink: 0,
-}
-const addBtn: React.CSSProperties = {
-  border: '1px dashed var(--border-color)', background: 'transparent', color: 'var(--text-secondary, var(--text-muted))',
-  borderRadius: '4px', padding: '3px 10px', fontSize: '12px', cursor: 'pointer', marginTop: '2px',
-}
-const groupLabel: React.CSSProperties = { fontSize: '12px', fontWeight: 600, marginTop: '12px', marginBottom: '4px', color: 'var(--text-secondary, var(--text-normal))' }
+//
+// Bewusst EIN Speichern-Knopf für alle drei Listen (kein Auto-Save pro Feld): ein halb
+// getippter Domainname darf nicht sofort als Regel in die Notiz.
 
 export const EmailRelevanceRulesSection: React.FC<{ vaultPath: string }> = ({ vaultPath }) => {
   const { t } = useTranslation()
@@ -53,66 +44,63 @@ export const EmailRelevanceRulesSection: React.FC<{ vaultPath: string }> = ({ va
     } catch { setStatus('error') } finally { setSaving(false) }
   }, [vaultPath, vip, domains, keywords])
 
+  const removeBtn = (onClick: () => void) => (
+    <button type="button" className="sui-rule-remove" title={t('settings.email.rules.remove')} aria-label={t('settings.email.rules.remove')} onClick={onClick}>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+    </button>
+  )
+
   return (
-    <div style={{ marginTop: '8px', paddingTop: '12px', borderTop: '1px solid var(--border-color)' }}>
-      <div style={{ fontWeight: 600, marginBottom: '2px' }}>{t('settings.email.rules.title')}</div>
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: '8px' }}>
-        {t('settings.email.rules.hint')}
-      </div>
+    <Card>
+      <Row label={t('settings.email.rules.title')} hint={t('settings.email.rules.hint')} />
 
-      {/* VIP-Absender */}
-      <div style={groupLabel}>{t('settings.email.rules.vip')}</div>
-      {vip.map((v, i) => (
-        <div key={i} style={rowStyle}>
-          <input style={{ ...inputStyle, flex: '1 1 130px' }} placeholder={t('settings.email.rules.namePh')}
-            value={v.name || ''} onChange={e => setVip(vip.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
-          <input style={{ ...inputStyle, flex: '1 1 170px' }} placeholder={t('settings.email.rules.emailPh')}
-            value={v.email || ''} onChange={e => setVip(vip.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} />
-          <input type="number" min={0} max={100} style={weightStyle} title="Gewicht"
-            value={v.weight} onChange={e => setVip(vip.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
-          <button style={removeBtn} title="Entfernen" onClick={() => setVip(vip.filter((_, j) => j !== i))}>×</button>
-        </div>
-      ))}
-      <button style={addBtn} onClick={() => setVip([...vip, { name: '', email: '', weight: DEFAULT_VIP_WEIGHT }])}>{t('settings.email.rules.add')}</button>
+      <Row label={t('settings.email.rules.vip')} stacked>
+        {vip.map((v, i) => (
+          <div key={i} className="sui-rule-row">
+            <input className="sui-input" placeholder={t('settings.email.rules.namePh')} value={v.name || ''}
+              onChange={e => setVip(vip.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} />
+            <input className="sui-input" placeholder={t('settings.email.rules.emailPh')} value={v.email || ''}
+              onChange={e => setVip(vip.map((x, j) => j === i ? { ...x, email: e.target.value } : x))} />
+            <input type="number" className="sui-input is-number" min={0} max={100} title={t('settings.email.rules.weight')} value={v.weight}
+              onChange={e => setVip(vip.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
+            {removeBtn(() => setVip(vip.filter((_, j) => j !== i)))}
+          </div>
+        ))}
+        <div><Button variant="link" onClick={() => setVip([...vip, { name: '', email: '', weight: DEFAULT_VIP_WEIGHT }])}>{t('settings.email.rules.add')}</Button></div>
+      </Row>
 
-      {/* Domains */}
-      <div style={groupLabel}>{t('settings.email.rules.domains')}</div>
-      {domains.map((d, i) => (
-        <div key={i} style={rowStyle}>
-          <input style={{ ...inputStyle, flex: '1 1 220px' }} placeholder={t('settings.email.rules.domainPh')}
-            value={d.domain} onChange={e => setDomains(domains.map((x, j) => j === i ? { ...x, domain: e.target.value } : x))} />
-          <input type="number" min={0} max={100} style={weightStyle} title="Gewicht"
-            value={d.weight} onChange={e => setDomains(domains.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
-          <button style={removeBtn} title="Entfernen" onClick={() => setDomains(domains.filter((_, j) => j !== i))}>×</button>
-        </div>
-      ))}
-      <button style={addBtn} onClick={() => setDomains([...domains, { domain: '', weight: DEFAULT_DOMAIN_WEIGHT }])}>{t('settings.email.rules.add')}</button>
+      <Row label={t('settings.email.rules.domains')} stacked>
+        {domains.map((d, i) => (
+          <div key={i} className="sui-rule-row">
+            <input className="sui-input" placeholder={t('settings.email.rules.domainPh')} value={d.domain}
+              onChange={e => setDomains(domains.map((x, j) => j === i ? { ...x, domain: e.target.value } : x))} />
+            <input type="number" className="sui-input is-number" min={0} max={100} title={t('settings.email.rules.weight')} value={d.weight}
+              onChange={e => setDomains(domains.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
+            {removeBtn(() => setDomains(domains.filter((_, j) => j !== i)))}
+          </div>
+        ))}
+        <div><Button variant="link" onClick={() => setDomains([...domains, { domain: '', weight: DEFAULT_DOMAIN_WEIGHT }])}>{t('settings.email.rules.add')}</Button></div>
+      </Row>
 
-      {/* Schlüsselwörter */}
-      <div style={groupLabel}>{t('settings.email.rules.keywords')}</div>
-      {keywords.map((k, i) => (
-        <div key={i} style={rowStyle}>
-          <input style={{ ...inputStyle, flex: '1 1 220px' }} placeholder={t('settings.email.rules.keywordPh')}
-            value={k.term} onChange={e => setKeywords(keywords.map((x, j) => j === i ? { ...x, term: e.target.value } : x))} />
-          <input type="number" min={0} max={100} style={weightStyle} title="Boost"
-            value={k.weight} onChange={e => setKeywords(keywords.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
-          <button style={removeBtn} title="Entfernen" onClick={() => setKeywords(keywords.filter((_, j) => j !== i))}>×</button>
-        </div>
-      ))}
-      <button style={addBtn} onClick={() => setKeywords([...keywords, { term: '', weight: DEFAULT_KEYWORD_BOOST }])}>{t('settings.email.rules.add')}</button>
+      <Row label={t('settings.email.rules.keywords')} stacked>
+        {keywords.map((k, i) => (
+          <div key={i} className="sui-rule-row">
+            <input className="sui-input" placeholder={t('settings.email.rules.keywordPh')} value={k.term}
+              onChange={e => setKeywords(keywords.map((x, j) => j === i ? { ...x, term: e.target.value } : x))} />
+            <input type="number" className="sui-input is-number" min={0} max={100} title="Boost" value={k.weight}
+              onChange={e => setKeywords(keywords.map((x, j) => j === i ? { ...x, weight: Number(e.target.value) } : x))} />
+            {removeBtn(() => setKeywords(keywords.filter((_, j) => j !== i)))}
+          </div>
+        ))}
+        <div><Button variant="link" onClick={() => setKeywords([...keywords, { term: '', weight: DEFAULT_KEYWORD_BOOST }])}>{t('settings.email.rules.add')}</Button></div>
+      </Row>
 
-      <div style={{ fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5, margin: '12px 0 8px' }}>
-        {t('settings.email.rules.replyAuto')}
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <button onClick={save} disabled={saving} className="settings-btn-primary"
-          style={{ padding: '5px 14px', fontSize: '13px', cursor: saving ? 'default' : 'pointer' }}>
-          {t('settings.email.rules.save')}
-        </button>
-        {status === 'saved' && <span style={{ fontSize: '12px', color: 'var(--success-color, #4caf50)' }}>{t('settings.email.rules.saved')}</span>}
-        {status === 'error' && <span style={{ fontSize: '12px', color: 'var(--error-color, #e57373)' }}>{t('settings.email.rules.saveError')}</span>}
-      </div>
-    </div>
+      <Note tone="muted">{t('settings.email.rules.replyAuto')}</Note>
+      {status === 'error' && <Note tone="danger">{t('settings.email.rules.saveError')}</Note>}
+      <Row label={t('settings.email.rules.save')}>
+        {status === 'saved' && <span className="sui-saved">{t('settings.email.rules.saved')}</span>}
+        <Button variant="primary" onClick={() => void save()} disabled={saving}>{t('settings.email.rules.save')}</Button>
+      </Row>
+    </Card>
   )
 }

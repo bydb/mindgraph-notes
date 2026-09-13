@@ -1,9 +1,11 @@
 import type { Language } from '../stores/uiStore'
+import * as settingsPagesI18n from './i18n/settingsPages'
 
 type TranslationKey = keyof typeof translations.de
 
 const translations = {
   de: {
+    ...settingsPagesI18n.de,
     // ── Einstellungen · Redesign 09/2026: geteilte Bausteine, Integrationen, KI-Tab, Modul-Tab ──
     'settings.ui.saved': 'Gespeichert',
     'settings.ui.remove': 'Entfernen',
@@ -3519,6 +3521,7 @@ const translations = {
   },
 
   en: {
+    ...settingsPagesI18n.en,
     // ── Settings · Redesign 09/2026: shared building blocks, integrations, AI tab, modules tab ──
     'settings.ui.saved': 'Saved',
     'settings.ui.remove': 'Remove',

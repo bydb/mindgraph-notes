@@ -3,6 +3,8 @@ import { useUIStore } from '../../stores/uiStore'
 import { invokePlugin } from '../../plugins/client'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { wordpressService } from '../../stores/wordpressServiceBridge'
+import { useTranslation } from '../../utils/translations'
+import { PageHeader, SectionTitle, Card, Row, Note, Details, Button, StatusChip } from './SettingsUI'
 
 type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard' | 'ai' | `plugin:${string}`
 
@@ -26,6 +28,7 @@ interface Props {
  * in dem die Credential tatsächlich gesetzt/gelöscht wird.
  */
 export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
+  const { t } = useTranslation()
   const email = useUIStore(s => s.email)
   const readwise = useUIStore(s => s.readwise)
   const languageTool = useUIStore(s => s.languageTool)
@@ -36,43 +39,9 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
   // Dynamische Credential-Liste — Email-Accounts kommen aus dem uiStore
   const credentials: CredentialRow[] = React.useMemo(() => {
     const rows: CredentialRow[] = []
-
-    // Telegram
-    rows.push({
-      id: 'telegram-token',
-      label: 'Telegram Bot-Token',
-      category: 'Messenger',
-      note: 'Bot für Vault-Abfragen via Telegram',
-      settingsTab: 'telegram',
-      checkSet: () => window.electronAPI.telegramHasToken()
-    })
-    // ElevenLabs (Speech)
-    rows.push({
-      id: 'elevenlabs-key',
-      label: 'ElevenLabs API-Key',
-      category: 'KI-Cloud',
-      note: 'Für Cloud-TTS im Sprache-Modul',
-      settingsTab: 'speech',
-      checkSet: async () => {
-        const k = await window.electronAPI.elevenlabsLoadKey()
-        return !!k
-      }
-    })
-
-    // Sync
-    rows.push({
-      id: 'sync-passphrase',
-      label: 'Sync-Passphrase',
-      category: 'Sync',
-      note: 'E2E-verschlüsselter Vault-Sync',
-      settingsTab: 'sync',
-      checkSet: async () => {
-        const p = await window.electronAPI.syncLoadPassphrase()
-        return !!p
-      }
-    })
-
-    // Email-Accounts — ein Eintrag pro Account
+    rows.push({ id: 'telegram-token', label: 'Telegram Bot-Token', category: 'Messenger', note: 'Bot für Vault-Abfragen via Telegram', settingsTab: 'telegram', checkSet: () => window.electronAPI.telegramHasToken() })
+    rows.push({ id: 'elevenlabs-key', label: 'ElevenLabs API-Key', category: 'KI-Cloud', note: 'Für Cloud-TTS im Sprache-Modul', settingsTab: 'speech', checkSet: async () => !!(await window.electronAPI.elevenlabsLoadKey()) })
+    rows.push({ id: 'sync-passphrase', label: 'Sync-Passphrase', category: 'Sync', note: 'E2E-verschlüsselter Vault-Sync', settingsTab: 'sync', checkSet: async () => !!(await window.electronAPI.syncLoadPassphrase()) })
     for (const acc of email.accounts ?? []) {
       rows.push({
         id: `email-${acc.id}`,
@@ -80,92 +49,28 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
         category: 'Kommunikation',
         note: `IMAP ${acc.host} · SMTP ${acc.smtpHost}`,
         settingsTab: 'email',
-        checkSet: async () => {
-          const pw = await window.electronAPI.emailLoadPassword(acc.id)
-          return !!pw
-        }
+        checkSet: async () => !!(await window.electronAPI.emailLoadPassword(acc.id))
       })
     }
-
-    // edoobox
     rows.push({
-      id: 'edoobox',
-      label: 'edoobox API-Key + Secret',
-      category: 'Business',
-      note: 'Veranstaltungs-Agent',
-      settingsTab: 'agents',
-      checkSet: async () => {
-        const creds = await edooboxService.loadCredentials()
-        return !!(creds && creds.apiKey && creds.apiSecret)
-      }
+      id: 'edoobox', label: 'edoobox API-Key + Secret', category: 'Business', note: 'Veranstaltungs-Agent', settingsTab: 'agents',
+      checkSet: async () => { const creds = await edooboxService.loadCredentials(); return !!(creds && creds.apiKey && creds.apiSecret) }
     })
-
-    // Antares CS (Medienzentrum-Verleih)
     rows.push({
-      id: 'antares',
-      label: 'Antares Zugangsdaten',
-      category: 'Business',
-      note: 'Username + Passwort für Antares CS (Medienzentrum-Verleih). Read-only.',
-      settingsTab: 'plugin:antares',
+      id: 'antares', label: 'Antares Zugangsdaten', category: 'Business', note: 'Username + Passwort für Antares CS (Medienzentrum-Verleih). Read-only.', settingsTab: 'plugin:antares',
       checkSet: async () => {
         const creds = await invokePlugin<{ username?: string; password?: string } | null>('antares', 'antares.loadCredentials').catch(() => null)
         return !!(creds && creds.username && creds.password)
       }
     })
-
-    // WordPress (eigenes Plugin seit Paket 3 der Modul-Entflechtung)
     rows.push({
-      id: 'wordpress',
-      label: 'WordPress App-Passwort',
-      category: 'Business',
-      note: 'Publishing aus Editor und Marketing-Tab',
-      settingsTab: 'plugin:wordpress',
-      checkSet: async () => {
-        const creds = await wordpressService.loadCredentials()
-        return !!(creds && creds.wpAppPassword)
-      }
+      id: 'wordpress', label: 'WordPress App-Passwort', category: 'Business', note: 'Publishing aus Editor und Marketing-Tab', settingsTab: 'plugin:wordpress',
+      checkSet: async () => { const creds = await wordpressService.loadCredentials(); return !!(creds && creds.wpAppPassword) }
     })
-
-    // uiStore-basierte Credentials (NICHT safeStorage — Sicherheits-Hinweis)
-    rows.push({
-      id: 'openalex-key',
-      label: 'OpenAlex API-Key',
-      category: 'Forschung',
-      note: 'Höhere Limits im Research-Panel',
-      settingsTab: 'integrations',
-      checkSet: async () => {
-        const k = await window.electronAPI.openAlexLoadKey()
-        return !!k
-      }
-    })
-
-    rows.push({
-      id: 'readwise',
-      label: 'Readwise API-Key',
-      category: 'Forschung',
-      note: 'Highlights-Synchronisation',
-      settingsTab: 'integrations',
-      checkSet: async () => !!readwise?.apiKey,
-      inUiStore: true
-    })
-    rows.push({
-      id: 'languagetool',
-      label: 'LanguageTool API-Key',
-      category: 'Editor',
-      note: 'Nur bei LanguageTool Premium API',
-      settingsTab: 'integrations',
-      checkSet: async () => !!languageTool?.apiKey,
-      inUiStore: true
-    })
-    rows.push({
-      id: 'imagen',
-      label: 'Google AI Studio API-Key',
-      category: 'KI-Cloud',
-      note: 'Nano-Banana-Bildgenerierung — genutzt von Marketing und Notiz-Agent',
-      settingsTab: 'ai',
-      checkSet: async () => !!(await window.electronAPI.imageGenLoadKey())
-    })
-
+    rows.push({ id: 'openalex-key', label: 'OpenAlex API-Key', category: 'Forschung', note: 'Höhere Limits im Research-Panel', settingsTab: 'integrations', checkSet: async () => !!(await window.electronAPI.openAlexLoadKey()) })
+    rows.push({ id: 'readwise', label: 'Readwise API-Key', category: 'Forschung', note: 'Highlights-Synchronisation', settingsTab: 'integrations', checkSet: async () => !!readwise?.apiKey, inUiStore: true })
+    rows.push({ id: 'languagetool', label: 'LanguageTool API-Key', category: 'Editor', note: 'Nur bei LanguageTool Premium API', settingsTab: 'integrations', checkSet: async () => !!languageTool?.apiKey, inUiStore: true })
+    rows.push({ id: 'imagen', label: 'Google AI Studio API-Key', category: 'KI-Cloud', note: 'Nano-Banana-Bildgenerierung — genutzt von Marketing und Notiz-Agent', settingsTab: 'ai', checkSet: async () => !!(await window.electronAPI.imageGenLoadKey()) })
     return rows
   }, [email, readwise, languageTool])
 
@@ -173,21 +78,14 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
     setLoading(true)
     const result: Record<string, boolean> = {}
     await Promise.all(credentials.map(async c => {
-      try {
-        result[c.id] = await c.checkSet()
-      } catch {
-        result[c.id] = false
-      }
+      try { result[c.id] = await c.checkSet() } catch { result[c.id] = false }
     }))
     setStatuses(result)
     setLoading(false)
   }, [credentials])
 
-  useEffect(() => {
-    refreshAll()
-  }, [refreshAll])
+  useEffect(() => { void refreshAll() }, [refreshAll])
 
-  // Gruppierung nach Kategorie
   const grouped = React.useMemo(() => {
     const map = new Map<string, CredentialRow[]>()
     for (const c of credentials) {
@@ -202,100 +100,33 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
 
   return (
     <div className="settings-section">
-      <h3>Zugangsdaten</h3>
-      <p className="settings-help">
-        Zentrale Übersicht aller gespeicherten API-Keys, Passwörter und Tokens. Die Credentials selbst werden
-        in ihrem jeweiligen Feature-Tab gesetzt und gelöscht — hier siehst du nur den Status und springst
-        per Klick zum passenden Tab. Alle Einträge (außer den mit ⚠️ markierten) werden via
-        <code> electron.safeStorage</code> verschlüsselt lokal abgelegt und verlassen den Rechner nicht.
-      </p>
+      <PageHeader title={t('settings.credentials.title')} subtitle={t('settings.credentials.subtitle')} />
 
-      <div className="settings-group" style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-        <strong>{setCount}</strong>
-        <span>von {credentials.length} Einträgen gesetzt</span>
-        <button
-          className="settings-button"
-          onClick={refreshAll}
-          disabled={loading}
-          style={{ marginLeft: 'auto' }}
-        >
-          {loading ? 'Prüfe …' : 'Aktualisieren'}
-        </button>
-      </div>
-
-      {hasUiStoreClearText && (
-        <div
-          style={{
-            padding: '10px 14px',
-            background: '#fff7e6',
-            border: '1px solid #f4c078',
-            borderRadius: 4,
-            marginBottom: 16,
-            fontSize: 13,
-            color: '#8a5a00'
-          }}
-        >
-          ⚠️ Einträge mit dem Warnsymbol sind aktuell im Klartext in der lokalen UI-Settings-Datei
-          abgelegt (nicht verschlüsselt). Bei Bedarf sollten diese auf safeStorage migriert werden.
-        </div>
-      )}
-
+      <SectionTitle title={t('settings.credentials.groupStored')} meta={loading ? t('settings.credentials.checking') : t('settings.credentials.meta', { set: setCount, total: credentials.length })} />
+      {hasUiStoreClearText && <Card><Note tone="warn">{t('settings.credentials.plaintextWarn')}</Note></Card>}
       {grouped.map(([category, rows]) => (
-        <div key={category} className="settings-group">
-          <label className="settings-label" style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, opacity: 0.7 }}>
-            {category}
-          </label>
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {rows.map(row => {
-              const isSet = statuses[row.id]
-              return (
-                <li
-                  key={row.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 12px',
-                    background: 'var(--bg-secondary)',
-                    borderRadius: 4,
-                    marginBottom: 6
-                  }}
-                >
-                  <span
-                    title={isSet ? 'Gesetzt' : 'Nicht gesetzt'}
-                    style={{
-                      display: 'inline-block',
-                      width: 10,
-                      height: 10,
-                      borderRadius: '50%',
-                      background: loading ? '#ccc' : isSet ? '#44c767' : '#ddd',
-                      flexShrink: 0
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 500 }}>
-                      {row.label}
-                      {row.inUiStore && (
-                        <span title="Im Klartext in ui-settings.json — sollte auf safeStorage migriert werden" style={{ marginLeft: 6 }}>
-                          ⚠️
-                        </span>
-                      )}
-                    </div>
-                    {row.note && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{row.note}</div>}
-                  </div>
-                  <button
-                    className="settings-button small"
-                    onClick={() => onNavigateToTab(row.settingsTab)}
-                    title="Zum Feature-Tab wechseln, wo die Credential verwaltet wird"
-                  >
-                    {isSet ? 'Ändern' : 'Einrichten'}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
+        <Card key={category}>
+          <Row label={category}>
+            {category === grouped[0][0] && (
+              <Button variant="link" onClick={() => void refreshAll()} disabled={loading}>{loading ? t('settings.credentials.checking') : t('settings.credentials.refresh')}</Button>
+            )}
+          </Row>
+          {rows.map(row => {
+            const isSet = statuses[row.id]
+            return (
+              <Row key={row.id} label={row.label} hint={<>{row.note}{row.inUiStore && <> · <b>{t('settings.credentials.plaintext')}</b></>}</>}>
+                <StatusChip tone={loading ? 'checking' : isSet ? 'ok' : 'off'} label={loading ? t('settings.credentials.checking') : isSet ? t('settings.credentials.set') : t('settings.credentials.missing')} />
+                <Button variant="link" onClick={() => onNavigateToTab(row.settingsTab)}>{isSet ? t('settings.credentials.change') : t('settings.credentials.setup')}</Button>
+              </Row>
+            )
+          })}
+        </Card>
       ))}
+      <Card>
+        <Details title={t('settings.credentials.whereTitle')}>
+          <p>{t('settings.credentials.whereBody')}</p>
+        </Details>
+      </Card>
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import { generateNoteId } from '../../utils/linkExtractor'
 import type { NoteAgentSkill, NoteAgentCatalogSkill } from '../../../shared/types'
+import { PageHeader, SectionTitle, Card, Row, Note, Details, Toggle, Button, Code } from './SettingsUI'
 
 // Agent-Skills Stufe 1 (docs/agent-skills-plan.md): Vault-Skills verwalten.
 // Skills sind Markdown-Notizen (Skills/<ordner>/SKILL.md, agentskills.io-Format) —
@@ -35,18 +36,13 @@ export function SkillsSection({ onClose }: Props) {
     setLoading(false)
   }, [vaultPath])
 
-  useEffect(() => {
-    void reload()
-  }, [reload])
+  useEffect(() => { void reload() }, [reload])
 
   const toggleSkill = async (skill: NoteAgentSkill) => {
     if (!vaultPath) return
     const res = await window.electronAPI.noteSkillsSetEnabled(vaultPath, skill.folderName, !skill.enabled)
-    if (res.success) {
-      setSkills(prev => prev.map(s => (s.folderName === skill.folderName ? { ...s, enabled: !skill.enabled } : s)))
-    } else {
-      setError(res.error || null)
-    }
+    if (res.success) setSkills(prev => prev.map(s => (s.folderName === skill.folderName ? { ...s, enabled: !skill.enabled } : s)))
+    else setError(res.error || null)
   }
 
   // SKILL.md als normale Notiz öffnen (Muster: PDFViewer „Mit KI bearbeiten").
@@ -123,9 +119,7 @@ export function SkillsSection({ onClose }: Props) {
       setError(res.error || 'Import fehlgeschlagen')
       return
     }
-    setInstallStatus(
-      `${t('settings.skills.installed')}: ${res.folderName}${res.includedScripts ? ` — ${t('settings.skills.scriptsIncluded')}` : ''}`
-    )
+    setInstallStatus(`${t('settings.skills.installed')}: ${res.folderName}${res.includedScripts ? ` — ${t('settings.skills.scriptsIncluded')}` : ''}`)
     await reload()
   }
 
@@ -138,156 +132,96 @@ export function SkillsSection({ onClose }: Props) {
       setError(res.error || 'Installation fehlgeschlagen')
       return
     }
-    setInstallStatus(
-      res.installed.length > 0
-        ? `${t('settings.skills.installed')}: ${res.installed.join(', ')}`
-        : t('settings.skills.installedNone')
-    )
+    setInstallStatus(res.installed.length > 0 ? `${t('settings.skills.installed')}: ${res.installed.join(', ')}` : t('settings.skills.installedNone'))
     await reload()
   }
 
+  const enabledCount = skills.filter(s => s.enabled).length
+
   return (
     <div className="settings-section">
-      <h3>{t('settings.skills.title')}</h3>
-      <p className="settings-hint">{t('settings.skills.intro')}</p>
+      <PageHeader title={t('settings.tab.skills')} subtitle={t('settings.skills.subtitle')} />
 
-      {loading ? (
-        <p className="settings-hint">…</p>
-      ) : skills.length === 0 ? (
-        <p className="settings-hint">{t('settings.skills.empty')}</p>
-      ) : (
-        skills.map(skill => (
-          <div key={skill.folderName} className="settings-row" style={{ alignItems: 'flex-start' }}>
-            <label style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ fontWeight: 500 }}>{skill.name}</span>
-              {skill.description && (
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {skill.description}
-                </span>
-              )}
-              <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2, fontFamily: 'var(--font-mono, monospace)' }}>
-                {skill.relPath}
-              </span>
-            </label>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-              <button type="button" className="settings-btn-secondary" onClick={() => void openSkill(skill.relPath)}>
-                {t('settings.skills.edit')}
-              </button>
-              <input
-                type="checkbox"
-                checked={skill.enabled}
-                onChange={() => void toggleSkill(skill)}
-                title={skill.enabled ? t('settings.skills.disable') : t('settings.skills.enable')}
-              />
-            </div>
-          </div>
-        ))
-      )}
+      <SectionTitle title={t('settings.skills.groupVault')} meta={loading ? undefined : t('settings.skills.meta', { n: skills.length, on: enabledCount })} />
+      <Card>
+        {loading ? (
+          <Note tone="muted">…</Note>
+        ) : skills.length === 0 ? (
+          <Note tone="muted">{t('settings.skills.empty')}</Note>
+        ) : skills.map(skill => (
+          <Row
+            key={skill.folderName}
+            label={skill.name}
+            htmlFor={`skill-${skill.folderName}`}
+            hint={
+              <>
+                {skill.description && <>{skill.description}<br /></>}
+                <span className="sui-secret-suffix">{skill.relPath}</span> · <button type="button" className="sui-link" onClick={() => void openSkill(skill.relPath)}>{t('settings.skills.edit')}</button>
+              </>
+            }
+          >
+            <Toggle id={`skill-${skill.folderName}`} checked={skill.enabled} onChange={() => void toggleSkill(skill)} ariaLabel={skill.enabled ? t('settings.skills.disable') : t('settings.skills.enable')} />
+          </Row>
+        ))}
+        <Details title={t('settings.skills.newHint')}>
+          <p>{t('settings.skills.limitNote')}</p>
+        </Details>
+      </Card>
 
-      <div className="settings-divider" />
-
-      <div className="settings-row">
-        <label>{t('settings.skills.new')}</label>
-        <div className="settings-input-group">
+      <SectionTitle title={t('settings.skills.groupAdd')} />
+      <Card>
+        <Row label={t('settings.skills.new')} hint={t('settings.skills.newHint')}>
           <input
-            className="settings-input"
+            type="text"
+            className="sui-input"
             value={newName}
             placeholder={t('settings.skills.newPlaceholder')}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') void createNewSkill() }}
           />
-          <button type="button" className="settings-btn" onClick={() => void createNewSkill()} disabled={!newName.trim()}>
-            {t('settings.skills.create')}
-          </button>
-        </div>
-      </div>
+          <Button variant="primary" onClick={() => void createNewSkill()} disabled={!newName.trim()}>{t('settings.skills.create')}</Button>
+        </Row>
+        <Row label={t('settings.skills.starter')} hint={t('settings.skills.starterHint')}>
+          <Button onClick={() => void installStarter()}>{t('settings.skills.install')}</Button>
+        </Row>
+        <Row label={t('settings.skills.import')} hint={t('settings.skills.importHint')}>
+          <Button onClick={() => void importFromDisk()}>{t('settings.skills.importButton')}</Button>
+        </Row>
+        <Row label={t('settings.skills.catalog')} hint={t('settings.skills.catalogHint')}>
+          <Button onClick={() => void loadCatalog()} disabled={catalogLoading}>{catalogLoading ? '…' : t('settings.skills.catalogLoad')}</Button>
+        </Row>
+        {installStatus && <Note tone="ok">{installStatus}</Note>}
+        {error && <Note tone="danger">{error}</Note>}
+      </Card>
 
-      <div className="settings-row">
-        <label>
-          {t('settings.skills.starter')}
-          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {t('settings.skills.starterHint')}
-          </span>
-        </label>
-        <button type="button" className="settings-btn-secondary" onClick={() => void installStarter()}>
-          {t('settings.skills.install')}
-        </button>
-      </div>
-      <div className="settings-row">
-        <label>
-          {t('settings.skills.import')}
-          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {t('settings.skills.importHint')}
-          </span>
-        </label>
-        <button type="button" className="settings-btn-secondary" onClick={() => void importFromDisk()}>
-          {t('settings.skills.importButton')}
-        </button>
-      </div>
-
-      <div className="settings-divider" />
-
-      <div className="settings-row">
-        <label>
-          {t('settings.skills.catalog')}
-          <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
-            {t('settings.skills.catalogHint')}
-          </span>
-        </label>
-        <button type="button" className="settings-btn-secondary" onClick={() => void loadCatalog()} disabled={catalogLoading}>
-          {catalogLoading ? '…' : t('settings.skills.catalogLoad')}
-        </button>
-      </div>
-
-      {catalog && catalog.length === 0 && <p className="settings-hint">{t('settings.skills.catalogEmpty')}</p>}
-      {catalog?.map(entry => {
-        const alreadyInstalled = skills.some(s => s.folderName === entry.id)
-        return (
-          <div key={entry.id} className="settings-row" style={{ alignItems: 'flex-start', flexDirection: 'column', gap: 6 }}>
-            <div style={{ display: 'flex', width: '100%', gap: 8, alignItems: 'flex-start' }}>
-              <label style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ fontWeight: 500 }}>{entry.name}</span>
-                <span style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{entry.description}</span>
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>
-                  {entry.source} · {entry.license}{entry.language ? ` · ${entry.language}` : ''}
-                </span>
-              </label>
-              <button
-                type="button"
-                className="settings-btn-secondary"
-                onClick={() => setPreviewId(previewId === entry.id ? null : entry.id)}
-                disabled={alreadyInstalled}
-              >
-                {alreadyInstalled ? t('settings.skills.alreadyInstalled') : previewId === entry.id ? t('settings.skills.previewClose') : t('settings.skills.preview')}
-              </button>
-            </div>
-            {previewId === entry.id && !alreadyInstalled && (
-              <div style={{ width: '100%' }}>
-                {/* Pflicht-UX: kompletter Inhalt VOR der Installation sichtbar */}
-                <pre style={{
-                  maxHeight: 260,
-                  overflow: 'auto',
-                  padding: '8px 10px',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--bg-primary)',
-                  fontSize: 11,
-                  whiteSpace: 'pre-wrap',
-                  margin: 0
-                }}>{entry.content}</pre>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 6 }}>
-                  <button type="button" className="settings-btn" onClick={() => void installFromCatalog(entry.id)}>
-                    {t('settings.skills.install')}
-                  </button>
+      {catalog && (
+        <>
+          <SectionTitle title={t('settings.skills.catalog')} meta={t('settings.skills.catalogMeta', { n: catalog.length })} />
+          <Card>
+            {catalog.length === 0 && <Note tone="muted">{t('settings.skills.catalogEmpty')}</Note>}
+            {catalog.map(entry => {
+              const alreadyInstalled = skills.some(s => s.folderName === entry.id)
+              const open = previewId === entry.id && !alreadyInstalled
+              return (
+                <div key={entry.id}>
+                  <Row label={entry.name} hint={<>{entry.description}<br />{entry.source} · {entry.license}{entry.language ? ` · ${entry.language}` : ''}</>}>
+                    <Button onClick={() => setPreviewId(open ? null : entry.id)} disabled={alreadyInstalled}>
+                      {alreadyInstalled ? t('settings.skills.alreadyInstalled') : open ? t('settings.skills.previewClose') : t('settings.skills.preview')}
+                    </Button>
+                  </Row>
+                  {open && (
+                    <Row label={t('settings.skills.preview')} stacked>
+                      {/* Pflicht-UX: kompletter Inhalt VOR der Installation sichtbar */}
+                      <div className="sui-preview"><Code>{entry.content}</Code></div>
+                      <div className="sui-pair"><Button variant="primary" onClick={() => void installFromCatalog(entry.id)}>{t('settings.skills.install')}</Button></div>
+                    </Row>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      {installStatus && <p className="settings-hint">{installStatus}</p>}
-      {error && <p className="settings-hint" style={{ color: 'var(--color-danger)' }}>{error}</p>}
+              )
+            })}
+          </Card>
+        </>
+      )}
     </div>
   )
 }

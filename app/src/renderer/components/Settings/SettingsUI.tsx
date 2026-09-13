@@ -9,7 +9,8 @@
 // die Rückmeldung ist das grüne „Gespeichert" an der Zeile.
 
 import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react'
-import { useTranslation } from '../../utils/translations'
+import { useIsModuleEnabled } from '../../utils/modules'
+import { useTranslation, type TranslationKey } from '../../utils/translations'
 import './SettingsUI.css'
 
 export type StatusTone = 'ok' | 'off' | 'warn' | 'checking'
@@ -368,6 +369,7 @@ export function TextInput({
   disabled,
   type = 'text',
   narrow,
+  wide,
   id,
   showAutoSaveHint
 }: {
@@ -377,6 +379,8 @@ export function TextInput({
   disabled?: boolean
   type?: 'text' | 'email' | 'url'
   narrow?: boolean
+  /** volle Breite (in gestapelten Zeilen) */
+  wide?: boolean
   id?: string
   /** graues „Speichert automatisch" links vom Feld, solange noch nichts übernommen wurde */
   showAutoSaveHint?: boolean
@@ -408,7 +412,7 @@ export function TextInput({
       <input
         id={id}
         type={type}
-        className={`sui-input${narrow ? ' is-narrow' : ''}`}
+        className={`sui-input${narrow ? ' is-narrow' : ''}${wide ? ' is-wide' : ''}`}
         value={draft}
         placeholder={placeholder}
         disabled={disabled}
@@ -497,7 +501,7 @@ export function SecretField({
   /** letzte Zeichen des Schlüssels, falls bekannt (sonst nur Punkte) */
   suffix?: string | null
   onSave: (value: string) => void | Promise<void>
-  onRemove: () => void | Promise<void>
+  onRemove?: () => void | Promise<void>
   placeholder?: string
   disabled?: boolean
   busy?: boolean
@@ -519,9 +523,11 @@ export function SecretField({
           <span className="sui-secret-dots">••••••••</span>
           {suffix && <span className="sui-secret-suffix">…{suffix}</span>}
         </div>
-        <button type="button" className="sui-link is-muted" onClick={() => void onRemove()} disabled={disabled || busy}>
-          {t('settings.ui.remove')}
-        </button>
+        {onRemove && (
+          <button type="button" className="sui-link is-muted" onClick={() => void onRemove()} disabled={disabled || busy}>
+            {t('settings.ui.remove')}
+          </button>
+        )}
       </>
     )
   }
@@ -637,4 +643,165 @@ export function ModuleOffCard({
 export function useControlId(prefix: string): string {
   const id = useId()
   return `${prefix}-${id}`
+}
+
+// ── Alt-Hinweis „Modul deaktiviert" (Vorgänger von ModuleOffCard, wird seitenweise abgelöst) ──
+export const ModuleDisabledHint: React.FC<{
+  moduleId: string
+  onGoToModules: () => void
+  t: (key: TranslationKey) => string
+}> = ({ moduleId, onGoToModules, t }) => {
+  const enabled = useIsModuleEnabled(moduleId)
+  if (enabled) return null
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '12px',
+        padding: '8px 12px',
+        margin: '8px 0 12px',
+        background: 'var(--bg-secondary)',
+        border: '1px dashed var(--border-color)',
+        borderRadius: 'var(--radius-md, 6px)',
+        fontSize: '12px',
+        color: 'var(--text-secondary)'
+      }}
+    >
+      <span>{t('settings.moduleGate.disabledHint')}</span>
+      <button
+        className="settings-btn-secondary"
+        onClick={onGoToModules}
+        style={{ padding: '4px 10px', fontSize: '12px', whiteSpace: 'nowrap' }}
+      >
+        {t('settings.moduleGate.goToModules')} →
+      </button>
+    </div>
+  )
+}
+
+
+// ── Entfernbare Chips + Eingabe zum Hinzufügen (Tags, Ordner, Dateitypen) ─────
+export function RemovableChips({
+  items,
+  onRemove,
+  removeTitle,
+  empty
+}: {
+  items: string[]
+  onRemove: (item: string) => void
+  removeTitle?: string
+  empty?: ReactNode
+}) {
+  if (items.length === 0) return empty ? <span className="sui-autosave">{empty}</span> : null
+  return (
+    <div className="sui-chips is-removable">
+      {items.map(item => (
+        <span key={item} className="sui-chip-item">
+          {item}
+          <button type="button" onClick={() => onRemove(item)} title={removeTitle} aria-label={removeTitle}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
+          </button>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+export function ChipInput({
+  placeholder,
+  onAdd,
+  addLabel,
+  disabled
+}: {
+  placeholder?: string
+  onAdd: (value: string) => void
+  addLabel?: ReactNode
+  disabled?: boolean
+}) {
+  const { t } = useTranslation()
+  const [draft, setDraft] = useState('')
+  const commit = () => {
+    const v = draft.trim()
+    if (!v) return
+    onAdd(v)
+    setDraft('')
+  }
+  return (
+    <>
+      <input
+        type="text"
+        className="sui-input"
+        value={draft}
+        placeholder={placeholder}
+        disabled={disabled}
+        onChange={e => setDraft(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commit() } }}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <Button onClick={commit} disabled={disabled || !draft.trim()}>{addLabel ?? t('settings.ui.add')}</Button>
+    </>
+  )
+}
+
+// ── Mehrzeiliges Textfeld (Auto-Save bei blur) ────────────────────────────
+export function Textarea({
+  value,
+  onCommit,
+  placeholder,
+  rows = 4,
+  disabled,
+  mono,
+  id
+}: {
+  value: string
+  onCommit: (next: string) => void
+  placeholder?: string
+  rows?: number
+  disabled?: boolean
+  mono?: boolean
+  id?: string
+}) {
+  const [draft, setDraft] = useState(value)
+  const [flash, setFlash] = useState(false)
+  const last = useRef(value)
+  useEffect(() => { if (value !== last.current) { last.current = value; setDraft(value) } }, [value])
+  return (
+    <div className="sui-textarea-wrap">
+      <textarea
+        id={id}
+        className={`sui-textarea${mono ? ' is-mono' : ''}`}
+        value={draft}
+        rows={rows}
+        placeholder={placeholder}
+        disabled={disabled}
+        spellCheck={false}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={() => {
+          if (draft === value) return
+          last.current = draft
+          onCommit(draft)
+          setFlash(true)
+          window.setTimeout(() => setFlash(false), 1600)
+        }}
+      />
+      {flash && <SavedMark />}
+    </div>
+  )
+}
+
+// ── Tastenkürzel-Anzeige ──────────────────────────────────────────────────
+export function Keys({ keys }: { keys: string[] }) {
+  return (
+    <span className="sui-keys">
+      {keys.map((k, i) => <kbd key={i} className="sui-kbd">{k}</kbd>)}
+    </span>
+  )
+}
+
+// ── Codeblock (Referenzseiten) ─────────────────────────────────────────────
+export function Code({ children }: { children: string }) {
+  return <code className="sui-code">{children}</code>
 }
