@@ -8,7 +8,7 @@ import { SETTINGS_SECTION_SLOT } from '@mindgraph/plugin-api'
 import { pluginErrorText } from '../../utils/pluginErrors'
 import { catalogCategories, filterCatalogEntries } from '../../utils/catalogFilter'
 import { edooboxService } from '../../stores/edooboxServiceBridge'
-import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
+import { useNotesStore } from '../../stores/notesStore'
 import { useSyncStore } from '../../stores/syncStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
@@ -24,6 +24,9 @@ import { ImageGenerationSection } from './ImageGenerationSection'
 import { SkillsSection } from './SkillsSection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import { SettingsSearch, type SettingsSearchEntry } from './SettingsSearch'
+import { IntegrationsTab } from './IntegrationsTab'
+import { useIntegrationStatus, type IntegrationStatus, type ConnState } from './useIntegrationStatus'
+import { PageHeader, SectionTitle, Card, ServiceHead, IconTile, TILE_GLYPH, Row, Note, Details, Toggle, Segmented, Select, Button, NumberInput, Hero, ModuleOffCard } from './SettingsUI'
 import { getModelVerdict, CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { isCloudProviderReady, cloudProviderForSentinel, CLOUD_PROVIDER_META, type CloudProviderId } from '../../../shared/llmBackend'
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
@@ -62,6 +65,148 @@ type SelectedTemplate = {
 } | {
   type: 'custom'
   id: string
+}
+
+// Navigations-Icons der Einstellungen (18 px Strichglyphen), gekeyt nach Tab.
+// Die Nav wird datengetrieben gerendert (Gruppen klappen ein) — Icons hier, Gruppen im Render.
+const NAV_ICONS: Record<string, React.ReactNode> = {
+  vault: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M2 5L9 2L16 5V13L9 16L2 13V5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M9 8V16M2 5L9 8L16 5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  ),
+  general: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M9 1V3M9 15V17M1 9H3M15 9H17M3.5 3.5L5 5M13 13L14.5 14.5M3.5 14.5L5 13M13 5L14.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  editor: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M13.5 2.5L15.5 4.5L6 14H4V12L13.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  templates: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M5 6H13M5 9H13M5 12H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  shortcuts: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="1" y="5" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M4 8H5M7 8H8M10 8H11M13 8H14M5 11H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  dashboard: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="10" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="2" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="10" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+  dailyNote: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M6 6h6M6 9h6M6 12h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <circle cx="13" cy="13" r="4" fill="var(--bg-primary)" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M13 11v2h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  brain: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 2.5C7 2.5 5.5 4 5.5 6c0 .4.05.8.16 1.17C4.36 7.66 3.5 8.74 3.5 10c0 1.04.6 1.95 1.5 2.43C5 13.4 5.84 14 6.8 14c.43 0 .82-.12 1.16-.32C8.31 14.5 9.13 15 10 15c1.66 0 3-1.12 3-2.5 0-.18-.02-.36-.06-.53.94-.46 1.56-1.32 1.56-2.32 0-1.07-.7-1.99-1.7-2.42.13-.4.2-.81.2-1.23 0-2-1.5-3.5-3.5-3.5-.36 0-.7.05-1 .15-.3-.1-.65-.15-1-.15z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M9 6v8M7 9c1 1 3 1 4 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  skills: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 2l1.8 4.4L15 8.2l-4.2 1.8L9 14.4 7.2 10 3 8.2l4.2-1.8L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M14.5 12.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  transport: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  dataview: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="2" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M5 7H13M5 10H13M5 13H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  ai: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 2l1.8 4.4L15 8.2l-4.2 1.8L9 14.4 7.2 10 3 8.2l4.2-1.8L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  ),
+  modules: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 2L2 6l7 4 7-4-7-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M2 12l7 4 7-4M2 9l7 4 7-4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+    </svg>
+  ),
+  integrations: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M6 9H12M9 6V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="11" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="2" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+      <rect x="11" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  ),
+  email: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="2.5" y="4" width="13" height="10" rx="1.8" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M3.5 5.5L8.2 9.1a1.3 1.3 0 001.6 0l4.7-3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  agents: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  speech: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M9 1a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M14 8v1a5 5 0 0 1-10 0V8M9 14v3M6 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  remarkable: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <rect x="3" y="1" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
+      <path d="M7 5h4M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  plugin: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M6 2v4M12 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M4 6h10v3a5 5 0 01-10 0V6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+      <path d="M9 14v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  telegram: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M2 9l14-6-2 13-5-3-3 3v-4l8-6-9 5-3-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+    </svg>
+  ),
+  sync: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M3 9C3 5.69 5.69 3 9 3C11.22 3 13.15 4.26 14.13 6.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M15 9C15 12.31 12.31 15 9 15C6.78 15 4.85 13.74 3.87 11.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+      <path d="M12 6H15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  credentials: (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+      <path d="M12 3a3 3 0 0 1 3 3v2h1v7H2V8h1V6a3 3 0 0 1 3-3h6zm0 1.5H6a1.5 1.5 0 0 0-1.5 1.5v2h9V6A1.5 1.5 0 0 0 12 4.5zM9 10.5a1.5 1.5 0 0 0-.75 2.8V14h1.5v-.7A1.5 1.5 0 0 0 9 10.5z" stroke="currentColor" strokeWidth="1" fill="none"/>
+    </svg>
+  )
 }
 
 const BUILTIN_LABELS: Record<BuiltInTemplateKey, string> = {
@@ -624,27 +769,42 @@ const categoryGlyph = (cat: ModuleCategory): React.ReactNode => (
 // Module, deren Konfiguration in einem anderen Settings-Tab liegt: nach dem
 // Aktivieren direkt dorthin springen können — Toggle (hier) und Einrichtung
 // (dort) sind sonst zwei getrennte Orte ohne Verbindung.
-const MODULE_CONFIG_TABS: Record<string, Tab> = {
-  email: 'email',
-  speech: 'speech',
-  remarkable: 'remarkable',
-  'mz-suite': 'agents',
-  'smart-connections': 'ai',
-  'web-research': 'ai',
-  'agent-shell': 'ai',
-  'image-generation': 'ai'
+// Konfigurationsort eines Moduls: fester Tab, optional mit Anker auf die Dienst-Karte
+// (Integrationen) oder Sektion (KI). Die Wahrheit über den Verbindungszustand steht damit
+// an beiden Orten — Modul-Tab (Status-Zeile) und Konfigurationsseite (Karte).
+const MODULE_CONFIG_TABS: Record<string, { tab: Tab; anchor?: string }> = {
+  email: { tab: 'email' },
+  speech: { tab: 'speech' },
+  remarkable: { tab: 'remarkable' },
+  'mz-suite': { tab: 'agents' },
+  'smart-connections': { tab: 'ai', anchor: 'ai-smart-connections' },
+  'web-research': { tab: 'ai', anchor: 'ai-webresearch' },
+  'agent-shell': { tab: 'ai', anchor: 'ai-agentshell' },
+  'image-generation': { tab: 'ai', anchor: 'ai-imagegen' },
+  zotero: { tab: 'integrations', anchor: 'integration-zotero' },
+  'semantic-scholar': { tab: 'integrations', anchor: 'integration-research' },
+  readwise: { tab: 'integrations', anchor: 'integration-readwise' },
+  docling: { tab: 'integrations', anchor: 'integration-docling' },
+  'vision-ocr': { tab: 'integrations', anchor: 'integration-vision-ocr' },
+  'language-tool': { tab: 'integrations', anchor: 'integration-languagetool' }
 }
 
-// Config-Tab eines Moduls: fester Eintrag oben ODER — bei Plugin-Modulen — der dynamische
+// Config-Ziel eines Moduls: fester Eintrag oben ODER — bei Plugin-Modulen — der dynamische
 // Tab `plugin:<id>`, wenn das Plugin eine settings.section beiträgt (z.B. Antares).
-function moduleConfigTab(modId: string): Tab | undefined {
+function moduleConfigTab(modId: string): { tab: Tab; anchor?: string } | undefined {
   if (MODULE_CONFIG_TABS[modId]) return MODULE_CONFIG_TABS[modId]
   const sections = getSettingsSections()
   const pluginId = pluginIdsForModule(modId).find(id => sections.some(c => c.pluginId === id))
-  return pluginId ? `plugin:${pluginId}` : undefined
+  return pluginId ? { tab: `plugin:${pluginId}` } : undefined
 }
 
-const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t, onOpenTab }) => {
+type ModuleFilter = 'all' | 'active' | 'setup'
+
+const ModulesTab: React.FC<{
+  t: TabTFn
+  onOpenTab: (tab: Tab, anchor?: string) => void
+  status: IntegrationStatus
+}> = ({ t, onOpenTab, status }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
   const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.webResearchEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
@@ -859,14 +1019,60 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
 
   const orderedCategories: ModuleCategory[] = ['ai', 'communication', 'business', 'learning', 'research', 'devices', 'documents']
 
+  // Status-Zeile je aktivem Modul mit Konfiguration (Redesign 2b). Verbindungszustand aus
+  // useIntegrationStatus; für Module ohne prüfbare Verbindung nur der Sprung „Einstellungen →".
+  const emailAccounts = useUIStore(s => s.email.accounts.length)
+  const readwiseHasKey = useUIStore(s => !!s.readwise.apiKey)
+  const visionModel = useUIStore(s => s.visionOcr.model)
+  const webResearchCfg = useUIStore(s => s.webResearchConfig)
+  const [imageGenKey, setImageGenKey] = useState<boolean | null>(null)
+  useEffect(() => {
+    window.electronAPI.imageGenLoadKey().then(k => setImageGenKey(!!k)).catch(() => setImageGenKey(null))
+  }, [])
+  const connLabel = (s: ConnState, okLabel?: string) =>
+    s === 'connected' ? (okLabel ?? t('settings.connected')) : s === 'checking' ? t('settings.checkingConnection') : t('settings.notConnected')
+  const connTone = (s: ConnState): 'ok' | 'off' | 'warn' | 'checking' =>
+    s === 'connected' ? 'ok' : s === 'checking' ? 'checking' : 'off'
+  const moduleStatus = (id: string): { tone: 'ok' | 'off' | 'warn' | 'checking'; label: string } | null => {
+    switch (id) {
+      case 'zotero': return { tone: connTone(status.zotero), label: connLabel(status.zotero) }
+      case 'semantic-scholar': return { tone: connTone(status.openAlex), label: connLabel(status.openAlex, status.openAlexKeySaved ? t('settings.modules.status.openAlexKey') : t('settings.modules.status.openAlexDemo')) }
+      case 'docling': return { tone: connTone(status.docling), label: connLabel(status.docling) }
+      case 'language-tool': return { tone: connTone(status.languageTool), label: connLabel(status.languageTool) }
+      case 'readwise': return readwiseHasKey ? { tone: connTone(status.readwise), label: connLabel(status.readwise) } : { tone: 'off', label: t('settings.modules.status.noKey') }
+      case 'vision-ocr': return visionModel ? { tone: 'ok', label: t('settings.modules.status.modelReady', { model: visionModel }) } : { tone: 'off', label: t('settings.modules.status.noModel') }
+      case 'email': return emailAccounts > 0 ? { tone: 'ok', label: t('settings.modules.status.accounts', { n: emailAccounts }) } : { tone: 'off', label: t('settings.modules.status.noAccount') }
+      case 'image-generation': return imageGenKey === null ? null : imageGenKey ? { tone: 'ok', label: t('settings.modules.status.keyStored') } : { tone: 'off', label: t('settings.modules.status.noKey') }
+      case 'web-research': {
+        if (!webResearchCfg) return null
+        const ok = webResearchCfg.provider === 'searxng' ? !!webResearchCfg.searxngUrl : webResearchCfg.provider === 'tavily' ? webResearchCfg.hasTavilyKey : webResearchCfg.hasLinkupKey
+        return ok ? { tone: 'ok', label: t('settings.modules.status.configured') } : { tone: 'off', label: t('settings.modules.status.notConfigured') }
+      }
+      default: return null
+    }
+  }
+
+  const [filter, setFilter] = useState<ModuleFilter>('all')
+  const needsSetup = (mod: ModuleDescriptor) => {
+    if (!isModuleEnabled(mod.id)) return false
+    const st = moduleStatus(mod.id)
+    return !!st && st.tone === 'off'
+  }
+  const allMods = [...coreModules, ...pluginMods]
+  const activeCount = allMods.filter(m => isModuleEnabled(m.id)).length
+  const setupCount = allMods.filter(needsSetup).length
+  const passesFilter = (mod: ModuleDescriptor) =>
+    filter === 'all' ? true : filter === 'active' ? isModuleEnabled(mod.id) : needsSetup(mod)
+
   const renderModuleRow = (mod: ModuleDescriptor, official?: boolean) => {
     const enabled = isModuleEnabled(mod.id)
-    const configTab = moduleConfigTab(mod.id)
+    const config = moduleConfigTab(mod.id)
+    const st = enabled ? moduleStatus(mod.id) : null
     return (
       // htmlFor MUSS explizit gesetzt sein: ohne es wäre das Label-Ziel das ERSTE labelbare
       // Element im Baum — und das ist der „Konfigurieren"-<button>, nicht die Checkbox.
       // Ein Klick auf die Zeile/den Toggle öffnete dann den Config-Tab statt umzuschalten.
-      <label key={mod.id} htmlFor={`module-toggle-${mod.id}`} className={`module-row ${enabled ? 'active' : ''}`}>
+      <label key={mod.id} htmlFor={`module-toggle-${mod.id}`} className={`module-row ${enabled ? 'active' : 'is-off'}`}>
         <div
           className="module-row-icon"
           style={{ background: mod.iconText ? (mod.iconColor || 'var(--accent-color, #4a9eff)') : CATEGORY_VISUAL[mod.category].color }}
@@ -895,20 +1101,32 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
               {moduleErrors[mod.id]}
             </div>
           )}
-          {enabled && configTab && (
-            <button
-              type="button"
-              className="module-row-configure"
-              onClick={(e) => {
-                // Row ist ein <label> um die Toggle-Checkbox — ohne preventDefault
-                // würde der Klick das Modul gleich wieder deaktivieren.
-                e.preventDefault()
-                e.stopPropagation()
-                onOpenTab(configTab)
-              }}
-            >
-              {t('settings.modules.configure')} →
-            </button>
+          {enabled && (st || config) && (
+            <div className="module-row-status">
+              {st && (
+                <>
+                  <span className={`sui-dot is-${st.tone}`} aria-hidden="true" />
+                  <span className={`is-${st.tone}`}>{st.label}</span>
+                </>
+              )}
+              {st && config && <span className="sui-sep">·</span>}
+              {config && (
+                <button
+                  type="button"
+                  className="module-row-configure"
+                  style={{ marginTop: 0 }}
+                  onClick={(e) => {
+                    // Row ist ein <label> um die Toggle-Checkbox — ohne preventDefault
+                    // würde der Klick das Modul gleich wieder deaktivieren.
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onOpenTab(config.tab, config.anchor)
+                  }}
+                >
+                  {st && st.tone === 'off' ? t('settings.ui.setupLink') : t('settings.ui.settingsLink')}
+                </button>
+              )}
+            </div>
           )}
         </div>
         <input
@@ -925,21 +1143,42 @@ const ModulesTab: React.FC<{ t: TabTFn; onOpenTab: (tab: Tab) => void }> = ({ t,
 
   return (
     <div className="settings-section">
-      <div className="settings-tab-header">
-        <h2>{t('settings.modules.tabTitle')}</h2>
-        <p className="settings-tab-subtitle">{t('settings.modules.hint')}</p>
+      <div className="modules-head">
+        <div className="settings-tab-header">
+          <h2>{t('settings.modules.tabTitle')}</h2>
+          <p className="settings-tab-subtitle">{t('settings.modules.hint')}</p>
+        </div>
+        <Segmented
+          options={[
+            { value: 'all' as ModuleFilter, label: `${t('settings.modules.filterAll')} · ${allMods.length}` },
+            { value: 'active' as ModuleFilter, label: `${t('settings.modules.filterActive')} · ${activeCount}` },
+            { value: 'setup' as ModuleFilter, label: `${t('settings.modules.filterSetup')} · ${setupCount}` }
+          ]}
+          value={filter}
+          onChange={setFilter}
+          ariaLabel={t('settings.modules.filterLabel')}
+        />
       </div>
 
-      {orderedCategories.map(cat => (
-        grouped[cat].length === 0 ? null : (
+      {orderedCategories.map(cat => {
+        const visible = grouped[cat].filter(passesFilter)
+        if (grouped[cat].length === 0 || visible.length === 0) return null
+        const on = grouped[cat].filter(m => isModuleEnabled(m.id)).length
+        return (
           <div key={cat} className="modules-category">
-            <h4 className="modules-category-title">{MODULE_CATEGORIES[cat]}</h4>
+            <div className="sui-section" style={{ margin: '0 0 8px' }}>
+              <span>{MODULE_CATEGORIES[cat]}</span>
+              <span className="sui-section-meta">{t('settings.modules.categoryMeta', { on, total: grouped[cat].length })}</span>
+            </div>
             <div className="modules-list">
-              {grouped[cat].map(mod => renderModuleRow(mod))}
+              {visible.map(mod => renderModuleRow(mod))}
             </div>
           </div>
         )
-      ))}
+      })}
+      {filter !== 'all' && allMods.filter(passesFilter).length === 0 && (
+        <p className="settings-hint">{filter === 'setup' ? t('settings.modules.filterSetupEmpty') : t('settings.modules.filterActiveEmpty')}</p>
+      )}
 
       <div className="plugins-zone">
         <div className="plugins-zone-header">
@@ -2070,24 +2309,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     }, 90)
     return () => window.clearTimeout(timer)
   }, [isOpen, initialTab, initialAnchor])
-  const [zoteroStatus, setZoteroStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
+  // Verbindungszustand der externen Dienste — geteilt von Integrations- und Modul-Tab
+  const integrationStatus = useIntegrationStatus(isOpen && (activeTab === 'integrations' || activeTab === 'modules'))
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
-  const [doclingStatus, setDoclingStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
-  const [doclingVersion, setDoclingVersion] = useState<string>('')
-  const [visionOcrModelList, setVisionOcrModelList] = useState<{ name: string; size: number }[]>([])
-
-  const [languageToolStatus, setLanguageToolStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
-  const [readwiseStatus, setReadwiseStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
-  const [openAlexStatus, setOpenAlexStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
-  const [openAlexApiKey, setOpenAlexApiKey] = useState('')
-  const [openAlexKeySaved, setOpenAlexKeySaved] = useState(false)
-  const [openAlexMessage, setOpenAlexMessage] = useState<string | null>(null)
-  const [openAlexMailto, setOpenAlexMailto] = useState('')
-  const [openAlexMailtoSaved, setOpenAlexMailtoSaved] = useState<string | null>(null)
-  const [readwiseSyncing, setReadwiseSyncing] = useState(false)
-  const [readwiseSyncProgress, setReadwiseSyncProgress] = useState<{ current: number; total: number; status: string; title?: string } | null>(null)
-  const [readwiseSyncResult, setReadwiseSyncResult] = useState<string | null>(null)
   const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
   const [emailTestStatus, setEmailTestStatus] = useState<Record<string, 'idle' | 'testing' | 'success' | 'failed'>>({})
@@ -2180,20 +2405,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     iconSet,
     setIconSet,
     smartConnectionsEnabled,
-    semanticScholarEnabled,
     flashcardsEnabled,
     smartConnectionsWeights,
     setSmartConnectionsWeights,
     smartConnectionsRerankerEnabled,
     setSmartConnectionsRerankerEnabled,
-    docling,
-    setDocling,
-    visionOcr,
-    setVisionOcr,
-    readwise,
-    setReadwise,
-    languageTool,
-    setLanguageTool,
     customLogo,
     setCustomLogo,
     removeCustomLogo,
@@ -2237,6 +2453,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchRemarkableEnabled = useIsModuleEnabled('remarkable')
   const searchWebResearchEnabled = useIsModuleEnabled('web-research')
   const searchImageGenEnabled = useIsModuleEnabled('image-generation')
+  const agentShellModuleOn = useIsModuleEnabled('agent-shell')
+  const projectRagOn = useIsModuleEnabled('project-rag')
   const searchIndex = React.useMemo<SettingsSearchEntry[]>(() => {
     const g = {
       basics: t('settings.nav.basics'),
@@ -2287,7 +2505,14 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (europäischer Anbieter)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
       { id: 'ai-webresearch', tab: 'ai', label: 'Webrecherche', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'webrecherche tavily linkup suche web research agent', anchor: 'ai-webresearch' },
       { id: 'ai-imagegen', tab: 'ai', label: 'Bild-Generierung', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'bild generierung nano banana imagen google bilder image generation api key', anchor: 'ai-imagegen' },
-      { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen' },
+      { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen', anchor: 'ai-smart-connections' },
+      // Integrationen: eine Dienst-Karte pro Anker
+      { id: 'integ-zotero', tab: 'integrations', label: 'Zotero', path: `${g.modules} → ${t('settings.tab.integrations')}`, keywords: 'zotero better bibtex zitate literatur', anchor: 'integration-zotero' },
+      { id: 'integ-research', tab: 'integrations', label: t('settings.integ.research.name'), path: `${g.modules} → ${t('settings.tab.integrations')}`, keywords: 'research openalex semantic scholar paper api key mailto', anchor: 'integration-research' },
+      { id: 'integ-readwise', tab: 'integrations', label: 'Readwise', path: `${g.modules} → ${t('settings.tab.integrations')}`, keywords: 'readwise highlights sync token', anchor: 'integration-readwise' },
+      { id: 'integ-docling', tab: 'integrations', label: t('settings.integ.docling.name'), path: `${g.modules} → ${t('settings.tab.integrations')}`, keywords: 'docling pdf extraktion server docker', anchor: 'integration-docling' },
+      { id: 'integ-vision-ocr', tab: 'integrations', label: t('settings.integ.ocr.name'), path: `${g.modules} → ${t('settings.tab.integrations')}`, keywords: 'vision ocr scan handschrift bild text modell seitenbreite', anchor: 'integration-vision-ocr' },
+      { id: 'integ-languagetool', tab: 'integrations', label: 'LanguageTool', path: `${g.modules} → ${t('settings.tab.integrations')}`, keywords: 'languagetool grammatik rechtschreibung server api', anchor: 'integration-languagetool' },
       // E-Mail
       { id: 'email-analysis-model', tab: 'email', label: t('settings.email.analysisModel'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'analyse modell email ki relevanz' },
       { id: 'email-signature', tab: 'email', label: t('settings.email.signature'), path: `${g.modules} → ${t('settings.email.title')}`, keywords: 'signatur unterschrift absender' },
@@ -2323,26 +2548,11 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     }
   }, [isOpen])
 
-  // Zotero Status prüfen
+  // Lokales Backend (Ollama / LM Studio) prüfen — KI-Tab, E-Mail-Modell-Picker, Agenten, Modul-Status
   useEffect(() => {
-    if (isOpen && (activeTab === 'integrations' || activeTab === 'email' || activeTab === 'agents')) {
-      checkZoteroConnection()
+    if (isOpen && (activeTab === 'ai' || activeTab === 'integrations' || activeTab === 'email' || activeTab === 'agents' || activeTab === 'modules')) {
       checkOllamaConnection()
       checkLmstudioConnection()
-      checkDoclingConnection()
-      checkLanguageToolConnection()
-      checkReadwiseConnection()
-      checkOpenAlexConnection()
-      window.electronAPI.openAlexLoadKey().then(key => {
-        setOpenAlexKeySaved(Boolean(key))
-        setOpenAlexApiKey('')
-      }).catch(() => {})
-      window.electronAPI.openAlexLoadMailto().then(mailto => {
-        setOpenAlexMailtoSaved(mailto)
-        setOpenAlexMailto('')
-      }).catch(() => {})
-      // Load vision OCR models
-      window.electronAPI.visionOcrModels().then(setVisionOcrModelList).catch(() => {})
     }
   }, [isOpen, activeTab])
 
@@ -2407,16 +2617,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       })
     }
   }, [isOpen, activeTab, vaultPath])
-
-  const checkZoteroConnection = async () => {
-    setZoteroStatus('checking')
-    try {
-      const connected = await window.electronAPI.zoteroCheck()
-      setZoteroStatus(connected ? 'connected' : 'disconnected')
-    } catch {
-      setZoteroStatus('disconnected')
-    }
-  }
 
   const checkOllamaConnection = async () => {
     setOllamaStatus('checking')
@@ -2509,173 +2709,6 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       }
     } catch {
       setLmstudioStatus('disconnected')
-    }
-  }
-
-  const checkDoclingConnection = async () => {
-    setDoclingStatus('checking')
-    try {
-      const result = await window.electronAPI.doclingCheck(docling.url)
-      setDoclingStatus(result.available ? 'connected' : 'disconnected')
-      if (result.version) {
-        setDoclingVersion(result.version)
-      }
-    } catch {
-      setDoclingStatus('disconnected')
-    }
-  }
-
-  const checkLanguageToolConnection = async () => {
-    setLanguageToolStatus('checking')
-    try {
-      const mode = languageTool.mode || 'local'
-      const result = await window.electronAPI.languagetoolCheck(
-        mode,
-        mode === 'local' ? languageTool.url : undefined,
-        mode === 'api' ? languageTool.apiKey : undefined
-      )
-      setLanguageToolStatus(result.available ? 'connected' : 'disconnected')
-    } catch {
-      setLanguageToolStatus('disconnected')
-    }
-  }
-
-  const checkReadwiseConnection = async () => {
-    if (!readwise.apiKey) {
-      setReadwiseStatus('disconnected')
-      return
-    }
-    setReadwiseStatus('checking')
-    try {
-      const result = await window.electronAPI.readwiseCheck(readwise.apiKey)
-      setReadwiseStatus(result.available ? 'connected' : 'disconnected')
-    } catch {
-      setReadwiseStatus('disconnected')
-    }
-  }
-
-  const checkOpenAlexConnection = async () => {
-    setOpenAlexStatus('checking')
-    setOpenAlexMessage(null)
-    try {
-      const result = await window.electronAPI.openAlexCheck()
-      setOpenAlexStatus(result.available ? 'connected' : 'disconnected')
-      if (result.available) {
-        setOpenAlexMessage(result.authenticated
-          ? t('settings.integrations.openAlexConnectedWithKey')
-          : t('settings.integrations.openAlexConnectedDemo'))
-      } else {
-        setOpenAlexMessage(result.error || t('settings.notConnected'))
-      }
-    } catch {
-      setOpenAlexStatus('disconnected')
-      setOpenAlexMessage(t('settings.notConnected'))
-    }
-  }
-
-  const saveOpenAlexKey = async () => {
-    const key = openAlexApiKey.trim()
-    if (!key) return
-    const result = await window.electronAPI.openAlexSaveKey(key)
-    if (result.success) {
-      setOpenAlexKeySaved(true)
-      setOpenAlexApiKey('')
-      setOpenAlexMessage(t('settings.integrations.openAlexSaved'))
-      await checkOpenAlexConnection()
-    } else {
-      setOpenAlexStatus('disconnected')
-      setOpenAlexMessage(result.error || t('settings.integrations.openAlexSaveFailed'))
-    }
-  }
-
-  const deleteOpenAlexKey = async () => {
-    await window.electronAPI.openAlexDeleteKey()
-    setOpenAlexKeySaved(false)
-    setOpenAlexApiKey('')
-    setOpenAlexMessage(t('settings.integrations.openAlexDeleted'))
-    await checkOpenAlexConnection()
-  }
-
-  const saveOpenAlexMailto = async () => {
-    const mailto = openAlexMailto.trim()
-    if (!mailto) return
-    const result = await window.electronAPI.openAlexSaveMailto(mailto)
-    if (result.success) {
-      setOpenAlexMailtoSaved(mailto)
-      setOpenAlexMailto('')
-      setOpenAlexMessage(t('settings.integrations.openAlexMailtoSaved'))
-      await checkOpenAlexConnection()
-    } else {
-      setOpenAlexMessage(result.error || t('settings.integrations.openAlexMailtoSaveFailed'))
-    }
-  }
-
-  const deleteOpenAlexMailto = async () => {
-    await window.electronAPI.openAlexDeleteMailto()
-    setOpenAlexMailtoSaved(null)
-    setOpenAlexMailto('')
-    setOpenAlexMessage(t('settings.integrations.openAlexMailtoDeleted'))
-    await checkOpenAlexConnection()
-  }
-
-  const triggerReadwiseSync = async () => {
-    if (!readwise.apiKey || !vaultPath || readwiseSyncing) return
-    setReadwiseSyncing(true)
-    setReadwiseSyncResult(null)
-    setReadwiseSyncProgress(null)
-
-    // Progress-Listener registrieren
-    window.electronAPI.onReadwiseSyncProgress((progress) => {
-      setReadwiseSyncProgress(progress)
-    })
-
-    try {
-      const result = await window.electronAPI.readwiseSync(
-        readwise.apiKey,
-        readwise.syncFolder,
-        vaultPath,
-        readwise.lastSyncedAt || undefined,
-        readwise.syncCategories
-      )
-
-      if (result.success && result.stats) {
-        const now = new Date().toISOString()
-        setReadwise({ lastSyncedAt: now })
-        setReadwiseSyncResult(
-          t('settings.readwise.syncStats')
-            .replace('{new}', String(result.stats.new))
-            .replace('{updated}', String(result.stats.updated))
-            .replace('{total}', String(result.stats.total))
-        )
-
-        // FileTree neu laden und synced Dateien in den NotesStore aufnehmen
-        if ((result.stats.new > 0 || result.stats.updated > 0) && result.syncedFiles && result.syncedFiles.length > 0) {
-          try {
-            // FileTree aktualisieren
-            const newTree = await window.electronAPI.readDirectory(vaultPath)
-            useNotesStore.getState().setFileTree(newTree)
-
-            // Synced-Dateien lesen und in NotesStore laden
-            const contents = await window.electronAPI.readFilesBatch(vaultPath, result.syncedFiles)
-            for (const relativePath of result.syncedFiles) {
-              const content = contents[relativePath]
-              if (!content) continue
-              const fullPath = `${vaultPath}/${relativePath}`
-              const note = await createNoteFromFile(fullPath, relativePath, content)
-              useNotesStore.getState().addNote(note)
-            }
-            console.log(`[Readwise] ${result.syncedFiles.length} Notizen in Store geladen`)
-          } catch (e) {
-            console.error('[Readwise] Store-Update failed:', e)
-          }
-        }
-      } else {
-        setReadwiseSyncResult(`Fehler: ${result.error}`)
-      }
-    } catch (error) {
-      setReadwiseSyncResult(`Fehler: ${error instanceof Error ? error.message : 'Unbekannt'}`)
-    } finally {
-      setReadwiseSyncing(false)
     }
   }
 
@@ -2796,6 +2829,79 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, templateHasChanges])
 
+  // Navigation (Redesign): nur die Gruppe der aktiven Seite ist ausgeklappt, die anderen
+  // zeigen Label + Zähler — so passen alle Gruppen ohne Scrollen ins Fenster. Ein Klick
+  // aufs Label klappt eine Gruppe zum Nachsehen auf; ein Seitenwechsel räumt wieder auf.
+  const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({})
+  useEffect(() => { setOpenNavGroups({}) }, [activeTab])
+  // Seitenwechsel beginnt oben — vorher blieb der Scroll der vorigen Seite stehen. Anker-Sprünge
+  // (navigateToSetting) scrollen 90 ms später gezielt nach, das bleibt davon unberührt.
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  useEffect(() => { if (contentRef.current) contentRef.current.scrollTop = 0 }, [activeTab])
+  type NavItem = { id: Tab; label: string; icon: React.ReactNode }
+  const navGroups: Array<{ id: string; label: string; items: NavItem[] }> = [
+    {
+      id: 'basics',
+      label: t('settings.nav.basics'),
+      items: [
+        { id: 'general', label: t('settings.tab.general'), icon: NAV_ICONS.general },
+        { id: 'editor', label: t('settings.tab.editor'), icon: NAV_ICONS.editor },
+        { id: 'templates', label: t('settings.tab.templates'), icon: NAV_ICONS.templates },
+        { id: 'shortcuts', label: t('settings.tab.shortcuts'), icon: NAV_ICONS.shortcuts }
+      ]
+    },
+    {
+      id: 'workflow',
+      label: t('settings.nav.workflow'),
+      items: [
+        { id: 'dashboard', label: t('settings.dashboard.title'), icon: NAV_ICONS.dashboard },
+        { id: 'dailyNote', label: t('settings.tab.dailyNote'), icon: NAV_ICONS.dailyNote },
+        { id: 'brain', label: t('settings.tab.brain'), icon: NAV_ICONS.brain },
+        { id: 'skills', label: t('settings.tab.skills'), icon: NAV_ICONS.skills },
+        { id: 'transport', label: t('settings.transport.title'), icon: NAV_ICONS.transport },
+        { id: 'dataview', label: t('settings.tab.dataview'), icon: NAV_ICONS.dataview }
+      ]
+    },
+    {
+      id: 'modules',
+      label: t('settings.nav.modules'),
+      items: [
+        // KI-Zentrale (Design 1c): alle Modell-Entscheidungen an einem Ort
+        { id: 'ai', label: t('settings.tab.ai'), icon: NAV_ICONS.ai },
+        { id: 'modules', label: t('settings.tab.modules'), icon: NAV_ICONS.modules },
+        { id: 'integrations', label: t('settings.tab.integrations'), icon: NAV_ICONS.integrations },
+        // Modul-Tabs nur bei aktivem Modul
+        ...(searchEmailEnabled ? [{ id: 'email' as Tab, label: t('settings.email.title'), icon: NAV_ICONS.email }] : []),
+        ...(isModuleEnabled('mz-suite') ? [{ id: 'agents' as Tab, label: t('settings.tab.agents'), icon: NAV_ICONS.agents }] : []),
+        ...(searchSpeechEnabled ? [{ id: 'speech' as Tab, label: t('settings.tab.speech'), icon: NAV_ICONS.speech }] : []),
+        ...(searchRemarkableEnabled ? [{ id: 'remarkable' as Tab, label: 'reMarkable', icon: NAV_ICONS.remarkable }] : []),
+        // Plugin-Settings-Tabs: ein Eintrag pro settings.section-Beitrag eines aktiven
+        // Plugins (z.B. Antares). Der Kern nennt kein Plugin namentlich.
+        ...pluginSettingsSections.map(section => ({ id: `plugin:${section.pluginId}` as Tab, label: section.title ?? section.pluginId, icon: NAV_ICONS.plugin })),
+        // Telegram: immer sichtbar (Bot-Feature)
+        { id: 'telegram', label: 'Telegram', icon: NAV_ICONS.telegram }
+      ]
+    },
+    {
+      id: 'account',
+      label: t('settings.nav.account'),
+      items: [
+        { id: 'sync', label: t('settings.tab.sync'), icon: NAV_ICONS.sync },
+        { id: 'credentials', label: 'Zugangsdaten', icon: NAV_ICONS.credentials }
+      ]
+    }
+  ]
+  const renderNavItem = (item: NavItem) => (
+    <button
+      key={item.id}
+      className={`settings-nav-item ${activeTab === item.id ? 'active' : ''}`}
+      onClick={() => setActiveTab(item.id)}
+    >
+      {item.icon}
+      {item.label}
+    </button>
+  )
+
   if (!isOpen) return null
 
   return (
@@ -2815,274 +2921,34 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
             {/* Settings-Suche (Design 1b): findet Tabs UND Einzel-Einstellungen */}
             <SettingsSearch entries={searchIndex} onNavigate={navigateToSetting} />
             {/* Vault (immer ganz oben, wenn geladen) */}
-            {vaultPath && (
-              <button
-                className={`settings-nav-item ${activeTab === 'vault' ? 'active' : ''}`}
-                onClick={() => setActiveTab('vault')}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M2 5L9 2L16 5V13L9 16L2 13V5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                  <path d="M9 8V16M2 5L9 8L16 5" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                </svg>
-                {t('settings.tab.vault')}
-              </button>
-            )}
-
-            {/* Section: Grundlagen */}
-            <div className="settings-nav-section-label">{t('settings.nav.basics')}</div>
-            <button
-              className={`settings-nav-item ${activeTab === 'general' ? 'active' : ''}`}
-              onClick={() => setActiveTab('general')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <circle cx="9" cy="9" r="3" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M9 1V3M9 15V17M1 9H3M15 9H17M3.5 3.5L5 5M13 13L14.5 14.5M3.5 14.5L5 13M13 5L14.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              {t('settings.tab.general')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'editor' ? 'active' : ''}`}
-              onClick={() => setActiveTab('editor')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M13.5 2.5L15.5 4.5L6 14H4V12L13.5 2.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.editor')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'templates' ? 'active' : ''}`}
-              onClick={() => setActiveTab('templates')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="2" y="2" width="14" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M5 6H13M5 9H13M5 12H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              {t('settings.tab.templates')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'shortcuts' ? 'active' : ''}`}
-              onClick={() => setActiveTab('shortcuts')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="1" y="5" width="16" height="10" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M4 8H5M7 8H8M10 8H11M13 8H14M5 11H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              {t('settings.tab.shortcuts')}
-            </button>
-
-            {/* Section: Workflow */}
-            <div className="settings-nav-section-label">{t('settings.nav.workflow')}</div>
-            <button
-              className={`settings-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dashboard')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="10" y="2" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="2" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="10" y="10" width="6" height="6" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-              {t('settings.dashboard.title')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'dailyNote' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dailyNote')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="3" y="2" width="12" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M6 6h6M6 9h6M6 12h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <circle cx="13" cy="13" r="4" fill="var(--bg-primary)" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M13 11v2h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.dailyNote')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'brain' ? 'active' : ''}`}
-              onClick={() => setActiveTab('brain')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 2.5C7 2.5 5.5 4 5.5 6c0 .4.05.8.16 1.17C4.36 7.66 3.5 8.74 3.5 10c0 1.04.6 1.95 1.5 2.43C5 13.4 5.84 14 6.8 14c.43 0 .82-.12 1.16-.32C8.31 14.5 9.13 15 10 15c1.66 0 3-1.12 3-2.5 0-.18-.02-.36-.06-.53.94-.46 1.56-1.32 1.56-2.32 0-1.07-.7-1.99-1.7-2.42.13-.4.2-.81.2-1.23 0-2-1.5-3.5-3.5-3.5-.36 0-.7.05-1 .15-.3-.1-.65-.15-1-.15z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                <path d="M9 6v8M7 9c1 1 3 1 4 0" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-              </svg>
-              {t('settings.tab.brain')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'skills' ? 'active' : ''}`}
-              onClick={() => setActiveTab('skills')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 2l1.8 4.4L15 8.2l-4.2 1.8L9 14.4 7.2 10 3 8.2l4.2-1.8L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                <path d="M14.5 12.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.skills')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'transport' ? 'active' : ''}`}
-              onClick={() => setActiveTab('transport')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M3 9l6-6 6 6M9 3v12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.transport.title')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'dataview' ? 'active' : ''}`}
-              onClick={() => setActiveTab('dataview')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="2" y="3" width="14" height="12" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                <path d="M5 7H13M5 10H13M5 13H9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-              </svg>
-              {t('settings.tab.dataview')}
-            </button>
-
-            {/* Section: Module */}
-            <div className="settings-nav-section-label">{t('settings.nav.modules')}</div>
-            {/* KI-Zentrale (Design 1c): alle Modell-Entscheidungen an einem Ort */}
-            <button
-              className={`settings-nav-item ${activeTab === 'ai' ? 'active' : ''}`}
-              onClick={() => setActiveTab('ai')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 2l1.8 4.4L15 8.2l-4.2 1.8L9 14.4 7.2 10 3 8.2l4.2-1.8L9 2z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.ai')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'modules' ? 'active' : ''}`}
-              onClick={() => setActiveTab('modules')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M9 2L2 6l7 4 7-4-7-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                <path d="M2 12l7 4 7-4M2 9l7 4 7-4" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.modules')}
-            </button>
-            <button
-              className={`settings-nav-item ${activeTab === 'integrations' ? 'active' : ''}`}
-              onClick={() => setActiveTab('integrations')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M6 9H12M9 6V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="11" y="2" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="2" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-                <rect x="11" y="11" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.5"/>
-              </svg>
-              {t('settings.tab.integrations')}
-            </button>
-            {/* Email-Tab: nur wenn Modul aktiv */}
-            {isModuleEnabled('email') && (
-              <button
-                className={`settings-nav-item ${activeTab === 'email' ? 'active' : ''}`}
-                onClick={() => setActiveTab('email')}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <rect x="2.5" y="4" width="13" height="10" rx="1.8" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M3.5 5.5L8.2 9.1a1.3 1.3 0 001.6 0l4.7-3.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                {t('settings.email.title')}
-              </button>
-            )}
-            {/* Edoobox-Tab: nur wenn Modul aktiv */}
-            {isModuleEnabled('mz-suite') && (
-              <button
-                className={`settings-nav-item ${activeTab === 'agents' ? 'active' : ''}`}
-                onClick={() => setActiveTab('agents')}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <circle cx="9" cy="9" r="7" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M9 6v6M6 9h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                {t('settings.tab.agents')}
-              </button>
-            )}
-            {/* Speech-Tab: nur wenn Modul aktiv */}
-            {isModuleEnabled('speech') && (
-              <button
-                className={`settings-nav-item ${activeTab === 'speech' ? 'active' : ''}`}
-                onClick={() => setActiveTab('speech')}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <path d="M9 1a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M14 8v1a5 5 0 0 1-10 0V8M9 14v3M6 17h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                {t('settings.tab.speech')}
-              </button>
-            )}
-            {/* reMarkable-Tab: nur wenn Modul aktiv */}
-            {isModuleEnabled('remarkable') && (
-              <button
-                className={`settings-nav-item ${activeTab === 'remarkable' ? 'active' : ''}`}
-                onClick={() => setActiveTab('remarkable')}
-              >
-                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                  <rect x="3" y="1" width="12" height="16" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                  <path d="M7 5h4M7 8h4M7 11h2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                </svg>
-                reMarkable
-              </button>
-            )}
-            {/* Plugin-Settings-Tabs: ein Eintrag pro settings.section-Beitrag eines aktiven
-                Plugins (z.B. Antares). Der Kern nennt kein Plugin namentlich. */}
-            {pluginSettingsSections.map(section => {
-              const tabId: Tab = `plugin:${section.pluginId}`
+            {vaultPath && renderNavItem({ id: 'vault', label: t('settings.tab.vault'), icon: NAV_ICONS.vault })}
+            {navGroups.map(group => {
+              const hasActive = group.items.some(i => i.id === activeTab)
+              const open = hasActive || !!openNavGroups[group.id]
               return (
-                <button
-                  key={tabId}
-                  className={`settings-nav-item ${activeTab === tabId ? 'active' : ''}`}
-                  onClick={() => setActiveTab(tabId)}
-                >
-                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                    <path d="M6 2v4M12 2v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                    <path d="M4 6h10v3a5 5 0 01-10 0V6z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
-                    <path d="M9 14v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                  </svg>
-                  {section.title ?? section.pluginId}
-                </button>
+                <React.Fragment key={group.id}>
+                  <button
+                    type="button"
+                    className={`settings-nav-section-label is-collapsible${open ? ' is-open' : ''}`}
+                    aria-expanded={open}
+                    onClick={() => setOpenNavGroups(prev => ({ ...prev, [group.id]: !open }))}
+                  >
+                    <span>{group.label}</span>
+                    <span className="settings-nav-section-count">
+                      {!open && group.items.length}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg>
+                    </span>
+                  </button>
+                  {open && group.items.map(renderNavItem)}
+                </React.Fragment>
               )
             })}
-            {/* Telegram-Tab: immer sichtbar (Bot-Feature) */}
-            <button
-              className={`settings-nav-item ${activeTab === 'telegram' ? 'active' : ''}`}
-              onClick={() => setActiveTab('telegram')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M2 9l14-6-2 13-5-3-3 3v-4l8-6-9 5-3-2z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-              </svg>
-              Telegram
-            </button>
-
-            {/* Section: Konto & Sync */}
-            <div className="settings-nav-section-label">{t('settings.nav.account')}</div>
-            <button
-              className={`settings-nav-item ${activeTab === 'sync' ? 'active' : ''}`}
-              onClick={() => setActiveTab('sync')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M3 9C3 5.69 5.69 3 9 3C11.22 3 13.15 4.26 14.13 6.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M15 9C15 12.31 12.31 15 9 15C6.78 15 4.85 13.74 3.87 11.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                <path d="M12 6H15V3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M6 12H3V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              {t('settings.tab.sync')}
-            </button>
-            {/* Zugangsdaten-Tab: zentrale Übersicht aller Credentials */}
-            <button
-              className={`settings-nav-item ${activeTab === 'credentials' ? 'active' : ''}`}
-              onClick={() => setActiveTab('credentials')}
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <path d="M12 3a3 3 0 0 1 3 3v2h1v7H2V8h1V6a3 3 0 0 1 3-3h6zm0 1.5H6a1.5 1.5 0 0 0-1.5 1.5v2h9V6A1.5 1.5 0 0 0 12 4.5zM9 10.5a1.5 1.5 0 0 0-.75 2.8V14h1.5v-.7A1.5 1.5 0 0 0 9 10.5z" stroke="currentColor" strokeWidth="1" fill="none"/>
-              </svg>
-              Zugangsdaten
-            </button>
           </nav>
 
-          <div className="settings-content">
+          <div className="settings-content" ref={contentRef}>
             {/* Petrol redesign: großer Seiten-Titel je Tab wie im Module-Tab (Konsistenz).
                 Der Module-Tab bringt seinen eigenen Header inkl. Untertitel mit → hier ausgenommen. */}
-            {activeTab !== 'modules' && (
+            {!['modules', 'integrations', 'ai'].includes(activeTab) && (
               <div className="settings-tab-header">
                 <h2>{
                   activeTab === 'dashboard' ? t('settings.dashboard.title')
@@ -3737,1066 +3603,274 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
             {/* KI & Modelle (Design 1c „KI-Zentrale"): Backend, Standard-Modell,
                 Modul-Matrix, Embedding und Cloud-Provider an EINEM Ort — vorher
                 über den Integrationen-Tab verstreut. */}
-            {activeTab === 'ai' && (
-              <div className="settings-section">
-                <div className="ai-central-status" data-settings-anchor="ai-backend">
-                  <span className="ai-central-status-icon">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="4" y="4" width="16" height="16" rx="3"/>
-                      <circle cx="12" cy="12" r="3"/>
-                      <path d="M12 4V2M12 22v-2M4 12H2M22 12h-2"/>
-                    </svg>
-                  </span>
-                  <span className="ai-central-status-text">
-                    <span className="ai-central-status-title">
-                      {ollama.backend === 'lm-studio' ? 'LM Studio' : 'Ollama'}
-                      {(ollama.backend === 'lm-studio' ? lmstudioStatus : ollamaStatus) === 'connected' ? (
-                        <> {t('settings.ai.statusRunning')} <span className="ai-central-status-dot ai-central-status-dot-ok" /></>
-                      ) : (ollama.backend === 'lm-studio' ? lmstudioStatus : ollamaStatus) === 'checking' ? (
-                        <> {t('settings.checkingConnection')}</>
-                      ) : (
-                        <> {t('settings.ai.statusOffline')} <span className="ai-central-status-dot ai-central-status-dot-off" /></>
-                      )}
-                    </span>
-                    <span className="ai-central-status-meta">
-                      {ollama.backend === 'lm-studio' ? `localhost:${ollama.lmStudioPort}` : 'localhost:11434'}
-                      {' · '}
-                      {(ollama.backend === 'lm-studio' ? lmstudioModels : ollamaModels).length} {t('settings.models')}
-                    </span>
-                  </span>
-                  <button
-                    className="settings-refresh"
-                    onClick={ollama.backend === 'lm-studio' ? checkLmstudioConnection : checkOllamaConnection}
-                  >
-                    {t('settings.refresh')}
-                  </button>
-                </div>
-                <div className="settings-info" style={{ marginBottom: '16px' }}>
-                  <p>{t('settings.ai.privacyStory')}</p>
-                </div>
-                <h3>{t('settings.integrations.localAI')}</h3>
-
-                <div className="settings-row">
-                  <label>{t('settings.integrations.aiEnabled')}</label>
+            {/* KI & Modelle (Redesign 2c): Status-Kopf bündelt Backend, Erreichbarkeit,
+                Modellzahl und Hauptschalter; Modelle als Karte; Cloud-Anbieter als
+                kollabierende Karten; Erklärtexte als Aufklapper. */}
+            {activeTab === 'ai' && (() => {
+              const isLm = ollama.backend === 'lm-studio'
+              const backendState = isLm ? lmstudioStatus : ollamaStatus
+              const backendModels = isLm ? lmstudioModels : ollamaModels
+              const backendName = isLm ? 'LM Studio' : 'Ollama'
+              const backendTone = backendState === 'connected' ? 'ok' : backendState === 'checking' ? 'checking' : 'off'
+              const connected = backendState === 'connected'
+              const cloudActiveCount = (searchImageGenEnabled ? 1 : 0) + (ollama.openrouter.enabled ? 1 : 0) + (ollama.llmbase.enabled ? 1 : 0)
+              const weightTotal = smartConnectionsWeights.embedding + smartConnectionsWeights.keyword + smartConnectionsWeights.wikilink + smartConnectionsWeights.tags + smartConnectionsWeights.folder
+              const weightRow = (key: 'embedding' | 'keyword' | 'wikilink' | 'tags' | 'folder') => (
+                <Row key={key} label={t(`smartConnections.weights.${key}`)}>
                   <input
-                    type="checkbox"
-                    checked={ollama.enabled}
-                    onChange={e => setOllama({ enabled: e.target.checked })}
+                    type="range"
+                    className="sui-range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={smartConnectionsWeights[key]}
+                    onChange={e => setSmartConnectionsWeights({ [key]: parseInt(e.target.value, 10) })}
                   />
-                </div>
+                  <span className="sui-unit" style={{ textAlign: 'right' }}>{smartConnectionsWeights[key]}%</span>
+                </Row>
+              )
+              return (
+                <div className="settings-section">
+                  <PageHeader title={t('settings.tab.ai')} subtitle={t('settings.aiTab.subtitle')} />
 
-                <div className="settings-row">
-                  <label>{t('settings.integrations.backend')}</label>
-                  <select
-                    value={ollama.backend}
-                    onChange={e => {
-                      const newBackend = e.target.value as LLMBackend
-                      setOllama({ backend: newBackend, selectedModel: '' })
-                    }}
-                    disabled={!ollama.enabled}
-                  >
-                    <option value="ollama">Ollama (localhost:11434)</option>
-                    <option value="lm-studio">LM Studio (localhost:{ollama.lmStudioPort})</option>
-                  </select>
-                </div>
+                  <div data-settings-anchor="ai-backend">
+                    <Hero
+                      icon={TILE_GLYPH.cpu}
+                      title={`${backendName} ${connected ? t('settings.ai.statusRunning') : backendState === 'checking' ? t('settings.checkingConnection') : t('settings.ai.statusOffline')}`}
+                      dot={backendTone}
+                      meta={
+                        <>
+                          {isLm ? `localhost:${ollama.lmStudioPort}` : 'localhost:11434'} · {backendModels.length} {t('settings.models')}
+                          {ollama.selectedModel && <> · {t('settings.aiTab.defaultShort')}: <b>{ollama.selectedModel}</b></>}
+                        </>
+                      }
+                      actions={
+                        <>
+                          <Segmented
+                            options={[{ value: 'ollama' as LLMBackend, label: 'Ollama' }, { value: 'lm-studio' as LLMBackend, label: 'LM Studio' }]}
+                            value={ollama.backend}
+                            onChange={b => setOllama({ backend: b, selectedModel: '' })}
+                            disabled={!ollama.enabled}
+                            ariaLabel={t('settings.integrations.backend')}
+                          />
+                          <Button onClick={isLm ? checkLmstudioConnection : checkOllamaConnection} disabled={backendState === 'checking'}>
+                            {t('settings.refresh')}
+                          </Button>
+                          <Toggle checked={ollama.enabled} onChange={v => setOllama({ enabled: v })} ariaLabel={t('settings.integrations.aiEnabled')} />
+                        </>
+                      }
+                    />
+                  </div>
+                  <p className="sui-hero-note">{t('settings.aiTab.brainLocal')}</p>
+                  <Details title={t('settings.aiTab.privacyMore')}>
+                    <p>{t('settings.ai.privacyStory')}</p>
+                  </Details>
 
-                {/* Ollama Settings */}
-                {ollama.backend === 'ollama' && (
-                  <>
-                    <div className="settings-row">
-                      <label>Ollama Status</label>
-                      <div className="settings-status">
-                        {ollamaStatus === 'checking' && (
-                          <span className="status-checking">{t('settings.checkingConnection')}</span>
+                  {backendState === 'disconnected' && (
+                    <Card>
+                      <Note tone="warn" action={t('settings.integ.recheck')} onAction={isLm ? checkLmstudioConnection : checkOllamaConnection}>
+                        {isLm ? (
+                          <><b>LM Studio</b> {t('settings.integrations.lmstudioDesc')} {t('settings.integrations.lmstudioSetup')} · <ExternalLink href="https://lmstudio.ai">lmstudio.ai</ExternalLink></>
+                        ) : (
+                          <><b>Ollama</b> {t('settings.integrations.ollamaDesc')} {t('settings.integrations.installOllama')} <ExternalLink href="https://ollama.ai">ollama.ai</ExternalLink></>
                         )}
-                        {ollamaStatus === 'connected' && (
-                          <span className="status-connected">{t('settings.connected')} ({ollamaModels.length} {t('settings.models')})</span>
+                      </Note>
+                    </Card>
+                  )}
+
+                  {/* ── Modelle ── */}
+                  <SectionTitle title={t('settings.aiTab.models')} />
+                  <Card>
+                    {isLm && (
+                      <Row label={t('settings.aiTab.lmPort')}>
+                        <NumberInput value={ollama.lmStudioPort} min={1} max={65535} onCommit={p => setOllama({ lmStudioPort: p })} />
+                        <Button onClick={checkLmstudioConnection}>{t('settings.connect')}</Button>
+                      </Row>
+                    )}
+                    <Row label={t('settings.aiTab.defaultModel')} hint={t('settings.aiTab.defaultModelHint')} anchor="ai-default-model" stacked>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <ModelPicker
+                          value={ollama.selectedModel}
+                          models={backendModels}
+                          onChange={value => setOllama({ selectedModel: value })}
+                          disabled={!ollama.enabled || !connected}
+                          placeholder={{ value: '', label: t('settings.selectModel') }}
+                          ariaLabel={t('settings.aiTab.defaultModel')}
+                          style={{ flex: 1 }}
+                          maxWidth="none"
+                        />
+                        {!isLm && ollama.selectedModel && (
+                          <Button variant="link" onClick={() => handleDeleteModel(ollama.selectedModel)} title={t('settings.integrations.ollama.deleteModel')}>
+                            {t('settings.integrations.ollama.deleteModel')}
+                          </Button>
                         )}
-                        {ollamaStatus === 'disconnected' && (
-                          <span className="status-disconnected">{t('settings.notConnected')}</span>
-                        )}
-                        <button className="settings-refresh" onClick={checkOllamaConnection}>
-                          {t('settings.refresh')}
-                        </button>
                       </div>
+                      <ActiveModelStatusBadge model={ollama.selectedModel} />
+                      <ModelRamWarning model={ollama.selectedModel} />
+                    </Row>
+                    {!isLm && connected && projectRagOn && (() => {
+                      const patterns = ['embed', 'minilm', 'bge', 'gte', 'e5', 'nomic']
+                      const embs = ollamaModels.filter(m => patterns.some(p => m.name.toLowerCase().includes(p)))
+                      const cur = ollama.projectRagEmbeddingModel || 'bge-m3'
+                      if (!embs.some(m => m.name === cur)) embs.unshift({ name: cur, size: 0 })
+                      return (
+                        <Row label={t('settings.aiTab.embedding')} hint={t('settings.aiTab.embeddingHint')} anchor="ai-embedding">
+                          <ModelPicker
+                            value={cur}
+                            models={embs}
+                            onChange={value => setOllama({ projectRagEmbeddingModel: value })}
+                            disabled={!ollama.enabled}
+                            getLabel={name => {
+                              const m = embs.find(e => e.name === name)
+                              return name + (m && m.size === 0 ? (language === 'en' ? ' (not installed)' : ' (nicht installiert)') : '')
+                            }}
+                            ariaLabel={t('settings.aiTab.embedding')}
+                            maxWidth={260}
+                          />
+                        </Row>
+                      )
+                    })()}
+                    <Row label={t('settings.integrations.defaultTranslation')}>
+                      <Select
+                        value={ollama.defaultTranslateLanguage}
+                        onChange={e => setOllama({ defaultTranslateLanguage: e.target.value as typeof ollama.defaultTranslateLanguage })}
+                        disabled={!ollama.enabled}
+                      >
+                        {AI_LANGUAGES.map(lang => <option key={lang.code} value={lang.code}>{lang.name}</option>)}
+                      </Select>
+                    </Row>
+                    <div data-settings-anchor="ai-matrix">
+                      <Details title={t('settings.aiTab.compatToggle')} wide defaultOpen={initialAnchor === 'ai-matrix'}>
+                        <ModelCompatibilitySection availableModels={backendModels} />
+                      </Details>
                     </div>
-
-                    {ollamaStatus === 'connected' && (
-                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }} data-settings-anchor="ai-default-model">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
-                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flex: 1 }}>
-                            <ModelPicker
-                              value={ollama.selectedModel}
-                              models={ollamaModels}
-                              onChange={value => setOllama({ selectedModel: value })}
-                              disabled={!ollama.enabled}
-                              placeholder={{ value: '', label: t('settings.selectModel') }}
-                              ariaLabel={t('settings.integrations.ollama.model')}
+                    {!isLm && connected && (
+                      <Details title={t('settings.aiTab.pullToggle')} wide>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <Select
+                              value={pullModelName}
+                              onChange={e => { setPullModelName(e.target.value); setCustomPullModelName('') }}
+                              disabled={isPulling}
                               style={{ flex: 1 }}
-                              maxWidth="none"
-                            />
-                            {ollama.selectedModel && (
-                              <button
-                                className="settings-refresh"
-                                onClick={() => handleDeleteModel(ollama.selectedModel)}
-                                title={t('settings.integrations.ollama.deleteModel')}
-                                style={{ color: 'var(--text-error, #e53935)', flexShrink: 0 }}
-                              >
-                                ✕
-                              </button>
-                            )}
+                            >
+                              <optgroup label={t('settings.integrations.ollama.cloudTestGroup')}>
+                                {CLOUD_TEST_MODELS.map(m => <option key={m.name} value={m.name}>{m.label}</option>)}
+                              </optgroup>
+                              <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
+                                {RECOMMENDED_PULL_MODELS.filter(m => (m.kind ?? 'chat') === 'chat').map(m => (
+                                  <option key={m.name} value={m.name}>{modelMarkers(m.name)}{m.label}</option>
+                                ))}
+                              </optgroup>
+                              <optgroup label={t('settings.integrations.ollama.embeddingModels')}>
+                                {RECOMMENDED_PULL_MODELS.filter(m => m.kind === 'embedding').map(m => (
+                                  <option key={m.name} value={m.name}>{modelMarkers(m.name)}{m.label}</option>
+                                ))}
+                              </optgroup>
+                            </Select>
+                            <Button variant="primary" onClick={handlePullModel} disabled={isPulling}>
+                              {isPulling ? t('settings.integrations.ollama.pulling') : t('settings.integrations.ollama.download')}
+                            </Button>
                           </div>
-                        </div>
-                        <ActiveModelStatusBadge model={ollama.selectedModel} />
-                        <ModelRamWarning model={ollama.selectedModel} />
-                      </div>
-                    )}
-
-                    {/* Projekt-RAG: zentrales Embedding-Modell (nur wenn Modul aktiv) */}
-                    {ollamaStatus === 'connected' && isModuleEnabled('project-rag') && (
-                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }} data-settings-anchor="ai-embedding">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <label style={{ minWidth: '120px' }}>
-                            {language === 'en' ? 'Project-RAG embedding' : 'Projekt-RAG Embedding'}
-                          </label>
-                          {(() => {
-                            const patterns = ['embed', 'minilm', 'bge', 'gte', 'e5', 'nomic']
-                            const embs = ollamaModels.filter(m => patterns.some(p => m.name.toLowerCase().includes(p)))
-                            const cur = ollama.projectRagEmbeddingModel || 'bge-m3'
-                            if (!embs.some(m => m.name === cur)) embs.unshift({ name: cur, size: 0 })
-                            return (
-                              <ModelPicker
-                                value={cur}
-                                models={embs}
-                                onChange={value => setOllama({ projectRagEmbeddingModel: value })}
-                                disabled={!ollama.enabled}
-                                getLabel={name => {
-                                  const m = embs.find(e => e.name === name)
-                                  return name + (m && m.size === 0 ? (language === 'en' ? ' (not installed)' : ' (nicht installiert)') : '')
-                                }}
-                                ariaLabel={language === 'en' ? 'Project-RAG embedding' : 'Projekt-RAG Embedding'}
-                                style={{ flex: 1 }}
-                                maxWidth="none"
-                              />
-                            )
-                          })()}
-                        </div>
-                        <p className="settings-hint" style={{ fontSize: '11px' }}>
-                          {language === 'en'
-                            ? 'Local embedding model for Project-RAG (bge-m3 recommended for German vaults). Answers use the chat model selected above. Everything stays local.'
-                            : 'Lokales Embedding-Modell fürs Projekt-RAG (bge-m3 für deutsche Vaults empfohlen). Antworten nutzen das oben gewählte Chat-Modell. Alles bleibt lokal.'}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Model Download Section */}
-                    {ollamaStatus === 'connected' && (
-                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '8px' }}>
-                        <label>{t('settings.integrations.ollama.pullModel')}</label>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                          <select
-                            value={pullModelName}
-                            onChange={e => { setPullModelName(e.target.value); setCustomPullModelName('') }}
-                            disabled={isPulling}
-                            style={{ flex: 1 }}
-                          >
-                            <optgroup label={t('settings.integrations.ollama.cloudTestGroup')}>
-                              {CLOUD_TEST_MODELS.map(m => (
-                                <option key={m.name} value={m.name}>{m.label}</option>
-                              ))}
-                            </optgroup>
-                            <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
-                              {RECOMMENDED_PULL_MODELS.filter(m => (m.kind ?? 'chat') === 'chat').map(m => (
-                                <option key={m.name} value={m.name}>
-                                  {modelMarkers(m.name)}{m.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                            <optgroup label={t('settings.integrations.ollama.embeddingModels')}>
-                              {RECOMMENDED_PULL_MODELS.filter(m => m.kind === 'embedding').map(m => (
-                                <option key={m.name} value={m.name}>
-                                  {modelMarkers(m.name)}{m.label}
-                                </option>
-                              ))}
-                            </optgroup>
-                          </select>
-                          <button
-                            className="settings-refresh"
-                            onClick={handlePullModel}
-                            disabled={isPulling}
-                            style={{ flexShrink: 0 }}
-                          >
-                            {isPulling ? t('settings.integrations.ollama.pulling') : t('settings.integrations.ollama.download')}
-                          </button>
-                        </div>
-                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                           <input
                             type="text"
+                            className="sui-input"
+                            style={{ width: '100%' }}
                             placeholder={t('settings.integrations.ollama.customModel')}
                             value={customPullModelName}
                             onChange={e => setCustomPullModelName(e.target.value)}
                             disabled={isPulling}
                             onKeyDown={e => { if (e.key === 'Enter') handlePullModel() }}
-                            style={{ flex: 1 }}
                           />
-                        </div>
-                        {isCloudModel(customPullModelName || pullModelName) && (
-                          <span style={{ fontSize: '11px', color: 'var(--warning, #d97706)' }}>
-                            {t('settings.integrations.ollama.cloudHint')}
-                          </span>
-                        )}
-                        <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {t('settings.integrations.ollama.humanFavoriteHint')}
-                        </span>
-                        {isPulling && pullProgress && (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div className="inbox-progress-bar">
-                              <div style={{
-                                width: pullProgress.total
-                                  ? `${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%`
-                                  : '100%',
-                                ...(pullProgress.total ? {} : { animation: 'indeterminate 1.5s infinite linear' })
-                              }} />
+                          {isCloudModel(customPullModelName || pullModelName) && (
+                            <span style={{ fontSize: '12px', color: 'var(--color-warning)' }}>{t('settings.integrations.ollama.cloudHint')}</span>
+                          )}
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('settings.integrations.ollama.humanFavoriteHint')}</span>
+                          {isPulling && pullProgress && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                              <div className="inbox-progress-bar">
+                                <div style={{
+                                  width: pullProgress.total
+                                    ? `${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%`
+                                    : '100%',
+                                  ...(pullProgress.total ? {} : { animation: 'indeterminate 1.5s infinite linear' })
+                                }} />
+                              </div>
+                              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                                {pullProgress.status}
+                                {pullProgress.total ? ` — ${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%` : ''}
+                              </span>
                             </div>
-                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                              {pullProgress.status}
-                              {pullProgress.total ? ` — ${Math.round((pullProgress.completed || 0) / pullProgress.total * 100)}%` : ''}
-                            </span>
-                          </div>
-                        )}
-                        {pullSuccess && (
-                          <span style={{ fontSize: '12px', color: 'var(--text-success, #43a047)' }}>
-                            {t('settings.integrations.ollama.pullSuccess')}
-                          </span>
-                        )}
-                        {pullError && (
-                          <span style={{ fontSize: '12px', color: 'var(--text-error, #e53935)' }}>
-                            {t('settings.integrations.ollama.pullError')}: {pullError}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                    <div className="settings-info">
-                      <p>
-                        <strong>Ollama</strong> {t('settings.integrations.ollamaDesc')}
-                      </p>
-                      <p>
-                        {t('settings.integrations.installOllama')} <ExternalLink href="https://ollama.ai">ollama.ai</ExternalLink>
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {/* LM Studio Settings */}
-                {ollama.backend === 'lm-studio' && (
-                  <>
-                    <div className="settings-row">
-                      <label>LM Studio Port</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="number"
-                          min="1"
-                          max="65535"
-                          value={ollama.lmStudioPort}
-                          onChange={e => setOllama({ lmStudioPort: parseInt(e.target.value) || 1234 })}
-                          style={{ width: '80px' }}
-                        />
-                        <button className="settings-refresh" onClick={checkLmstudioConnection}>
-                          {t('settings.connect')}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>LM Studio Status</label>
-                      <div className="settings-status">
-                        {lmstudioStatus === 'checking' && (
-                          <span className="status-checking">{t('settings.checkingConnection')}</span>
-                        )}
-                        {lmstudioStatus === 'connected' && (
-                          <span className="status-connected">{t('settings.connected')} ({lmstudioModels.length} {t('settings.models')})</span>
-                        )}
-                        {lmstudioStatus === 'disconnected' && (
-                          <span className="status-disconnected">{t('settings.notConnected')}</span>
-                        )}
-                        <button className="settings-refresh" onClick={checkLmstudioConnection}>
-                          {t('settings.refresh')}
-                        </button>
-                      </div>
-                    </div>
-
-                    {lmstudioStatus === 'connected' && (
-                      <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '4px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <label style={{ minWidth: '120px' }}>{t('settings.integrations.ollama.model')}</label>
-                          <ModelPicker
-                            value={ollama.selectedModel}
-                            models={lmstudioModels}
-                            onChange={value => setOllama({ selectedModel: value })}
-                            disabled={!ollama.enabled}
-                            placeholder={{ value: '', label: t('settings.selectModel') }}
-                            ariaLabel={t('settings.integrations.ollama.model')}
-                            style={{ flex: 1 }}
-                            maxWidth="none"
-                          />
+                          )}
+                          {pullSuccess && <span style={{ fontSize: '12px', color: 'var(--color-success)' }}>{t('settings.integrations.ollama.pullSuccess')}</span>}
+                          {pullError && <span style={{ fontSize: '12px', color: 'var(--color-danger)' }}>{t('settings.integrations.ollama.pullError')}: {pullError}</span>}
                         </div>
-                        <ActiveModelStatusBadge model={ollama.selectedModel} />
-                        <ModelRamWarning model={ollama.selectedModel} />
-                      </div>
+                      </Details>
                     )}
+                  </Card>
 
-                    <div className="settings-info">
-                      <p>
-                        <strong>LM Studio</strong> {t('settings.integrations.lmstudioDesc')}
-                      </p>
-                      <p>
-                        Download: <ExternalLink href="https://lmstudio.ai">lmstudio.ai</ExternalLink>
-                      </p>
-                      <p>
-                        <strong>Setup:</strong> {t('settings.integrations.lmstudioSetup')}
-                      </p>
-                    </div>
-                  </>
-                )}
+                  {/* ── Cloud-Anbieter (Opt-in) ── */}
+                  <SectionTitle title={t('settings.aiTab.cloud')} meta={t('settings.aiTab.cloudActive', { n: cloudActiveCount, total: 3 })} />
+                  <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>
+                  <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
+                  <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
 
-                <div data-settings-anchor="ai-matrix">
-                  <ModelCompatibilitySection
-                    availableModels={ollama.backend === 'ollama' ? ollamaModels : lmstudioModels}
-                  />
-                </div>
-
-                {/* Gruppenüberschrift wie bei „KI-Funktionen": vorher hingen fünf optionale Dienste ohne Titel unter der Modell-Matrix, jeder mit eigenem Überschriftenstil. */}
-                <h3>{t('settings.integrations.extensions')}</h3>
-                <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
-                <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
-                {isModuleEnabled('web-research') && <div data-settings-anchor="ai-webresearch"><WebResearchSection /></div>}
-                {isModuleEnabled('agent-shell') && <div data-settings-anchor="ai-agentshell"><AgentShellSection /></div>}
-                {isModuleEnabled('image-generation') && <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>}
-
-                <div className="settings-row">
-                  <label>{t('settings.integrations.defaultTranslation')}</label>
-                  <select
-                    value={ollama.defaultTranslateLanguage}
-                    onChange={e => setOllama({ defaultTranslateLanguage: e.target.value as typeof ollama.defaultTranslateLanguage })}
-                    disabled={!ollama.enabled}
-                  >
-                    {AI_LANGUAGES.map(lang => (
-                      <option key={lang.code} value={lang.code}>
-                        {lang.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="settings-info" style={{ marginTop: '12px' }}>
-                  <p>
-                    {t('settings.integrations.usage')}
-                  </p>
-                  <p>
-                    {t('settings.integrations.transparency')}
-                  </p>
-                </div>
-
-                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.aiFeatures')}</h3>
-                <div className="settings-info" style={{ marginBottom: '16px' }}>
-                  <p>
-                    {t('settings.integrations.aiFeaturesDesc')}
-                  </p>
-                </div>
-                <h3 style={{ marginTop: '16px' }}>{t('settings.integrations.smartConnections')}</h3>
-                <p className="settings-hint">{t('settings.integrations.smartConnectionsHint')}</p>
-                <ModuleDisabledHint moduleId="smart-connections" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                {/* Smart Connections Weights Configuration */}
-                {smartConnectionsEnabled && (
-                  <div className="settings-subsection" style={{ marginLeft: '8px', paddingLeft: '12px', borderLeft: '2px solid var(--border-color)' }}>
-                    <div className="settings-row" style={{ marginBottom: '8px' }}>
-                      <label style={{ fontWeight: 500, fontSize: '13px' }}>{t('smartConnections.weights.title')}</label>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('smartConnections.weights.embedding')}</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={smartConnectionsWeights.embedding}
-                          onChange={e => setSmartConnectionsWeights({ embedding: parseInt(e.target.value) })}
-                          style={{ width: '100px' }}
-                        />
-                        <span style={{ minWidth: '40px', textAlign: 'right' }}>{smartConnectionsWeights.embedding}%</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('smartConnections.weights.keyword')}</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={smartConnectionsWeights.keyword}
-                          onChange={e => setSmartConnectionsWeights({ keyword: parseInt(e.target.value) })}
-                          style={{ width: '100px' }}
-                        />
-                        <span style={{ minWidth: '40px', textAlign: 'right' }}>{smartConnectionsWeights.keyword}%</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('smartConnections.weights.wikilink')}</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={smartConnectionsWeights.wikilink}
-                          onChange={e => setSmartConnectionsWeights({ wikilink: parseInt(e.target.value) })}
-                          style={{ width: '100px' }}
-                        />
-                        <span style={{ minWidth: '40px', textAlign: 'right' }}>{smartConnectionsWeights.wikilink}%</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('smartConnections.weights.tags')}</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={smartConnectionsWeights.tags}
-                          onChange={e => setSmartConnectionsWeights({ tags: parseInt(e.target.value) })}
-                          style={{ width: '100px' }}
-                        />
-                        <span style={{ minWidth: '40px', textAlign: 'right' }}>{smartConnectionsWeights.tags}%</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-row">
-                      <label>{t('smartConnections.weights.folder')}</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="range"
-                          min="0"
-                          max="100"
-                          step="5"
-                          value={smartConnectionsWeights.folder}
-                          onChange={e => setSmartConnectionsWeights({ folder: parseInt(e.target.value) })}
-                          style={{ width: '100px' }}
-                        />
-                        <span style={{ minWidth: '40px', textAlign: 'right' }}>{smartConnectionsWeights.folder}%</span>
-                      </div>
-                    </div>
-
-                    <div className="settings-row" style={{ marginTop: '8px' }}>
-                      <label>{t('smartConnections.weights.total')}</label>
-                      <span style={{
-                        fontWeight: 500,
-                        color: (smartConnectionsWeights.embedding + smartConnectionsWeights.keyword + smartConnectionsWeights.wikilink + smartConnectionsWeights.tags + smartConnectionsWeights.folder) === 100
-                          ? 'var(--text-primary)'
-                          : 'var(--color-warning, #ff9500)'
-                      }}>
-                        {smartConnectionsWeights.embedding + smartConnectionsWeights.keyword + smartConnectionsWeights.wikilink + smartConnectionsWeights.tags + smartConnectionsWeights.folder}%
-                      </span>
-                    </div>
-
-                    <div className="settings-info" style={{ marginTop: '8px' }}>
-                      <p style={{ fontSize: '12px' }}>{t('smartConnections.weights.hint')}</p>
-                    </div>
-                  </div>
-                )}
-
-                {smartConnectionsEnabled && (
-                  <div className="settings-subsection" style={{ marginLeft: '8px', paddingLeft: '12px', borderLeft: '2px solid var(--border-color)', marginTop: '12px' }}>
-                    <div className="settings-row">
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          type="checkbox"
-                          checked={smartConnectionsRerankerEnabled}
-                          onChange={e => setSmartConnectionsRerankerEnabled(e.target.checked)}
-                        />
-                        <span style={{ fontWeight: 500, fontSize: '13px' }}>LLM-Reranker (experimentell)</span>
-                      </label>
-                    </div>
-                    <div className="settings-info" style={{ marginTop: '4px' }}>
-                      <p style={{ fontSize: '12px' }}>
-                        Nach der Embedding-Suche bewertet das aktuell gewählte Ollama-Modell die Top-Kandidaten paarweise auf Relevanz und sortiert um. Läuft im Hintergrund (~1-3s pro Kandidat), die Embedding-Liste wird sofort angezeigt. Kein dedizierter Reranker, sondern LLM-as-Judge — funktioniert mit jedem Chat-Modell, das du eh nutzt.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Notes Chat, Flashcards: Aktivierung erfolgt im Modul-Tab (keine Konfiguration nötig). */}
-
-                {/* Flashcards-Ollama-Warnung bleibt als globaler Hinweis sichtbar, wenn das Modul aktiv ist aber Ollama fehlt */}
-                {flashcardsEnabled && (!ollama.enabled || !ollama.selectedModel) && (
-                  <div className="settings-warning" style={{
-                    marginTop: '8px',
-                    padding: '12px',
-                    background: 'var(--color-warning-bg, rgba(255, 149, 0, 0.1))',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--color-warning, #ff9500)'
-                  }}>
-                    <p style={{ margin: 0, fontSize: '13px', color: 'var(--color-warning, #ff9500)' }}>
-                      {t('settings.integrations.flashcardsOllamaWarning')}
-                    </p>
-                  </div>
-                )}
-
-              </div>
-            )}
-
-            {/* Integrationen: externe Dienste (Zotero, Research, …) — die KI-Blöcke
-                sind in den Tab „KI & Modelle" gewandert. */}
-            {activeTab === 'integrations' && (
-              <div className="settings-section">
-                <h3>{t('settings.integrations.zotero')}</h3>
-                <div className="settings-row">
-                  <label>Status</label>
-                  <div className="settings-status">
-                    {zoteroStatus === 'checking' && (
-                      <span className="status-checking">{t('settings.checkingConnection')}</span>
-                    )}
-                    {zoteroStatus === 'connected' && (
-                      <span className="status-connected">{t('settings.connected')}</span>
-                    )}
-                    {zoteroStatus === 'disconnected' && (
-                      <span className="status-disconnected">{t('settings.notConnected')}</span>
-                    )}
-                    <button className="settings-refresh" onClick={checkZoteroConnection}>
-                      {t('settings.refresh')}
-                    </button>
-                  </div>
-                </div>
-                <div className="settings-info">
-                  <p>
-                    {t('settings.integrations.zoteroDesc')}
-                  </p>
-                  <p>
-                    {t('settings.integrations.zoteroShortcut')} <kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>
-                  </p>
-                </div>
-
-                <h3 style={{ marginTop: '32px' }}>{t('settings.integrations.research')}</h3>
-                <ModuleDisabledHint moduleId="semantic-scholar" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                <div className="settings-info">
-                  <p>{t('settings.integrations.researchDesc')}</p>
-                  <p>{t('settings.integrations.openAlexHint')}</p>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.integrations.openAlexApiKey')}</label>
-                  <div className="settings-input-group">
-                    <input
-                      type="password"
-                      value={openAlexApiKey}
-                      onChange={e => setOpenAlexApiKey(e.target.value)}
-                      placeholder={openAlexKeySaved ? t('settings.integrations.openAlexKeySaved') : 'OPENALEX_API_KEY'}
-                      disabled={!semanticScholarEnabled}
-                      style={{ width: '260px' }}
-                    />
-                    <button
-                      className="settings-refresh"
-                      onClick={saveOpenAlexKey}
-                      disabled={!openAlexApiKey.trim() || !semanticScholarEnabled}
-                    >
-                      {t('settings.integrations.openAlexSave')}
-                    </button>
-                    {openAlexKeySaved && (
-                      <button className="settings-refresh" onClick={deleteOpenAlexKey}>
-                        {t('settings.integrations.openAlexDelete')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.integrations.openAlexMailto')}</label>
-                  <div className="settings-input-group">
-                    <input
-                      type="email"
-                      value={openAlexMailto}
-                      onChange={e => setOpenAlexMailto(e.target.value)}
-                      placeholder={openAlexMailtoSaved || 'mail@example.com'}
-                      disabled={!semanticScholarEnabled}
-                      style={{ width: '260px' }}
-                    />
-                    <button
-                      className="settings-refresh"
-                      onClick={saveOpenAlexMailto}
-                      disabled={!openAlexMailto.trim() || !semanticScholarEnabled}
-                    >
-                      {t('settings.integrations.openAlexSave')}
-                    </button>
-                    {openAlexMailtoSaved && (
-                      <button className="settings-refresh" onClick={deleteOpenAlexMailto}>
-                        {t('settings.integrations.openAlexDelete')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="settings-hint" style={{ marginTop: '-4px', marginLeft: 0 }}>
-                  {t('settings.integrations.openAlexMailtoHint')}
-                </p>
-
-                <div className="settings-row">
-                  <label>Status</label>
-                  <div className="settings-status">
-                    {openAlexStatus === 'checking' && (
-                      <span className="status-checking">{t('settings.checkingConnection')}</span>
-                    )}
-                    {openAlexStatus === 'connected' && (
-                      <span className="status-connected">{t('settings.connected')}</span>
-                    )}
-                    {openAlexStatus === 'disconnected' && (
-                      <span className="status-disconnected">{t('settings.notConnected')}</span>
-                    )}
-                    <button className="settings-refresh" onClick={checkOpenAlexConnection}>
-                      {t('settings.refresh')}
-                    </button>
-                  </div>
-                </div>
-
-                {openAlexMessage && (
-                  <div className="settings-info">
-                    <p>{openAlexMessage}</p>
-                  </div>
-                )}
-
-                <h3 style={{ marginTop: '32px' }}>{t('settings.docling.title')}</h3>
-                <ModuleDisabledHint moduleId="docling" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                <div className="settings-row">
-                  <label>{t('settings.docling.url')}</label>
-                  <div className="settings-input-group">
-                    <input
-                      type="text"
-                      value={docling.url}
-                      onChange={e => setDocling({ url: e.target.value })}
-                      placeholder="http://localhost:5001"
-                      disabled={!docling.enabled}
-                      style={{ width: '200px' }}
-                    />
-                    <button className="settings-refresh" onClick={checkDoclingConnection}>
-                      {t('settings.connect')}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>Status</label>
-                  <div className="settings-status">
-                    {doclingStatus === 'checking' && (
-                      <span className="status-checking">{t('settings.checkingConnection')}</span>
-                    )}
-                    {doclingStatus === 'connected' && (
-                      <span className="status-connected">
-                        {t('settings.connected')} {doclingVersion && `(v${doclingVersion})`}
-                      </span>
-                    )}
-                    {doclingStatus === 'disconnected' && (
-                      <span className="status-disconnected">{t('settings.notConnected')}</span>
-                    )}
-                    <button className="settings-refresh" onClick={checkDoclingConnection}>
-                      {t('settings.refresh')}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.docling.ocrEnabled')}</label>
-                  <input
-                    type="checkbox"
-                    checked={docling.ocrEnabled}
-                    onChange={e => setDocling({ ocrEnabled: e.target.checked })}
-                    disabled={!docling.enabled}
-                  />
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.docling.ocrLanguages')}</label>
-                  <div className="settings-input-group">
-                    <input
-                      type="text"
-                      value={docling.ocrLanguages.join(', ')}
-                      onChange={e => setDocling({
-                        ocrLanguages: e.target.value.split(',').map(s => s.trim()).filter(s => s)
-                      })}
-                      placeholder="de, en"
-                      disabled={!docling.enabled || !docling.ocrEnabled}
-                      style={{ width: '120px' }}
-                    />
-                  </div>
-                </div>
-
-                <div className="settings-info">
-                  <p>
-                    <strong>Docling</strong> {t('settings.docling.description')}
-                  </p>
-                  <p>
-                    {t('settings.docling.usage')}
-                  </p>
-                  <p>
-                    {t('settings.docling.installHint')} <code>docker run -p 5001:5001 ds4sd/docling-serve</code>
-                  </p>
-                </div>
-
-                {/* Vision OCR */}
-                <h3 style={{ marginTop: '32px' }}>{t('settings.visionOcr.title')}</h3>
-                <ModuleDisabledHint moduleId="vision-ocr" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                <div className="settings-row">
-                  <label>{t('settings.visionOcr.model')}</label>
-                  <div className="settings-input-group">
-                    <select
-                      value={visionOcr.model}
-                      onChange={e => setVisionOcr({ model: e.target.value })}
-                      disabled={!visionOcr.enabled}
-                      style={{ minWidth: '200px' }}
-                    >
-                      <option value="">{t('settings.selectModel')}</option>
-                      {visionOcrModelList.map(m => (
-                        <option key={m.name} value={m.name}>{m.name}</option>
-                      ))}
-                    </select>
-                    <button className="settings-refresh" onClick={() => window.electronAPI.visionOcrModels().then(setVisionOcrModelList).catch(() => {})}>
-                      {t('settings.refresh')}
-                    </button>
-                  </div>
-                </div>
-                <div className="settings-row">
-                  <label>{t('settings.visionOcr.pageWidth')}</label>
-                  <select
-                    value={visionOcr.pageWidth}
-                    onChange={e => setVisionOcr({ pageWidth: Number(e.target.value) })}
-                    disabled={!visionOcr.enabled}
-                  >
-                    <option value={400}>400px (schnell)</option>
-                    <option value={600}>600px</option>
-                    <option value={800}>800px (empfohlen)</option>
-                    <option value={1200}>1200px (hohe Qualität)</option>
-                  </select>
-                </div>
-                <div className="settings-info">
-                  <p>
-                    <strong>Vision OCR</strong> {t('settings.visionOcr.description')}
-                  </p>
-                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {t('settings.visionOcr.modelHint')}
-                  </p>
-                </div>
-
-                <h3 style={{ marginTop: '32px' }}>{t('settings.languagetool.title')}</h3>
-                <ModuleDisabledHint moduleId="language-tool" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                <div className="settings-row">
-                  <label>{t('settings.languagetool.mode')}</label>
-                  <select
-                    value={languageTool.mode || 'local'}
-                    onChange={e => setLanguageTool({ mode: e.target.value as 'local' | 'api' })}
-                    disabled={!languageTool.enabled}
-                  >
-                    <option value="local">{t('settings.languagetool.modeLocal')}</option>
-                    <option value="api">{t('settings.languagetool.modeApi')}</option>
-                  </select>
-                </div>
-
-                {(languageTool.mode || 'local') === 'local' && (
-                  <div className="settings-row">
-                    <label>{t('settings.languagetool.url')}</label>
-                    <div className="settings-input-group">
-                      <input
-                        type="text"
-                        value={languageTool.url}
-                        onChange={e => setLanguageTool({ url: e.target.value })}
-                        placeholder="http://localhost:8010"
-                        disabled={!languageTool.enabled}
-                        style={{ width: '200px' }}
-                      />
-                      <button className="settings-refresh" onClick={checkLanguageToolConnection}>
-                        {t('settings.connect')}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {(languageTool.mode || 'local') === 'api' && (
-                  <>
-                    <div className="settings-row">
-                      <label>{t('settings.languagetool.apiUsername')}</label>
-                      <input
-                        type="email"
-                        value={languageTool.apiUsername || ''}
-                        onChange={e => setLanguageTool({ apiUsername: e.target.value })}
-                        placeholder={t('settings.languagetool.apiUsernamePlaceholder')}
-                        disabled={!languageTool.enabled}
-                        style={{ width: '250px' }}
-                      />
-                    </div>
-                    <div className="settings-row">
-                      <label>{t('settings.languagetool.apiKey')}</label>
-                      <div className="settings-input-group">
-                        <input
-                          type="password"
-                          value={languageTool.apiKey || ''}
-                          onChange={e => setLanguageTool({ apiKey: e.target.value })}
-                          placeholder={t('settings.languagetool.apiKeyPlaceholder')}
-                          disabled={!languageTool.enabled}
-                          style={{ width: '200px' }}
-                        />
-                        <button className="settings-refresh" onClick={checkLanguageToolConnection}>
-                          {t('settings.connect')}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                <div className="settings-row">
-                  <label>Status</label>
-                  <div className="settings-status">
-                    {languageToolStatus === 'checking' && (
-                      <span className="status-checking">{t('settings.checkingConnection')}</span>
-                    )}
-                    {languageToolStatus === 'connected' && (
-                      <span className="status-connected">{t('settings.connected')}</span>
-                    )}
-                    {languageToolStatus === 'disconnected' && (
-                      <span className="status-disconnected">{t('settings.notConnected')}</span>
-                    )}
-                    <button className="settings-refresh" onClick={checkLanguageToolConnection}>
-                      {t('settings.refresh')}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.languagetool.language')}</label>
-                  <select
-                    value={languageTool.language}
-                    onChange={e => setLanguageTool({ language: e.target.value })}
-                    disabled={!languageTool.enabled}
-                  >
-                    <option value="auto">{t('settings.languagetool.languageAuto')}</option>
-                    <option value="de-DE">Deutsch</option>
-                    <option value="en-US">English (US)</option>
-                    <option value="en-GB">English (UK)</option>
-                    <option value="fr">Français</option>
-                    <option value="es">Español</option>
-                    <option value="it">Italiano</option>
-                    <option value="pt-PT">Português</option>
-                    <option value="nl">Nederlands</option>
-                    <option value="pl-PL">Polski</option>
-                  </select>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.languagetool.autoCheck')}</label>
-                  <input
-                    type="checkbox"
-                    checked={languageTool.autoCheck}
-                    onChange={e => setLanguageTool({ autoCheck: e.target.checked })}
-                    disabled={!languageTool.enabled}
-                  />
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.languagetool.autoCheckDelay')}</label>
-                  <div className="settings-input-group">
-                    <input
-                      type="number"
-                      min="500"
-                      max="5000"
-                      step="100"
-                      value={languageTool.autoCheckDelay}
-                      onChange={e => setLanguageTool({ autoCheckDelay: parseInt(e.target.value) || 1500 })}
-                      disabled={!languageTool.enabled || !languageTool.autoCheck}
-                      style={{ width: '80px' }}
-                    />
-                    <span>ms</span>
-                  </div>
-                </div>
-
-                <div className="settings-info">
-                  <p>
-                    <strong>LanguageTool</strong> {t('settings.languagetool.description')}
-                  </p>
-                  {(languageTool.mode || 'local') === 'local' ? (
-                    <p>
-                      {t('settings.languagetool.installHint')} <code>docker run -d -p 8010:8010 erikvl87/languagetool</code>
-                    </p>
-                  ) : (
-                    <p>
-                      {t('settings.languagetool.apiHint')}
-                    </p>
+                  {/* ── Agent-Fähigkeiten (nur bei aktivem Modul) ── */}
+                  {(searchWebResearchEnabled || agentShellModuleOn) && <SectionTitle title={t('settings.aiTab.agent')} />}
+                  {searchWebResearchEnabled && (
+                    <Card anchor="ai-webresearch"><div className="sui-embed"><WebResearchSection /></div></Card>
                   )}
-                </div>
+                  {agentShellModuleOn && (
+                    <Card anchor="ai-agentshell"><div className="sui-embed"><AgentShellSection /></div></Card>
+                  )}
 
-                <h3 style={{ marginTop: '32px' }}>{t('settings.readwise.title')}</h3>
-                <ModuleDisabledHint moduleId="readwise" onGoToModules={() => setActiveTab('modules')} t={t} />
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.apiKey')}</label>
-                  <div className="settings-input-group">
-                    <input
-                      type="password"
-                      value={readwise.apiKey}
-                      onChange={e => setReadwise({ apiKey: e.target.value })}
-                      placeholder={t('settings.readwise.apiKeyHint')}
-                      disabled={!readwise.enabled}
-                      style={{ width: '250px' }}
+                  {/* ── Smart Connections ── */}
+                  <SectionTitle title={t('settings.aiTab.smartConnections')} />
+                  {!smartConnectionsEnabled ? (
+                    <ModuleOffCard
+                      icon={<IconTile bg="#7c5cff">{TILE_GLYPH.spark}</IconTile>}
+                      name="Smart Connections"
+                      onEnable={() => { void setModuleEnabled('smart-connections', true).catch(err => console.error('[settings] smart-connections:', err)) }}
+                      anchor="ai-smart-connections"
                     />
-                    <button className="settings-refresh" onClick={checkReadwiseConnection}>
-                      {t('settings.connect')}
-                    </button>
-                  </div>
+                  ) : (
+                    <Card anchor="ai-smart-connections">
+                      <ServiceHead
+                        icon={<IconTile bg="#7c5cff">{TILE_GLYPH.spark}</IconTile>}
+                        name="Smart Connections"
+                        desc={t('settings.integrations.smartConnectionsHint')}
+                      />
+                      <Row label={t('smartConnections.weights.title')} hint={t('smartConnections.weights.hint')} />
+                      {weightRow('embedding')}
+                      {weightRow('keyword')}
+                      {weightRow('wikilink')}
+                      {weightRow('tags')}
+                      {weightRow('folder')}
+                      <Row label={t('smartConnections.weights.total')}>
+                        <span style={{ fontWeight: 600, color: weightTotal === 100 ? 'var(--text-primary)' : 'var(--color-warning)' }}>{weightTotal}%</span>
+                      </Row>
+                      <Row label={t('settings.aiTab.rerankerTitle')} hint={t('settings.aiTab.rerankerHint')} htmlFor="sc-reranker">
+                        <Toggle id="sc-reranker" checked={smartConnectionsRerankerEnabled} onChange={setSmartConnectionsRerankerEnabled} />
+                      </Row>
+                    </Card>
+                  )}
+
+                  {flashcardsEnabled && (!ollama.enabled || !ollama.selectedModel) && (
+                    <Card>
+                      <Note tone="warn">{t('settings.integrations.flashcardsOllamaWarning')}</Note>
+                    </Card>
+                  )}
+
+                  <Details title={t('settings.aiTab.howTo')}>
+                    <p>{t('settings.integrations.usage')}</p>
+                    <p>{t('settings.integrations.transparency')}</p>
+                  </Details>
                 </div>
+              )
+            })()}
 
-                <div className="settings-row">
-                  <label>Status</label>
-                  <div className="settings-status">
-                    {readwiseStatus === 'checking' && (
-                      <span className="status-checking">{t('settings.checkingConnection')}</span>
-                    )}
-                    {readwiseStatus === 'connected' && (
-                      <span className="status-connected">{t('settings.connected')}</span>
-                    )}
-                    {readwiseStatus === 'disconnected' && (
-                      <span className="status-disconnected">{t('settings.notConnected')}</span>
-                    )}
-                    <button className="settings-refresh" onClick={checkReadwiseConnection}>
-                      {t('settings.refresh')}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.syncFolder')}</label>
-                  <input
-                    type="text"
-                    value={readwise.syncFolder}
-                    onChange={e => setReadwise({ syncFolder: e.target.value })}
-                    placeholder="500 - 📚 Readwise"
-                    disabled={!readwise.enabled}
-                    style={{ width: '250px' }}
-                  />
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.categories')}</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {(['books', 'articles', 'tweets', 'podcasts', 'supplementals'] as const).map(cat => (
-                      <label key={cat} style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={readwise.syncCategories?.[cat] !== false}
-                          onChange={e => setReadwise({
-                            syncCategories: { ...readwise.syncCategories, [cat]: e.target.checked }
-                          })}
-                          disabled={!readwise.enabled}
-                        />
-                        {t(`settings.readwise.category.${cat}`)}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.autoSync')}</label>
-                  <input
-                    type="checkbox"
-                    checked={readwise.autoSync}
-                    onChange={e => setReadwise({ autoSync: e.target.checked })}
-                    disabled={!readwise.enabled}
-                  />
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.autoSyncInterval')}</label>
-                  <div className="settings-input-group">
-                    <select
-                      value={readwise.autoSyncInterval}
-                      onChange={e => setReadwise({ autoSyncInterval: parseInt(e.target.value) })}
-                      disabled={!readwise.enabled || !readwise.autoSync}
-                    >
-                      <option value={15}>15 {t('settings.readwise.minutes')}</option>
-                      <option value={30}>30 {t('settings.readwise.minutes')}</option>
-                      <option value={60}>60 {t('settings.readwise.minutes')}</option>
-                      <option value={120}>120 {t('settings.readwise.minutes')}</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.lastSync')}</label>
-                  <div className="settings-input-group">
-                    <span>
-                      {readwise.lastSyncedAt
-                        ? new Date(readwise.lastSyncedAt).toLocaleString()
-                        : t('settings.readwise.never')
-                      }
-                    </span>
-                    {readwise.lastSyncedAt && (
-                      <button
-                        className="settings-refresh"
-                        onClick={() => setReadwise({ lastSyncedAt: '' })}
-                        disabled={readwiseSyncing}
-                        title={t('settings.readwise.resetSync')}
-                        style={{ fontSize: '11px' }}
-                      >
-                        {t('settings.readwise.resetSync')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="settings-row">
-                  <label>{t('settings.readwise.syncNow')}</label>
-                  <div className="settings-input-group">
-                    <button
-                      className="settings-refresh"
-                      onClick={triggerReadwiseSync}
-                      disabled={!readwise.enabled || !readwise.apiKey || readwiseSyncing || readwiseStatus !== 'connected'}
-                    >
-                      {readwiseSyncing ? t('settings.readwise.syncing') : (readwise.lastSyncedAt ? t('settings.readwise.syncNow') : t('settings.readwise.fullSync'))}
-                    </button>
-                  </div>
-                </div>
-
-                {readwiseSyncProgress && readwiseSyncing && (
-                  <div className="settings-row">
-                    <label></label>
-                    <span style={{ fontSize: '12px', opacity: 0.7 }}>
-                      {readwiseSyncProgress.title}
-                      {readwiseSyncProgress.total > 0 && ` (${readwiseSyncProgress.current}/${readwiseSyncProgress.total})`}
-                    </span>
-                  </div>
-                )}
-
-                {readwiseSyncResult && (
-                  <div className="settings-row">
-                    <label></label>
-                    <span style={{ fontSize: '12px', color: readwiseSyncResult.startsWith('Fehler') ? 'var(--color-danger)' : 'var(--color-success)' }}>
-                      {readwiseSyncResult}
-                    </span>
-                  </div>
-                )}
-
-                <div className="settings-info">
-                  <p>
-                    <strong>Readwise</strong> {t('settings.readwise.description')}
-                  </p>
-                </div>
-              </div>
+            {activeTab === 'integrations' && (
+              <IntegrationsTab status={integrationStatus} onGoToModules={() => setActiveTab('modules')} />
             )}
 
             {/* Tastenkürzel Tab */}
@@ -6201,7 +5275,7 @@ LIMIT 10
 
             {/* Modules Tab */}
             {activeTab === 'modules' && (
-              <ModulesTab t={t} onOpenTab={setActiveTab} />
+              <ModulesTab t={t} onOpenTab={navigateToSetting} status={integrationStatus} />
             )}
 
             {/* Speech Tab */}

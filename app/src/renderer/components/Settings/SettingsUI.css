@@ -1,0 +1,613 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   Einstellungen · geteilte Bausteine (Redesign 09/2026, Claude-Design „Einstellungen")
+
+   EIN System für alle Seiten: Seitenkopf, Sektionstitel mit Meta, Karte,
+   Dienst-Kopf (Icon · Name · Status-Chip · Handlung · Schalter), Zeile
+   (Label + Hinweis links, Control rechts), gestylte Controls, Auto-Save mit
+   „Gespeichert", Diagnose-Zeile, Aufklapper.
+
+   Alles über die globalen Tokens aus styles/index.css — kein eigenes Farbschema,
+   damit Dark Mode und Akzentfarbe mitziehen.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Sektionstitel: Versalien + Hairline, rechts gedämpftes Meta („3 von 5 aktiv") */
+.sui-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-primary);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+  margin: 24px 0 10px;
+}
+.sui-section:first-child,
+.settings-tab-header + .sui-section,
+.sui-hero + .sui-section,
+.sui-hero-note + .sui-section {
+  margin-top: 0;
+}
+.sui-hero + .sui-section,
+.sui-hero-note + .sui-section {
+  margin-top: 22px;
+}
+.sui-section-meta {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-muted);
+}
+
+/* Karte: ein Rahmen, ein Radius, Inhalt als Zeilen mit Hairlines dazwischen */
+.sui-card {
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-content);
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+.sui-card.is-dashed {
+  border-style: dashed;
+}
+.sui-card > * + * {
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Dienst-Kopf: Icon-Kachel · Name/Beschreibung · Status-Chip · Handlungen · Schalter */
+.sui-service {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--bg-secondary);
+}
+.sui-card.is-dashed .sui-service,
+.sui-service.is-plain {
+  background: transparent;
+}
+.sui-service-body {
+  flex: 1;
+  min-width: 0;
+}
+.sui-service-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sui-service-desc {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.sui-service.is-dimmed .sui-service-name { color: var(--text-secondary); }
+.sui-service.is-dimmed .sui-service-desc { color: var(--text-muted); }
+.sui-service.is-dimmed .sui-tile { opacity: 0.45; }
+.sui-service-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+/* Icon-Kachel (32 px, weiße Glyphe auf Markenfarbe) */
+.sui-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+}
+.sui-tile.is-serif {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+}
+.sui-tile.is-neutral {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+.sui-tile img { width: 20px; height: 20px; }
+
+/* Status-Chip: Punkt + Wort, immer mit Bedeutung („Verbunden", „Nicht verbunden", „Prüfe …") */
+.sui-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--bg-content);
+  border: 1px solid var(--border-color);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+.sui-chip::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+.sui-chip.is-ok { color: var(--color-success); }
+.sui-chip.is-off { color: var(--text-secondary); }
+.sui-chip.is-off::before { background: var(--color-danger); }
+.sui-chip.is-warn { color: var(--color-warning); }
+.sui-chip.is-checking { color: var(--text-muted); }
+.sui-chip.is-checking::before { background: var(--text-muted); animation: sui-pulse 1.2s ease-in-out infinite; }
+@keyframes sui-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+
+/* Zeile: Label + Hinweis links, Control rechts */
+.sui-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+}
+.sui-row.is-stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.sui-row-text {
+  min-width: 0;
+  flex: 1;
+}
+.sui-row-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.sui-row-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  line-height: 1.45;
+}
+.sui-row-hint a { color: var(--accent-color); text-decoration: none; font-weight: 600; }
+.sui-row-hint a:hover { text-decoration: underline; }
+.sui-row-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  max-width: 100%;
+}
+.sui-row.is-stacked .sui-row-control {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.sui-row.is-disabled .sui-row-label,
+.sui-row.is-disabled .sui-row-hint { color: var(--text-muted); }
+
+/* Hinweis-/Diagnose-Zeile in der Karte */
+.sui-note {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 16px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+.sui-note svg { flex-shrink: 0; margin-top: 2px; }
+.sui-note.is-warn svg { color: var(--color-warning); }
+.sui-note.is-danger svg { color: var(--color-danger); }
+.sui-note.is-ok svg { color: var(--color-success); }
+.sui-note.is-muted { color: var(--text-secondary); font-size: 12.5px; }
+.sui-note-body { flex: 1; min-width: 0; }
+.sui-note-body b { font-weight: 600; }
+.sui-note code,
+.sui-details-body code {
+  display: inline-block;
+  padding: 1px 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+/* Aufklapper: „So funktioniert es" */
+.sui-details-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+}
+.sui-details-toggle:hover { color: var(--text-primary); }
+.sui-details-caret {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+.sui-details.is-open .sui-details-caret { transform: rotate(90deg); }
+.sui-details-body {
+  padding: 0 16px 14px 34px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+.sui-details-body p { margin: 0 0 8px; }
+.sui-details-body p:last-child { margin-bottom: 0; }
+.sui-details-body kbd {
+  display: inline-block;
+  padding: 0 5px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font: 11.5px inherit;
+}
+/* Aufklapper mit eingebettetem Vollinhalt (z.B. Kompatibilitäts-Matrix): kein Einzug */
+.sui-details-body.is-wide { padding: 0 16px 14px; color: var(--text-primary); }
+
+/* Textlink-Handlung („Erneut prüfen", „Einstellungen →") */
+.sui-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--accent-color);
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sui-link:hover { text-decoration: underline; }
+.sui-link:disabled { opacity: 0.5; cursor: default; text-decoration: none; }
+.sui-link.is-muted { color: var(--text-secondary); font-size: 12.5px; }
+.sui-link.is-muted:hover { color: var(--text-primary); }
+
+/* Schalter (38 × 22) — dasselbe Maß wie die Modul-Toggles */
+.sui-toggle {
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  width: 38px;
+  height: 22px;
+}
+.sui-toggle input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.sui-toggle input:disabled { cursor: default; }
+.sui-toggle-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--border-color);
+  transition: background 0.18s ease;
+  pointer-events: none;
+}
+.sui-toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.18s ease;
+}
+.sui-toggle input:checked + .sui-toggle-track { background: var(--accent-color); }
+.sui-toggle input:checked + .sui-toggle-track::after { transform: translateX(16px); }
+.sui-toggle input:disabled + .sui-toggle-track { opacity: 0.5; }
+.sui-toggle input:focus-visible + .sui-toggle-track {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 25%, transparent);
+}
+
+/* Segment-Control */
+.sui-seg {
+  display: inline-flex;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.sui-seg button {
+  padding: 6px 12px;
+  border: none;
+  border-left: 1px solid var(--border-color);
+  background: var(--bg-content);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+.sui-seg button:first-child { border-left: none; }
+.sui-seg button:hover:not(.is-active):not(:disabled) { color: var(--text-primary); background: var(--bg-secondary); }
+.sui-seg button.is-active { background: var(--accent-color); color: var(--accent-on); }
+.sui-seg button:disabled { opacity: 0.5; cursor: default; }
+
+/* Gestylte Felder: Select, Text, Zahl */
+.sui-select,
+.sui-input {
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-content);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 1.3;
+  min-width: 0;
+}
+.sui-select:focus,
+.sui-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-color) 12%, transparent);
+}
+.sui-select:disabled,
+.sui-input:disabled { opacity: 0.55; cursor: default; }
+.sui-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 28px;
+  min-width: 160px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  cursor: pointer;
+}
+.sui-input { width: 240px; }
+.sui-input.is-narrow { width: 120px; }
+.sui-input.is-number { width: 72px; text-align: right; }
+.sui-input::placeholder { color: var(--text-muted); }
+.sui-unit {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  min-width: 28px;
+}
+
+/* Auto-Save-Rückmeldung */
+.sui-saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-success);
+  white-space: nowrap;
+}
+.sui-autosave {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* Secret-Feld im gespeicherten Zustand: Punkte + letzte Zeichen */
+.sui-secret {
+  box-sizing: border-box;
+  width: 240px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-content);
+  font-size: 13px;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.sui-secret-dots { letter-spacing: 2px; }
+.sui-secret-suffix {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* Chip-Auswahl (Kategorien) */
+.sui-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 380px;
+}
+.sui-chips button {
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.sui-chips button.is-active {
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+}
+.sui-chips button:disabled { opacity: 0.5; cursor: default; }
+
+/* Status-Kopf einer Seite (Ollama läuft lokal · Vault · Gehirn) */
+.sui-hero {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-content);
+}
+.sui-hero-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.sui-hero-body { flex: 1; min-width: 0; }
+.sui-hero-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.sui-hero-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--text-muted);
+}
+.sui-hero-dot.is-ok { background: var(--color-success); }
+.sui-hero-dot.is-off { background: var(--color-danger); }
+.sui-hero-meta {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+.sui-hero-meta b { color: var(--text-primary); font-weight: 600; }
+.sui-hero-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.sui-hero-note {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 8px 2px 0;
+  line-height: 1.5;
+}
+
+/* Eingebettete Alt-Sektionen (WebResearch, Agent-Shell) in einer Karte: eigenes Chrome abschalten */
+.sui-embed > .settings-row,
+.sui-embed > .settings-guard-card {
+  border: none;
+  margin: 0;
+  padding: 14px 16px;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* Modul-Zeile (Module-Tab): Status-Zeile unter der Beschreibung, gedämpfte Aus-Zeile */
+.module-row-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  flex-wrap: wrap;
+}
+.module-row-status .sui-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--text-muted);
+  flex-shrink: 0;
+}
+.module-row-status .sui-dot.is-ok { background: var(--color-success); }
+.module-row-status .sui-dot.is-off { background: var(--color-danger); }
+.module-row-status .sui-dot.is-warn { background: var(--color-warning); }
+.module-row-status .is-ok { color: var(--color-success); }
+.module-row-status .is-off { color: var(--text-secondary); }
+.module-row-status .is-warn { color: var(--color-warning); }
+.module-row-status .sui-sep { color: var(--text-muted); font-weight: 400; }
+.module-row.is-off .module-row-label { color: var(--text-secondary); }
+.module-row.is-off .module-row-icon { opacity: 0.55; box-shadow: none; }
+.module-row.is-off .module-row-desc { color: var(--text-muted); }
+
+/* Modul-Filter (Alle · Aktiv · Einrichtung nötig) neben dem Seitenkopf */
+.modules-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.modules-head .settings-tab-header { margin: 0; flex: 1; min-width: 0; }
+.modules-head .sui-seg { margin-top: 2px; }
+
+/* Navigation: eingeklappte Gruppen — Label bleibt, Einträge weichen einem Zähler */
+.settings-nav-section-label.is-collapsible {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.settings-nav-section-label.is-collapsible:hover { opacity: 1; color: var(--text-primary); }
+.settings-nav-section-label.is-collapsible > span:first-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.settings-nav-section-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-weight: 600;
+}
+.settings-nav-section-count svg { transition: transform 0.15s ease; }
+.settings-nav-section-label.is-open .settings-nav-section-count svg { transform: rotate(90deg); }
+
+/* Kleine Tastenkürzel-Kapsel in Beschreibungen, Schieberegler in Zeilen */
+.sui-kbd {
+  display: inline-block;
+  padding: 0 5px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font: 11.5px inherit;
+  color: var(--text-primary);
+}
+.sui-range {
+  width: 140px;
+  accent-color: var(--accent-color);
+}

@@ -156,6 +156,16 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - **Trigger-Provider dürfen werfen** (`collectManual`): fehlende Antares-/edoobox-Zugangsdaten landen als Grund im Lauf statt als falsches „nichts gefunden". Betreff der Hand-off-Mail aus Empfängersicht (`Anmeldebestätigung: …`, `Erinnerung: Rückgabe … fällig`), nicht die interne Ereignisbezeichnung.
 - **Dev-Falle**: Dev-App und installierte App teilen denselben Vault, haben aber **getrennte userData** → jeder Schreibvorgang triggert den Vault-Watcher der anderen App (CPU-Spitze). Beim Entwickeln nur EINE App auf dem Vault offen halten.
 
+### Einstellungen: geteilte Bausteine (Redesign 09/2026)
+- Quelle: Claude-Design-Export „Mindgraph Notes Einstellungsdesign" (Desktop-Ordner) — drei Ziel-Seiten plus Prototyp aller 22 Seiten. Umgesetzt sind Fundament + Integrationen, Module, KI & Modelle; die übrigen Seiten laufen noch im alten `.settings-row`-Muster und sollen etappenweise folgen.
+- **`Settings/SettingsUI.tsx` + `SettingsUI.css` sind die einzige Quelle für Optik und Verhalten** (Klassenpräfix `sui-`): `PageHeader`, `SectionTitle` (mit Meta „3 von 5 aktiv"), `Card`, `ServiceHead` (Icon-Kachel · Name · Status-Chip · Handlung · Schalter), `Row` (Label + Hinweis links, Control rechts), `Note` (Diagnose MIT nächstem Schritt), `Details` (Aufklapper), `Toggle`, `Segmented`, `Select`, `TextInput`/`NumberInput` (Auto-Save bei blur/Enter), `SecretField` („Gespeichert •••• …4f2a Entfernen"), `ChipSelect`, `Hero`, `ModuleOffCard`. Neue Seiten NUR daraus zusammensetzen — keine Inline-Styles, keine „Speichern"-Knöpfe pro Feld.
+- **Auto-Save-Konvention**: Textfelder übernehmen beim Verlassen oder mit Enter, nie pro Tastendruck (sonst prüft eine URL-Zeile nach jedem Zeichen den Server). Schalter/Segmente/Selects sofort. Secret-Felder zeigen den Klartext nie wieder an, nur die letzten vier Zeichen.
+- **`useIntegrationStatus`** hält den Verbindungszustand der externen Dienste (Zotero, OpenAlex, Docling, Vision OCR, LanguageTool, Readwise) für Integrations- UND Modul-Tab. Prüft beim Aktivwerden eines der beiden Tabs einmal alle Dienste, danach nur auf Knopfdruck. Der Modul-Tab zeigt daraus Status-Zeilen („Verbunden · Einstellungen →" / „Nicht verbunden · Einrichten →") und den Filter „Einrichtung nötig".
+- **Modul ↔ Konfiguration beidseitig verlinkt**: `MODULE_CONFIG_TABS` mappt Modul → Tab + `data-settings-anchor` (Dienst-Karte); ausgeschaltete Module zeigen auf der Konfigurationsseite eine gestrichelte `ModuleOffCard` mit „Modul einschalten" (schaltet direkt ein, kein Umweg über den Modul-Tab).
+- **Navigation klappt inaktive Gruppen ein** (Label + Zähler), damit alle Gruppen ohne Scrollen sichtbar sind; ein Seitenwechsel setzt manuelle Aufklappungen zurück und scrollt den Inhalt nach oben. Icons in `NAV_ICONS`, Gruppen datengetrieben in `navGroups`.
+- **Cloud-Anbieter**: `CloudProviderSection` ist EINE Komponente für OpenRouter und LLMBase (vorher zwei zeilengleiche Dateien); `OpenRouterSection`/`LLMBaseSection` sind nur noch Wrapper. Karten kollabieren auf den Kopf, solange der Anbieter aus ist. Bild-Generierung trägt den Modul-Schalter im Kartenkopf.
+- **GUI-Prüfung ohne Computer-Use**: Dev-App gegen geklontes Profil ohne `*.enc` starten (`MINDGRAPH_USER_DATA_DIR`, Vault auf `~/MindGraph-Modelltest-Vault`), Schlüsselbund-Dialog per osascript „Nicht erlauben", dann per CDP (`--remote-debugging-port=9222`, `Page.captureScreenshot` mit `scale: 2`) Tabs anklicken und Screenshots lesen. Das `/json`-Endpoint hängt, wenn ein früherer `curl` die Verbindung offen hält.
+
 ### Notiz-Kategorien (🔴🟢🔵) — zentrales UI-Konzept
 - Alle Kategorien-Logik in `utils/noteKind.ts`. **Niemals duplizieren** — wenn ein neuer UI-Punkt Farbe/Label braucht, `NOTE_KINDS[kind]` nutzen.
 - Drei funktionale Kategorien: 🔴 *Problem* (Aktion), 🟢 *Lösung* (Wissen/Guide), 🔵 *Info* (Reader).
@@ -179,7 +189,7 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - 4 Verdicts: `green` (geeignet), `yellow` (Vorbehalt), `red` (Hard-Lock), `untested` (Default für unbekannte Modelle).
 - **`damageRelevant: true`** für `task-extraction` und `dashboard-snapshot` → bei `red` echter Code-Lock via `isHardLocked()`.
 - **Prio-Reihenfolge im Code**: tab-spezifisches Modell (z.B. `email.analysisModel`) → `ollama.moduleModelOverrides[module]` → globales `selectedModel`.
-- **UI**: `ModelCompatibilitySection` in Settings → Integrationen → Ollama; `ActiveModelStatusBadge` neben Modell-Picker.
+- **UI**: `ModelCompatibilitySection` in Settings → KI & Modelle, Aufklapper in der Modelle-Karte (Anker `ai-matrix`); `ActiveModelStatusBadge` unter dem Modell-Picker.
 - **Empirische Grundlage**: `~/dev/brain-model-benchmark/results/`. Aktuelle Werte aus 160 Läufen vom 14.05.2026 (siehe Analyse-Dokument `~/2026/100 - ✅ Projekte/110 - MindGraph-Notes/Modell-Kompatibilitaets-Analyse.md`).
 - **Bei neuen Benchmarks**: Daten in `modelCompatibility.ts` einpflegen, `version` updaten, Analyse-Dokument updaten.
 
