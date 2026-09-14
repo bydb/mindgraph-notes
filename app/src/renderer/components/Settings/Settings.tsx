@@ -1325,11 +1325,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [isOpen, templateHasChanges])
 
-  // Navigation (Redesign): nur die Gruppe der aktiven Seite ist ausgeklappt, die anderen
-  // zeigen Label + Zähler — so passen alle Gruppen ohne Scrollen ins Fenster. Ein Klick
-  // aufs Label klappt eine Gruppe zum Nachsehen auf; ein Seitenwechsel räumt wieder auf.
+  // Navigation: alle Gruppen sind standardmäßig offen — bei 22 Seiten zählt Überblick mehr
+  // als Kompaktheit, denn wer nicht weiß, in welcher Gruppe „Diktat" oder „Schnellerfassung"
+  // steckt, muss sonst raten und zweimal klicken. Ein Klick aufs Label klappt eine Gruppe
+  // ein; die Wahl bleibt erhalten (Bedienprobe 14.09.2026: das Zurücksetzen beim
+  // Seitenwechsel machte rückgängig, was man gerade selbst getan hatte). Passt die Liste
+  // nicht in den Dialog, scrollt die Navigation, das Suchfeld bleibt oben stehen.
   const [openNavGroups, setOpenNavGroups] = useState<Record<string, boolean>>({})
-  useEffect(() => { setOpenNavGroups({}) }, [activeTab])
   // Seitenwechsel beginnt oben — vorher blieb der Scroll der vorigen Seite stehen. Anker-Sprünge
   // (navigateToSetting) scrollen 90 ms später gezielt nach, das bleibt davon unberührt.
   const contentRef = React.useRef<HTMLDivElement>(null)
@@ -1387,6 +1389,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       ]
     }
   ]
+  // Landet die aktive Seite in einer eingeklappten Gruppe (Suche, Anker-Sprung, Modul-Link),
+  // wird nur DIESE Gruppe aufgedeckt — sonst wäre der markierte Eintrag unsichtbar.
+  const activeGroupId = navGroups.find(g => g.items.some(i => i.id === activeTab))?.id
+  useEffect(() => {
+    if (!activeGroupId) return
+    setOpenNavGroups(prev => (prev[activeGroupId] === false ? { ...prev, [activeGroupId]: true } : prev))
+  }, [activeTab, activeGroupId])
   const renderNavItem = (item: NavItem) => (
     <button
       key={item.id}
@@ -1419,10 +1428,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
             {/* Vault (immer ganz oben, wenn geladen) */}
             {vaultPath && renderNavItem({ id: 'vault', label: t('settings.tab.vault'), icon: NAV_ICONS.vault })}
             {navGroups.map(group => {
-              // Gruppe der aktiven Seite ist standardmäßig offen, lässt sich aber per Klick einklappen
-              // (undefined = Standard, true/false = ausdrückliche Wahl; Seitenwechsel setzt zurück).
-              const hasActive = group.items.some(i => i.id === activeTab)
-              const open = openNavGroups[group.id] ?? hasActive
+              // undefined = Standard (offen), false = vom Nutzer eingeklappt.
+              const open = openNavGroups[group.id] ?? true
               return (
                 <React.Fragment key={group.id}>
                   <button
