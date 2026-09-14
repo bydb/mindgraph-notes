@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.8-beta",
+    "softwareVersion": "0.11.9-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Einstellungen neu gebaut: ein System, Auto-Save, Status mit n&auml;chstem Schritt &middot; v0.11.8</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Mails finden ihr Projekt: &bdquo;UNO-Q&ldquo; trifft &bdquo;UnoQ&ldquo;, Allerweltsw&ouml;rter z&auml;hlen nicht mehr &middot; v0.11.9</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.8 &middot; Einstellungen aus einem Guss</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Alle 22 Einstellungsseiten folgen einem System: Karten mit Status und n&auml;chstem Schritt, Auto-Save statt Speichern-Kn&ouml;pfen, Erkl&auml;rungen zum Aufklappen.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Die Einstellungen waren &uuml;ber Jahre gewachsen: drei Zeilenformen, nackte Browser-Felder, ein &bdquo;Speichern&ldquo;-Knopf pro Feld und Status ohne Weg zur L&ouml;sung. Jetzt sitzt jeder Dienst in einer Karte mit Statuschip und Handlung, Schl&uuml;ssel speichern sich beim Verlassen des Felds, ausgeschaltete Module lassen sich direkt dort einschalten, und die Navigation klappt inaktive Gruppen ein. Dazu ein Hilfe-Guide auf aktuellem Stand und ein experimenteller Shell-Zugriff f&uuml;r den Notiz-Agenten, vom Betriebssystem eingez&auml;unt.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.9 &middot; Projekt-Zuordnung von Mails</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Posteingang ordnet Mails wieder dem richtigen Projekt zu: Schreibweisen mit Bindestrich oder Leerzeichen treffen, und Allerweltsw&ouml;rter wie &bdquo;Zusammenfassung&ldquo; entscheiden nicht mehr.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Ein kleines Release mit einem echten Fall dahinter: Eine Mail von Arduino zum Projekt &bdquo;UNO Q&ldquo; bekam kein Projekt, weil im Betreff &bdquo;UNO-Q&ldquo; stand und das Schl&uuml;sselwort &bdquo;UnoQ&ldquo; hie&szlig;. Gleichzeitig landete eine Wochenmail der eigenen Website beim selben Projekt, nur weil &bdquo;Zusammenfassung&ldquo; im Betreff stand. Beides ist behoben, ohne dass Schl&uuml;sselwortlisten angefasst werden m&uuml;ssen.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Ein Baukasten f&uuml;r alle Seiten</b><p data-i18n="release.c1">Seitenkopf, Sektionen mit &bdquo;3 von 5 aktiv&ldquo;, Zeilen mit Hinweis links und Control rechts, Segment-Schalter, Chips. Textfelder &uuml;bernehmen beim Verlassen oder mit Enter; Geheimnisse zeigen nur die letzten vier Zeichen. Der Modul-Tab kennt den Verbindungszustand und filtert nach &bdquo;Einrichtung n&ouml;tig&ldquo;.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Hilfe und Agent</b><p data-i18n="release.c2">Der Hilfe-Guide erkl&auml;rt jetzt Gehirn, Notiz-Agent und Skills, Macher-Leiste, Sprachbefehle, Zeitbilanz und die Cloud-Anbieter, mit Spr&uuml;ngen in die passende Einstellung. Ein Notizwechsel bricht einen laufenden Agentenlauf nicht mehr ab; die Volltextsuche findet auch Notizen, die seit dem Start nicht ge&ouml;ffnet waren.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Shell-Zugriff, experimentell</b><p data-i18n="release.c3">Der Notiz-Agent darf nach Freigabe pro Lauf Befehle ausf&uuml;hren, in einer Sandbox des Betriebssystems: nur Anh&auml;nge lesen, nur im Arbeitsordner schreiben, kein Netz. Standardm&auml;&szlig;ig aus, derzeit nur macOS; ohne Sandbox startet die Shell nicht.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Schreibweisen mit Trennzeichen treffen</b><p data-i18n="release.c1">Begriff und Mailtext werden in Wortbausteine zerlegt und nur ganze Bausteine verglichen. &bdquo;UNO-Q&ldquo; und &bdquo;UNO Q&ldquo; treffen jetzt &bdquo;UnoQ&ldquo;, &bdquo;UNO Qualit&auml;t&ldquo; dagegen nicht. Umlaute sind keine Wortgrenzen-Falle mehr.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Allerweltsw&ouml;rter z&auml;hlen nicht</b><p data-i18n="release.c2">Zusammenfassung, Transkript, Protokoll, Call, Meeting, Bericht und &auml;hnliche Gattungsw&ouml;rter benennen die Art einer Datei, nie ein Projekt. Sie werden beim Zuordnen ignoriert und nicht mehr als Schl&uuml;sselwort vorgeschlagen.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.8: Einstellungen aus einem Guss</b><p data-i18n="release.c3">Alle 22 Einstellungsseiten folgen einem System mit Karten, Statuschips und Auto-Save, dazu der aktualisierte Hilfe-Guide und der experimentelle Shell-Zugriff des Notiz-Agenten in einer Sandbox des Betriebssystems.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Einstellungen neu gebaut: ein System, Auto-Save, Status mit n&auml;chstem Schritt &middot; v{vs}",
+        "hero.release": "Mails finden ihr Projekt: „UNO-Q“ trifft „UnoQ“, Allerweltswörter zählen nicht mehr &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Einstellungen aus einem Guss",
-        "release.heading": "Was ist neu — <em>Alle 22 Einstellungsseiten folgen einem System: Karten mit Status und nächstem Schritt, Auto-Save statt Speichern-Knöpfen, Erklärungen zum Aufklappen.</em>",
-        "release.lead": "Die Einstellungen waren über Jahre gewachsen: drei Zeilenformen, nackte Browser-Felder, ein „Speichern“-Knopf pro Feld und Status ohne Weg zur Lösung. Jetzt sitzt jeder Dienst in einer Karte mit Statuschip und Handlung, Schlüssel speichern sich beim Verlassen des Felds, ausgeschaltete Module lassen sich direkt dort einschalten, und die Navigation klappt inaktive Gruppen ein. Dazu ein Hilfe-Guide auf aktuellem Stand und ein experimenteller Shell-Zugriff für den Notiz-Agenten, vom Betriebssystem eingezäunt.",
-        "release.c1h": "Ein Baukasten für alle Seiten",
-        "release.c1": "Seitenkopf, Sektionen mit „3 von 5 aktiv“, Zeilen mit Hinweis links und Control rechts, Segment-Schalter, Chips. Textfelder übernehmen beim Verlassen oder mit Enter; Geheimnisse zeigen nur die letzten vier Zeichen. Der Modul-Tab kennt den Verbindungszustand jedes Dienstes und filtert nach „Einrichtung nötig“; ausgeschaltete Module lassen sich auf ihrer Konfigurationsseite direkt einschalten.",
-        "release.c2h": "Hilfe und Agent",
-        "release.c2": "Der Hilfe-Guide (⌘/) erklärt jetzt Gehirn, Notiz-Agent und Skills, Macher-Leiste, Sprachbefehle, Zeitbilanz, Kategorien und die Cloud-Anbieter, mit Sprüngen in die passende Einstellung; 405 tote Texte der alten Hilfe sind entfernt. Ein Notizwechsel bricht einen laufenden Agentenlauf nicht mehr ab, das Panel zeigt Laufzeit und Schrittzahl. Die Volltextsuche lädt fehlende Inhalte nach, Wikilinks mit Ordnerpfad öffnen in allen Modi.",
-        "release.c3h": "Shell-Zugriff, experimentell",
-        "release.c3": "Der Notiz-Agent darf nach zweistufiger Freigabe (Modul plus Schalter pro Lauf) Befehle und Skripte ausführen, in einer Sandbox des Betriebssystems: nur Anhänge lesen, nur im Arbeitsordner schreiben, kein Netz. Vor jeder Freigabe läuft ein Selbsttest; ohne Sandbox startet die Shell nicht. Standardmäßig aus, derzeit nur macOS. Modelle mit bekannter Anfälligkeit für eingeschleuste Anweisungen bleiben gesperrt.",
+        "release.label": "Release {vs} · Projekt-Zuordnung von Mails",
+        "release.heading": "Was ist neu — <em>Der Posteingang ordnet Mails wieder dem richtigen Projekt zu: Schreibweisen mit Bindestrich oder Leerzeichen treffen, und Allerweltswörter wie „Zusammenfassung“ entscheiden nicht mehr.</em>",
+        "release.lead": "Ein kleines Release mit einem echten Fall dahinter: Eine Mail von Arduino zum Projekt „UNO Q“ bekam kein Projekt, weil im Betreff „UNO-Q“ stand und das Schlüsselwort „UnoQ“ hieß. Gleichzeitig landete eine Wochenmail der eigenen Website beim selben Projekt, nur weil „Zusammenfassung“ im Betreff stand. Beides ist behoben, ohne dass Schlüsselwortlisten angefasst werden müssen.",
+        "release.c1h": "Schreibweisen mit Trennzeichen treffen",
+        "release.c1": "Begriff und Mailtext werden in Wortbausteine zerlegt und nur ganze Bausteine verglichen. „UNO-Q“ und „UNO Q“ treffen jetzt „UnoQ“, „UNO Qualität“ dagegen nicht. Umlaute sind keine Wortgrenzen-Falle mehr, und mehrteilige Schlüsselwörter treffen auch mit Bindestrich oder als Kompositum.",
+        "release.c2h": "Allerweltswörter zählen nicht",
+        "release.c2": "Zusammenfassung, Transkript, Protokoll, Call, Meeting, Bericht und ähnliche Gattungswörter benennen die Art einer Datei, nie ein Projekt. Sie werden beim Zuordnen ignoriert und nicht mehr als Schlüsselwort vorgeschlagen. Bestehende Listen in den Projekt-Statusdateien müssen nicht bereinigt werden.",
+        "release.c3h": "Aus 0.11.8: Einstellungen aus einem Guss",
+        "release.c3": "Alle 22 Einstellungsseiten folgen einem System mit Karten, Statuschips und Auto-Save, dazu der aktualisierte Hilfe-Guide und der experimentelle Shell-Zugriff des Notiz-Agenten in einer Sandbox des Betriebssystems.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Settings rebuilt: one system, auto-save, status with a next step &middot; v{vs}",
+        "hero.release": "Mails find their project: “UNO-Q” matches “UnoQ”, filler words no longer count &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Settings from a single mould",
-        "release.heading": "What’s new — <em>All 22 settings pages follow one system: cards with status and a next step, auto-save instead of save buttons, explanations that fold open.</em>",
-        "release.lead": "The settings had grown over years: three row styles, bare browser inputs, a “Save” button per field and status without a path to a fix. Now every service sits in a card with a status chip and an action, keys save when you leave the field, disabled modules can be switched on right where they are configured, and the navigation folds inactive groups away. Plus an up-to-date help guide and an experimental shell access for the note agent, fenced in by the operating system.",
-        "release.c1h": "One kit for every page",
-        "release.c1": "Page header, sections with “3 of 5 active”, rows with the hint on the left and the control on the right, segmented switches, chips. Text fields commit on blur or Enter; secrets show only their last four characters. The modules tab knows the connection state of every service and filters by “needs setup”; disabled modules can be enabled right on their configuration page.",
-        "release.c2h": "Help and agent",
-        "release.c2": "The help guide (⌘/) now explains Brain, note agent and skills, maker bar, voice commands, time balance, categories and the cloud providers, with jumps to the matching setting; 405 dead strings of the old help are gone. Switching notes no longer aborts a running agent run, and the panel shows elapsed time and step count. Full-text search loads missing content on demand, wikilinks with folder paths open in every mode.",
-        "release.c3h": "Shell access, experimental",
-        "release.c3": "After a two-step approval (module plus a switch per run) the note agent may execute commands and scripts inside an operating-system sandbox: read attachments only, write only in the run’s work folder, no network. A self-test runs before every approval; without a sandbox the shell does not start. Off by default, macOS only for now. Models with known susceptibility to injected instructions stay locked out.",
+        "release.label": "Release {vs} · Matching mails to projects",
+        "release.heading": "What’s new — <em>The inbox assigns mails to the right project again: spellings with hyphens or spaces match, and filler words like “summary” no longer decide.</em>",
+        "release.lead": "A small release with a real case behind it: a mail from Arduino about the “UNO Q” project got no project, because the subject said “UNO-Q” and the keyword was “UnoQ”. At the same time a weekly mail from our own website landed in that very project, only because “summary” appeared in the subject. Both are fixed without touching any keyword list.",
+        "release.c1h": "Spellings with separators match",
+        "release.c1": "Keyword and mail text are split into word pieces and only whole pieces are compared. “UNO-Q” and “UNO Q” now match “UnoQ”, while “UNO Quality” does not. Umlauts no longer trip the word boundary, and multi-word keywords match with hyphens or as a compound.",
+        "release.c2h": "Filler words do not count",
+        "release.c2": "Summary, transcript, minutes, call, meeting, report and similar genre words name the kind of a file, never a project. They are ignored when matching and no longer suggested as keywords. Existing lists in the project status files need no cleanup.",
+        "release.c3h": "From 0.11.8: settings from a single mould",
+        "release.c3": "All 22 settings pages follow one system with cards, status chips and auto-save, plus the updated help guide and the note agent’s experimental shell access inside an operating-system sandbox.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

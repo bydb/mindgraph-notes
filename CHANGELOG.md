@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.9-beta] - 2026-09-14
+
+Ein kleines Release mit einem echten Fall dahinter: Eine Mail von Arduino zum Projekt „UNO Q" bekam im Posteingang kein Projekt, weil im Betreff „UNO-Q" stand und das Schlüsselwort „UnoQ" hieß. Gleichzeitig landete die WPForms-Wochenmail der eigenen Website beim selben Projekt, nur weil „Zusammenfassung" im Betreff stand.
+
+### Behoben
+
+- **Projekt-Zuordnung trifft Schreibweisen mit Trennzeichen.** Begriff und Mailtext werden in Buchstaben-/Ziffernläufe zerlegt und nur ganze Token-Folgen verglichen. „UNO-Q" und „UNO Q" treffen jetzt „UnoQ", „UNO Qualität" dagegen nicht. Mehrteilige Schlüsselwörter treffen auch mit Bindestrich oder als Kompositum. Nebenbei sind Umlaute keine Wortgrenzen-Falle mehr, denn die alte Regex-Wortgrenze kannte nur ASCII.
+- **Dokument-Gattungswörter zählen nicht mehr.** Zusammenfassung, Transkript, Protokoll, Call, Meeting, Besprechung, Bericht, Notizen und Varianten stehen in der geteilten Stoppliste. Sie werden beim Zuordnen ignoriert und vom Keyword-Vorschlag aus Dateinamen nicht mehr angeboten. Bestehende `_STATUS.md`-Listen müssen nicht bereinigt werden.
+- Gilt für den Posteingang und den Workflow-Baustein „Projekt zuordnen" gleichermaßen (eine geteilte Funktion). Neue Tests in `shared/projectMatch.test.ts`, darunter beide Realfälle.
+
 ## [0.11.8-beta] - 2026-09-13
 
 Drei Stränge. Erstens die Einstellungen: alle 22 Seiten folgen jetzt einem System, nach einem Design-Prototyp gebaut. Zweitens der Hilfe-Guide, der seit Mai nicht mehr zur App passte. Drittens der Notiz-Agent: neun Bedienfehler behoben und, als Experiment, ein Shell-Zugriff mit Schutzgrenzen des Betriebssystems.
