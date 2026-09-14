@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.9-beta",
+    "softwareVersion": "0.11.10-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Mails finden ihr Projekt: &bdquo;UNO-Q&ldquo; trifft &bdquo;UnoQ&ldquo;, Allerweltsw&ouml;rter z&auml;hlen nicht mehr &middot; v0.11.9</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Einstellungen mit &Uuml;berblick: alle Gruppen offen, Suchfeld bleibt stehen &middot; v0.11.10</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.9 &middot; Projekt-Zuordnung von Mails</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Der Posteingang ordnet Mails wieder dem richtigen Projekt zu: Schreibweisen mit Bindestrich oder Leerzeichen treffen, und Allerweltsw&ouml;rter wie &bdquo;Zusammenfassung&ldquo; entscheiden nicht mehr.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Ein kleines Release mit einem echten Fall dahinter: Eine Mail von Arduino zum Projekt &bdquo;UNO Q&ldquo; bekam kein Projekt, weil im Betreff &bdquo;UNO-Q&ldquo; stand und das Schl&uuml;sselwort &bdquo;UnoQ&ldquo; hie&szlig;. Gleichzeitig landete eine Wochenmail der eigenen Website beim selben Projekt, nur weil &bdquo;Zusammenfassung&ldquo; im Betreff stand. Beides ist behoben, ohne dass Schl&uuml;sselwortlisten angefasst werden m&uuml;ssen.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.10 &middot; Einstellungen mit &Uuml;berblick</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Die Einstellungs-Navigation zeigt alle 22 Seiten auf einmal, merkt sich, was du einklappst, und der Dialog nutzt die Fensterh&ouml;he.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Eine Bedienprobe der neuen Einstellungen zeigte: Eingeklappte Gruppen kosten bei 22 Seiten Raten und einen zweiten Klick, und ein Seitenwechsel machte r&uuml;ckg&auml;ngig, was man gerade selbst aufgeklappt hatte. Jetzt sind alle Gruppen offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog wird so hoch wie das Fenster erlaubt. Dazu die Korrektur aus 0.11.9: Mails finden ihr Projekt auch bei Schreibweisen mit Bindestrich.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Schreibweisen mit Trennzeichen treffen</b><p data-i18n="release.c1">Begriff und Mailtext werden in Wortbausteine zerlegt und nur ganze Bausteine verglichen. &bdquo;UNO-Q&ldquo; und &bdquo;UNO Q&ldquo; treffen jetzt &bdquo;UnoQ&ldquo;, &bdquo;UNO Qualit&auml;t&ldquo; dagegen nicht. Umlaute sind keine Wortgrenzen-Falle mehr.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Allerweltsw&ouml;rter z&auml;hlen nicht</b><p data-i18n="release.c2">Zusammenfassung, Transkript, Protokoll, Call, Meeting, Bericht und &auml;hnliche Gattungsw&ouml;rter benennen die Art einer Datei, nie ein Projekt. Sie werden beim Zuordnen ignoriert und nicht mehr als Schl&uuml;sselwort vorgeschlagen.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.8: Einstellungen aus einem Guss</b><p data-i18n="release.c3">Alle 22 Einstellungsseiten folgen einem System mit Karten, Statuschips und Auto-Save, dazu der aktualisierte Hilfe-Guide und der experimentelle Shell-Zugriff des Notiz-Agenten in einer Sandbox des Betriebssystems.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Alle Gruppen offen</b><p data-i18n="release.c1">Wer nicht wei&szlig;, ob &bdquo;Diktat&ldquo; unter KI oder &bdquo;Schnellerfassung&ldquo; unter Workflow steckt, kann jetzt &uuml;berfliegen statt raten. Ein Klick auf den Gruppenkopf klappt ein, und das bleibt so, bis du es wieder &auml;nderst. Eine eingeklappte Gruppe &ouml;ffnet sich nur, wenn eine Suche oder ein Link direkt hineinf&uuml;hrt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Dialog nutzt die Fensterh&ouml;he</b><p data-i18n="release.c2">Der Einstellungsdialog wird bis zu 1000 Punkte hoch statt 760 und die Navigation breiter, damit &bdquo;Wissen &amp; Workflow&ldquo; ausgeschrieben ist. Muss die Liste doch scrollen, bleibt das Suchfeld oben stehen, und die Trefferliste passt in die Navigation.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.9: Mails finden ihr Projekt</b><p data-i18n="release.c3">&bdquo;UNO-Q&ldquo; im Betreff trifft das Schl&uuml;sselwort &bdquo;UnoQ&ldquo;, und Gattungsw&ouml;rter wie &bdquo;Zusammenfassung&ldquo; entscheiden nicht mehr &uuml;ber die Projekt-Zuordnung.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Mails finden ihr Projekt: „UNO-Q“ trifft „UnoQ“, Allerweltswörter zählen nicht mehr &middot; v{vs}",
+        "hero.release": "Einstellungen mit Überblick: alle Gruppen offen, Suchfeld bleibt stehen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Projekt-Zuordnung von Mails",
-        "release.heading": "Was ist neu — <em>Der Posteingang ordnet Mails wieder dem richtigen Projekt zu: Schreibweisen mit Bindestrich oder Leerzeichen treffen, und Allerweltswörter wie „Zusammenfassung“ entscheiden nicht mehr.</em>",
-        "release.lead": "Ein kleines Release mit einem echten Fall dahinter: Eine Mail von Arduino zum Projekt „UNO Q“ bekam kein Projekt, weil im Betreff „UNO-Q“ stand und das Schlüsselwort „UnoQ“ hieß. Gleichzeitig landete eine Wochenmail der eigenen Website beim selben Projekt, nur weil „Zusammenfassung“ im Betreff stand. Beides ist behoben, ohne dass Schlüsselwortlisten angefasst werden müssen.",
-        "release.c1h": "Schreibweisen mit Trennzeichen treffen",
-        "release.c1": "Begriff und Mailtext werden in Wortbausteine zerlegt und nur ganze Bausteine verglichen. „UNO-Q“ und „UNO Q“ treffen jetzt „UnoQ“, „UNO Qualität“ dagegen nicht. Umlaute sind keine Wortgrenzen-Falle mehr, und mehrteilige Schlüsselwörter treffen auch mit Bindestrich oder als Kompositum.",
-        "release.c2h": "Allerweltswörter zählen nicht",
-        "release.c2": "Zusammenfassung, Transkript, Protokoll, Call, Meeting, Bericht und ähnliche Gattungswörter benennen die Art einer Datei, nie ein Projekt. Sie werden beim Zuordnen ignoriert und nicht mehr als Schlüsselwort vorgeschlagen. Bestehende Listen in den Projekt-Statusdateien müssen nicht bereinigt werden.",
-        "release.c3h": "Aus 0.11.8: Einstellungen aus einem Guss",
-        "release.c3": "Alle 22 Einstellungsseiten folgen einem System mit Karten, Statuschips und Auto-Save, dazu der aktualisierte Hilfe-Guide und der experimentelle Shell-Zugriff des Notiz-Agenten in einer Sandbox des Betriebssystems.",
+        "release.label": "Release {vs} · Einstellungen mit Überblick",
+        "release.heading": "Was ist neu — <em>Die Einstellungs-Navigation zeigt alle 22 Seiten auf einmal, merkt sich, was du einklappst, und der Dialog nutzt die Fensterhöhe.</em>",
+        "release.lead": "Eine Bedienprobe der neuen Einstellungen zeigte: Eingeklappte Gruppen kosten bei 22 Seiten Raten und einen zweiten Klick, und ein Seitenwechsel machte rückgängig, was man gerade selbst aufgeklappt hatte. Jetzt sind alle Gruppen offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog wird so hoch wie das Fenster erlaubt. Dazu die Korrektur aus 0.11.9: Mails finden ihr Projekt auch bei Schreibweisen mit Bindestrich.",
+        "release.c1h": "Alle Gruppen offen",
+        "release.c1": "Wer nicht weiß, ob „Diktat“ unter KI oder „Schnellerfassung“ unter Workflow steckt, kann jetzt überfliegen statt raten. Ein Klick auf den Gruppenkopf klappt ein, und das bleibt so, bis du es wieder änderst. Eine eingeklappte Gruppe öffnet sich nur, wenn eine Suche oder ein Link direkt hineinführt.",
+        "release.c2h": "Dialog nutzt die Fensterhöhe",
+        "release.c2": "Der Einstellungsdialog wird bis zu 1000 Punkte hoch statt 760 und die Navigation breiter, damit „Wissen & Workflow“ ausgeschrieben ist. Muss die Liste doch scrollen, bleibt das Suchfeld oben stehen, und die Trefferliste passt in die Navigation.",
+        "release.c3h": "Aus 0.11.9: Mails finden ihr Projekt",
+        "release.c3": "„UNO-Q“ im Betreff trifft das Schlüsselwort „UnoQ“, und Gattungswörter wie „Zusammenfassung“ entscheiden nicht mehr über die Projekt-Zuordnung. Bestehende Schlüsselwortlisten müssen nicht angefasst werden.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Mails find their project: “UNO-Q” matches “UnoQ”, filler words no longer count &middot; v{vs}",
+        "hero.release": "Settings at a glance: all groups open, search stays put &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Matching mails to projects",
-        "release.heading": "What’s new — <em>The inbox assigns mails to the right project again: spellings with hyphens or spaces match, and filler words like “summary” no longer decide.</em>",
-        "release.lead": "A small release with a real case behind it: a mail from Arduino about the “UNO Q” project got no project, because the subject said “UNO-Q” and the keyword was “UnoQ”. At the same time a weekly mail from our own website landed in that very project, only because “summary” appeared in the subject. Both are fixed without touching any keyword list.",
-        "release.c1h": "Spellings with separators match",
-        "release.c1": "Keyword and mail text are split into word pieces and only whole pieces are compared. “UNO-Q” and “UNO Q” now match “UnoQ”, while “UNO Quality” does not. Umlauts no longer trip the word boundary, and multi-word keywords match with hyphens or as a compound.",
-        "release.c2h": "Filler words do not count",
-        "release.c2": "Summary, transcript, minutes, call, meeting, report and similar genre words name the kind of a file, never a project. They are ignored when matching and no longer suggested as keywords. Existing lists in the project status files need no cleanup.",
-        "release.c3h": "From 0.11.8: settings from a single mould",
-        "release.c3": "All 22 settings pages follow one system with cards, status chips and auto-save, plus the updated help guide and the note agent’s experimental shell access inside an operating-system sandbox.",
+        "release.label": "Release {vs} · Settings at a glance",
+        "release.heading": "What’s new — <em>The settings navigation shows all 22 pages at once, remembers what you collapse, and the dialog uses the window height.</em>",
+        "release.lead": "A usability pass over the new settings showed: with 22 pages, collapsed groups mean guessing plus a second click, and switching pages undid what you had just expanded yourself. Now all groups are open, collapsing sticks, the search field stays put while scrolling, and the dialog grows as tall as the window allows. Plus the fix from 0.11.9: mails find their project even with hyphenated spellings.",
+        "release.c1h": "All groups open",
+        "release.c1": "If you don’t know whether “Dictation” lives under AI or “Quick capture” under Workflow, you can now skim instead of guess. A click on a group header collapses it, and that stays until you change it again. A collapsed group only opens when a search or a link leads straight into it.",
+        "release.c2h": "The dialog uses the window height",
+        "release.c2": "The settings dialog grows up to 1000 points tall instead of 760 and the navigation is wider, so “Knowledge & Workflow” is spelled out. If the list still has to scroll, the search field stays at the top and the result list fits inside the navigation.",
+        "release.c3h": "From 0.11.9: mails find their project",
+        "release.c3": "“UNO-Q” in a subject matches the keyword “UnoQ”, and genre words like “summary” no longer decide the project assignment. Existing keyword lists need no cleanup.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

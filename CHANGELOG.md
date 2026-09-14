@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.10-beta] - 2026-09-14
+
+Eine Bedienprobe der neuen Einstellungen: Eingeklappte Gruppen kosten bei 22 Seiten Raten und einen zweiten Klick, und ein Seitenwechsel machte rückgängig, was man gerade selbst aufgeklappt hatte.
+
+### Einstellungen
+
+- **Alle Gruppen standardmäßig offen.** Der Gruppenkopf klappt weiterhin ein, und die Wahl bleibt erhalten. Kein Zurücksetzen beim Seitenwechsel mehr. Landet die aktive Seite über Suche, Anker-Sprung oder Modul-Link in einer eingeklappten Gruppe, wird nur diese Gruppe aufgedeckt.
+- **Dialog nutzt die Fensterhöhe**: 90 Prozent statt 82, Deckel 1000 statt 760 Punkte, Breite 1000 statt 960. Navigation 236 statt 212 Punkte breit, „Wissen & Workflow" ist ausgeschrieben; Zeilen etwas dichter.
+- **Suchfeld bleibt beim Scrollen der Navigation oben stehen.** Die Trefferliste passt in die Navigationsbreite statt rechts abgeschnitten zu werden; der Hinweistext darunter heißt „↑↓ wählen · ↵ öffnen".
+
 ## [0.11.9-beta] - 2026-09-14
 
 Ein kleines Release mit einem echten Fall dahinter: Eine Mail von Arduino zum Projekt „UNO Q" bekam im Posteingang kein Projekt, weil im Betreff „UNO-Q" stand und das Schlüsselwort „UnoQ" hieß. Gleichzeitig landete die WPForms-Wochenmail der eigenen Website beim selben Projekt, nur weil „Zusammenfassung" im Betreff stand.
