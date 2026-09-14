@@ -148,7 +148,7 @@
     "@vitejs/plugin-react": "^5.1.2",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "ajv": "^6.14.0",
     "chokidar": "^5.0.0",
     "defuddle": "^0.19.1",
@@ -162,7 +162,7 @@
     "jszip": "^3.10.1",
     "katex": "^0.16.27",
     "linkedom": "^0.18.13",
-    "mailparser": "^3.9.3",
+    "mailparser": "^3.9.26",
     "mammoth": "^1.11.0",
     "markdown-it": "^14.1.0",
     "markdown-it-footnote": "^4.0.0",
@@ -170,7 +170,7 @@
     "markdown-it-texmath": "^1.0.0",
     "mermaid": "^11.12.2",
     "node-pty": "^1.1.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^9.1.1",
     "pdfjs-dist": "5.4.296",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
@@ -186,7 +186,7 @@
   },
   "overrides": {
     "brace-expansion": "^5.0.8",
-    "adm-zip": "^0.6.0",
+    "adm-zip": "^0.6.1",
     "sharp": "^0.35.3"
   }
 }
