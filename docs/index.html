@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.10-beta",
+    "softwareVersion": "0.11.11-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Einstellungen mit &Uuml;berblick: alle Gruppen offen, Suchfeld bleibt stehen &middot; v0.11.10</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sicherheits-Update: Mail-Bibliotheken und Archiv-Leser aktualisiert &middot; v0.11.11</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.10 &middot; Einstellungen mit &Uuml;berblick</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Die Einstellungs-Navigation zeigt alle 22 Seiten auf einmal, merkt sich, was du einklappst, und der Dialog nutzt die Fensterh&ouml;he.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Eine Bedienprobe der neuen Einstellungen zeigte: Eingeklappte Gruppen kosten bei 22 Seiten Raten und einen zweiten Klick, und ein Seitenwechsel machte r&uuml;ckg&auml;ngig, was man gerade selbst aufgeklappt hatte. Jetzt sind alle Gruppen offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog wird so hoch wie das Fenster erlaubt. Dazu die Korrektur aus 0.11.9: Mails finden ihr Projekt auch bei Schreibweisen mit Bindestrich.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.11 &middot; Sicherheits-Update</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>F&uuml;nf gemeldete L&uuml;cken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon &uuml;ber eingehende Mails erreichbar.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">GitHub meldete f&uuml;nf L&uuml;cken in Bibliotheken, die die App mitbringt. Vier davon betreffen den Mail-Versender nodemailer; eine ist real erreichbar, weil der Mail-Parser denselben Adress-Parser f&uuml;r eingehende Kopfzeilen nutzt und eine pr&auml;parierte Mail die App h&auml;tte aufh&auml;ngen k&ouml;nnen. Die f&uuml;nfte betrifft den Archiv-Leser, den die App nur zum Lesen von Anki- und Office-Dateien nutzt, nie zum Entpacken. Alle f&uuml;nf sind mit den aktuellen Versionen geschlossen.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Alle Gruppen offen</b><p data-i18n="release.c1">Wer nicht wei&szlig;, ob &bdquo;Diktat&ldquo; unter KI oder &bdquo;Schnellerfassung&ldquo; unter Workflow steckt, kann jetzt &uuml;berfliegen statt raten. Ein Klick auf den Gruppenkopf klappt ein, und das bleibt so, bis du es wieder &auml;nderst. Eine eingeklappte Gruppe &ouml;ffnet sich nur, wenn eine Suche oder ein Link direkt hineinf&uuml;hrt.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Dialog nutzt die Fensterh&ouml;he</b><p data-i18n="release.c2">Der Einstellungsdialog wird bis zu 1000 Punkte hoch statt 760 und die Navigation breiter, damit &bdquo;Wissen &amp; Workflow&ldquo; ausgeschrieben ist. Muss die Liste doch scrollen, bleibt das Suchfeld oben stehen, und die Trefferliste passt in die Navigation.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.9: Mails finden ihr Projekt</b><p data-i18n="release.c3">&bdquo;UNO-Q&ldquo; im Betreff trifft das Schl&uuml;sselwort &bdquo;UnoQ&ldquo;, und Gattungsw&ouml;rter wie &bdquo;Zusammenfassung&ldquo; entscheiden nicht mehr &uuml;ber die Projekt-Zuordnung.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Mail-Bibliotheken aktualisiert</b><p data-i18n="release.c1">nodemailer 9.1.1 und mailparser 3.9.26. Der Adress-Parser brauchte bei langen Empf&auml;ngerlisten quadratisch viel Zeit; eine Kopfzeile mit 20&nbsp;000 Adressen wird jetzt in 55 Millisekunden gelesen. Versand mit eingebettetem Signaturbild und Ablage im Gesendet-Ordner wurden mit den neuen Versionen gepr&uuml;ft.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Archiv-Leser aktualisiert</b><p data-i18n="release.c2">adm-zip 0.6.1 schlie&szlig;t das Schreiben durch Symlinks beim Entpacken. Die App war nicht betroffen, weil Anki-Import und Office-Parser Eintr&auml;ge nur lesen und selbst schreiben; das Update nimmt die Meldung trotzdem vom Tisch.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.10: Einstellungen mit &Uuml;berblick</b><p data-i18n="release.c3">Alle Gruppen der Einstellungs-Navigation sind offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog nutzt die Fensterh&ouml;he.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Einstellungen mit Überblick: alle Gruppen offen, Suchfeld bleibt stehen &middot; v{vs}",
+        "hero.release": "Sicherheits-Update: Mail-Bibliotheken und Archiv-Leser aktualisiert &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Einstellungen mit Überblick",
-        "release.heading": "Was ist neu — <em>Die Einstellungs-Navigation zeigt alle 22 Seiten auf einmal, merkt sich, was du einklappst, und der Dialog nutzt die Fensterhöhe.</em>",
-        "release.lead": "Eine Bedienprobe der neuen Einstellungen zeigte: Eingeklappte Gruppen kosten bei 22 Seiten Raten und einen zweiten Klick, und ein Seitenwechsel machte rückgängig, was man gerade selbst aufgeklappt hatte. Jetzt sind alle Gruppen offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog wird so hoch wie das Fenster erlaubt. Dazu die Korrektur aus 0.11.9: Mails finden ihr Projekt auch bei Schreibweisen mit Bindestrich.",
-        "release.c1h": "Alle Gruppen offen",
-        "release.c1": "Wer nicht weiß, ob „Diktat“ unter KI oder „Schnellerfassung“ unter Workflow steckt, kann jetzt überfliegen statt raten. Ein Klick auf den Gruppenkopf klappt ein, und das bleibt so, bis du es wieder änderst. Eine eingeklappte Gruppe öffnet sich nur, wenn eine Suche oder ein Link direkt hineinführt.",
-        "release.c2h": "Dialog nutzt die Fensterhöhe",
-        "release.c2": "Der Einstellungsdialog wird bis zu 1000 Punkte hoch statt 760 und die Navigation breiter, damit „Wissen & Workflow“ ausgeschrieben ist. Muss die Liste doch scrollen, bleibt das Suchfeld oben stehen, und die Trefferliste passt in die Navigation.",
-        "release.c3h": "Aus 0.11.9: Mails finden ihr Projekt",
-        "release.c3": "„UNO-Q“ im Betreff trifft das Schlüsselwort „UnoQ“, und Gattungswörter wie „Zusammenfassung“ entscheiden nicht mehr über die Projekt-Zuordnung. Bestehende Schlüsselwortlisten müssen nicht angefasst werden.",
+        "release.label": "Release {vs} · Sicherheits-Update",
+        "release.heading": "Was ist neu — <em>Fünf gemeldete Lücken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon über eingehende Mails erreichbar.</em>",
+        "release.lead": "GitHub meldete fünf Lücken in Bibliotheken, die die App mitbringt. Vier davon betreffen den Mail-Versender nodemailer; eine ist real erreichbar, weil der Mail-Parser denselben Adress-Parser für eingehende Kopfzeilen nutzt und eine präparierte Mail die App hätte aufhängen können. Die fünfte betrifft den Archiv-Leser, den die App nur zum Lesen von Anki- und Office-Dateien nutzt, nie zum Entpacken. Alle fünf sind mit den aktuellen Versionen geschlossen.",
+        "release.c1h": "Mail-Bibliotheken aktualisiert",
+        "release.c1": "nodemailer 9.1.1 und mailparser 3.9.26. Der Adress-Parser brauchte bei langen Empfängerlisten quadratisch viel Zeit; eine Kopfzeile mit 20 000 Adressen wird jetzt in 55 Millisekunden gelesen. Versand mit eingebettetem Signaturbild und Ablage im Gesendet-Ordner wurden mit den neuen Versionen geprüft. Bewusst nicht auf nodemailer 10, das ein Umbau ohne Sicherheitsgewinn wäre.",
+        "release.c2h": "Archiv-Leser aktualisiert",
+        "release.c2": "adm-zip 0.6.1 schließt das Schreiben durch Symlinks beim Entpacken. Die App war nicht betroffen, weil Anki-Import und Office-Parser Einträge nur lesen und selbst schreiben; das Update nimmt die Meldung trotzdem vom Tisch.",
+        "release.c3h": "Aus 0.11.10: Einstellungen mit Überblick",
+        "release.c3": "Alle Gruppen der Einstellungs-Navigation sind offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog nutzt die Fensterhöhe. Und aus 0.11.9: Mails finden ihr Projekt auch bei Schreibweisen mit Bindestrich.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Settings at a glance: all groups open, search stays put &middot; v{vs}",
+        "hero.release": "Security update: mail libraries and archive reader updated &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Settings at a glance",
-        "release.heading": "What’s new — <em>The settings navigation shows all 22 pages at once, remembers what you collapse, and the dialog uses the window height.</em>",
-        "release.lead": "A usability pass over the new settings showed: with 22 pages, collapsed groups mean guessing plus a second click, and switching pages undid what you had just expanded yourself. Now all groups are open, collapsing sticks, the search field stays put while scrolling, and the dialog grows as tall as the window allows. Plus the fix from 0.11.9: mails find their project even with hyphenated spellings.",
-        "release.c1h": "All groups open",
-        "release.c1": "If you don’t know whether “Dictation” lives under AI or “Quick capture” under Workflow, you can now skim instead of guess. A click on a group header collapses it, and that stays until you change it again. A collapsed group only opens when a search or a link leads straight into it.",
-        "release.c2h": "The dialog uses the window height",
-        "release.c2": "The settings dialog grows up to 1000 points tall instead of 760 and the navigation is wider, so “Knowledge & Workflow” is spelled out. If the list still has to scroll, the search field stays at the top and the result list fits inside the navigation.",
-        "release.c3h": "From 0.11.9: mails find their project",
-        "release.c3": "“UNO-Q” in a subject matches the keyword “UnoQ”, and genre words like “summary” no longer decide the project assignment. Existing keyword lists need no cleanup.",
+        "release.label": "Release {vs} · Security update",
+        "release.heading": "What’s new — <em>Five reported vulnerabilities in mail libraries and the archive reader closed, one of them reachable through incoming mail.</em>",
+        "release.lead": "GitHub reported five vulnerabilities in libraries the app ships. Four concern the mail sender nodemailer; one is genuinely reachable, because the mail parser uses the same address parser for incoming headers and a crafted mail could have hung the app. The fifth concerns the archive reader, which the app only uses to read Anki and Office files, never to extract. All five are closed with the current versions.",
+        "release.c1h": "Mail libraries updated",
+        "release.c1": "nodemailer 9.1.1 and mailparser 3.9.26. The address parser took quadratic time on long recipient lists; a header with 20,000 addresses now parses in 55 milliseconds. Sending with an embedded signature image and filing to the Sent folder were checked with the new versions. Deliberately not nodemailer 10, which would be a rewrite without a security gain.",
+        "release.c2h": "Archive reader updated",
+        "release.c2": "adm-zip 0.6.1 closes writing through symlinks during extraction. The app was not affected because the Anki import and the Office parser only read entries and write themselves; the update takes the report off the table anyway.",
+        "release.c3h": "From 0.11.10: settings at a glance",
+        "release.c3": "All groups in the settings navigation are open, collapsing sticks, the search field stays put while scrolling, and the dialog uses the window height. And from 0.11.9: mails find their project even with hyphenated spellings.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

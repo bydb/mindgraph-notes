@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.11-beta] - 2026-09-14
+
+Sicherheits-Update: GitHub meldete fünf Lücken in mitgelieferten Bibliotheken. Alle fünf sind geschlossen, `npm audit` ist leer.
+
+### Sicherheit
+
+- **nodemailer 9.1.1, mailparser 3.9.26.** Vier Meldungen zu nodemailer; die hohe (quadratische Laufzeit im Adress-Parser) war über eingehende Mails erreichbar, weil mailparser denselben Parser für Kopfzeilen nutzt. Eine Kopfzeile mit 20 000 Adressen wird jetzt in 55 ms gelesen. Die drei mittleren (Domain-Sperrliste, alter `resolveContent`-Aufruf) betreffen Funktionen, die die App nicht nutzt. mailparser musste mit, weil 3.9.17 nodemailer 9.0.6 exakt festnagelt. Bewusst nicht nodemailer 10 (TypeScript/ESM-Umbau, Node ≥ 20).
+- **adm-zip 0.6.1.** Schließt das Schreiben durch Symlinks beim Entpacken. Die App war nicht betroffen (Anki-Import und Office-Parser lesen Einträge nur und schreiben selbst), das Update nimmt die Meldung trotzdem vom Tisch.
+- Geprüft: Typecheck, Tests, Build; Versand-Baustein mit CID-Signaturbild und mailparser-Roundtrip; DOCX-Vorlage per adm-zip gelesen. Nicht geprüft: echter SMTP-Versand und IMAP-Abruf gegen ein Postfach.
+
 ## [0.11.10-beta] - 2026-09-14
 
 Eine Bedienprobe der neuen Einstellungen: Eingeklappte Gruppen kosten bei 22 Seiten Raten und einen zweiten Klick, und ein Seitenwechsel machte rückgängig, was man gerade selbst aufgeklappt hatte.
