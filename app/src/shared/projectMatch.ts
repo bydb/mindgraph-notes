@@ -8,7 +8,10 @@ export interface ProjectMatch {
 }
 
 interface MatchTerm {
+  /** Originalschreibweise — für `matchedTerms` in der UI. */
   term: string
+  /** Normalform (siehe normalizeTerm), gegen die gematcht wird. */
+  normalized: string
   /** Erlaubt Treffer am Anfang deutscher Komposita, z.B. "Mars" in "Marslandschaft". */
   compoundPrefix: boolean
 }
@@ -66,6 +69,19 @@ export const GENERIC_STOPWORDS = new Set<string>([
   'antrag', 'anträge', 'antraege', 'formular', 'formulare',
   'rückmeldung', 'rueckmeldung', 'rückmeldungen', 'rueckmeldungen',
   'anhang', 'anhänge', 'anhaenge', 'betreff',
+  // Dokument-Gattungswörter: benennen die ART einer Datei (Zusammenfassung,
+  // Transkript, Protokoll, Call …), nie ein Projekt. Kommen über den Keyword-
+  // Vorschlag aus Dateinamen in `_STATUS.md`-Listen — und dann trifft
+  // „WPForms-Zusammenfassung" im Betreff ein Arduino-Projekt (real, 09/2026).
+  // Werden beim Matchen gefiltert, bestehende Listen müssen nicht bereinigt werden.
+  'zusammenfassung', 'zusammenfassungen', 'summary',
+  'transkript', 'transkripte', 'transcript', 'transcripts',
+  'protokoll', 'protokolle',
+  'call', 'calls', 'videocall', 'telefonat', 'meeting', 'meetings',
+  'besprechung', 'besprechungen', 'sitzung', 'sitzungen',
+  'gespräch', 'gespräche', 'gespraeche',
+  'bericht', 'berichte', 'report', 'reports',
+  'notiz', 'notizen', 'note', 'notes',
   // Anrede- / Grußformeln (reines Boilerplate):
   'sehr', 'geehrte', 'geehrter', 'geehrten', 'geehrtes',
   'freundlich', 'freundliche', 'freundlichen', 'freundlichem',
@@ -74,12 +90,57 @@ export const GENERIC_STOPWORDS = new Set<string>([
 
 const SUBJECT_WEIGHT = 5
 
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
+/**
+ * Wie viele aufeinanderfolgende Text-Tokens höchstens zu einem Begriff
+ * zusammengezogen werden. „UNO Q" (2 Tokens) oder „E-Mail-Adresse" (3) reichen;
+ * mehr würde nur Rechenzeit kosten.
+ */
+const MAX_JOINED_TOKENS = 4
 
 function isStopword(term: string): boolean {
   return GENERIC_STOPWORDS.has(term.toLowerCase().trim())
+}
+
+/** Zerlegt Text in kleingeschriebene Buchstaben-/Ziffernläufe (Unicode-tauglich). */
+function tokenize(text: string): string[] {
+  const runs = text.match(/[\p{L}\p{N}]+/gu)
+  if (!runs) return []
+  return runs.map(t => t.toLowerCase())
+}
+
+/**
+ * Normalform eines Begriffs: alle Buchstaben-/Ziffernläufe kleingeschrieben und
+ * OHNE Trennzeichen zusammengezogen. „UnoQ", „UNO Q", „UNO-Q" und „unoq" sind
+ * damit derselbe Begriff.
+ */
+function normalizeTerm(term: string): string {
+  return tokenize(term).join('')
+}
+
+/**
+ * Zählt, wie oft `needle` (Normalform) im tokenisierten Text vorkommt. Getroffen
+ * wird nur eine Folge GANZER Tokens, deren Aneinanderreihung gleich `needle` ist
+ * (exact) bzw. mit `needle` beginnt (compoundPrefix). Dadurch sind Bindestrich und
+ * Leerzeichen im Text unerheblich („UNO-Q" trifft „UnoQ"), ohne dass Teilwörter
+ * zählen („UNO Qualität" trifft „UnoQ" nicht — „unoqualität" ≠ „unoq").
+ *
+ * Hintergrund: Die frühere `\b`-Regex verlangte exakte Schreibweise inklusive
+ * Trennzeichen; eine Arduino-Mail mit „UNO-Q" im Betreff traf das Keyword „UnoQ"
+ * nie (real, 09/2026). Außerdem ist JS-`\b` ASCII-basiert und stolperte über Umlaute.
+ */
+function countTokenMatches(tokens: string[], needle: string, compoundPrefix: boolean): number {
+  if (!needle || tokens.length === 0) return 0
+  let count = 0
+  for (let i = 0; i < tokens.length; i++) {
+    let acc = ''
+    for (let j = i; j < tokens.length && j - i < MAX_JOINED_TOKENS; j++) {
+      acc += tokens[j]
+      if (acc.length < needle.length) continue
+      if (compoundPrefix ? acc.startsWith(needle) : acc === needle) count++
+      break
+    }
+  }
+  return count
 }
 
 function stripFolderPrefix(name: string): string {
@@ -96,16 +157,6 @@ function splitIdentityTokens(value: string): string[] {
     .filter(s => s.length >= 4 && !isStopword(s))
 }
 
-function countMatches(text: string, term: string, compoundPrefix = false): number {
-  if (!text.trim()) return 0
-  const escaped = escapeRegex(term)
-  if (!compoundPrefix) {
-    return text.match(new RegExp(`\\b${escaped}\\b`, 'gi'))?.length || 0
-  }
-  const matches = text.match(new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}[\\p{L}\\p{N}]*`, 'giu'))
-  return matches?.length || 0
-}
-
 function effectiveTerms(
   project: DiscoveredProject,
   synonymsByFolder: Record<string, ProjectSynonymCache>
@@ -116,10 +167,12 @@ function effectiveTerms(
     const trimmed = term.trim()
     if (!trimmed) return
     if (isStopword(trimmed)) return
-    const key = `${trimmed.toLowerCase()}::${compoundPrefix ? 'compound' : 'exact'}`
+    const normalized = normalizeTerm(trimmed)
+    if (!normalized) return
+    const key = `${normalized}::${compoundPrefix ? 'compound' : 'exact'}`
     if (seen.has(key)) return
     seen.add(key)
-    out.push({ term: trimmed, compoundPrefix })
+    out.push({ term: trimmed, normalized, compoundPrefix })
   }
 
   for (const kw of project.marker?.keywords || []) push(kw)
@@ -150,9 +203,9 @@ export function matchEmailToProjects(
   projects: DiscoveredProject[],
   synonymsByFolder: Record<string, ProjectSynonymCache> = {}
 ): ProjectMatch[] {
-  const subject = email.subject || ''
-  const body = email.bodyText || ''
-  if (!subject.trim() && !body.trim()) return []
+  const subjectTokens = tokenize(email.subject || '')
+  const bodyTokens = tokenize(email.bodyText || '')
+  if (subjectTokens.length === 0 && bodyTokens.length === 0) return []
 
   const matches: ProjectMatch[] = []
 
@@ -164,10 +217,10 @@ export function matchEmailToProjects(
     let subjectHitCount = 0
     const matched: string[] = []
     for (const term of terms) {
-      const subjectHits = countMatches(subject, term.term, term.compoundPrefix)
+      const subjectHits = countTokenMatches(subjectTokens, term.normalized, term.compoundPrefix)
       const bodyHits = term.compoundPrefix
         ? 0
-        : countMatches(body, term.term, false)
+        : countTokenMatches(bodyTokens, term.normalized, false)
       const termHits = subjectHits * SUBJECT_WEIGHT + bodyHits
       if (termHits > 0) {
         hitCount += termHits
