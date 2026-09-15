@@ -390,7 +390,7 @@ Click-Handler für Decorations: `view.posAtCoords()` + StateField-Lookup nutzen 
 1. Version in `app/package.json` bumpen — danach `npm install --package-lock-only` in `app/`, sonst bleibt `package-lock.json` auf der alten Version stehen
 2. In `docs/index.html` **nur** `"softwareVersion"` im JSON-LD (`<script id="app-schema">`) anfassen — das ist die einzige Versionsquelle der Seite. Hero-Badge und Release-Label lesen sie über das Token `{vs}` (Kurzform ohne `-beta`) im `translations`-Objekt, Release-Datum und Download-Karten über `[data-app-version]` (voller Tag). Der Inline-Text daneben ist nur der No-JS-Fallback. Die Release-**Texte** (Badge-Highlight, `release.*`-Karten) natürlich weiterhin inhaltlich neu schreiben, DE **und** EN
 3. `<lastmod>` in `docs/sitemap.xml` auf das Release-Datum setzen
-4. `CHANGELOG.md` aktualisieren — Versions-Heading `## [X.X.XX-beta] - JJJJ-MM-TT`; der Was-ist-neu-Dialog schneidet genau diese erste Zeile weg (`extractVersionSection`)
+4. `CHANGELOG.md` aktualisieren — Versions-Heading `## [X.X.XX-beta] - JJJJ-MM-TT`; der Was-ist-neu-Dialog schneidet genau diese erste Zeile weg (`extractVersionSection`). **Der Eintrag wird fremden Nutzern gezeigt** (Dialog, Website-Karte, GitHub): zuerst ein fetter Satz „Was kann ich jetzt“ plus höchstens drei Sätze Nutzen, dann `### Hintergrund` mit Auslöser, Helfern, Grenzen. Keine eigenen Notizen als Beispiel, keine Quelldateinamen, kein Testprotokoll
 5. Commit: `"Bump version to X.X.XX-beta"`
 6. Tag: `git tag vX.X.XX-beta && git push origin vX.X.XX-beta`
 7. GitHub Actions baut automatisch:
