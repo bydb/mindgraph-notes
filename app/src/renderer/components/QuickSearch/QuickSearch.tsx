@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import type { Note } from '../../../shared/types'
+import { matchNoteName, type NoteNameSource } from '../../../shared/noteSearchNames'
 
 interface QuickSearchProps {
   isOpen: boolean
@@ -14,6 +15,8 @@ interface SearchResult {
   note: Note
   matchType: 'title' | 'tag' | 'content'
   matchText: string
+  /** Bei Titeltreffern: welcher Name gepasst hat. Dateiname/Frontmatter werden mit angezeigt. */
+  nameSource?: NoteNameSource
 }
 
 export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose, initialQuery = '' }) => {
@@ -97,13 +100,17 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose, initi
     const queryLower = query.toLowerCase()
     const addedNoteIds = new Set<string>()
 
-    // Suche nach Titel (höchste Priorität)
+    // Suche nach Namen (höchste Priorität): H1-Titel, Dateiname, Frontmatter-Titel.
+    // `note.title` allein reicht nicht — KI-Zusammenfassungen heißen fast immer
+    // „Zusammenfassung", der sprechende Name steht nur im Dateinamen/Frontmatter.
     for (const note of notes) {
-      if (note.title.toLowerCase().includes(queryLower)) {
+      const hit = matchNoteName(note, queryLower)
+      if (hit) {
         searchResults.push({
           note,
           matchType: 'title',
-          matchText: note.title
+          matchText: hit.text,
+          nameSource: hit.source
         })
         addedNoteIds.add(note.id)
       }
@@ -249,6 +256,15 @@ export const QuickSearch: React.FC<QuickSearchProps> = ({ isOpen, onClose, initi
                   <div className="quick-search-result-title">{result.note.title}</div>
                   {result.matchType !== 'title' && (
                     <div className="quick-search-result-match">
+                      {result.matchText}
+                    </div>
+                  )}
+                  {result.matchType === 'title' && result.nameSource && result.nameSource !== 'title' && (
+                    <div className="quick-search-result-match">
+                      {result.nameSource === 'fileName'
+                        ? t('quickSearch.matchFileName')
+                        : t('quickSearch.matchFrontmatterTitle')}
+                      {': '}
                       {result.matchText}
                     </div>
                   )}

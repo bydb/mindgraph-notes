@@ -119,6 +119,10 @@ Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.expose
 - **workflowStore**: Workflow Canvas (Nodes/Edges, Validierung, lokale Simulation, `execute`/`runForNewEmails` via IPC, Autosave nach `workflows.json`)
 - Selektoren: `useShallow` aus `zustand/react/shallow` verwenden — siehe `MarkdownEditor.tsx` und `DashboardView.tsx` als Referenz
 
+### Schnellsuche (⌘P) und Quick Switcher (⌘K): drei Namen pro Notiz
+- `note.title` kommt aus der ersten H1 — bei KI-Zusammenfassungen fast immer „Zusammenfassung", der sprechende Name steht nur im Dateinamen (`202609031500 - 🟢 Marburger Forum.md`) und im Frontmatter (`title:`). Eine Suche nur über `note.title` fand solche Notizen nicht als Titeltreffer (real, 15.09.2026).
+- `shared/noteSearchNames.ts` (`noteSearchNames`, `matchNoteName`, getestet) liefert H1-Titel, Dateiname und Frontmatter-Titel; QuickSearch und QuickSwitcher prüfen alle drei gleichwertig und zeigen den passenden Namen unter dem Titel („Dateiname: …" / „Frontmatter-Titel: …"). Neue Suchstellen (Wikilink-Autocomplete u.a.) sollen denselben Helfer nutzen.
+
 ### Modals
 Boolean-State in uiStore, `if (!open) return null` im Component.
 

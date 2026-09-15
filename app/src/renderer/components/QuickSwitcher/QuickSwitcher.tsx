@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import type { Note } from '../../../shared/types'
+import { noteSearchNames } from '../../../shared/noteSearchNames'
 import { useTranslation } from '../../utils/translations'
 
 interface QuickSwitcherProps {
@@ -14,6 +15,8 @@ interface SearchResult {
   note: Note
   matchType: 'title' | 'path' | 'content'
   score: number
+  /** Frontmatter-Titel, wenn der Treffer nur darüber zustande kam — der Pfad zeigt ihn nicht. */
+  matchedFrontmatterTitle?: string
 }
 
 export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
@@ -43,40 +46,36 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
     const results: SearchResult[] = []
 
     for (const note of notes) {
-      const titleLower = note.title.toLowerCase()
       const pathLower = note.path.toLowerCase()
 
       let score = 0
       let matchType: 'title' | 'path' | 'content' = 'title'
 
-      // Exakter Titel-Match
-      if (titleLower === query) {
-        score = 100
-        matchType = 'title'
-      }
-      // Titel beginnt mit Query
-      else if (titleLower.startsWith(query)) {
-        score = 90
-        matchType = 'title'
-      }
-      // Titel enthält Query
-      else if (titleLower.includes(query)) {
-        score = 70
-        matchType = 'title'
-      }
-      // Fuzzy-Match im Titel
-      else if (fuzzyMatch(query, titleLower)) {
-        score = 50
-        matchType = 'title'
+      // Alle Namen der Notiz gleichwertig prüfen: H1-Titel, Dateiname, Frontmatter-Titel.
+      // Der beste Treffer über alle Namen zählt — sonst bleibt eine KI-Zusammenfassung
+      // („# Zusammenfassung") nur als schwacher Pfadtreffer sichtbar.
+      let matchedFrontmatterTitle: string | undefined
+      for (const name of noteSearchNames(note)) {
+        const nameLower = name.text.toLowerCase()
+        let nameScore = 0
+        if (nameLower === query) nameScore = 100
+        else if (nameLower.startsWith(query)) nameScore = 90
+        else if (nameLower.includes(query)) nameScore = 70
+        else if (fuzzyMatch(query, nameLower)) nameScore = 50
+        if (nameScore > score) {
+          score = nameScore
+          matchType = 'title'
+          matchedFrontmatterTitle = name.source === 'frontmatterTitle' ? name.text : undefined
+        }
       }
       // Pfad enthält Query
-      else if (pathLower.includes(query)) {
+      if (score === 0 && pathLower.includes(query)) {
         score = 30
         matchType = 'path'
       }
 
       if (score > 0) {
-        results.push({ note, matchType, score })
+        results.push({ note, matchType, score, matchedFrontmatterTitle })
       }
     }
 
@@ -195,6 +194,11 @@ export const QuickSwitcher: React.FC<QuickSwitcherProps> = ({
                     <span className="quick-switcher-title">
                       {highlightMatch(result.note.title, searchQuery)}
                     </span>
+                    {result.matchedFrontmatterTitle && (
+                      <span className="quick-switcher-path">
+                        {t('quickSearch.matchFrontmatterTitle')}: {highlightMatch(result.matchedFrontmatterTitle, searchQuery)}
+                      </span>
+                    )}
                     <span className="quick-switcher-path">{result.note.path}</span>
                   </div>
                   {result.note.id === selectedNoteId && (
