@@ -1631,14 +1631,14 @@
       <div class="release-head">
         <div>
           <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.12 &middot; Suche</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Schnellsuche und Quick Switcher finden eine Notiz auch dann, wenn ihr Name nur im Dateinamen oder im Frontmatter steht.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Ein echter Fall: Die Notiz &bdquo;202609031500 - Marburger Forum&ldquo; war &uuml;ber &bdquo;Marburger&ldquo; nicht zu finden. Der Titel einer Notiz kommt aus ihrer ersten &Uuml;berschrift, und die hei&szlig;t bei KI-Zusammenfassungen fast immer &bdquo;Zusammenfassung&ldquo;. Der sprechende Name stand nur im Dateinamen und im Frontmatter, und genau dort schaute die Suche nicht nach. Jetzt z&auml;hlen alle drei Namen gleichwertig.</p>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Die Suche findet Notizen jetzt auch &uuml;ber Dateiname und Frontmatter-Titel.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Bisher z&auml;hlte f&uuml;r Schnellsuche und Quick Switcher nur die erste &Uuml;berschrift einer Notiz. Wer seine Notizen &uuml;ber den Dateinamen oder ein title-Feld benennt, etwa bei KI-Zusammenfassungen mit der &Uuml;berschrift &bdquo;Zusammenfassung&ldquo;, fand sie nicht. Jetzt z&auml;hlen alle drei Namen gleich.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Schnellsuche (&#8984;P) pr&uuml;ft drei Namen</b><p data-i18n="release.c1">&Uuml;berschrift, Dateiname ohne Endung und Frontmatter-Titel z&auml;hlen als Titeltreffer. Kam der Treffer &uuml;ber Dateiname oder Frontmatter, steht der passende Name als zweite Zeile unter dem Titel, damit man die Notiz wiedererkennt.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Quick Switcher (&#8984;K) bewertet gleichwertig</b><p data-i18n="release.c2">Bisher z&auml;hlte der Dateiname nur als schwacher Pfadtreffer ganz unten. Jetzt bekommen alle drei Namen dieselben Punkte wie der Titel, und ein Frontmatter-Treffer wird mit markiertem Suchbegriff angezeigt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Schnellsuche (&#8984;P) pr&uuml;ft drei Namen</b><p data-i18n="release.c1">&Uuml;berschrift, Dateiname und Frontmatter-Titel z&auml;hlen gleich. Der Treffer zeigt an, &uuml;ber welchen Namen er gefunden wurde.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Quick Switcher (&#8984;K) ebenso</b><p data-i18n="release.c2">Eine Notiz, deren Name nur im Dateinamen steht, landet jetzt oben statt ganz unten in der Liste.</p></div></div>
         <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.11: Sicherheits-Update</b><p data-i18n="release.c3">F&uuml;nf gemeldete L&uuml;cken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon &uuml;ber eingehende Mails erreichbar.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
@@ -1983,12 +1983,12 @@
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
         "release.label": "Release {vs} · Suche",
-        "release.heading": "Was ist neu — <em>Schnellsuche und Quick Switcher finden eine Notiz auch dann, wenn ihr Name nur im Dateinamen oder im Frontmatter steht.</em>",
-        "release.lead": "Ein echter Fall: Die Notiz „202609031500 - Marburger Forum" war über „Marburger" nicht zu finden. Der Titel einer Notiz kommt aus ihrer ersten Überschrift, und die heißt bei KI-Zusammenfassungen fast immer „Zusammenfassung". Der sprechende Name stand nur im Dateinamen und im Frontmatter, und genau dort schaute die Suche nicht nach. Jetzt zählen alle drei Namen gleichwertig.",
+        "release.heading": "Was ist neu — <em>Die Suche findet Notizen jetzt auch über Dateiname und Frontmatter-Titel.</em>",
+        "release.lead": "Bisher zählte für Schnellsuche und Quick Switcher nur die erste Überschrift einer Notiz. Wer seine Notizen über den Dateinamen oder ein title-Feld benennt, etwa bei KI-Zusammenfassungen mit der Überschrift „Zusammenfassung", fand sie nicht. Jetzt zählen alle drei Namen gleich.",
         "release.c1h": "Schnellsuche (⌘P) prüft drei Namen",
-        "release.c1": "Überschrift, Dateiname ohne Endung und Frontmatter-Titel zählen als Titeltreffer. Kam der Treffer über Dateiname oder Frontmatter, steht der passende Name als zweite Zeile unter dem Titel („Dateiname: 202609031500 - Marburger Forum"), damit man die Notiz wiedererkennt.",
-        "release.c2h": "Quick Switcher (⌘K) bewertet gleichwertig",
-        "release.c2": "Bisher zählte der Dateiname nur als schwacher Pfadtreffer ganz unten. Jetzt bekommen alle drei Namen dieselben Punkte wie der Titel, und ein Frontmatter-Treffer wird mit markiertem Suchbegriff angezeigt.",
+        "release.c1": "Überschrift, Dateiname und Frontmatter-Titel zählen gleich. Der Treffer zeigt an, über welchen Namen er gefunden wurde.",
+        "release.c2h": "Quick Switcher (⌘K) ebenso",
+        "release.c2": "Eine Notiz, deren Name nur im Dateinamen steht, landet jetzt oben statt ganz unten in der Liste.",
         "release.c3h": "Aus 0.11.11: Sicherheits-Update",
         "release.c3": "Fünf gemeldete Lücken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon über eingehende Mails erreichbar. Und aus 0.11.10: Einstellungen mit allen Gruppen offen und festem Suchfeld.",
         "release.link": "Vollständige Release Notes auf GitHub →",
@@ -2251,12 +2251,12 @@
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
         "release.label": "Release {vs} · Search",
-        "release.heading": "What’s new — <em>Quick search and quick switcher find a note even when its name lives only in the file name or the frontmatter.</em>",
-        "release.lead": "A real case: the note “202609031500 - Marburger Forum” could not be found by searching “Marburger”. A note’s title comes from its first heading, and for AI summaries that is almost always “Summary”. The telling name lived only in the file name and the frontmatter, exactly where the search did not look. All three names now count equally.",
+        "release.heading": "What’s new — <em>Search now finds notes by file name and frontmatter title too.</em>",
+        "release.lead": "Until now, quick search and quick switcher only looked at a note’s first heading. If you name your notes by file name or a title field, for example AI summaries headed “Summary”, they could not be found. All three names now count equally.",
         "release.c1h": "Quick search (⌘P) checks three names",
-        "release.c1": "Heading, file name without extension and frontmatter title all count as title hits. When the hit came from the file name or the frontmatter, the matching name is shown as a second line under the title (“File name: 202609031500 - Marburger Forum”) so you recognise the note.",
-        "release.c2h": "Quick switcher (⌘K) scores equally",
-        "release.c2": "The file name used to count only as a weak path hit at the bottom. All three names now score the same as the title, and a frontmatter hit is shown with the search term highlighted.",
+        "release.c1": "Heading, file name and frontmatter title count equally. Each hit shows which name it was found by.",
+        "release.c2h": "Quick switcher (⌘K) as well",
+        "release.c2": "A note whose name lives only in the file name now lands at the top of the list instead of the bottom.",
         "release.c3h": "From 0.11.11: security update",
         "release.c3": "Five reported vulnerabilities in mail libraries and the archive reader closed, one of them reachable through incoming mail. And from 0.11.10: settings with all groups open and a fixed search field.",
         "release.link": "Full release notes on GitHub →",
