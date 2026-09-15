@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.12-beta] - 2026-09-15
+
+Ein echter Fall: Die Notiz „202609031500 - 🟢 Marburger Forum" war über „Marburger" nicht als Titeltreffer zu finden. Der Titel einer Notiz kommt aus ihrer ersten Überschrift, und die heißt bei KI-Zusammenfassungen fast immer „Zusammenfassung". Der sprechende Name stand nur im Dateinamen und im Frontmatter-`title`, und genau dort schaute die Suche nicht nach. Die Notiz tauchte nur als Volltexttreffer über die Frontmatter-Zeile auf, unter dem Namen „Zusammenfassung" und hinter einer Mail mit echtem Titeltreffer.
+
+### Suche
+
+- **Drei Namen pro Notiz.** Neuer Helfer `shared/noteSearchNames.ts` (getestet) liefert Überschrift, Dateiname ohne Endung und Frontmatter-Titel. Schnellsuche (⌘P) und Quick Switcher (⌘K) prüfen alle drei gleichwertig.
+- **Schnellsuche zeigt den passenden Namen.** Kam der Treffer über Dateiname oder Frontmatter, steht er als zweite Zeile unter dem Titel („Dateiname: 202609031500 - 🟢 Marburger Forum" / „Frontmatter-Titel: …"), damit man die Notiz wiedererkennt.
+- **Quick Switcher bewertet gleichwertig.** Bisher zählte der Dateiname nur als schwacher Pfadtreffer ganz unten. Jetzt bekommen alle drei Namen dieselben Punkte wie der Titel; ein Frontmatter-Treffer wird mit markiertem Suchbegriff angezeigt.
+- Geprüft in der laufenden App: ⌘P „Marburger" und „Gießener" (Name nur im Frontmatter), ⌘K mit denselben Begriffen, Öffnen per Enter. Unverändert: Tab-Beschriftung und Brotkrumen zeigen weiterhin die Überschrift.
+
 ## [0.11.11-beta] - 2026-09-14
 
 Sicherheits-Update: GitHub meldete fünf Lücken in mitgelieferten Bibliotheken. Alle fünf sind geschlossen, `npm audit` ist leer.

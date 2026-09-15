@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.11-beta",
+    "softwareVersion": "0.11.12-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sicherheits-Update: Mail-Bibliotheken und Archiv-Leser aktualisiert &middot; v0.11.11</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Suche findet Notizen jetzt auch &uuml;ber Dateinamen und Frontmatter-Titel &middot; v0.11.12</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.11 &middot; Sicherheits-Update</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>F&uuml;nf gemeldete L&uuml;cken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon &uuml;ber eingehende Mails erreichbar.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">GitHub meldete f&uuml;nf L&uuml;cken in Bibliotheken, die die App mitbringt. Vier davon betreffen den Mail-Versender nodemailer; eine ist real erreichbar, weil der Mail-Parser denselben Adress-Parser f&uuml;r eingehende Kopfzeilen nutzt und eine pr&auml;parierte Mail die App h&auml;tte aufh&auml;ngen k&ouml;nnen. Die f&uuml;nfte betrifft den Archiv-Leser, den die App nur zum Lesen von Anki- und Office-Dateien nutzt, nie zum Entpacken. Alle f&uuml;nf sind mit den aktuellen Versionen geschlossen.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.12 &middot; Suche</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Schnellsuche und Quick Switcher finden eine Notiz auch dann, wenn ihr Name nur im Dateinamen oder im Frontmatter steht.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Ein echter Fall: Die Notiz &bdquo;202609031500 - Marburger Forum&ldquo; war &uuml;ber &bdquo;Marburger&ldquo; nicht zu finden. Der Titel einer Notiz kommt aus ihrer ersten &Uuml;berschrift, und die hei&szlig;t bei KI-Zusammenfassungen fast immer &bdquo;Zusammenfassung&ldquo;. Der sprechende Name stand nur im Dateinamen und im Frontmatter, und genau dort schaute die Suche nicht nach. Jetzt z&auml;hlen alle drei Namen gleichwertig.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Mail-Bibliotheken aktualisiert</b><p data-i18n="release.c1">nodemailer 9.1.1 und mailparser 3.9.26. Der Adress-Parser brauchte bei langen Empf&auml;ngerlisten quadratisch viel Zeit; eine Kopfzeile mit 20&nbsp;000 Adressen wird jetzt in 55 Millisekunden gelesen. Versand mit eingebettetem Signaturbild und Ablage im Gesendet-Ordner wurden mit den neuen Versionen gepr&uuml;ft.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Archiv-Leser aktualisiert</b><p data-i18n="release.c2">adm-zip 0.6.1 schlie&szlig;t das Schreiben durch Symlinks beim Entpacken. Die App war nicht betroffen, weil Anki-Import und Office-Parser Eintr&auml;ge nur lesen und selbst schreiben; das Update nimmt die Meldung trotzdem vom Tisch.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.10: Einstellungen mit &Uuml;berblick</b><p data-i18n="release.c3">Alle Gruppen der Einstellungs-Navigation sind offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog nutzt die Fensterh&ouml;he.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Schnellsuche (&#8984;P) pr&uuml;ft drei Namen</b><p data-i18n="release.c1">&Uuml;berschrift, Dateiname ohne Endung und Frontmatter-Titel z&auml;hlen als Titeltreffer. Kam der Treffer &uuml;ber Dateiname oder Frontmatter, steht der passende Name als zweite Zeile unter dem Titel, damit man die Notiz wiedererkennt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Quick Switcher (&#8984;K) bewertet gleichwertig</b><p data-i18n="release.c2">Bisher z&auml;hlte der Dateiname nur als schwacher Pfadtreffer ganz unten. Jetzt bekommen alle drei Namen dieselben Punkte wie der Titel, und ein Frontmatter-Treffer wird mit markiertem Suchbegriff angezeigt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.11: Sicherheits-Update</b><p data-i18n="release.c3">F&uuml;nf gemeldete L&uuml;cken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon &uuml;ber eingehende Mails erreichbar.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Sicherheits-Update: Mail-Bibliotheken und Archiv-Leser aktualisiert &middot; v{vs}",
+        "hero.release": "Suche findet Notizen jetzt auch über Dateinamen und Frontmatter-Titel &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sicherheits-Update",
-        "release.heading": "Was ist neu — <em>Fünf gemeldete Lücken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon über eingehende Mails erreichbar.</em>",
-        "release.lead": "GitHub meldete fünf Lücken in Bibliotheken, die die App mitbringt. Vier davon betreffen den Mail-Versender nodemailer; eine ist real erreichbar, weil der Mail-Parser denselben Adress-Parser für eingehende Kopfzeilen nutzt und eine präparierte Mail die App hätte aufhängen können. Die fünfte betrifft den Archiv-Leser, den die App nur zum Lesen von Anki- und Office-Dateien nutzt, nie zum Entpacken. Alle fünf sind mit den aktuellen Versionen geschlossen.",
-        "release.c1h": "Mail-Bibliotheken aktualisiert",
-        "release.c1": "nodemailer 9.1.1 und mailparser 3.9.26. Der Adress-Parser brauchte bei langen Empfängerlisten quadratisch viel Zeit; eine Kopfzeile mit 20 000 Adressen wird jetzt in 55 Millisekunden gelesen. Versand mit eingebettetem Signaturbild und Ablage im Gesendet-Ordner wurden mit den neuen Versionen geprüft. Bewusst nicht auf nodemailer 10, das ein Umbau ohne Sicherheitsgewinn wäre.",
-        "release.c2h": "Archiv-Leser aktualisiert",
-        "release.c2": "adm-zip 0.6.1 schließt das Schreiben durch Symlinks beim Entpacken. Die App war nicht betroffen, weil Anki-Import und Office-Parser Einträge nur lesen und selbst schreiben; das Update nimmt die Meldung trotzdem vom Tisch.",
-        "release.c3h": "Aus 0.11.10: Einstellungen mit Überblick",
-        "release.c3": "Alle Gruppen der Einstellungs-Navigation sind offen, Einklappen bleibt erhalten, das Suchfeld steht beim Scrollen fest, und der Dialog nutzt die Fensterhöhe. Und aus 0.11.9: Mails finden ihr Projekt auch bei Schreibweisen mit Bindestrich.",
+        "release.label": "Release {vs} · Suche",
+        "release.heading": "Was ist neu — <em>Schnellsuche und Quick Switcher finden eine Notiz auch dann, wenn ihr Name nur im Dateinamen oder im Frontmatter steht.</em>",
+        "release.lead": "Ein echter Fall: Die Notiz „202609031500 - Marburger Forum" war über „Marburger" nicht zu finden. Der Titel einer Notiz kommt aus ihrer ersten Überschrift, und die heißt bei KI-Zusammenfassungen fast immer „Zusammenfassung". Der sprechende Name stand nur im Dateinamen und im Frontmatter, und genau dort schaute die Suche nicht nach. Jetzt zählen alle drei Namen gleichwertig.",
+        "release.c1h": "Schnellsuche (⌘P) prüft drei Namen",
+        "release.c1": "Überschrift, Dateiname ohne Endung und Frontmatter-Titel zählen als Titeltreffer. Kam der Treffer über Dateiname oder Frontmatter, steht der passende Name als zweite Zeile unter dem Titel („Dateiname: 202609031500 - Marburger Forum"), damit man die Notiz wiedererkennt.",
+        "release.c2h": "Quick Switcher (⌘K) bewertet gleichwertig",
+        "release.c2": "Bisher zählte der Dateiname nur als schwacher Pfadtreffer ganz unten. Jetzt bekommen alle drei Namen dieselben Punkte wie der Titel, und ein Frontmatter-Treffer wird mit markiertem Suchbegriff angezeigt.",
+        "release.c3h": "Aus 0.11.11: Sicherheits-Update",
+        "release.c3": "Fünf gemeldete Lücken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon über eingehende Mails erreichbar. Und aus 0.11.10: Einstellungen mit allen Gruppen offen und festem Suchfeld.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Security update: mail libraries and archive reader updated &middot; v{vs}",
+        "hero.release": "Search now finds notes by file name and frontmatter title &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Security update",
-        "release.heading": "What’s new — <em>Five reported vulnerabilities in mail libraries and the archive reader closed, one of them reachable through incoming mail.</em>",
-        "release.lead": "GitHub reported five vulnerabilities in libraries the app ships. Four concern the mail sender nodemailer; one is genuinely reachable, because the mail parser uses the same address parser for incoming headers and a crafted mail could have hung the app. The fifth concerns the archive reader, which the app only uses to read Anki and Office files, never to extract. All five are closed with the current versions.",
-        "release.c1h": "Mail libraries updated",
-        "release.c1": "nodemailer 9.1.1 and mailparser 3.9.26. The address parser took quadratic time on long recipient lists; a header with 20,000 addresses now parses in 55 milliseconds. Sending with an embedded signature image and filing to the Sent folder were checked with the new versions. Deliberately not nodemailer 10, which would be a rewrite without a security gain.",
-        "release.c2h": "Archive reader updated",
-        "release.c2": "adm-zip 0.6.1 closes writing through symlinks during extraction. The app was not affected because the Anki import and the Office parser only read entries and write themselves; the update takes the report off the table anyway.",
-        "release.c3h": "From 0.11.10: settings at a glance",
-        "release.c3": "All groups in the settings navigation are open, collapsing sticks, the search field stays put while scrolling, and the dialog uses the window height. And from 0.11.9: mails find their project even with hyphenated spellings.",
+        "release.label": "Release {vs} · Search",
+        "release.heading": "What’s new — <em>Quick search and quick switcher find a note even when its name lives only in the file name or the frontmatter.</em>",
+        "release.lead": "A real case: the note “202609031500 - Marburger Forum” could not be found by searching “Marburger”. A note’s title comes from its first heading, and for AI summaries that is almost always “Summary”. The telling name lived only in the file name and the frontmatter, exactly where the search did not look. All three names now count equally.",
+        "release.c1h": "Quick search (⌘P) checks three names",
+        "release.c1": "Heading, file name without extension and frontmatter title all count as title hits. When the hit came from the file name or the frontmatter, the matching name is shown as a second line under the title (“File name: 202609031500 - Marburger Forum”) so you recognise the note.",
+        "release.c2h": "Quick switcher (⌘K) scores equally",
+        "release.c2": "The file name used to count only as a weak path hit at the bottom. All three names now score the same as the title, and a frontmatter hit is shown with the search term highlighted.",
+        "release.c3h": "From 0.11.11: security update",
+        "release.c3": "Five reported vulnerabilities in mail libraries and the archive reader closed, one of them reachable through incoming mail. And from 0.11.10: settings with all groups open and a fixed search field.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
