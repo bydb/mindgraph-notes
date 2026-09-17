@@ -88,7 +88,14 @@
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "signtoolOptions": {
+        "publisherName": "Jochen Rudolf Leeder",
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "rfc3161TimeStampServer": "http://time.certum.pl"
+      }
     },
     "nsis": {
       "oneClick": false,

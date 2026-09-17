@@ -396,7 +396,7 @@ Click-Handler für Decorations: `view.posAtCoords()` + StateField-Lookup nutzen 
 7. GitHub Actions baut automatisch:
    - macOS (arm64+x64) — signiert + notarisiert
    - Linux (AppImage+deb+snap)
-   - Windows (exe)
+   - Windows (exe) — signiert (Certum SimplySign, siehe unten)
 8. Release wird automatisch auf GitHub erstellt via `softprops/action-gh-release`
 9. Snap wird automatisch zum Snap Store (edge channel) hochgeladen
 
@@ -417,6 +417,18 @@ Oder: `/release` Command verwenden.
   - `APPLE_API_KEY` muss als Dateipfad gesetzt werden, nicht als Inhalt
   - `~` wird in GitHub Actions Env-Vars nicht expandiert → `$HOME` verwenden
   - Neue Developer-Accounts: erste Notarization dauert Stunden, danach 5-15 Min
+
+## Windows Code Signing (Certum SimplySign)
+
+- **Anlass (16.09.2026)**: ein Konzern-Einkauf prüft die App; Windows-Builds waren bis dahin unsigniert. In Konzern-Umgebungen startet die Client-Verwaltung unsignierte Programme gar nicht erst — Signierung ist dort Eintrittskarte, nicht Kosmetik.
+- **Zertifikat**: Certum „Standard Code Signing in the Cloud" auf die natürliche Person (Bestellung 17.09.2026, 1 Jahr, ~249 € brutto). Kein Azure Artifact Signing: in der EU nur für eingetragene Organisationen, Einzelpersonen nur USA/Kanada. Kein EV: seit 2024 ohne SmartScreen-Vorschuss. Der Schlüssel liegt in Certums Cloud-HSM; SimplySign Desktop stellt ihn als Smartcard-Zertifikat im Speicher `CurrentUser\My` bereit, signtool sieht eine Smartcard.
+- **CI** (`build.yml`, Job `build-windows`): Action `dismine/windows-app-signing-setup-action` (auf Commit gepinnt, Quelle gelesen) installiert SimplySign Desktop 9.4.3.90 (URL gepinnt — die Anmeldung bedient das Login-Fenster per Tastatur, ein neues Fenster bricht sie), erzeugt aus dem TOTP-Geheimnis den Einmalcode, meldet an und wartet auf das Zertifikat. Danach signiert electron-builder selbst App-Exe, DLLs, Uninstaller, Setup und portable Exe. Der Thumbprint kommt NUR per CLI (`--config.win.signtoolOptions.certificateSha1`), nie in die package.json — ein lokales `npm run dist` ohne Zertifikat bleibt unsigniert lauffähig.
+- **GitHub Secrets**: `CERTUM_USERNAME` (SimplySign-Login), `CERTUM_OTP_URI` (vollständiger `otpauth://`-Link vom Einrichtungs-QR-Code — Langzeitgeheimnis, ersetzt die Handy-App), `CERTUM_KEY_ID` (SHA-1-Thumbprint des Zertifikats). Ohne Secrets baut die CI unsigniert, **ein Tag-Build ohne Secrets bricht ab** — analog zur Notarisierungspflicht beim Mac.
+- **`win.signtoolOptions.publisherName` muss exakt dem CN des Zertifikats entsprechen und darf danach nie wieder wechseln**: electron-updater vergleicht vor jedem Update den CN des Installers mit diesem Wert (`app-update.yml`); ein Wechsel hieße, dass jede installierte Version das nächste Update ablehnt, und die SmartScreen-Reputation fängt bei null an. Der Schritt „Signaturen prüfen" erzwingt die Gleichheit (plus Status `Valid` und Zeitstempel) — schlägt er fehl, fällt das Release.
+- **Nur SHA-256, Zeitstempel `http://time.certum.pl`** (RFC 3161). Kein SHA-1-Doppelsignieren (Windows 7 ist tot, halbiert den Verbrauch am 5000er-Monatslimit).
+- **Testlauf ohne Release**: Actions → „Build and Release" → „Run workflow" mit `only_windows=true` (überspringt macOS/Linux). Ergebnis in den Datei-Eigenschaften → Digitale Signaturen kontrollieren.
+- **SmartScreen bleibt trotzdem**: ein frisch signiertes Zertifikat hat null Reputation, der Hinweis „Windows hat den PC geschützt" verschwindet erst mit Download-Volumen — auch bei EV. Nicht als Signierfehler deuten.
+- **Erneuerung**: Certum stellt seit 27.02.2026 maximal 459 Tage aus. Neues Zertifikat = neuer Thumbprint → `CERTUM_KEY_ID` tauschen; der CN muss identisch bleiben (siehe oben).
 
 ## Snap Store
 
