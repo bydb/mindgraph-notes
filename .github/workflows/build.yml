@@ -213,7 +213,11 @@ jobs:
       # stellt ihn als Smartcard-Zertifikat im Windows-Zertifikatsspeicher bereit. Version ist
       # GEPINNT, weil die Anmeldung (dismine-Action) das Login-Fenster per Tastatur bedient — ein
       # geändertes Fenster in einer neueren Version bricht sie. Neue Version nur nach Testlauf.
-      SIMPLYSIGN_URL: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.3.90/SimplySignDesktop-9.4.3.90-64-bit-en.msi
+      # Der Pin muss trotzdem die AKTUELLE Version sein: eine ältere zeigt beim Start den Dialog
+      # "Neue Version gefunden", und je nach Timing hält die Action dann das falsche Fenster für das
+      # Login-Fenster ("Credential rejected", real 17.09.2026 mit 9.4.3.90, als 9.4.4.92 erschien).
+      # Der Schritt "SimplySign-Version prüfen" meldet das, bevor ein Anmeldeversuch verbraucht wird.
+      SIMPLYSIGN_URL: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.4.92/SimplySignDesktop-9.4.4.92-64-bit-en.msi
 
     steps:
       - name: Checkout code
@@ -256,6 +260,29 @@ jobs:
           } else {
             Write-Host "Code Signing: übersprungen — Secrets fehlen ($($missing -join ', ')), kein Tag-Build"
             "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
+      # Fail-fast statt Münzwurf: ist bei Certum eine neuere Version erschienen als gepinnt, scheitert
+      # die Anmeldung am Update-Dialog — und jeder Fehlversuch zählt bei Certum gegen das Konto.
+      # Ist die Download-Seite nicht lesbar, wird nur gewarnt (Certums Webseite darf kein Release kippen).
+      - name: SimplySign-Version prüfen
+        if: steps.signing.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $pinned = [version]([regex]::Match($env:SIMPLYSIGN_URL, '/Windows/([\d.]+)/').Groups[1].Value)
+          try {
+            $page = (Invoke-WebRequest -Uri 'https://simplysign.certum.eu/downloads/' -TimeoutSec 30).Content
+            $found = [regex]::Matches($page, 'SimplySignDesktop/Windows/([\d.]+)/') | ForEach-Object { [version]$_.Groups[1].Value }
+            if (-not $found) { throw 'keine Versionsnummer auf der Download-Seite gefunden' }
+            $latest = ($found | Sort-Object -Descending)[0]
+          } catch {
+            Write-Host "::warning::SimplySign-Versionsprüfung übersprungen: $($_.Exception.Message)"
+            exit 0
+          }
+          Write-Host "SimplySign gepinnt: $pinned, aktuell bei Certum: $latest"
+          if ($latest -gt $pinned) {
+            Write-Host "::error::SimplySign Desktop $latest ist erschienen, gepinnt ist $pinned. Die ältere Version zeigt einen Update-Dialog, an dem die automatische Anmeldung scheitert. SIMPLYSIGN_URL in build.yml auf $latest anheben und erst mit only_windows=true testen."
+            exit 1
           }
 
       - name: SimplySign-Installer cachen (274 MB)
