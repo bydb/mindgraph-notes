@@ -14,6 +14,11 @@ on:
         type: boolean
         required: false
         default: false
+      signing_diagnostics:
+        description: 'Screenshots der SimplySign-Anmeldung als Artefakt (zeigt die Login-Adresse, 1 Tag Aufbewahrung)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -274,6 +279,20 @@ jobs:
           certum-otp-uri: ${{ secrets.CERTUM_OTP_URI }}
           certum-key-id: ${{ secrets.CERTUM_KEY_ID }}
           simplysign-url: ${{ env.SIMPLYSIGN_URL }}
+          capture-diagnostics: ${{ inputs.signing_diagnostics == true }}
+
+      # Nur beim manuellen Diagnoselauf: Die Action meldet bei einer abgelehnten Anmeldung nur
+      # "Credential rejected" — was SimplySign wirklich anzeigt (falsches Feld, Update-Dialog,
+      # Kontomeldung), steht allein in den Screenshots. Das Repo ist öffentlich, deshalb ein Tag
+      # Aufbewahrung; zu sehen sind die Login-Adresse und ein abgelaufener Einmalcode, kein Geheimnis.
+      - name: Anmelde-Screenshots hochladen (Diagnose)
+        if: always() && inputs.signing_diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplysign-diagnostics
+          path: simplysign-diag-*.png
+          retention-days: 1
+          if-no-files-found: warn
 
       # electron-builder signiert damit alles selbst: App-Exe, gebündelte DLLs, Uninstaller, NSIS-Setup
       # und portable Exe (signtool /sha1 <Thumbprint> /s My, SHA-256, RFC-3161-Zeitstempel bei Certum —
