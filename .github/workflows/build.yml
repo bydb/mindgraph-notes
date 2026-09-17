@@ -9,6 +9,16 @@ on:
       version:
         description: 'Version tag (e.g., v1.0.2)'
         required: false
+      only_windows:
+        description: 'Nur Windows bauen (Signier-Testlauf, kein Release)'
+        type: boolean
+        required: false
+        default: false
+      signing_diagnostics:
+        description: 'Screenshots der SimplySign-Anmeldung als Artefakt (zeigt die Login-Adresse, 1 Tag Aufbewahrung)'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -22,6 +32,8 @@ jobs:
     # für beide Architekturen (v0.11.5-beta, zwei Anläufe). Apple hat das
     # Entsperren von Keychains außerhalb einer Login-Session in 26.6 gehärtet;
     # auf GitHub-Runnern ist das nicht beeinflussbar. Image 20260728 lief noch.
+    # Bei manuellem Start mit only_windows=true übersprungen (Signier-Testlauf spart 2× macOS-Runner).
+    if: ${{ !inputs.only_windows }}
     runs-on: macos-15
     timeout-minutes: 45
     strategy:
@@ -136,6 +148,7 @@ jobs:
           if-no-files-found: error
 
   build-linux:
+    if: ${{ !inputs.only_windows }}
     runs-on: ubuntu-latest
 
     steps:
@@ -194,6 +207,13 @@ jobs:
     # die VS-Installation nicht mehr ("Could not find any Visual Studio installation").
     # windows-2022 (VS 2022) ist die bekannt-funktionierende Umgebung (v0.7.26 lief damit durch).
     runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      # Certum SimplySign Desktop: der Signierschlüssel liegt in Certums Cloud-HSM, die Desktop-App
+      # stellt ihn als Smartcard-Zertifikat im Windows-Zertifikatsspeicher bereit. Version ist
+      # GEPINNT, weil die Anmeldung (dismine-Action) das Login-Fenster per Tastatur bedient — ein
+      # geändertes Fenster in einer neueren Version bricht sie. Neue Version nur nach Testlauf.
+      SIMPLYSIGN_URL: https://files.certum.eu/software/SimplySignDesktop/Windows/9.4.3.90/SimplySignDesktop-9.4.3.90-64-bit-en.msi
 
     steps:
       - name: Checkout code
@@ -214,9 +234,112 @@ jobs:
         working-directory: app
         run: npm run build
 
-      - name: Build Windows (x64)
+      # Ohne die drei Certum-Secrets (Fork-PRs, Dependabot) wird unsigniert gebaut — aber NIE für ein
+      # Release: ein Tag-Build ohne Secrets bricht ab, damit nie wieder eine unsignierte Exe auf der
+      # Release-Seite landet (analog zur Notarisierungspflicht beim Mac).
+      - name: Code Signing vorbereiten
+        id: signing
+        shell: pwsh
+        env:
+          CERTUM_USERNAME: ${{ secrets.CERTUM_USERNAME }}
+          CERTUM_OTP_URI: ${{ secrets.CERTUM_OTP_URI }}
+          CERTUM_KEY_ID: ${{ secrets.CERTUM_KEY_ID }}
+        run: |
+          $missing = @('CERTUM_USERNAME', 'CERTUM_OTP_URI', 'CERTUM_KEY_ID') |
+            Where-Object { [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) }
+          if ($missing.Count -eq 0) {
+            Write-Host "Code Signing: aktiv (Certum SimplySign)"
+            "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          } elseif ($env:GITHUB_REF -like 'refs/tags/*') {
+            Write-Error "Release-Build ohne Certum-Secrets ($($missing -join ', ')) — ein Windows-Release darf nicht unsigniert erscheinen."
+            exit 1
+          } else {
+            Write-Host "Code Signing: übersprungen — Secrets fehlen ($($missing -join ', ')), kein Tag-Build"
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
+      - name: SimplySign-Installer cachen (274 MB)
+        if: steps.signing.outputs.enabled == 'true'
+        uses: actions/cache@v4
+        with:
+          path: SimplySignDesktop.msi
+          key: simplysign-msi-${{ env.SIMPLYSIGN_URL }}
+
+      # Installiert SimplySign Desktop, erzeugt aus dem TOTP-Geheimnis den Einmalcode, meldet sich im
+      # Login-Fenster an und wartet, bis das Zertifikat mit dem Thumbprint CERTUM_KEY_ID im Speicher
+      # CurrentUser\My liegt. Auf den Commit gepinnt, nicht auf den Tag v1.2.5: die Action sieht das
+      # TOTP-Geheimnis, ein umgehängter Tag darf es nicht abgreifen können. Quelle am 17.09.2026
+      # vollständig gelesen (MIT-Lizenz): Secrets bleiben in Env/Zwischenablage, Zwischenablage wird
+      # nach dem Einfügen geleert, keine Screenshots ohne capture-diagnostics.
+      - name: Bei Certum SimplySign anmelden (TOTP)
+        if: steps.signing.outputs.enabled == 'true'
+        uses: dismine/windows-app-signing-setup-action@89ae3b032d4bc7a5b98d1a42a34e61ecb6faad64 # v1.2.5
+        with:
+          certum-username: ${{ secrets.CERTUM_USERNAME }}
+          certum-otp-uri: ${{ secrets.CERTUM_OTP_URI }}
+          certum-key-id: ${{ secrets.CERTUM_KEY_ID }}
+          simplysign-url: ${{ env.SIMPLYSIGN_URL }}
+          capture-diagnostics: ${{ inputs.signing_diagnostics == true }}
+
+      # Nur beim manuellen Diagnoselauf: Die Action meldet bei einer abgelehnten Anmeldung nur
+      # "Credential rejected" — was SimplySign wirklich anzeigt (falsches Feld, Update-Dialog,
+      # Kontomeldung), steht allein in den Screenshots. Das Repo ist öffentlich, deshalb ein Tag
+      # Aufbewahrung; zu sehen sind die Login-Adresse und ein abgelaufener Einmalcode, kein Geheimnis.
+      - name: Anmelde-Screenshots hochladen (Diagnose)
+        if: always() && inputs.signing_diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: simplysign-diagnostics
+          path: simplysign-diag-*.png
+          retention-days: 1
+          if-no-files-found: warn
+
+      # electron-builder signiert damit alles selbst: App-Exe, gebündelte DLLs, Uninstaller, NSIS-Setup
+      # und portable Exe (signtool /sha1 <Thumbprint> /s My, SHA-256, RFC-3161-Zeitstempel bei Certum —
+      # siehe win.signtoolOptions in app/package.json). Der Thumbprint kommt NUR hier über die
+      # Kommandozeile, nie in die package.json: ein lokales `npm run dist` auf Windows ohne Zertifikat
+      # soll weiterhin unsigniert durchlaufen. Fehlt das Zertifikat im Speicher, bricht der Build ab
+      # ("Cannot find certificate") — es gibt keinen stillen Rückfall auf unsigniert.
+      - name: Build Windows (x64, signiert)
+        if: steps.signing.outputs.enabled == 'true'
+        working-directory: app
+        shell: pwsh
+        env:
+          CERTUM_KEY_ID: ${{ secrets.CERTUM_KEY_ID }}
+        run: npx electron-builder --win --x64 --publish never --config.win.signtoolOptions.certificateSha1=$env:CERTUM_KEY_ID
+
+      - name: Build Windows (x64, unsigniert)
+        if: steps.signing.outputs.enabled != 'true'
         working-directory: app
         run: npx electron-builder --win --x64 --publish never
+
+      # Fängt SOFORT ab, was sonst erst beim Nutzer auffiele: (1) Status muss "Valid" sein (Kette bis
+      # zur vertrauenswürdigen Wurzel), (2) der Herausgeber (CN) muss exakt dem publisherName aus
+      # package.json entsprechen — genau der Vergleich, den electron-updater vor jedem Update macht;
+      # ein abweichender CN hieße, dass jede künftige Version vom Auto-Update abgelehnt wird —,
+      # (3) ein Zeitstempel muss vorhanden sein, sonst wird die Signatur mit dem Zertifikat ungültig.
+      - name: Signaturen prüfen
+        if: steps.signing.outputs.enabled == 'true'
+        shell: pwsh
+        run: |
+          $expected = (Get-Content app/package.json -Raw | ConvertFrom-Json).build.win.signtoolOptions.publisherName
+          if ([string]::IsNullOrWhiteSpace($expected)) { Write-Error "build.win.signtoolOptions.publisherName fehlt in app/package.json"; exit 1 }
+
+          $files = @(Get-ChildItem -Path app/dist/*.exe) + @(Get-ChildItem -LiteralPath 'app/dist/win-unpacked/MindGraph Notes.exe')
+          if ($files.Count -lt 3) { Write-Error "Erwartet mindestens Setup, portable Exe und App-Exe, gefunden: $($files.Count)"; exit 1 }
+
+          $failed = $false
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature -LiteralPath $f.FullName
+            $cn = if ($sig.SignerCertificate) { $sig.SignerCertificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false) } else { '' }
+            $ts = if ($sig.TimeStamperCertificate) { 'ja' } else { 'NEIN' }
+            Write-Host "$($f.Name): Status=$($sig.Status) CN='$cn' Zeitstempel=$ts"
+            if ($sig.Status -ne 'Valid') { Write-Host "::error::$($f.Name): Signatur nicht gültig ($($sig.Status)): $($sig.StatusMessage)"; $failed = $true }
+            if ($cn -ne $expected) { Write-Host "::error::$($f.Name): Herausgeber '$cn' ≠ publisherName '$expected' — Auto-Update würde Updates ablehnen"; $failed = $true }
+            if (-not $sig.TimeStamperCertificate) { Write-Host "::error::$($f.Name): kein Zeitstempel"; $failed = $true }
+          }
+          if ($failed) { exit 1 }
+          Write-Host "Alle Signaturen OK"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
