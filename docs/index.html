@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.12-beta",
+    "softwareVersion": "0.11.13-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Suche findet Notizen jetzt auch &uuml;ber Dateinamen und Frontmatter-Titel &middot; v0.11.12</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Windows-Version ist jetzt digital signiert &middot; v0.11.13</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.12 &middot; Suche</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &mdash; <em>Die Suche findet Notizen jetzt auch &uuml;ber Dateiname und Frontmatter-Titel.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Bisher z&auml;hlte f&uuml;r Schnellsuche und Quick Switcher nur die erste &Uuml;berschrift einer Notiz. Wer seine Notizen &uuml;ber den Dateinamen oder ein title-Feld benennt, etwa bei KI-Zusammenfassungen mit der &Uuml;berschrift &bdquo;Zusammenfassung&ldquo;, fand sie nicht. Jetzt z&auml;hlen alle drei Namen gleich.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.13 &#183; Windows-Signatur</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Die Windows-Version ist jetzt digital signiert.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Installer und Programm tragen ab dieser Version eine g&#252;ltige Signatur auf den Namen des Entwicklers. Windows zeigt damit einen gepr&#252;ften Herausgeber statt &#8222;Unbekannter Herausgeber&#8220;, und verwaltete Firmenrechner, die unsignierte Programme blockieren, lassen die App zu. An der App selbst &#228;ndert sich nichts, f&#252;r macOS und Linux bleibt alles beim Alten.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Schnellsuche (&#8984;P) pr&uuml;ft drei Namen</b><p data-i18n="release.c1">&Uuml;berschrift, Dateiname und Frontmatter-Titel z&auml;hlen gleich. Der Treffer zeigt an, &uuml;ber welchen Namen er gefunden wurde.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Quick Switcher (&#8984;K) ebenso</b><p data-i18n="release.c2">Eine Notiz, deren Name nur im Dateinamen steht, landet jetzt oben statt ganz unten in der Liste.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.11: Sicherheits-Update</b><p data-i18n="release.c3">F&uuml;nf gemeldete L&uuml;cken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon &uuml;ber eingehende Mails erreichbar.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Gepr&#252;fter Herausgeber</b><p data-i18n="release.c1">Setup, portable Version und das Programm selbst sind signiert und tragen einen Zeitstempel. Nachzusehen in den Datei-Eigenschaften unter &#8222;Digitale Signaturen&#8220;.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">SmartScreen warnt anfangs noch</b><p data-i18n="release.c2">Ein neues Zertifikat hat bei Microsoft noch keinen Ruf. Der Hinweis &#8222;Der Computer wurde durch Windows gesch&#252;tzt&#8220; verschwindet erst mit der Zahl der Downloads. Das ist kein Fehler der Signatur.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.12: Suche &#252;ber drei Namen</b><p data-i18n="release.c3">Schnellsuche und Quick Switcher finden Notizen jetzt auch &#252;ber Dateiname und Frontmatter-Titel.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Suche findet Notizen jetzt auch über Dateinamen und Frontmatter-Titel &middot; v{vs}",
+        "hero.release": "Windows-Version ist jetzt digital signiert &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Suche",
-        "release.heading": "Was ist neu — <em>Die Suche findet Notizen jetzt auch über Dateiname und Frontmatter-Titel.</em>",
-        "release.lead": "Bisher zählte für Schnellsuche und Quick Switcher nur die erste Überschrift einer Notiz. Wer seine Notizen über den Dateinamen oder ein title-Feld benennt, etwa bei KI-Zusammenfassungen mit der Überschrift „Zusammenfassung", fand sie nicht. Jetzt zählen alle drei Namen gleich.",
-        "release.c1h": "Schnellsuche (⌘P) prüft drei Namen",
-        "release.c1": "Überschrift, Dateiname und Frontmatter-Titel zählen gleich. Der Treffer zeigt an, über welchen Namen er gefunden wurde.",
-        "release.c2h": "Quick Switcher (⌘K) ebenso",
-        "release.c2": "Eine Notiz, deren Name nur im Dateinamen steht, landet jetzt oben statt ganz unten in der Liste.",
-        "release.c3h": "Aus 0.11.11: Sicherheits-Update",
-        "release.c3": "Fünf gemeldete Lücken in Mail-Bibliotheken und im Archiv-Leser geschlossen, eine davon über eingehende Mails erreichbar. Und aus 0.11.10: Einstellungen mit allen Gruppen offen und festem Suchfeld.",
+        "release.label": "Release {vs} · Windows-Signatur",
+        "release.heading": "Was ist neu — <em>Die Windows-Version ist jetzt digital signiert.</em>",
+        "release.lead": "Installer und Programm tragen ab dieser Version eine gültige Signatur auf den Namen des Entwicklers. Windows zeigt damit einen geprüften Herausgeber statt „Unbekannter Herausgeber“, und verwaltete Firmenrechner, die unsignierte Programme blockieren, lassen die App zu. An der App selbst ändert sich nichts, für macOS und Linux bleibt alles beim Alten.",
+        "release.c1h": "Geprüfter Herausgeber",
+        "release.c1": "Setup, portable Version und das Programm selbst sind signiert und tragen einen Zeitstempel. Nachzusehen in den Datei-Eigenschaften unter „Digitale Signaturen“.",
+        "release.c2h": "SmartScreen warnt anfangs noch",
+        "release.c2": "Ein neues Zertifikat hat bei Microsoft noch keinen Ruf. Der Hinweis „Der Computer wurde durch Windows geschützt“ verschwindet erst mit der Zahl der Downloads. Das ist kein Fehler der Signatur.",
+        "release.c3h": "Aus 0.11.12: Suche über drei Namen",
+        "release.c3": "Schnellsuche und Quick Switcher finden Notizen jetzt auch über Dateiname und Frontmatter-Titel.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Search now finds notes by file name and frontmatter title &middot; v{vs}",
+        "hero.release": "The Windows version is now digitally signed &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Search",
-        "release.heading": "What’s new — <em>Search now finds notes by file name and frontmatter title too.</em>",
-        "release.lead": "Until now, quick search and quick switcher only looked at a note’s first heading. If you name your notes by file name or a title field, for example AI summaries headed “Summary”, they could not be found. All three names now count equally.",
-        "release.c1h": "Quick search (⌘P) checks three names",
-        "release.c1": "Heading, file name and frontmatter title count equally. Each hit shows which name it was found by.",
-        "release.c2h": "Quick switcher (⌘K) as well",
-        "release.c2": "A note whose name lives only in the file name now lands at the top of the list instead of the bottom.",
-        "release.c3h": "From 0.11.11: security update",
-        "release.c3": "Five reported vulnerabilities in mail libraries and the archive reader closed, one of them reachable through incoming mail. And from 0.11.10: settings with all groups open and a fixed search field.",
+        "release.label": "Release {vs} · Windows signature",
+        "release.heading": "What’s new — <em>The Windows version is now digitally signed.</em>",
+        "release.lead": "From this version on, installer and program carry a valid signature in the developer’s name. Windows shows a verified publisher instead of “Unknown publisher”, and managed company machines that block unsigned programs will let the app run. Nothing changes in the app itself, and nothing changes on macOS and Linux.",
+        "release.c1h": "Verified publisher",
+        "release.c1": "Setup, portable version and the program itself are signed and timestamped. You can check it in the file properties under “Digital Signatures”.",
+        "release.c2h": "SmartScreen still warns at first",
+        "release.c2": "A new certificate has no reputation with Microsoft yet. The “Windows protected your PC” notice only disappears as downloads add up. It does not mean the signature is broken.",
+        "release.c3h": "From 0.11.12: search by three names",
+        "release.c3": "Quick search and quick switcher now also find notes by file name and frontmatter title.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

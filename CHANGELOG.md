@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.13-beta] - 2026-09-17
+
+**Die Windows-Version ist jetzt digital signiert.** Installer, portable Version und das Programm selbst tragen ab diesem Release eine gültige Signatur auf den Namen des Entwicklers. Windows zeigt damit einen geprüften Herausgeber statt „Unbekannter Herausgeber“, und verwaltete Firmenrechner, die unsignierte Programme gar nicht erst starten, lassen die App zu. An der App selbst ändert sich nichts; für macOS und Linux bleibt alles beim Alten.
+
+### Hintergrund
+
+- Anlass war die Prüfung der App in einer verwalteten Unternehmensumgebung. Dort ist eine Signatur Voraussetzung dafür, dass ein Programm überhaupt startet.
+- Signiert wird mit SHA-256 und einem Zeitstempel, die Signatur bleibt also auch nach Ablauf des Zertifikats gültig. Nachsehen lässt sie sich per Rechtsklick auf die Datei unter Eigenschaften → Digitale Signaturen.
+- Der private Schlüssel liegt in einem Hardware-Tresor des Zertifikatsausstellers und verlässt ihn nie. Die Build-Kette prüft nach dem Signieren jede Datei und bricht ein Release ab, wenn eine Signatur fehlt oder ungültig ist. Eine unsignierte Windows-Version kann damit nicht mehr versehentlich erscheinen.
+- **Grenze:** Der Hinweis „Der Computer wurde durch Windows geschützt“ (SmartScreen) erscheint anfangs weiterhin. Ein neues Zertifikat hat bei Microsoft noch keinen Ruf; die Warnung verschwindet erst mit der Zahl der Downloads. Das ist kein Fehler der Signatur.
+
 ## [0.11.12-beta] - 2026-09-15
 
 **Suche findet Notizen jetzt auch über Dateiname und Frontmatter-Titel.** Bisher zählte für die Schnellsuche (⌘P) und den Quick Switcher (⌘K) nur die erste Überschrift einer Notiz. Wer seine Notizen über den Dateinamen oder ein `title`-Feld benennt, etwa bei KI-Zusammenfassungen mit der Überschrift „Zusammenfassung", fand sie nicht. Jetzt zählen alle drei Namen gleich, und der Treffer zeigt an, über welchen Namen er gefunden wurde.
