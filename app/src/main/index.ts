@@ -207,6 +207,7 @@ import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './
 import { supportsNativeToolCalls, isNonGenerativeModel } from '../shared/modelCompatibility'
 import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
 import { VaultRagManager } from './rag/vaultRagManager'
+import { locateSource, type SourceRef } from './rag/vaultRetrieve'
 import { wrapIpcWithOllamaActivity, withOllamaActivity } from './rag/ollamaActivity'
 import { resolveLocalModel, describeLocalModelError } from './rag/localModel'
 import type { VaultQueryFilters } from '../shared/rag/vaultIndex'
@@ -7750,6 +7751,19 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
     return { success: false, requestId, error }
   } finally {
     cleanup()
+  }
+})
+
+// Quellenklick (F28): Frischeprüfung im Main, nie stiller Sprung auf alte Offsets.
+ipcMain.handle('vault-rag-locate-source', async (_event, vaultPath: string, ref: SourceRef) => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-locate-source')
+    if (!ref || typeof ref.fileRel !== 'string' || typeof ref.sourceHash !== 'string' || typeof ref.chunkHash !== 'string') {
+      return { success: false, error: 'Ungültige Quellenreferenz' }
+    }
+    return { success: true, result: await locateSource(vaultPath, ref, assertSafePath) }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 })
 

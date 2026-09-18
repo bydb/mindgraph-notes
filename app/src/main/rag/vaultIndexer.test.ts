@@ -368,6 +368,106 @@ describe('VaultIndexJob — Fehler und defektes Staging', () => {
   })
 })
 
+describe('Pfadschutz und Segment-Reparatur (F34, F37)', () => {
+  it('.mindgraph als Symlink nach außen: Lauf wird abgelehnt, kein Ordner außerhalb angelegt (F34)', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-idx-outside-'))
+    try {
+      await fs.rm(path.join(vault, '.mindgraph'), { recursive: true, force: true })
+      await fs.symlink(outside, path.join(vault, '.mindgraph'))
+      const real = await fs.realpath(vault)
+      const strict = async (p: string): Promise<string> => {
+        const resolved = path.resolve(p)
+        let canonical: string
+        try { canonical = await fs.realpath(resolved) } catch { canonical = path.join(await fs.realpath(path.dirname(resolved)), path.basename(resolved)) }
+        if (canonical !== real && !canonical.startsWith(real + path.sep)) throw new Error(`außerhalb: ${p}`)
+        return canonical
+      }
+      const { j } = job({ assertSafePath: strict })
+      const res = await j.run()
+      expect(res.status).toBe('error')
+      expect(res.error).toMatch(/außerhalb/)
+      await expect(fs.stat(path.join(outside, 'rag'))).rejects.toThrow()
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
+  })
+
+  it('defektes erstes Segment bei zwei Segmenten: Resume überschreibt das gültige nicht, Endcontainer vollständig (F37)', async () => {
+    const identity = identityFor(['400 - Archiv'])
+    const staging = stagingDirFor(userData, vault, identity)
+    embedDelayMs = 8
+    const first = job({ packetSize: 1 })
+    const p = first.j.run()
+    for (let i = 0; i < 600; i++) {
+      const cp = await loadCheckpoint(staging, identity)
+      if (cp && cp.segments.length >= 2) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    first.j.cancel()
+    await p
+    const cp = await loadCheckpoint(staging, identity)
+    expect(cp!.segments.length).toBeGreaterThanOrEqual(2)
+    const firstSeg = path.join(staging, cp!.segments[0].name)
+    const secondSegName = cp!.segments[1].name
+    const bytes = await fs.readFile(firstSeg)
+    await fs.writeFile(firstSeg, bytes.subarray(0, 20))
+
+    embedLog.length = 0
+    const res = await job({ packetSize: 1 }).j.run()
+    expect(res.status).toBe('done')
+    expect(res.fileCount).toBe(3)
+    const container = await loadVaultIndexFile(vaultIndexPath(vault, identity))
+    // Alle drei Dateien mit allen Chunks — nichts wurde überschrieben oder verloren
+    const perFile = new Map<string, number>()
+    for (const c of container!.meta.chunks) perFile.set(c.fileRel, (perFile.get(c.fileRel) ?? 0) + 1)
+    expect([...perFile.keys()].sort()).toEqual([
+      '100 - Projekte/202609181000 - 🔴 Alpha.md',
+      '100 - Projekte/Beta.md',
+      '300 - Ressourcen/Gamma.md'
+    ])
+    for (const c of container!.meta.chunks) {
+      const canonical = canonicalizeMarkdown(await fs.readFile(path.join(vault, c.fileRel), 'utf-8'))
+      expect(canonical.slice(c.sourceStart, c.sourceEnd)).toBe(c.text)
+    }
+    // Der zweite Segmentname existiert nicht mehr zweimal; kein Name aus dem Muster "seg-0000n"
+    expect(secondSegName).toMatch(/^seg-/)
+  })
+
+  it('mehrere Versionen derselben Datei im Staging: die jüngste gültige gewinnt (F37)', async () => {
+    const identity = identityFor(['400 - Archiv'])
+    const staging = stagingDirFor(userData, vault, identity)
+    embedDelayMs = 8
+    // Lauf 1 stagt Alpha (Paket 1), wird danach abgebrochen
+    const a = job({ packetSize: 1 })
+    const pa = a.j.run()
+    for (let i = 0; i < 600; i++) {
+      const cp = await loadCheckpoint(staging, identity)
+      if (cp && cp.segments.length >= 1) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    a.j.cancel()
+    await pa
+    // Alpha ändern → Lauf 2 stagt Alpha erneut (neues Segment), wird wieder abgebrochen
+    await writeNote('100 - Projekte/202609181000 - 🔴 Alpha.md', '# Alpha\n\n' + para(20, 'AlphaNeu'))
+    const b = job({ packetSize: 1 })
+    const pb = b.j.run()
+    for (let i = 0; i < 600; i++) {
+      const cp = await loadCheckpoint(staging, identity)
+      if (cp && cp.segments.length >= 2) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    b.j.cancel()
+    await pb
+    // Lauf 3 vollständig
+    const res = await job({ packetSize: 1 }).j.run()
+    expect(res.status).toBe('done')
+    const container = await loadVaultIndexFile(vaultIndexPath(vault, identity))
+    const alphaChunks = container!.meta.chunks.filter((c) => c.fileRel.includes('Alpha'))
+    expect(alphaChunks.some((c) => c.text.includes('AlphaNeu'))).toBe(true)
+    expect(alphaChunks.every((c) => !c.text.includes('Alpha Satz 1 '))).toBe(true)
+  })
+})
+
 describe('coalesceParts', () => {
   it('fasst benachbarte Teilstücke desselben Puffers zusammen', () => {
     const buf = new Float32Array([1, 2, 3, 4, 5, 6])

@@ -13,6 +13,8 @@ import { isCloudModel } from '../../../shared/modelCompatibility'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
 import type { NoteAgentAttachment, VaultRagAnswerDone, VaultRagHitDto } from '../../../shared/types'
 import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
+import { citationMarkdownPlugin, type CitationEnv } from '../../utils/citationMarkdown'
+import { useTabStore } from '../../stores/tabStore'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -147,6 +149,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     const katexOptions = { throwOnError: false, trust: false, strict: false, displayMode: false }
     instance.use(texmath, { engine: katex, delimiters: 'dollars', katexOptions })
     instance.use(texmath, { engine: katex, delimiters: 'brackets', katexOptions })
+    // Zitat-Hochzahlen als Inline-Token — nur in Text, nie in Code/Links (Codex F25).
+    instance.use(citationMarkdownPlugin)
 
     const defaultFence = instance.renderer.rules.fence
     instance.renderer.rules.fence = (tokens, idx, options, env, self) => {
@@ -298,24 +302,70 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     return suffix ? suffix.id : null
   }, [notes])
 
-  // Vault-Antwort: NUR die vom Prüfer erkannten gültigen Referenzen werden zu Hochzahlen —
-  // über Platzhalter im Markdown, nie per Ersetzung im fertigen HTML (Codex F25). Code,
-  // Links und escaped Klammern bleiben unverändert.
-  const CITE_TOKEN = /⟦cite:(\d{1,3})⟧/g
+  // Quellenklick (F28): Hash im Main prüfen, Stelle relokalisieren, Sprungziel an Notiz
+  // und Fassung binden. Geändert → Notiz öffnet oben mit sichtbarem Hinweis; fehlt → nur Hinweis.
+  const [sourceNotice, setSourceNotice] = useState<string | null>(null)
+  const sourceNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showSourceNotice = useCallback((text: string) => {
+    setSourceNotice(text)
+    if (sourceNoticeTimer.current) clearTimeout(sourceNoticeTimer.current)
+    sourceNoticeTimer.current = setTimeout(() => setSourceNotice(null), 7000)
+  }, [])
+  useEffect(() => {
+    const onJump = (e: Event) => {
+      const detail = (e as CustomEvent<{ status: 'ok' | 'changed' }>).detail
+      if (detail?.status === 'changed') showSourceNotice(t('notesChat.vaultSourceChanged'))
+    }
+    window.addEventListener('mindgraph:sourceJump', onJump)
+    return () => window.removeEventListener('mindgraph:sourceJump', onJump)
+  }, [showSourceNotice, t])
+  const openSource = useCallback(async (msg: ChatMessage, hit: VaultRagHitDto) => {
+    if (!vaultPath || msg.vaultPath !== vaultPath) {
+      showSourceNotice(t('notesChat.vaultOtherVault'))
+      return
+    }
+    const noteId = resolveSourceNoteId(hit.fileRel)
+    const res = await window.electronAPI.vaultRagLocateSource(vaultPath, {
+      fileRel: hit.fileRel, sourceHash: hit.sourceHash, chunkHash: hit.chunkHash,
+      sourceStart: hit.sourceStart, sourceEnd: hit.sourceEnd, startLine: hit.startLine
+    })
+    if (!res.success || !res.result) {
+      showSourceNotice((lang === 'de' ? 'Fehler: ' : 'Error: ') + (res.error ?? ''))
+      return
+    }
+    const r = res.result
+    if (r.status === 'missing' || !noteId) {
+      showSourceNotice(t('notesChat.vaultSourceMissing'))
+      return
+    }
+    if (r.status === 'changed') {
+      useTabStore.getState().setPendingSourceTarget(null)
+      useNotesStore.getState().selectNote(noteId)
+      showSourceNotice(t('notesChat.vaultSourceChanged'))
+      return
+    }
+    useTabStore.getState().setPendingSourceTarget({ noteId, line: r.startLine, sourceHash: r.sourceHash, nonce: Date.now() })
+    useNotesStore.getState().selectNote(noteId)
+    if (r.status === 'relocated') showSourceNotice(t('notesChat.vaultSourceRelocated'))
+  }, [vaultPath, resolveSourceNoteId, showSourceNotice, t, lang])
+
+  // Vault-Antwort: Zitat-Hochzahlen entstehen als Markdown-Token aus den gültigen Nummern
+  // des Prüfers (Codex F25) — kein Platzhalter, keine Ersetzung im fertigen HTML.
   const renderMessageHtml = (msg: ChatMessage): string => {
     if (!msg.citations) return linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId)
     const { hits, report } = msg.citations
     const sameVault = msg.vaultPath === vaultPath
-    const marked = replaceCitationRefs(msg.content, report, (n) => `⟦cite:${n}⟧`)
-    const html = linkifyWikilinks(sanitizeHtml(md.render(marked)), resolveNoteId)
-    return html.replace(CITE_TOKEN, (_m, n: string) => {
-      const i = Number(n)
-      const hit = hits[i - 1]
-      const id = hit && sameVault ? resolveSourceNoteId(hit.fileRel) : null
-      return id
-        ? `<sup class="nc-cite" role="link" tabindex="0" data-source-note-id="${ncEscapeAttr(id)}" title="${ncEscapeAttr(hit.fileRel)}">[${i}]</sup>`
-        : `<sup class="nc-cite">[${i}]</sup>`
-    })
+    const env: CitationEnv = {
+      cites: {
+        valid: new Set(report.refs.filter(r => r.valid).map(r => r.n)),
+        resolve: (n) => {
+          const hit = hits[n - 1]
+          if (!hit) return null
+          return { noteId: sameVault ? resolveSourceNoteId(hit.fileRel) : null, fileRel: hit.fileRel }
+        }
+      }
+    }
+    return linkifyWikilinks(sanitizeHtml(md.render(msg.content, env)), resolveNoteId)
   }
 
   const renderVaultFooter = (msg: ChatMessage) => {
@@ -337,7 +387,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
               <li key={i}>
                 <span className="nc-source-n">[{i + 1}]</span>
                 {id
-                  ? <span className="nc-source-link" role="link" tabIndex={0} data-source-note-id={id} title={h.fileRel}>{base}</span>
+                  ? <span className="nc-source-link" role="link" tabIndex={0} data-note={id} data-cite={i + 1} title={h.fileRel}>{base}</span>
                   : <span title={sameVault ? h.fileRel : t('notesChat.vaultOtherVault')}>{base}</span>}
                 <span className="nc-source-meta">
                   {h.heading ? ` › ${h.heading}` : ''} · {lang === 'de' ? 'Zeile' : 'line'} {h.startLine}
@@ -380,13 +430,17 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
   const handleMessagesClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
 
-    // Quellen-Fußnote oder Zitatnummer → Notiz öffnen (Chat-Panel bleibt offen).
-    const source = target.closest('[data-source-note-id]') as HTMLElement | null
+    // Quellen-Fußnote oder Zitat-Hochzahl → Quelle mit Frischeprüfung öffnen (F28).
+    const source = target.closest('.nc-cite[data-note], .nc-source-link[data-note]') as HTMLElement | null
     if (source) {
       e.preventDefault()
       e.stopPropagation()
-      const id = source.getAttribute('data-source-note-id')
-      if (id) useNotesStore.getState().selectNote(id)
+      const msgEl = source.closest('[data-msg-index]') as HTMLElement | null
+      const idx = msgEl ? Number(msgEl.getAttribute('data-msg-index')) : -1
+      const n = Number(source.getAttribute('data-cite') ?? source.textContent?.replace(/\D/g, ''))
+      const msg = messages[idx]
+      const hit = msg?.citations?.hits[n - 1]
+      if (msg && hit) void openSource(msg, hit)
       return
     }
 
@@ -424,7 +478,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
       .catch((error) => {
         console.error('[NotesChat] Copy code block failed:', error)
       })
-  }, [t])
+  }, [t, messages, openSource])
 
   // Letzte Projekt-RAG-Quellen (werden nach dem Streaming an die Antwort gehängt)
   const lastSourcesRef = useRef<Array<{ fileRel: string; heading: string }>>([])
@@ -842,13 +896,17 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
   const withVaultFootnotes = (msg: ChatMessage): string => {
     if (!msg.citations) return msg.content
     const { hits, report } = msg.citations
-    const fid = (msg.timestamp ? msg.timestamp.getTime() : Date.now()).toString(36).slice(-5)
+    // ID pro Einfügevorgang (Zeit + Zufall): dieselbe Antwort zweimal angehängt kollidiert nicht.
+    const fid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
     const body = replaceCitationRefs(msg.content, report, (n) => `[^q${fid}-${n}]`)
-    const wikiTarget = (rel: string) => rel.replace(/\.md$/i, '').replace(/\|/g, '¦').replace(/\]/g, '〕')
-    const lines = hits.map((h, i) => {
-      const base = (h.fileRel.split('/').pop() || h.fileRel).replace(/\.md$/i, '')
-      return `[^q${fid}-${i + 1}]: [[${wikiTarget(h.fileRel)}|${base}]]${h.heading ? ` › ${h.heading}` : ''} (${lang === 'de' ? 'Zeile' : 'line'} ${h.startLine})`
-    })
+    // Wikilinks können `|` und `]` nicht tragen: solche Pfade werden unverändert, aber
+    // unverlinkt als Code ausgegeben — keine „ähnliche" Schreibweise, die ins Leere zeigt.
+    const sourceLink = (rel: string) => {
+      const noExt = rel.replace(/\.md$/i, '')
+      const base = noExt.split('/').pop() || noExt
+      return /[|\]]/.test(noExt) ? `\`${rel}\`` : `[[${noExt}|${base}]]`
+    }
+    const lines = hits.map((h, i) => `[^q${fid}-${i + 1}]: ${sourceLink(h.fileRel)}${h.heading ? ` › ${h.heading}` : ''} (${lang === 'de' ? 'Zeile' : 'line'} ${h.startLine})`)
     const summary = t('notesChat.vaultCheckSummary', {
       sentences: report.summary.sentences, uncited: report.summary.uncited, low: report.summary.low,
       invalid: report.summary.invalidRefs, quotes: report.summary.quotesNotFound
@@ -1208,6 +1266,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
             </div>
           </div>
 
+          {sourceNotice && <div className="nc-source-notice" role="status">{sourceNotice}</div>}
           {/* Chat-Nachrichten */}
           <div className="notes-chat-messages" ref={messagesContainerRef} onClick={handleMessagesClick}>
             {messages.length === 0 && !streamingContent ? (
@@ -1221,7 +1280,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
             ) : (
               <>
                 {messages.map((msg, idx) => (
-                  <div key={idx} className={`notes-chat-message ${msg.role}`}>
+                  <div key={idx} className={`notes-chat-message ${msg.role}`} data-msg-index={idx}>
                     <div
                       className="notes-chat-message-content markdown-content"
                       dangerouslySetInnerHTML={{ __html: renderMessageHtml(msg) }}

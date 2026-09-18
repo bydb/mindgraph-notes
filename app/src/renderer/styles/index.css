@@ -22448,3 +22448,18 @@ body.presentation-mode *::after {
   font-weight: 600;
   letter-spacing: 0.01em;
 }
+
+/* Sprung zur Quellenstelle (Vault-Chat, F28) */
+.source-jump-highlight {
+  background: color-mix(in srgb, var(--accent-color, #0f766e) 18%, transparent);
+  transition: background 1.2s ease;
+  border-radius: 4px;
+}
+.nc-source-notice {
+  margin: 6px 12px 0;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
+}

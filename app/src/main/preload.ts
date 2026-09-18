@@ -415,6 +415,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   vaultRagAnswer: (vaultPath: string, query: string, requestId: string, language: 'de' | 'en' = 'de') =>
     ipcRenderer.invoke('vault-rag-answer', vaultPath, query, requestId, language),
   vaultRagAnswerCancel: (requestId: string) => ipcRenderer.invoke('vault-rag-answer-cancel', requestId),
+  vaultRagLocateSource: (vaultPath: string, ref: object) => ipcRenderer.invoke('vault-rag-locate-source', vaultPath, ref),
   onVaultRagAnswerChunk: (callback: (payload: { requestId: string; chunk: string }) => void): (() => void) => {
     const listener = (_event: Electron.IpcRendererEvent, payload: { requestId: string; chunk: string }) => callback(payload)
     ipcRenderer.on('vault-rag-answer-chunk', listener)

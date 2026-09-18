@@ -47,7 +47,6 @@ import {
   sha256Hex,
   stagingDirFor,
   vaultIndexPath,
-  vaultRagDir,
   writeSegment,
   writeVaultIndexAtomic,
   cleanupVaultIndexTemps,
@@ -91,6 +90,8 @@ export interface VaultIndexJobOptions {
   mode: VaultBuildMode
   /** Nur im inkrementellen Modus: geänderte/neue bzw. gelöschte Dateien (vault-relativ). */
   changed?: Set<string>
+  /** Inkrementell, aber JEDE Datei neu hashen (Warteschlange lief über — Codex F32). */
+  rescanAll?: boolean
   /** Bereits geladener Container (spart einen Parse); wird auf Identität geprüft. */
   existing?: VaultIndexContainer | null
   assertSafePath: AssertSafePath
@@ -384,13 +385,13 @@ export class VaultIndexJob {
         chunkingVersion: RAG_INDEX_VERSION,
         excludeKey: excludeKeyFor(excludeFolders)
       }
-      // Ordner anlegen und Zielpfad prüfen (F34): ein Symlink `.mindgraph/rag` nach außen
-      // führt zu einer Ablehnung, nicht zu einem Schreibvorgang außerhalb des Vaults.
-      const ragDir = await assertSafePath(vaultRagDir(vaultPath), 'vault-rag-dir').catch(async () => {
-        await fs.mkdir(vaultRagDir(vaultPath), { recursive: true })
-        return assertSafePath(vaultRagDir(vaultPath), 'vault-rag-dir')
-      })
-      const indexFile = await assertSafePath(vaultIndexPath(vaultPath, identity), 'vault-rag-index-file')
+      // Ordner NUR unter einem geprüften Elternpfad anlegen (F34): erst `.mindgraph` prüfen
+      // (Symlink nach außen → Ablehnung, kein mkdir), dann `rag` darunter anlegen, dann
+      // den Zielpfad prüfen. Eine Pfadschutz-Ablehnung ist nie eine Erlaubnis zum Anlegen.
+      const mindgraphDir = await assertSafePath(path.join(vaultPath, '.mindgraph'), 'vault-rag-dir')
+      await fs.mkdir(path.join(mindgraphDir, 'rag'), { recursive: true })
+      const ragDir = await assertSafePath(path.join(mindgraphDir, 'rag'), 'vault-rag-dir')
+      const indexFile = await assertSafePath(path.join(ragDir, path.basename(vaultIndexPath(vaultPath, identity))), 'vault-rag-index-file')
       stagingDir = stagingDirFor(userDataPath, vaultPath, identity)
 
       // 2. Scan + Bestand
@@ -418,17 +419,27 @@ export class VaultIndexJob {
       }
       // Defekte Segmente konsequent aus dem Checkpoint entfernen (Codex F37): sonst bleibt
       // ihre Referenz stehen und das Zusammensetzen scheitert bei jedem Resume erneut.
-      const stagedIn = new Map<string, string>() // rel → Segmentname (jüngstes Segment gewinnt)
+      // Datei→Segment UND Datei→Hash werden aus den tatsächlich gültigen Segmenten
+      // rekonstruiert (jüngstes gültiges gewinnt) — nie aus einem Hash, dessen Segment
+      // defekt ist (Codex F37).
+      const stagedIn = new Map<string, string>() // rel → Segmentname (jüngstes gültiges Segment gewinnt)
+      const stagedHash: Record<string, string> = {}
       const validSegments: StagingCheckpoint['segments'] = []
       for (const seg of checkpoint.segments) {
         const c = await loadSegment(stagingDir, seg.name, identity)
         if (!c) continue
         validSegments.push(seg)
-        for (const rel of Object.keys(c.meta.files)) stagedIn.set(rel, seg.name)
+        for (const [rel, fm] of Object.entries(c.meta.files)) {
+          stagedIn.set(rel, seg.name)
+          stagedHash[rel] = fm.sourceHash
+        }
       }
-      if (validSegments.length !== checkpoint.segments.length) {
+      const repaired = validSegments.length !== checkpoint.segments.length
+        || Object.keys(checkpoint.files).length !== Object.keys(stagedHash).length
+        || Object.entries(stagedHash).some(([rel, h]) => checkpoint.files[rel] !== h)
+      if (repaired) {
         checkpoint.segments = validSegments
-        for (const rel of Object.keys(checkpoint.files)) if (!stagedIn.has(rel)) delete checkpoint.files[rel]
+        checkpoint.files = stagedHash
         checkpoint.updatedAt = this.now()
         await saveCheckpoint(stagingDir, checkpoint)
       }
@@ -437,7 +448,10 @@ export class VaultIndexJob {
       this.emit(true, { phase: 'embedding', message: undefined })
       const decisions = new Map<string, Decision>()
       const changed = this.opts.changed
-      let segmentCounter = checkpoint.segments.length
+      // Segmentnamen unabhängig von der Listenlänge eindeutig (F37): nach einer Reparatur
+      // darf ein neues Segment nie ein gültiges überschreiben.
+      let segmentCounter = 0
+      const segmentName = () => `seg-${this.now().toString(36)}-${(segmentCounter++).toString(36)}-${Math.random().toString(36).slice(2, 6)}.ragbin`
 
       for (let start = 0; start < files.length; start += this.packetSize) {
         this.throwIfCancelled()
@@ -446,8 +460,8 @@ export class VaultIndexJob {
         const packetFiles: Record<string, VaultFileMeta> = {}
 
         for (const f of packet) {
-          // Inkrementell: unveränderte, bekannte Dateien ohne Lesen übernehmen.
-          if (this.opts.mode === 'incremental' && existing && existingRows.has(f.rel) && !(changed?.has(f.rel))) {
+          // Inkrementell: unveränderte, bekannte Dateien ohne Lesen übernehmen (außer rescanAll).
+          if (this.opts.mode === 'incremental' && !this.opts.rescanAll && existing && existingRows.has(f.rel) && !(changed?.has(f.rel))) {
             decisions.set(f.rel, { kind: 'existing' })
             this.progress.chunksReused += existingRows.get(f.rel)!.length
             continue
@@ -487,14 +501,14 @@ export class VaultIndexJob {
         this.progress.chunksPlanned += toEmbed.length
         if (toEmbed.length > 0 || Object.keys(packetFiles).length > 0) {
           const vectors = toEmbed.length > 0 ? await this.embedChunks(toEmbed, dim) : new Float32Array(0)
-          const segName = `seg-${String(segmentCounter++).padStart(5, '0')}.ragbin`
+          const segName = segmentName()
           const segMeta: VaultIndexMeta = {
             identity,
             createdAt: this.now(),
             files: packetFiles,
             chunks: toEmbed.map((c) => c.meta)
           }
-          await writeSegment(stagingDir, segName, { meta: segMeta, vectors, generation: segmentCounter })
+          await writeSegment(stagingDir, segName, { meta: segMeta, vectors, generation: checkpoint.segments.length + 1 })
           for (const rel of Object.keys(packetFiles)) {
             checkpoint.files[rel] = packetFiles[rel].sourceHash
             stagedIn.set(rel, segName)

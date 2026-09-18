@@ -33,10 +33,22 @@ export interface CanvasTabState {
   viewport: { x: number; y: number; zoom: number }
 }
 
+/** Sprung zu einer Quellenstelle (Vault-Chat): an Notiz und Anfrage gebunden, wird erst nach
+ *  Laden derselben Inhaltsfassung (sourceHash) konsumiert — nie ein stiller Sprung. */
+export interface PendingSourceTarget {
+  noteId: string
+  /** 1-basierte Zeile in der kanonischen Datei (inkl. Frontmatter). */
+  line: number
+  sourceHash: string
+  nonce: number
+}
+
 interface TabState {
   tabs: Tab[]
   activeTabId: string | null
   canvasStates: Record<string, CanvasTabState>  // Keyed by tab ID
+  pendingSourceTarget: PendingSourceTarget | null
+  setPendingSourceTarget: (target: PendingSourceTarget | null) => void
 
   // Actions
   openEditorTab: (noteId: string, title: string) => void
@@ -74,6 +86,8 @@ export const useTabStore = create<TabState>()((set, get) => ({
   tabs: [],
   activeTabId: null,
   canvasStates: {},
+  pendingSourceTarget: null,
+  setPendingSourceTarget: (target) => set({ pendingSourceTarget: target }),
 
   openEditorTab: (noteId, title) => {
     const state = get()

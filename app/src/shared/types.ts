@@ -120,6 +120,11 @@ export interface VaultRagQueryResponse {
   excludeMismatch?: boolean
 }
 
+export type VaultLocateSourceResult =
+  | { status: 'fresh' | 'relocated'; fileRel: string; sourceHash: string; sourceStart: number; sourceEnd: number; startLine: number; heading: string }
+  | { status: 'changed'; fileRel: string; sourceHash: string }
+  | { status: 'missing'; fileRel: string }
+
 /** Abschluss-Ereignis einer Vault-Antwort (jedes Ereignis trägt die requestId). */
 export type VaultRagAnswerDone =
   | { requestId: string; kind: 'answer'; answer: string; hits: VaultRagHitDto[]; report: import('./rag/citations').CitationReport; excludeMismatch: boolean; model: string }
@@ -952,6 +957,7 @@ export interface ElectronAPI {
   onVaultRagProgress: (callback: (progress: VaultBuildProgressDto) => void) => () => void;
   vaultRagAnswer: (vaultPath: string, query: string, requestId: string, language?: 'de' | 'en') => Promise<{ success: boolean; requestId?: string; kind?: string; error?: string }>;
   vaultRagAnswerCancel: (requestId: string) => Promise<{ success: boolean }>;
+  vaultRagLocateSource: (vaultPath: string, ref: { fileRel: string; sourceHash: string; chunkHash: string; sourceStart: number; sourceEnd: number; startLine: number }) => Promise<{ success: boolean; result?: VaultLocateSourceResult; error?: string }>;
   onVaultRagAnswerChunk: (callback: (payload: { requestId: string; chunk: string }) => void) => () => void;
   onVaultRagAnswerDone: (callback: (payload: VaultRagAnswerDone) => void) => () => void;
 

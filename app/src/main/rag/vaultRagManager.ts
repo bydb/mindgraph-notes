@@ -59,6 +59,7 @@ export interface VaultRagManagerDeps {
 const DEFAULT_CONFIG: VaultRagSettings = { enabled: false, excludeFolders: [] }
 const QUEUE_DEBOUNCE_MS = 30_000
 const QUEUE_MAX_WAIT_MS = 5 * 60_000
+const MAX_PENDING_PATHS = 2000
 
 function normalizeConfig(raw: unknown): VaultRagSettings {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_CONFIG }
@@ -230,9 +231,11 @@ export class VaultRagManager {
     await fs.writeFile(file, JSON.stringify({ ...current, vaultRag: merged }, null, 2), 'utf-8')
     if (this.sameVault(vaultPath)) this.configCache = merged
     if (!merged.enabled) {
-      // Abschalten stoppt den Job, nicht nur die Anzeige.
+      // Abschalten stoppt den Job und invalidiert vorbereitete Starts (F30).
+      if (this.sameVault(vaultPath)) this.generation++
       await this.cancel(vaultPath)
       this.pendingChanged.clear()
+      this.firstPendingAt = null
     }
     return merged
   }
@@ -293,9 +296,14 @@ export class VaultRagManager {
 
   // ─── Build ──────────────────────────────────────────────────────────────────
 
-  async startBuild(vaultPath: string, mode: 'full' | 'incremental' = 'full', changed?: Set<string>): Promise<{ ok: boolean; jobId?: string; error?: string }> {
+  async startBuild(vaultPath: string, mode: 'full' | 'incremental' = 'full', changed?: Set<string>, rescanAll = false): Promise<{ ok: boolean; jobId?: string; error?: string }> {
     if (!(await this.isSameVault(vaultPath))) await this.setVault(vaultPath)
+    // Starttoken VOR allen weiteren Wartepunkten (Codex F30): Vault-Wechsel, Opt-out,
+    // Modul-Aus und Abbruch zählen die Generation hoch und machen diesen Start ungültig.
+    const gen = this.generation
+    const stale = (): { ok: false; error: string } => ({ ok: false, error: 'Vault gewechselt oder abgeschaltet — Start verworfen' })
     if (!(await this.moduleEnabled())) return { ok: false, error: 'Modul „Notizen befragen (RAG)" ist ausgeschaltet' }
+    if (gen !== this.generation) return stale()
     // Sperre über die GESAMTE Startphase: zwischen der Prüfung „läuft schon?" und der
     // Zuweisung liegen Wartepunkte — zwei schnelle Klicks starteten sonst zwei Jobs.
     if (this.job || this.starting) {
@@ -303,15 +311,14 @@ export class VaultRagManager {
     }
     this.starting = true
     try {
-      return await this.startBuildLocked(vaultPath, mode, changed)
+      return await this.startBuildLocked(vaultPath, mode, changed, rescanAll, gen)
     } finally {
       this.starting = false
     }
   }
 
-  private async startBuildLocked(vaultPath: string, mode: 'full' | 'incremental', changed?: Set<string>): Promise<{ ok: boolean; jobId?: string; error?: string }> {
-    const gen = this.generation
-    const stale = (): { ok: false; error: string } => ({ ok: false, error: 'Vault gewechselt oder Modul abgeschaltet — Start verworfen' })
+  private async startBuildLocked(vaultPath: string, mode: 'full' | 'incremental', changed: Set<string> | undefined, rescanAll: boolean, gen: number): Promise<{ ok: boolean; jobId?: string; error?: string }> {
+    const stale = (): { ok: false; error: string } => ({ ok: false, error: 'Vault gewechselt oder abgeschaltet — Start verworfen' })
     const config = await this.getConfig(vaultPath)
     if (gen !== this.generation) return stale()
     if (!config.enabled) return { ok: false, error: 'Vault-Index ist für diesen Vault nicht eingeschaltet' }
@@ -322,7 +329,7 @@ export class VaultRagManager {
     } catch (err) {
       return { ok: false, error: describeLocalModelError(err) }
     }
-    if (gen !== this.generation || this.job) return stale()
+    if (gen !== this.generation || this.job || !this.sameVault(vaultPath)) return stale()
     const jobId = `build-${randomBytes(6).toString('hex')}`
     const existing = this.loaded?.container ?? null
     const job = new VaultIndexJob({
@@ -333,6 +340,7 @@ export class VaultRagManager {
       excludeFolders: config.excludeFolders,
       mode,
       changed,
+      rescanAll,
       existing,
       assertSafePath: this.deps.assertSafePath,
       onProgress: (p) => {
@@ -343,7 +351,7 @@ export class VaultRagManager {
     })
     this.job = job
     this.cancelRequested = false
-    this.inFlightChanged = mode === 'incremental' && changed ? new Set(changed) : null
+    this.inFlightChanged = mode === 'incremental' ? (rescanAll ? new Set(['*']) : changed ? new Set(changed) : null) : null
     const jobGen = this.generation
     this.jobPromise = job
       .run()
@@ -355,13 +363,16 @@ export class VaultRagManager {
           // (Validierung inklusive) — spart die Vollkopie im Job-Ergebnis.
           this.loaded = null
           await this.loadContainer(result.file)
-        } else if (this.inFlightChanged) {
-          // Fehler oder Abbruch: die Änderungsmenge zurücklegen, sonst gilt die geänderte
-          // Datei beim nächsten inkrementellen Lauf als unverändert (Codex F32).
+        } else if (this.inFlightChanged && jobGen === this.generation) {
+          // Fehler oder Abbruch IM SELBEN Vault: die Änderungsmenge zurücklegen, sonst gilt
+          // die geänderte Datei beim nächsten inkrementellen Lauf als unverändert (Codex F32).
+          // Nach Vault-Wechsel/Abschalten (andere Generation) wird sie verworfen.
           for (const rel of this.inFlightChanged) this.pendingChanged.add(rel)
           if (this.firstPendingAt === null) this.firstPendingAt = this.now()
           this.inFlightChanged = null
           if (result.status === 'error') this.retryCount++
+        } else {
+          this.inFlightChanged = null
         }
       })
       .catch((err) => {
@@ -395,7 +406,10 @@ export class VaultRagManager {
   }
 
   async cancel(vaultPath: string): Promise<boolean> {
-    if (!this.job || !this.sameVault(vaultPath)) return false
+    if (!this.sameVault(vaultPath)) return false
+    // Abbruch invalidiert auch einen noch nicht zugewiesenen Start (F30).
+    this.generation++
+    if (!this.job) return false
     this.cancelRequested = true
     // Auch einen bereits geplanten Flush stoppen: „Abbrechen" darf nicht Sekunden später
     // aus der Warteschlange neu starten. Ein NEUES Dateiereignis plant wieder (F32).
@@ -422,7 +436,14 @@ export class VaultRagManager {
     // lässt sie weg. Nicht indexierbare Pfade interessieren nur, wenn sie im Index waren.
     const exclude = this.configCache?.excludeFolders ?? []
     if (!isIndexable(rel, exclude) && !this.loaded?.container.meta.files[rel]) return
-    this.pendingChanged.add(rel)
+    // Mengenobergrenze (F32): ab MAX_PENDING_PATHS verdichten wir auf einen Rescan-Marker —
+    // der nächste Lauf hasht jede Datei, statt eine unbegrenzte Pfadmenge zu halten.
+    if (this.pendingChanged.has('*') || this.pendingChanged.size >= MAX_PENDING_PATHS) {
+      this.pendingChanged.clear()
+      this.pendingChanged.add('*')
+    } else {
+      this.pendingChanged.add(rel)
+    }
     if (this.firstPendingAt === null) this.firstPendingAt = this.now()
     this.scheduleFlush(this.queueDebounceMs)
   }
@@ -471,7 +492,8 @@ export class VaultRagManager {
     const changed = new Set(this.pendingChanged)
     this.pendingChanged.clear()
     this.firstPendingAt = null
-    const res = await this.startBuild(vaultPath, 'incremental', changed)
+    const rescanAll = changed.has('*')
+    const res = await this.startBuild(vaultPath, 'incremental', rescanAll ? undefined : changed, rescanAll)
     if (!res.ok) {
       // Zurücklegen, damit nichts verloren geht (z.B. Ollama gerade nicht erreichbar).
       for (const rel of changed) this.pendingChanged.add(rel)

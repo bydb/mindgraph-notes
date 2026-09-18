@@ -301,3 +301,41 @@ export async function queryVaultIndex(
     identity: { model: identity.model, digest: identity.digest }
   }
 }
+
+// ─── Quellenklick (F28): Frischeprüfung + Relokalisierung für die Navigation ────
+
+export interface SourceRef {
+  fileRel: string
+  sourceHash: string
+  chunkHash: string
+  sourceStart: number
+  sourceEnd: number
+  startLine: number
+}
+
+export type LocateSourceResult =
+  | { status: 'fresh' | 'relocated'; fileRel: string; sourceHash: string; sourceStart: number; sourceEnd: number; startLine: number; heading: string }
+  | { status: 'changed'; fileRel: string; sourceHash: string }
+  | { status: 'missing'; fileRel: string }
+
+/**
+ * Vor dem Klick: Hash der Datei prüfen. Gleich → Stelle wie im Index. Sonst neu chunken
+ * und per chunkHash relokalisieren — nur bei genau einem Treffer. Alles andere ist
+ * „geändert" (Notiz öffnet oben, sichtbarer Hinweis) oder „fehlt" (kein Öffnen).
+ */
+export async function locateSource(vaultPath: string, ref: SourceRef, assertSafePath: AssertSafePath): Promise<LocateSourceResult> {
+  let file: Awaited<ReturnType<typeof readCanonicalFile>>
+  try {
+    const safe = await assertSafePath(path.join(vaultPath, ref.fileRel), 'vault-rag-locate')
+    file = await readCanonicalFile(safe)
+  } catch {
+    return { status: 'missing', fileRel: ref.fileRel }
+  }
+  if (file.sourceHash === ref.sourceHash) {
+    return { status: 'fresh', fileRel: ref.fileRel, sourceHash: file.sourceHash, sourceStart: ref.sourceStart, sourceEnd: ref.sourceEnd, startLine: ref.startLine, heading: '' }
+  }
+  const matches = chunkMarkdown(file.canonical).filter((c) => sha256Hex(c.text) === ref.chunkHash)
+  if (matches.length !== 1) return { status: 'changed', fileRel: ref.fileRel, sourceHash: file.sourceHash }
+  const c = matches[0]
+  return { status: 'relocated', fileRel: ref.fileRel, sourceHash: file.sourceHash, sourceStart: c.sourceStart, sourceEnd: c.sourceEnd, startLine: c.startLine, heading: c.heading }
+}

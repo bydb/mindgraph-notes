@@ -11,7 +11,7 @@ vi.mock('./embed', () => ({
   embedText: async (_m: string, text: string) => (text.includes('alpha') ? [1, 0, 0, 0] : [0, 1, 0, 0])
 }))
 
-import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError } from './vaultRetrieve'
+import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource } from './vaultRetrieve'
 import { sha256Hex } from './vaultStore'
 import { chunkMarkdown, canonicalizeMarkdown } from '../../shared/rag/chunking'
 import type { VaultIndexContainer, VaultChunkMeta, VaultFileMeta } from '../../shared/rag/vaultIndex'
@@ -148,6 +148,41 @@ describe('Relokalisierung mit frischen Metadaten (F36)', () => {
     expect(without.hits).toHaveLength(1)
     expect(without.hits[0].fresh).toBe('relocated')
     expect(without.hits[0].kind).toBe('solution')
+  })
+})
+
+describe('locateSource (F28)', () => {
+  it('fresh, relocated, changed (doppelte Passage), missing', async () => {
+    const passage = Array.from({ length: 4 }, (_, i) => `Stabile Passage Satz ${i + 1}, die eindeutig bleibt und lang genug ist.`).join(' ')
+    const stable = '## Stabil\n\n' + passage
+    const filler = Array.from({ length: 20 }, (_, i) => `Vor Satz ${i + 1} mit genug Text für einen Chunk.`).join(' ')
+    const original = '# B\n\n' + filler + '\n\n' + stable + '\n'
+    await fs.writeFile(path.join(vault, 'b.md'), original)
+    const canon = canonicalizeMarkdown(original)
+    const target = chunkMarkdown(original).find((x) => x.text === stable)!
+    const ref = { fileRel: 'b.md', sourceHash: sha256Hex(canon), chunkHash: sha256Hex(stable), sourceStart: target.sourceStart, sourceEnd: target.sourceEnd, startLine: target.startLine }
+
+    const fresh = await locateSource(vault, ref, assertSafePath)
+    expect(fresh.status).toBe('fresh')
+
+    const changed = '# B\n\nNeu davor.\n\n' + filler + '\n\n' + stable + '\n'
+    await fs.writeFile(path.join(vault, 'b.md'), changed)
+    const rel = await locateSource(vault, ref, assertSafePath)
+    expect(rel.status).toBe('relocated')
+    if (rel.status === 'relocated') {
+      const t2 = chunkMarkdown(changed).find((x) => x.text === stable)!
+      expect(rel.startLine).toBe(t2.startLine)
+      expect(rel.heading).toBe('Stabil')
+      expect(rel.sourceHash).toBe(sha256Hex(canonicalizeMarkdown(changed)))
+    }
+
+    // Zweimal dieselbe Sektion → nicht eindeutig → „geändert" (die Passage hinter dem Füller,
+    // sonst zieht der Mini-Chunk-Merge die Überschrift „# B" in den ersten Treffer)
+    await fs.writeFile(path.join(vault, 'b.md'), '# B\n\n' + filler + '\n\n' + stable + '\n\n' + stable + '\n')
+    expect((await locateSource(vault, ref, assertSafePath)).status).toBe('changed')
+
+    await fs.rm(path.join(vault, 'b.md'))
+    expect((await locateSource(vault, ref, assertSafePath)).status).toBe('missing')
   })
 })
 

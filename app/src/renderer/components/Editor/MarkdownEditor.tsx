@@ -348,6 +348,27 @@ const md = new MarkdownIt({
   highlight: highlightCode
 })
 
+// Quellzeile an Block-Elementen (Sprung zur Textstelle aus dem Vault-Chat, F28): 0-basierte
+// Body-Zeile + `env.sourceLineOffset` (Zeilen des Frontmatters) = 0-basierte Dateizeile.
+// Callouts werden VOR dem Rendern durch HTML ersetzt, das mehr Zeilen hat als der Quelltext —
+// danach wären alle Zeilenangaben verschoben (real: Sprung sechs Zeilen zu früh). Deshalb trägt
+// jeder Callout-Wrapper `data-line-delta` (Zeilen im HTML minus Zeilen im Quelltext), und die
+// Regel zieht die aufgelaufene Differenz von allen folgenden Blöcken ab.
+md.core.ruler.push('source_lines', (state) => {
+  const offset = Number((state.env as { sourceLineOffset?: number })?.sourceLineOffset ?? 0)
+  let delta = 0
+  for (const token of state.tokens) {
+    if (!token.map) continue
+    if (token.nesting === 1) {
+      token.attrSet('data-source-line', String(Math.max(0, token.map[0] - delta + offset)))
+    }
+    if (token.type === 'html_block') {
+      const m = /data-line-delta="(-?\d+)"/.exec(token.content)
+      if (m) delta += Number(m[1])
+    }
+  }
+})
+
 // Task-Listen Plugin aktivieren (für - [ ] und - [x] Syntax)
 // WICHTIG: label:false. Mit label:true+labelAfter:true rendert das Plugin den Task-Text
 // DOPPELT — einmal als gerendertes Inline-Content, einmal als Rohtext im <label
@@ -852,7 +873,7 @@ const calloutIcons: Record<string, string> = {
 }
 
 // Konvertiert Obsidian Callouts zu HTML (mit Verschachtelung und Markdown im Titel)
-function processCallouts(content: string): string {
+function processCallouts(content: string, lineBase = 0): string {
   // Callout Pattern: > [!type](+|-) optional title
   // Gefolgt von > content lines
   // `[ \t]+` statt `\s+`: `\s` frisst den Zeilenumbruch, dann wurde bei einem Callout
@@ -860,7 +881,7 @@ function processCallouts(content: string): string {
   // „! > erste Zeile …" im Lesen-Modus).
   const calloutRegex = /^>\s*\[!(\w+)\]([+-])?(?:[ \t]+(.+))?\n((?:>.*\n?)*)/gm
 
-  const result = content.replace(calloutRegex, (_match, type, foldModifier, customTitle, body) => {
+  const result = content.replace(calloutRegex, (_match: string, type: string, foldModifier: string | undefined, customTitle: string | undefined, body: string, matchIndex: number) => {
     const calloutType = type.toLowerCase()
     const title = customTitle || type.charAt(0).toUpperCase() + type.slice(1)
     const isFoldable = foldModifier === '+' || foldModifier === '-'
@@ -891,17 +912,24 @@ function processCallouts(content: string): string {
     const foldAttr = isFoldable ? (isCollapsed ? '-' : '+') : ''
     const dataAttrs = `data-callout-type="${escapedType}" data-callout-fold="${foldAttr}" data-callout-title="${escapedTitle}"`
 
-    if (isFoldable) {
-      return `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'} ${dataAttrs}>
+    // Zeilenversatz für die Quellzeilen-Regel (`source_lines`): nur der äußere Wrapper trägt
+    // ihn, innere Marker verschachtelter Callouts werden entfernt, sonst zählten sie doppelt.
+    // Innere Blöcke tragen Zeilen relativ zum Callout-Text — für den Quellsprung wertlos und
+    // irreführend, deshalb raus; der Wrapper selbst bekommt die Dateizeile des Callouts.
+    const innerBody = renderedBody.replace(/ data-line-delta="-?\d+"/g, '').replace(/ data-source-line="\d+"/g, '')
+    const countNl = (text: string): number => (text.match(/\n/g) ?? []).length
+    const startLine = lineBase + countNl(content.slice(0, matchIndex))
+    const html = isFoldable
+      ? `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'} ${dataAttrs}>
       <summary class="callout-title">${icon} ${renderedTitle}<span class="callout-fold-indicator"></span></summary>
-      <div class="callout-content">${renderedBody}</div>
+      <div class="callout-content">${innerBody}</div>
     </details>\n`
-    }
-
-    return `<div class="callout callout-${escapedType}" ${dataAttrs}>
+      : `<div class="callout callout-${escapedType}" ${dataAttrs}>
       <div class="callout-title">${icon} ${renderedTitle}</div>
-      <div class="callout-content">${renderedBody}</div>
+      <div class="callout-content">${innerBody}</div>
     </div>\n`
+    const lineDelta = countNl(html) - countNl(_match)
+    return html.replace(/^<(details|div)/, `<$1 data-line-delta="${lineDelta}" data-source-line="${startLine}"`)
   })
 
   return result
@@ -1117,6 +1145,59 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       })
     }
   }, [viewMode])
+
+  // Sprung zur Quellenstelle (Vault-Chat, F28): nur für DIESE Notiz, nur wenn der geladene
+  // Inhalt dieselbe Fassung ist (sourceHash), sonst sichtbarer Hinweis statt stillem Sprung.
+  const pendingSourceTarget = useTabStore(s => s.pendingSourceTarget)
+  const setPendingSourceTarget = useTabStore(s => s.setPendingSourceTarget)
+  useEffect(() => {
+    const target = pendingSourceTarget
+    if (!target || isSecondary || !effectiveNoteId || target.noteId !== effectiveNoteId) return
+    const content = viewMode === 'preview' ? previewContent : (viewRef.current?.state.doc.toString() ?? '')
+    if (!content) return
+    let cancelled = false
+    const run = async () => {
+      const canonical = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
+      const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+      if (cancelled) return
+      setPendingSourceTarget(null)
+      if (hash !== target.sourceHash) {
+        window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'changed', noteId: target.noteId } }))
+        return
+      }
+      const lineIdx = Math.max(0, target.line - 1)
+      if (viewMode === 'preview') {
+        const root = editablePreviewRef.current
+        if (!root) return
+        let best: HTMLElement | null = null
+        let bestLine = -1
+        root.querySelectorAll<HTMLElement>('[data-source-line]').forEach(el => {
+          const l = Number(el.getAttribute('data-source-line'))
+          if (l <= lineIdx && l >= bestLine) { bestLine = l; best = el }
+        })
+        const el = best ?? root.querySelector<HTMLElement>('[data-source-line]')
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          el.classList.add('source-jump-highlight')
+          setTimeout(() => el.classList.remove('source-jump-highlight'), 2500)
+        }
+      } else {
+        const view = viewRef.current
+        if (!view) return
+        const line = view.state.doc.line(Math.min(view.state.doc.lines, lineIdx + 1))
+        view.dispatch({
+          selection: { anchor: line.from },
+          effects: EditorView.scrollIntoView(line.from, { y: 'center' })
+        })
+        view.focus()
+      }
+      window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'ok', noteId: target.noteId } }))
+    }
+    // Zwei Frames warten, damit Vorschau/Editor den Inhalt gezeichnet haben.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => { void run() }))
+    return () => { cancelled = true; cancelAnimationFrame(raf) }
+  }, [pendingSourceTarget, effectiveNoteId, viewMode, previewContent, isSecondary, setPendingSourceTarget])
 
   // Set up note click handler for dataview
   useEffect(() => {
@@ -3583,8 +3664,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Rendered markdown (mit Frontmatter-Titel, Callouts, Figures und interaktiven Checkboxen)
   const { frontmatterTitle, renderedMarkdown, bodyStartsWithH1 } = useMemo(() => {
     const { title, body } = parseFrontmatter(previewContent)
-    const withCallouts = processCallouts(body)
-    const htmlContent = md.render(withCallouts)
+    const sourceLineOffset = (previewContent.slice(0, previewContent.length - body.length).match(/\n/g) ?? []).length
+    const withCallouts = processCallouts(body, sourceLineOffset)
+    const htmlContent = md.render(withCallouts, { sourceLineOffset })
     const withFigures = processFigures(htmlContent)
     const withInteractiveCheckboxes = processTaskCheckboxes(withFigures, previewContent)
     const withFoldableHeadings = processHeadingFolds(withInteractiveCheckboxes)

@@ -108,6 +108,19 @@ function maskedRanges(text: string): Array<[number, number]> {
     const s = m.index
     if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[0].length])
   }
+  // Eingerückter Code (vier Leerzeichen/Tab nach einer Leerzeile) — Codex F25.
+  // Bewusst konservativ: auch eine eingerückte Listen-Fortsetzung wird maskiert.
+  const indented = /(?:^|\n\n)((?:(?: {4}|\t)[^\n]*\n?)+)/g
+  while ((m = indented.exec(text)) !== null) {
+    const s = m.index + m[0].length - m[1].length
+    if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[1].length])
+  }
+  // Linkziele und -titel `](…)`, Autolinks `<…>` und rohe URLs: dort ist `[1]` kein Zitat.
+  const dest = /\]\([^)\n]*\)|<https?:\/\/[^>\n]*>|https?:\/\/[^\s)]+/g
+  while ((m = dest.exec(text)) !== null) {
+    const s = m.index
+    if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[0].length])
+  }
   return ranges.sort((a, b) => a[0] - b[0])
 }
 

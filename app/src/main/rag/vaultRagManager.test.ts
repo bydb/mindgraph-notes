@@ -345,6 +345,69 @@ describe('Lebenszyklus-Generation und Änderungsmenge (F30, F32)', () => {
     }
   })
 
+  it('Vault-Wechsel während der Modulprüfung verwirft den Start (F30)', async () => {
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-other-'))
+    try {
+      // Nur die Modulprüfung des Starts (zweiter Aufruf) hängt; setVault-Aufrufe laufen sofort durch.
+      let calls = 0
+      let releaseA: () => void = () => undefined
+      const m = manager({
+        isModuleEnabled: () => {
+          calls++
+          if (calls === 2) return new Promise<boolean>((r) => { releaseA = () => r(true) })
+          return Promise.resolve(true)
+        }
+      })
+      await m.setConfig(vault, { enabled: true })
+      await m.setVault(vault)
+      const startA = m.startBuild(vault)
+      await new Promise((r) => setTimeout(r, 20))
+      await m.setVault(other)
+      releaseA()
+      const res = await startA
+      expect(res.ok).toBe(false)
+      expect(fake.jobs).toHaveLength(0)
+    } finally {
+      await fs.rm(other, { recursive: true, force: true })
+    }
+  })
+
+  it('Opt-out während der Modellauflösung verwirft den Start (F30)', async () => {
+    let releaseModel: (m: string) => void = () => undefined
+    const m = manager({ getEmbedModel: () => new Promise<string>((r) => { releaseModel = r }) })
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    const startA = m.startBuild(vault)
+    await new Promise((r) => setTimeout(r, 20))
+    await m.setConfig(vault, { enabled: false })
+    releaseModel('bge-m3')
+    const res = await startA
+    expect(res.ok).toBe(false)
+    expect(fake.jobs).toHaveLength(0)
+  })
+
+  it('Vault-Wechsel verwirft die Änderungsmenge des abgebrochenen Laufs (F32)', async () => {
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-other-'))
+    try {
+      const m = manager()
+      await m.setConfig(vault, { enabled: true })
+      await m.setVault(vault)
+      await writeContainer(['only-A.md'])
+      m.noteFileEvent(vault, 'change', path.join(vault, 'only-A.md'))
+      await waitFor(() => fake.jobs.length === 1)
+      await m.setVault(other)
+      expect(fake.jobs[0].cancelCalls).toBe(1)
+      expect((await m.getStatus(other)).pendingChanges).toBe(0)
+      // Ein B-Ereignis trägt keine A-Pfade
+      await m.setConfig(other, { enabled: true })
+      await fs.mkdir(path.join(other, '.mindgraph', 'rag'), { recursive: true })
+      m.noteFileEvent(other, 'change', path.join(other, 'b.md'))
+      expect((await m.getStatus(other)).pendingChanges).toBeLessThanOrEqual(1)
+    } finally {
+      await fs.rm(other, { recursive: true, force: true })
+    }
+  })
+
   it('Laufzeitfehler legt die Änderungsmenge zurück; nächster Lauf trägt A und B (F32)', async () => {
     const m = manager()
     await m.setConfig(vault, { enabled: true })
@@ -373,6 +436,22 @@ describe('Lebenszyklus-Generation und Änderungsmenge (F30, F32)', () => {
     await new Promise((r) => setTimeout(r, 200))
     expect(fake.jobs).toHaveLength(1)
     expect((await m.getStatus(vault)).pendingChanges).toBe(1)
+    await m.shutdown()
+  })
+})
+
+describe('Warteschlangen-Obergrenze (F32)', () => {
+  it('sehr viele Pfade verdichten sich zu einem Rescan-Lauf', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    await writeContainer(['a.md'])
+    for (let i = 0; i < 2100; i++) m.noteFileEvent(vault, 'change', path.join(vault, `n${i}.md`))
+    expect((await m.getStatus(vault)).pendingChanges).toBe(1)
+    await waitFor(() => fake.jobs.length === 1)
+    expect(fake.jobs[0].opts.rescanAll).toBe(true)
+    expect(fake.jobs[0].opts.changed).toBeUndefined()
+    fake.jobs[0].finish({ status: 'done' })
     await m.shutdown()
   })
 })

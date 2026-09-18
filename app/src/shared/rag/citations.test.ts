@@ -110,6 +110,13 @@ describe('analyzeCitations', () => {
     expect(r.refs.map((x) => x.n)).toEqual([1, 2])
   })
 
+  it('eingerückter Code, Linkziele/-titel und URLs sind keine Zitate (F25)', () => {
+    const md = 'Erster Satz. [1]\n\n    arr[1] + arr[2]\n\n[Link](https://example.org "[1]") und <https://x.y/[1]> und https://a.b/c[1] sind Links. [2]'
+    const r = analyzeCitations(md, sources)
+    expect(r.refs.map((x) => x.n)).toEqual([1, 2])
+    expect(r.sentences).toHaveLength(2)
+  })
+
   it('replaceCitationRefs ersetzt nur gültige Prüfer-Referenzen und lässt Code bytegetreu', () => {
     const md = 'Satz. [1] `code[1]` [9]\n\n```\nx[1]\n```'
     const r = analyzeCitations(md, sources)
