@@ -858,6 +858,11 @@ function getVaultRagManager(): VaultRagManager {
         const ollama = ui.ollama as { projectRagEmbeddingModel?: string } | undefined
         return ollama?.projectRagEmbeddingModel || 'bge-m3'
       },
+      // Modul-Flag Main-seitig aus ui-settings.json — der Renderer kann es nicht behaupten.
+      isModuleEnabled: async () => {
+        const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+        return ui.projectRagEnabled === true
+      },
       onProgress: (p) => {
         if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('vault-rag-progress', p)
       }
@@ -1621,6 +1626,8 @@ ipcMain.handle('load-ui-settings', async () => {
 
 // UI-Settings speichern
 ipcMain.handle('save-ui-settings', async (_event, settings: Record<string, unknown>) => {
+  // Modul „Notizen befragen (RAG)" aus → Vault-Index-Job stoppen, Warteschlange leeren (Codex F33).
+  if (typeof settings.projectRagEnabled === 'boolean') void getVaultRagManager().setModuleEnabled(settings.projectRagEnabled)
   const before = await loadUISettings()
   await saveUISettings(settings)
   recordReferenceChanges(before, settings)
@@ -7434,6 +7441,15 @@ ipcMain.handle('project-rag-answer', wrapIpcWithOllamaActivity('project-rag-answ
     event.sender.send('project-rag-answer-sources', chunks)
     const systemPrompt = buildRagPrompt(query, chunks, language)
 
+    // Direkt vor dem Senden erneut frisch prüfen (Codex F35): zwischen der Prüfung oben
+    // und hier kann ensureIndex lange laufen.
+    try {
+      await resolveLocalModel(chatModel, { fresh: true })
+    } catch (err) {
+      event.sender.send('project-rag-answer-done')
+      return { success: false, error: describeLocalModelError(err) }
+    }
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300000) // 5 min
     const ragStartedAt = Date.now()
@@ -7623,6 +7639,14 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
       }
 
       const systemPrompt = buildVaultPrompt(retrieval.hits, language, sanitizeUntrustedText)
+      // Frisch prüfen unmittelbar vor dem Senden (Codex F35), nicht nur vor dem Retrieval.
+      try {
+        await resolveLocalModel(chatModel, { fresh: true })
+      } catch (err) {
+        const error = describeLocalModelError(err)
+        sendDone({ kind: 'error', error })
+        return { success: false, requestId, error }
+      }
       const controller = new AbortController()
       vaultAnswerControllers.set(requestId, controller)
       const timeout = setTimeout(() => controller.abort(), 300000)

@@ -43,7 +43,10 @@ export interface EmbedOptions {
  */
 export async function assertLocalEmbeddingModel(model: string): Promise<void> {
   try {
-    await resolveLocalModel(model)
+    // IMMER frisch (Codex F35): ein 15-s-Cache ist kein Nachweis für Lokalität beim
+    // Senden — wird der Tag in der Zwischenzeit auf ein Remote-Modell umgebogen, darf
+    // kein Notiztext mehr rausgehen. Kostet einen lokalen /api/tags-Aufruf pro Request.
+    await resolveLocalModel(model, { fresh: true })
   } catch (err) {
     if (err instanceof LocalModelError && err.reason === 'missing') throw new EmbeddingModelMissingError(model)
     throw new Error(describeLocalModelError(err))

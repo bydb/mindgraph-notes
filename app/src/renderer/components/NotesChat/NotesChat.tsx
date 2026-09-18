@@ -431,11 +431,20 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
 
   // Letzte Projekt-RAG-Quellen (werden nach dem Streaming an die Antwort gehängt)
   const lastSourcesRef = useRef<Array<{ fileRel: string; heading: string }>>([])
-  // Laufende Vault-Anfrage (requestId) — für Abbruch beim Schließen des Panels.
+  // Laufende Vault-Anfrage (requestId) + ihre Abonnements — Abbruch und Abmeldung bei
+  // Panel-Schließen, Chat-Leeren und Vault-Wechsel (Codex F29).
   const vaultRequestRef = useRef<string | null>(null)
-  useEffect(() => () => {
-    if (vaultRequestRef.current) void window.electronAPI.vaultRagAnswerCancel(vaultRequestRef.current)
+  const vaultUnsubRef = useRef<Array<() => void>>([])
+  const cancelVaultRequest = useCallback(() => {
+    for (const off of vaultUnsubRef.current) off()
+    vaultUnsubRef.current = []
+    if (vaultRequestRef.current) {
+      void window.electronAPI.vaultRagAnswerCancel(vaultRequestRef.current)
+      vaultRequestRef.current = null
+    }
   }, [])
+  useEffect(() => () => cancelVaultRequest(), [cancelVaultRequest])
+  useEffect(() => { cancelVaultRequest() }, [vaultPath, cancelVaultRequest])
 
   // Streaming-Listener einrichten — sowohl normaler Notiz-Chat als auch
   // Projekt-RAG speisen denselben streamingContent/isStreaming-Fluss (nur jeweils
@@ -624,7 +633,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     const userMessage = inputValue.trim()
     lastUserQuestion.current = userMessage
     setInputValue('')
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }])
+    // Im Vault-Modus trägt auch die FRAGE die Herkunft: sie bezieht sich auf lokale
+    // Notizen und darf nicht später über einen Cloud-Anbieter rausgehen (Codex F24).
+    setMessages(prev => [...prev, contextMode === 'vault' && vaultPath
+      ? { role: 'user', content: userMessage, origin: 'vault-rag', vaultPath }
+      : { role: 'user', content: userMessage }])
     setIsStreaming(true)
     setStreamingContent('')
 
@@ -653,6 +666,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
       const offDone = window.electronAPI.onVaultRagAnswerDone((payload: VaultRagAnswerDone) => {
         if (payload.requestId !== requestId) return
         offChunk(); offDone()
+        vaultUnsubRef.current = []
         vaultRequestRef.current = null
         switch (payload.kind) {
           case 'answer':
@@ -672,6 +686,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
             break
         }
       })
+      vaultUnsubRef.current = [offChunk, offDone]
       try {
         const res = await window.electronAPI.vaultRagAnswer(vaultPath, userMessage, requestId, lang)
         if (!res.success && res.error && vaultRequestRef.current === requestId) {
@@ -797,8 +812,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
 
   // Chat leeren
   const clearChat = () => {
+    cancelVaultRequest()
     setMessages([])
     setStreamingContent('')
+    setIsStreaming(false)
   }
 
   // Provenienz-Callout (KI-generiert: Frage, Modell, Datum) — eine Quelle für

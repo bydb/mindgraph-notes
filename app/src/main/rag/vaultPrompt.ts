@@ -17,9 +17,21 @@ export function escapeDelimiters(text: string): string {
   return text.replace(/BEGIN_UNTRUSTED_CONTEXT|END_UNTRUSTED_CONTEXT/g, (m) => m.toLowerCase().replace(/_/g, '-'))
 }
 
-export function sourceHeader(n: number, hit: VaultHit): string {
-  const base = hit.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? hit.fileRel
-  return hit.heading ? `[${n}] ${base} › ${hit.heading}` : `[${n}] ${base}`
+/**
+ * Dateiname und Überschrift stammen aus dem Notizinhalt und sind damit ebenso untrusted
+ * wie der Chunk-Text (Codex F23): eine Zeile, Delimiter entschärft, keine `[n]`-Attrappen,
+ * gedeckelt. Nur die Nummer stammt von der App.
+ */
+export function sanitizeHeaderPart(raw: string, sanitize: (text: string) => string, max = 120): string {
+  const oneLine = escapeDelimiters(sanitize(raw)).replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+  const noFakeRefs = oneLine.replace(/\[(\d{1,3})\]/g, '($1)')
+  return noFakeRefs.length > max ? `${noFakeRefs.slice(0, max - 1)}…` : noFakeRefs
+}
+
+export function sourceHeader(n: number, hit: VaultHit, sanitize: (text: string) => string = (t) => t): string {
+  const base = sanitizeHeaderPart(hit.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? hit.fileRel, sanitize)
+  const heading = hit.heading ? sanitizeHeaderPart(hit.heading, sanitize) : ''
+  return heading ? `[${n}] ${base} › ${heading}` : `[${n}] ${base}`
 }
 
 export function buildVaultPrompt(
@@ -28,7 +40,7 @@ export function buildVaultPrompt(
   sanitize: (text: string) => string
 ): string {
   const context = hits
-    .map((h, i) => `${sourceHeader(i + 1, h)}\n${escapeDelimiters(sanitize(h.text))}`)
+    .map((h, i) => `${sourceHeader(i + 1, h, sanitize)}\n${escapeDelimiters(sanitize(h.text))}`)
     .join('\n\n---\n\n')
 
   if (language === 'de') {

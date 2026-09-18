@@ -68,12 +68,30 @@ const assertSafePath = async (p: string) => p
 let vault: string
 let userData: string
 let progress: unknown[]
+let moduleOn = true
+
+/** Strenge Pfadprüfung wie assertSafePath im Main: realpath (Elternpfad bei neuen Dateien), nur im Vault. */
+async function strictSafePath(root: string) {
+  const real = await fs.realpath(root)
+  return async (p: string): Promise<string> => {
+    const resolved = path.resolve(p)
+    let canonical: string
+    try {
+      canonical = await fs.realpath(resolved)
+    } catch {
+      canonical = path.join(await fs.realpath(path.dirname(resolved)), path.basename(resolved))
+    }
+    if (canonical !== real && !canonical.startsWith(real + path.sep)) throw new Error(`außerhalb: ${p}`)
+    return canonical
+  }
+}
 
 function manager(extra: Partial<ConstructorParameters<typeof VaultRagManager>[0]> = {}) {
   return new VaultRagManager({
     userDataPath: userData,
     assertSafePath,
     getEmbedModel: async () => 'bge-m3',
+    isModuleEnabled: async () => moduleOn,
     onProgress: (p) => progress.push(p),
     queueDebounceMs: 40,
     queueMaxWaitMs: 150,
@@ -118,6 +136,7 @@ beforeEach(async () => {
   vault = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-vault-')))
   userData = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-ud-'))
   progress = []
+  moduleOn = true
   fake.jobs.length = 0
 })
 afterEach(async () => {
@@ -245,6 +264,7 @@ describe('Watcher-Warteschlange', () => {
     const m = manager()
     await m.setConfig(vault, { enabled: true })
     await m.setVault(vault)
+    await writeContainer(['a.md'])
     const t0 = Date.now()
     const ticker = setInterval(() => m.noteFileEvent(vault, 'change', path.join(vault, `n${Date.now()}.md`)), 15)
     try {
@@ -261,6 +281,7 @@ describe('Watcher-Warteschlange', () => {
     const m = manager()
     await m.setConfig(vault, { enabled: true })
     await m.setVault(vault)
+    await writeContainer(['a.md'])
     await m.startBuild(vault)
     m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
     m.noteFileEvent(vault, 'unlink', path.join(vault, 'b.md'))
@@ -272,6 +293,70 @@ describe('Watcher-Warteschlange', () => {
     expect([...(fake.jobs[1].opts.changed as Set<string>)].sort()).toEqual(['a.md', 'b.md'])
     fake.jobs[1].finish({ status: 'done' })
     await m.shutdown()
+  })
+
+  it('kein Erstaufbau aus der Warteschlange: Schalter an + Dateiänderung ohne Klick startet nichts (F33)', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
+    await new Promise((r) => setTimeout(r, 150))
+    expect(fake.jobs).toHaveLength(0)
+    expect((await m.getStatus(vault)).pendingChanges).toBe(0)
+    await m.shutdown()
+  })
+
+  it('Modul aus: kein Start, laufender Job wird abgebrochen, keine Ereignisse mehr (F33)', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    await writeContainer(['a.md'])
+    expect((await m.startBuild(vault)).ok).toBe(true)
+    await m.setModuleEnabled(false)
+    expect(fake.jobs[0].cancelCalls).toBe(1)
+    m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
+    expect((await m.getStatus(vault)).pendingChanges).toBe(0)
+    moduleOn = false
+    const res = await m.startBuild(vault)
+    expect(res.ok).toBe(false)
+    expect(res.error).toMatch(/Modul/)
+    await expect(m.query(vault, 'alpha', undefined, {})).rejects.toThrow(/Modul/)
+  })
+})
+
+describe('Pfadschutz (F34)', () => {
+  it('Symlink auf .mindgraph/rag und vault-settings.json nach außen wird weder gelesen noch beschrieben noch aufgeräumt', async () => {
+    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-outside-'))
+    try {
+      // Fremder Ordner mit Container + Temp-Datei, fremde Settings-Datei
+      const foreignIdentity: VaultIndexIdentity = { model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, excludeKey: '' }
+      const foreignRag = path.join(outside, 'rag')
+      await fs.mkdir(foreignRag, { recursive: true })
+      const foreignMeta: VaultIndexMeta = { identity: foreignIdentity, createdAt: 1, files: {}, chunks: [] }
+      await writeVaultIndexAtomic(path.join(foreignRag, 'vault-bge-m3-latest--aaaaaaaaaaaa.ragbin'), foreignMeta, [new Float32Array(0)], 1)
+      const foreignTemp = path.join(foreignRag, 'vault-x--000000000000.ragbin.tmp-1-ab')
+      await fs.writeFile(foreignTemp, 'x')
+      const foreignSettings = path.join(outside, 'vault-settings.json')
+      await fs.writeFile(foreignSettings, JSON.stringify({ schemaVersion: 1, features: {}, vaultRag: { enabled: true, excludeFolders: [] } }))
+
+      await fs.mkdir(path.join(vault, '.mindgraph'), { recursive: true })
+      await fs.symlink(foreignRag, path.join(vault, '.mindgraph', 'rag'))
+      await fs.symlink(foreignSettings, path.join(vault, '.mindgraph', 'vault-settings.json'))
+
+      const m = manager({ assertSafePath: await strictSafePath(vault) })
+      await m.setVault(vault)
+      // Konfiguration: nicht gelesen (Default aus), nicht geschrieben
+      expect((await m.getConfig(vault)).enabled).toBe(false)
+      await expect(m.setConfig(vault, { enabled: true })).rejects.toThrow(/außerhalb/)
+      expect(JSON.parse(await fs.readFile(foreignSettings, 'utf-8')).vaultRag.enabled).toBe(true)
+      // Index: nicht gelesen, Temp nicht aufgeräumt
+      const st = await m.getStatus(vault)
+      expect(st.index.exists).toBe(false)
+      await expect(fs.stat(foreignTemp)).resolves.toBeDefined()
+      await m.shutdown()
+    } finally {
+      await fs.rm(outside, { recursive: true, force: true })
+    }
   })
 })
 

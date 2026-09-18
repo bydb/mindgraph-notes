@@ -46,6 +46,8 @@ export interface VaultRagManagerDeps {
   assertSafePath: AssertSafePath
   /** Aktuelles Embedding-Modell aus den UI-Einstellungen (Main-seitig gelesen). */
   getEmbedModel: () => Promise<string>
+  /** Modul „Notizen befragen (RAG)" — Main-seitig aus ui-settings.json (Codex F33). */
+  isModuleEnabled: () => Promise<boolean>
   onProgress: (p: VaultBuildProgress) => void
   now?: () => number
   /** Entprellung der Watcher-Warteschlange (Tests verkürzen sie). */
@@ -81,6 +83,8 @@ export class VaultRagManager {
   private configCache: VaultRagSettings | null = null
   /** Startphase eines Jobs (zwischen Prüfung und Zuweisung) — verhindert Doppelstart. */
   private starting = false
+  /** Zuletzt bekanntes Modul-Flag; Watcher-Fanout entscheidet synchron. */
+  private moduleOn = true
   /** Alle Schreibweisen des aktiven Vaults (resolve + realpath) — Symlink-sicherer Vergleich. */
   private vaultAliases = new Set<string>()
   private readonly now: () => number
@@ -130,9 +134,11 @@ export class VaultRagManager {
       } catch {
         /* Vault existiert (noch) nicht */
       }
-      // Konfiguration eifrig laden: der Watcher-Fanout entscheidet synchron.
+      // Konfiguration und Modul-Flag eifrig laden: der Watcher-Fanout entscheidet synchron.
       await this.getConfig(vaultPath)
-      await cleanupVaultIndexTemps(vaultRagDir(vaultPath)).catch(() => undefined)
+      await this.moduleEnabled()
+      const dir = await this.safeRagDir(vaultPath, 'vault-rag-cleanup')
+      if (dir) await cleanupVaultIndexTemps(dir, this.deps.assertSafePath).catch(() => undefined)
     }
   }
 
@@ -155,14 +161,42 @@ export class VaultRagManager {
 
   // ─── Konfiguration (vault-settings.json, Main-seitig) ───────────────────────
 
-  private settingsFile(vaultPath: string): string {
-    return path.join(vaultPath, '.mindgraph', 'vault-settings.json')
+  // Jeder Dateizugriff läuft durch assertSafePath (Codex F34): ein Symlink auf
+  // `.mindgraph/rag` oder `vault-settings.json` darf nicht nach außen führen. Nur die
+  // geprüften (kanonischen) Pfade werden weiterverwendet.
+  private async safeSettingsFile(vaultPath: string, op: string): Promise<string> {
+    const mindgraphDir = await this.deps.assertSafePath(path.join(vaultPath, '.mindgraph'), op)
+    return this.deps.assertSafePath(path.join(mindgraphDir, 'vault-settings.json'), op)
+  }
+
+  private async safeRagDir(vaultPath: string, op: string): Promise<string | null> {
+    try {
+      return await this.deps.assertSafePath(vaultRagDir(vaultPath), op)
+    } catch {
+      return null // Ordner fehlt oder zeigt nach außen → wie „kein Index"
+    }
+  }
+
+  /** Modul-Flag von außen (save-ui-settings): aus → Job stoppen, Warteschlange leeren. */
+  async setModuleEnabled(on: boolean): Promise<void> {
+    this.moduleOn = on
+    if (!on) {
+      this.pendingChanged.clear()
+      this.firstPendingAt = null
+      if (this.vaultPath) await this.cancel(this.vaultPath)
+    }
+  }
+
+  private async moduleEnabled(): Promise<boolean> {
+    this.moduleOn = await this.deps.isModuleEnabled().catch(() => false)
+    return this.moduleOn
   }
 
   async getConfig(vaultPath: string): Promise<VaultRagSettings> {
     let config: VaultRagSettings
     try {
-      const raw = JSON.parse(await fs.readFile(this.settingsFile(vaultPath), 'utf-8')) as { vaultRag?: unknown }
+      const file = await this.safeSettingsFile(vaultPath, 'vault-rag-config-read')
+      const raw = JSON.parse(await fs.readFile(file, 'utf-8')) as { vaultRag?: unknown }
       config = normalizeConfig(raw?.vaultRag)
     } catch {
       config = { ...DEFAULT_CONFIG }
@@ -172,7 +206,9 @@ export class VaultRagManager {
   }
 
   async setConfig(vaultPath: string, patch: Partial<VaultRagSettings>): Promise<VaultRagSettings> {
-    const file = this.settingsFile(vaultPath)
+    const mindgraphDir = await this.deps.assertSafePath(path.join(vaultPath, '.mindgraph'), 'vault-rag-config-write')
+    await fs.mkdir(mindgraphDir, { recursive: true })
+    const file = await this.deps.assertSafePath(path.join(mindgraphDir, 'vault-settings.json'), 'vault-rag-config-write')
     let current: Record<string, unknown> = {}
     try {
       current = JSON.parse(await fs.readFile(file, 'utf-8')) as Record<string, unknown>
@@ -181,7 +217,6 @@ export class VaultRagManager {
     }
     const merged: VaultRagSettings = normalizeConfig({ ...normalizeConfig(current.vaultRag), ...patch })
     if (patch.excludeFolders) merged.excludeFolders = patch.excludeFolders.map((f) => normalizeRelPath(f)).filter(Boolean)
-    await fs.mkdir(path.dirname(file), { recursive: true })
     await fs.writeFile(file, JSON.stringify({ ...current, vaultRag: merged }, null, 2), 'utf-8')
     if (this.sameVault(vaultPath)) this.configCache = merged
     if (!merged.enabled) {
@@ -200,7 +235,8 @@ export class VaultRagManager {
     const index: VaultRagStatus['index'] = {
       exists: false, file: null, chunkCount: 0, fileCount: 0, generation: 0, createdAt: null, model: null, digest: null, bytes: 0, excludeMismatch: false
     }
-    const files = await listVaultIndexFiles(vaultRagDir(vaultPath))
+    const dir = await this.safeRagDir(vaultPath, 'vault-rag-status')
+    const files = dir ? await listVaultIndexFiles(dir, this.deps.assertSafePath) : []
     if (files.length > 0) {
       // Der jüngste Container ist der gültige (nach einem Commit werden ältere entfernt).
       const newest = files.sort((a, b) => b.mtime - a.mtime)[0]
@@ -249,6 +285,7 @@ export class VaultRagManager {
 
   async startBuild(vaultPath: string, mode: 'full' | 'incremental' = 'full', changed?: Set<string>): Promise<{ ok: boolean; jobId?: string; error?: string }> {
     if (!(await this.isSameVault(vaultPath))) await this.setVault(vaultPath)
+    if (!(await this.moduleEnabled())) return { ok: false, error: 'Modul „Notizen befragen (RAG)" ist ausgeschaltet' }
     // Sperre über die GESAMTE Startphase: zwischen der Prüfung „läuft schon?" und der
     // Zuweisung liegen Wartepunkte — zwei schnelle Klicks starteten sonst zwei Jobs.
     if (this.job || this.starting) {
@@ -340,8 +377,8 @@ export class VaultRagManager {
   noteFileEvent(vaultRoot: string, eventName: string, absPath: string): void {
     if (!this.vaultPath || !this.sameVault(vaultRoot)) return
     if (eventName !== 'add' && eventName !== 'change' && eventName !== 'unlink') return
-    // Ohne (bekanntes) Opt-in keine Warteschlange — sonst sammelt sich hier still ein Backlog.
-    if (!this.configCache?.enabled) return
+    // Ohne (bekanntes) Opt-in und ohne Modul keine Warteschlange — sonst sammelt sich hier still ein Backlog.
+    if (!this.moduleOn || !this.configCache?.enabled) return
     const rel = normalizeRelPath(path.relative(vaultRoot, absPath))
     if (!rel || rel.startsWith('..')) return
     // Gelöschte Dateien gehen auch durch: der inkrementelle Lauf scannt frisch und
@@ -379,11 +416,25 @@ export class VaultRagManager {
       this.pendingChanged.clear()
       return
     }
+    if (!(await this.moduleEnabled())) {
+      this.pendingChanged.clear()
+      this.firstPendingAt = null
+      return
+    }
+    // Der Watcher aktualisiert NUR einen bereits autorisierten Bestand (Codex F33): Ohne
+    // vorhandenen Index gibt es keinen Erstaufbau aus der Warteschlange — den startet
+    // ausschließlich der Klick „Vault-Index erstellen".
+    const dir = await this.safeRagDir(vaultPath, 'vault-rag-flush')
+    const hasIndex = dir ? (await listVaultIndexFiles(dir, this.deps.assertSafePath)).length > 0 : false
+    if (!hasIndex) {
+      this.pendingChanged.clear()
+      this.firstPendingAt = null
+      return
+    }
     const changed = new Set(this.pendingChanged)
     this.pendingChanged.clear()
     this.firstPendingAt = null
-    const hasIndex = (await listVaultIndexFiles(vaultRagDir(vaultPath))).length > 0
-    const res = await this.startBuild(vaultPath, hasIndex ? 'incremental' : 'full', changed)
+    const res = await this.startBuild(vaultPath, 'incremental', changed)
     if (!res.ok) {
       // Zurücklegen, damit nichts verloren geht (z.B. Ollama gerade nicht erreichbar).
       for (const rel of changed) this.pendingChanged.add(rel)
@@ -400,9 +451,11 @@ export class VaultRagManager {
     filters: VaultQueryFilters | undefined,
     opts: { topK?: number; minScore?: number; perFileCap?: number; signal?: AbortSignal } = {}
   ): Promise<VaultQueryResult & { excludeMismatch: boolean }> {
+    if (!(await this.moduleEnabled())) throw new Error('Modul „Notizen befragen (RAG)" ist ausgeschaltet')
     const config = await this.getConfig(vaultPath)
     if (!config.enabled) throw new Error('Vault-Index ist für diesen Vault nicht eingeschaltet')
-    const files = await listVaultIndexFiles(vaultRagDir(vaultPath))
+    const dir = await this.safeRagDir(vaultPath, 'vault-rag-query')
+    const files = dir ? await listVaultIndexFiles(dir, this.deps.assertSafePath) : []
     if (files.length === 0) throw new Error('Kein Vault-Index vorhanden — bitte zuerst „Vault-Index erstellen"')
     const newest = files.sort((a, b) => b.mtime - a.mtime)[0]
     const container = await this.loadContainer(newest.file)

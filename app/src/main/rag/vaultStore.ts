@@ -177,8 +177,14 @@ export async function writeVaultIndexAtomic(
   return { bytes: VAULT_INDEX_HEADER_SIZE + metaBytes.length + vecBytesTotal }
 }
 
-/** Entfernt liegen gebliebene Commit-Temps (Absturz zwischen Schreiben und Rename). */
-export async function cleanupVaultIndexTemps(dir: string): Promise<number> {
+type AssertSafePath = (p: string, op: string) => Promise<string>
+const passThrough: AssertSafePath = async (p) => p
+
+/**
+ * Entfernt liegen gebliebene Commit-Temps (Absturz zwischen Schreiben und Rename).
+ * `dir` muss bereits geprüft sein; jede Datei wird vor dem Löschen erneut geprüft (F34).
+ */
+export async function cleanupVaultIndexTemps(dir: string, assertSafePath: AssertSafePath = passThrough): Promise<number> {
   let removed = 0
   let entries: string[]
   try {
@@ -188,15 +194,20 @@ export async function cleanupVaultIndexTemps(dir: string): Promise<number> {
   }
   for (const name of entries) {
     if (name.includes(TEMP_MARK)) {
-      await fs.rm(path.join(dir, name), { force: true }).catch(() => undefined)
-      removed++
+      try {
+        const safe = await assertSafePath(path.join(dir, name), 'vault-rag-cleanup')
+        await fs.rm(safe, { force: true })
+        removed++
+      } catch {
+        /* außerhalb oder schon weg */
+      }
     }
   }
   return removed
 }
 
-/** Listet vorhandene Vault-Container (nur Header, kein Metadaten-Parse). */
-export async function listVaultIndexFiles(dir: string): Promise<Array<{ file: string; chunkCount: number; generation: number; bytes: number; mtime: number }>> {
+/** Listet vorhandene Vault-Container (nur Header, kein Metadaten-Parse); jede Datei pfadgeprüft (F34). */
+export async function listVaultIndexFiles(dir: string, assertSafePath: AssertSafePath = passThrough): Promise<Array<{ file: string; chunkCount: number; generation: number; bytes: number; mtime: number }>> {
   let entries: string[]
   try {
     entries = await fs.readdir(dir)
@@ -206,7 +217,12 @@ export async function listVaultIndexFiles(dir: string): Promise<Array<{ file: st
   const out: Array<{ file: string; chunkCount: number; generation: number; bytes: number; mtime: number }> = []
   for (const name of entries) {
     if (!name.startsWith(INDEX_PREFIX) || !name.endsWith(INDEX_EXT) || name.includes(TEMP_MARK)) continue
-    const file = path.join(dir, name)
+    let file: string
+    try {
+      file = await assertSafePath(path.join(dir, name), 'vault-rag-list')
+    } catch {
+      continue
+    }
     try {
       const handle = await fs.open(file, 'r')
       try {
@@ -227,8 +243,8 @@ export async function listVaultIndexFiles(dir: string): Promise<Array<{ file: st
 }
 
 /** Entfernt alle Container im Ordner außer `keepFile` (alte Identitäten nach erfolgreichem Commit). */
-export async function removeOtherVaultIndexes(dir: string, keepFile: string): Promise<void> {
-  const files = await listVaultIndexFiles(dir)
+export async function removeOtherVaultIndexes(dir: string, keepFile: string, assertSafePath: AssertSafePath = passThrough): Promise<void> {
+  const files = await listVaultIndexFiles(dir, assertSafePath)
   for (const f of files) {
     if (path.resolve(f.file) === path.resolve(keepFile)) continue
     await fs.rm(f.file, { force: true }).catch(() => undefined)

@@ -254,7 +254,9 @@ Bewusst klein, wie mit dem Nutzer vereinbart: erst Nutzung beobachten, dann ausb
 
 - **Auffindbarkeit nachgebessert (14:15 Uhr, Nutzerwunsch):** Der Vault-Knopf im Chat trägt jetzt ein eigenes Symbol (Buch mit Haken) und das sichtbare Wort „Vault“ (`has-label`), nicht mehr das Personen-Symbol des alten Modus „Alle“. Neuer Einstieg „Vault befragen (Antworten mit Quellen)“ im Werkzeug-Menü und in der Befehlspalette (`panel-vault-chat`, Requirement `vaultChat` = Notes-Chat + RAG-Modul): öffnet den Chat (nie toggeln) und setzt den Modus über `modeRequest`. Die Vault-Index-Karte sagt bei vorhandenem Index, wo man ihn benutzt. Ein eigenes Panel oder Dashboard-Widget bewusst nicht — erst, wenn Phase 4 die Belege zur Fähigkeit über mehrere Zugänge macht.
 
-**Noch nicht abgenommen:** Handbewertung von 20 Antworten (Phase 3); Konkurrenztest im App-Pfad; Codex-Nachprüfung.
+**Codex-Umsetzungsreview (18.09.2026, F23–F38): keine Abnahme.** Sechzehn Befunde, alle bestätigt. Runde 1 behoben: Quellenköpfe untrusted (F23), Vault-Frage nie im Cloud-Verlauf (F24), kein Erstaufbau ohne Klick und Modul-Aus Main-seitig (F33), realpath-Schutz für alle Index- und Konfigurationszugriffe (F34), frische Modellprüfung vor jedem Request (F35). Offen: Robustheit (F29–F32, F36, F37), Zitatprüfung und Export (F25–F27), Stellensprung (F28), Abnahmeliste (F38). Details und Anker in der Review-Datei.
+
+**Noch nicht abgenommen:** Handbewertung von 20 Antworten (Phase 3); Konkurrenztest im App-Pfad; Codex-Nachprüfung der Runden 1–3.
 
 ## Risiken und Gegenmittel
 

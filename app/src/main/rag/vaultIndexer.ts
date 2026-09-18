@@ -366,7 +366,13 @@ export class VaultIndexJob {
         chunkingVersion: RAG_INDEX_VERSION,
         excludeKey: excludeKeyFor(excludeFolders)
       }
-      const indexFile = vaultIndexPath(vaultPath, identity)
+      // Ordner anlegen und Zielpfad prüfen (F34): ein Symlink `.mindgraph/rag` nach außen
+      // führt zu einer Ablehnung, nicht zu einem Schreibvorgang außerhalb des Vaults.
+      const ragDir = await assertSafePath(vaultRagDir(vaultPath), 'vault-rag-dir').catch(async () => {
+        await fs.mkdir(vaultRagDir(vaultPath), { recursive: true })
+        return assertSafePath(vaultRagDir(vaultPath), 'vault-rag-dir')
+      })
+      const indexFile = await assertSafePath(vaultIndexPath(vaultPath, identity), 'vault-rag-index-file')
       stagingDir = stagingDirFor(userDataPath, vaultPath, identity)
 
       // 2. Scan + Bestand
@@ -523,8 +529,8 @@ export class VaultIndexJob {
       const meta: VaultIndexMeta = { identity, createdAt: this.now(), files: metaFiles, chunks: metaChunks }
       const generation = (existing?.generation ?? 0) + 1
       await writeVaultIndexAtomic(indexFile, meta, coalesceParts(parts), generation)
-      await removeOtherVaultIndexes(vaultRagDir(vaultPath), indexFile)
-      await cleanupVaultIndexTemps(vaultRagDir(vaultPath))
+      await removeOtherVaultIndexes(ragDir, indexFile, assertSafePath)
+      await cleanupVaultIndexTemps(ragDir, assertSafePath)
       await removeStagingDir(stagingDir)
 
       // Keine zusätzliche Vollkopie der Vektoren im Ergebnis (Messlauf 18.09.: Peak-RSS
