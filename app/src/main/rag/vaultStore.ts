@@ -275,20 +275,27 @@ export async function loadCheckpoint(stagingDir: string, identity: VaultIndexIde
   }
 }
 
+/** Schreiben mit fsync vor dem Rename — sonst ist die zugesagte Haltbarkeit nur nominell (F37). */
+async function writeDurable(file: string, data: Uint8Array | string): Promise<void> {
+  const temp = `${file}${TEMP_MARK}${randomBytes(4).toString('hex')}`
+  const handle = await fs.open(temp, 'w')
+  try {
+    await handle.writeFile(data)
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
+  await fs.rename(temp, file)
+}
+
 export async function saveCheckpoint(stagingDir: string, cp: StagingCheckpoint): Promise<void> {
   await fs.mkdir(stagingDir, { recursive: true })
-  const file = path.join(stagingDir, CHECKPOINT_NAME)
-  const temp = `${file}${TEMP_MARK}${randomBytes(4).toString('hex')}`
-  await fs.writeFile(temp, JSON.stringify(cp), 'utf-8')
-  await fs.rename(temp, file)
+  await writeDurable(path.join(stagingDir, CHECKPOINT_NAME), JSON.stringify(cp))
 }
 
 export async function writeSegment(stagingDir: string, name: string, container: VaultIndexContainer): Promise<void> {
   await fs.mkdir(stagingDir, { recursive: true })
-  const file = path.join(stagingDir, name)
-  const temp = `${file}${TEMP_MARK}${randomBytes(4).toString('hex')}`
-  await fs.writeFile(temp, encodeVaultIndex(container))
-  await fs.rename(temp, file)
+  await writeDurable(path.join(stagingDir, name), encodeVaultIndex(container))
 }
 
 /** Segment laden; Format- oder Identitätsfehler → `null` (Segment wird dann neu erzeugt). */

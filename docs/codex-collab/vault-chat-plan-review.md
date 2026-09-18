@@ -572,12 +572,27 @@ Manager: `vault-settings.json`, `.mindgraph`, `.mindgraph/rag` und jede Containe
 ### F35 — Modell-Cache vor dem Senden → [ADRESSIERT]
 `embed.ts:assertLocalEmbeddingModel` löst IMMER frisch auf (`fresh: true`, ein lokaler `/api/tags`-Aufruf pro Request; beim Voll-Build ~19 000 Aufrufe, je wenige Millisekunden). Beide Answer-Handler prüfen das Chat-Modell zusätzlich unmittelbar vor dem Fetch, `project-rag-answer` also nach `ensureIndex`. Test `embed.test.ts` mit gestubbtem fetch: lokal → Embedding; danach Remote-Metadaten unter gleichem Tag → Ablehnung, kein Embedding-Aufruf. Restfenster (Ollama-Änderung zwischen Prüfung und Request innerhalb von Millisekunden) ist dokumentiert und nicht schließbar ohne Ollama-Koordination.
 
-### F29 — Abbruch-Lebenszyklus → [DISKUSSION] (teilweise umgesetzt)
-Renderer: Abonnements werden jetzt in `vaultUnsubRef` gehalten und bei Unmount, Chat-Leeren und Vault-Wechsel abgemeldet, laufende Anfrage abgebrochen. Main-Seite (Controller vor dem ersten await, Sender-Bindung, Duplikat-Ablehnung, webContents-Zerstörung) kommt in Runde 2.
+### F29 — Abbruch-Lebenszyklus → [ADRESSIERT]
+Renderer: Abonnements in `vaultUnsubRef`, Abmeldung und Abbruch bei Unmount, Chat-Leeren und Vault-Wechsel. Main (`index.ts:vault-rag-answer`): Controller wird VOR dem ersten await registriert, Schlüssel `${sender.id}:${requestId}`, doppelte IDs abgelehnt, Signal läuft durch Retrieval (`manager.query` → `embedText`) und Chat-Fetch, `webContents 'destroyed'` bricht ab, Cleanup im `finally`; `vault-rag-answer-cancel` wirkt nur auf Läufe des eigenen Senders. Nicht angefasst (ausgewiesen offen): die globalen `removeAllListeners` des Projekt-RAG-Pfads.
 
-### F25–F28, F30–F32, F36–F38 → [OFFEN]
-Runde 2 (Robustheit) und Runde 3 (Zitatprüfung/Export) folgen nach Nutzer-Go. F28 (Stellensprung) und die Abnahmeliste F38 bleiben als offener Phase-2-Umfang deklariert, nicht als erfüllt.
+### F30 — Vault-Wechsel während der Startphase → [ADRESSIERT]
+`vaultRagManager.ts`: Lebenszyklus-`generation`, hochgezählt bei `shutdown`/`setVault` und Modul-Aus; `startBuildLocked` prüft die Generation nach jedem await und vor der Job-Zuweisung; Job-Ende plant nur für die eigene Generation nach. Test „Vault-Wechsel während der Startphase verwirft den Start“ mit verzögerter Modellauflösung.
+
+### F31 — Weiterarbeitende Worker nach Fehler → [ADRESSIERT]
+`vaultIndexer.ts:embedChunks`: gemeinsamer terminaler Zustand `failure`; erster Fehler bricht alle laufenden Requests ab, `embedWithRetry` wiederholt nach Abbruch nur bei Vordergrund, nie bei Fehler; `Promise.allSettled` wartet alle Worker ab. Test: gescheiterter Worker bei Concurrency 2 → nach dem Fehler-Ergebnis keine weiteren Embedding-Aufrufe, kein Container.
+
+### F32 — Änderungen bei Laufzeitfehler, Neustart nach Abbruch → [ADRESSIERT]
+`inFlightChanged` bleibt bis zum Commit; bei Fehler/Abbruch zurück in die Warteschlange, Fehler mit begrenztem Backoff (Verdopplung bis zur Obergrenze). Nutzer-Abbruch (`cancelRequested`) plant nichts nach und stoppt einen bereits geplanten Flush; erst ein neues Ereignis plant wieder. Tests: A geändert → Fehler → B geändert → Lauf mit A und B; Ereignis während Build → Abbruch → kein neuer Lauf, Änderung bleibt in der Warteschlange. Verdichtung sehr vieler Pfade auf einen Full-Rescan-Marker: noch offen (Set wächst mit der Zahl geänderter Pfade).
+
+### F36 — Relokalisierung mit alten Metadaten → [ADRESSIERT]
+`vaultRetrieve.ts:verifyHits` leitet Kategorie und Datum aus demselben frischen Snapshot ab und wendet die aktiven Filter erneut an (`filters` werden durchgereicht); Treffer trägt `kind/dateValue` aus der Datei. Test: Kategorie im Frontmatter geändert, Body gleich → mit Filter `problem` fällt der Treffer weg, ohne Filter relokalisiert mit neuer Kategorie.
+
+### F37 — Defektes Staging-Segment → [ADRESSIERT]
+Beim Laden werden unlesbare Segmente samt ihrer Datei-Zuordnungen aus dem Checkpoint entfernt und der Checkpoint gespeichert; das Zusammensetzen sieht nur gültige Segmente. `writeSegment`/`saveCheckpoint` schreiben jetzt mit `fsync` vor dem Rename. Test: Abbruch nach dem ersten Segment, Segment halbieren, Resume → vollständiger Container, betroffene Dateien neu eingebettet.
+
+### F25–F28, F38 → [OFFEN]
+Runde 3 (Zitatprüfung/Export, F25–F27) folgt nach Nutzer-Go. F28 (Stellensprung) und die Abnahmeliste F38 bleiben als offener Phase-2-Umfang deklariert, nicht als erfüllt.
 
 ## Status
 
-Umsetzungsreview F23–F38 liegt vor (keine Abnahme). Runde 1 (F23, F24, F33, F34, F35 + Renderer-Teil von F29) umgesetzt und getestet; Runde 2 (Robustheit) und Runde 3 (Zitate/Export) offen. Branch `feature/vault-chat`, Runde 1 noch uncommitted.
+Umsetzungsreview F23–F38 liegt vor (keine Abnahme). Runde 1 (Sicherheit/Einwilligung: F23, F24, F33, F34, F35) und Runde 2 (Robustheit: F29, F30, F31, F32, F36, F37) umgesetzt und getestet; Runde 3 (Zitatprüfung/Export F25–F27) offen; F28/F38 ausgewiesen offen. Branch `feature/vault-chat`.

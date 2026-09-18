@@ -13,6 +13,8 @@ import type { NoteKindId } from '../../shared/noteKind'
 import { embedText } from './embed'
 import { resolveLocalModel } from './localModel'
 import { readCanonicalFile, sha256Hex } from './vaultStore'
+import { getNoteKindStrict, resolveNoteDate } from '../../shared/noteKind'
+import type { VaultFileMeta } from '../../shared/rag/vaultIndex'
 
 type AssertSafePath = (p: string, op: string) => Promise<string>
 
@@ -136,6 +138,8 @@ export function selectHits(
 interface FreshFile {
   canonical: string
   sourceHash: string
+  /** Metadaten aus demselben Snapshot — nach Änderung nie die alten aus dem Index (F36). */
+  meta: VaultFileMeta
   chunksByHash?: Map<string, VaultChunkMeta[]>
 }
 
@@ -148,7 +152,8 @@ export async function verifyHits(
   vaultPath: string,
   container: VaultIndexContainer,
   selected: Array<{ chunk: VaultChunkMeta; score: number }>,
-  assertSafePath: AssertSafePath
+  assertSafePath: AssertSafePath,
+  filters?: VaultQueryFilters
 ): Promise<{ hits: VaultHit[]; staleFiles: string[] }> {
   const cache = new Map<string, FreshFile | null>()
   const hits: VaultHit[] = []
@@ -162,7 +167,12 @@ export async function verifyHits(
       try {
         const safe = await assertSafePath(path.join(vaultPath, chunk.fileRel), 'vault-rag-verify')
         const f = await readCanonicalFile(safe)
-        fresh = { canonical: f.canonical, sourceHash: f.sourceHash }
+        const date = resolveNoteDate(chunk.fileRel, f.canonical, f.mtime)
+        fresh = {
+          canonical: f.canonical,
+          sourceHash: f.sourceHash,
+          meta: { sourceHash: f.sourceHash, mtime: f.mtime, size: f.size, kind: getNoteKindStrict(chunk.fileRel, f.canonical), dateValue: date.dateValue, dateSource: date.dateSource }
+        }
       } catch {
         fresh = null
       }
@@ -172,13 +182,19 @@ export async function verifyHits(
       stale.add(chunk.fileRel)
       continue
     }
+    // Aktive Filter gegen die FRISCHEN Metadaten prüfen — eine geänderte Kategorie oder
+    // ein geändertes Datum darf keinen Treffer im falschen Filter liefern (F36).
+    if (!matchesFilters(chunk.fileRel, fresh.meta, filters)) {
+      if (fresh.sourceHash !== fileMeta.sourceHash) stale.add(chunk.fileRel)
+      continue
+    }
     const base = {
       fileRel: chunk.fileRel,
       chunkIndex: chunk.chunkIndex,
       score,
       chunkHash: chunk.chunkHash,
-      kind: fileMeta.kind,
-      dateValue: fileMeta.dateValue
+      kind: fresh.meta.kind,
+      dateValue: fresh.meta.dateValue
     }
     if (fresh.sourceHash === fileMeta.sourceHash) {
       hits.push({
@@ -274,7 +290,7 @@ export async function queryVaultIndex(
   }
   const passing = ranked.filter((r) => r.score >= minScore)
   const selected = selectHits(container, passing, topK, perFileCap)
-  const { hits, staleFiles } = await verifyHits(vaultPath, container, selected, assertSafePath)
+  const { hits, staleFiles } = await verifyHits(vaultPath, container, selected, assertSafePath, opts.filters)
   return {
     hits,
     belowFloor: false,

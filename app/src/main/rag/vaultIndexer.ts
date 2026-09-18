@@ -192,6 +192,8 @@ type Decision =
 export class VaultIndexJob {
   private readonly cancelCtl = new AbortController()
   private cancelled = false
+  /** Erster Worker-Fehler: alle anderen Requests abbrechen, KEIN Retry (Codex F31). */
+  private failure: Error | null = null
   private userPaused = false
   private resumeWaiters: Array<() => void> = []
   private readonly inflight = new Set<AbortController>()
@@ -291,6 +293,7 @@ export class VaultIndexJob {
       } catch (err) {
         if (err instanceof EmbeddingAbortedError) {
           this.throwIfCancelled()
+          if (this.failure) throw this.failure // ein anderer Worker ist gescheitert → kein Retry
           continue // Vordergrund hat den Request unterbrochen → nach der Pause wiederholen
         }
         throw err
@@ -305,18 +308,33 @@ export class VaultIndexJob {
     let next = 0
     const worker = async (): Promise<void> => {
       for (;;) {
+        if (this.failure) return
         const i = next++
         if (i >= chunks.length) return
-        const v = await this.embedWithRetry(chunks[i].embedInput)
+        let v: number[]
+        try {
+          v = await this.embedWithRetry(chunks[i].embedInput)
+        } catch (err) {
+          // Gemeinsamer terminaler Zustand: erster Fehler stoppt alle Worker, laufende
+          // Requests werden abgebrochen und NICHT wiederholt (Codex F31).
+          if (!this.failure && !this.cancelled) this.failure = err instanceof Error ? err : new Error(String(err))
+          for (const c of this.inflight) c.abort()
+          return
+        }
         if (v.length !== dim) {
-          throw new Error(`Embedding-Dimension ${v.length} ≠ ${dim} — Modell hat sich während des Laufs geändert`)
+          this.failure = new Error(`Embedding-Dimension ${v.length} ≠ ${dim} — Modell hat sich während des Laufs geändert`)
+          for (const c of this.inflight) c.abort()
+          return
         }
         vectors.set(v, i * dim)
         this.progress.chunksEmbedded++
         this.emit(false, { etaMs: this.eta() })
       }
     }
-    await Promise.all(Array.from({ length: Math.min(this.concurrency, chunks.length) }, worker))
+    // Alle Worker abwarten — auch nach einem Fehler darf keiner weiterarbeiten.
+    await Promise.allSettled(Array.from({ length: Math.min(this.concurrency, chunks.length) }, worker))
+    this.throwIfCancelled()
+    if (this.failure) throw this.failure
     return vectors
   }
 
@@ -398,11 +416,21 @@ export class VaultIndexJob {
         await removeStagingDir(stagingDir)
         checkpoint = { identity, files: {}, segments: [], updatedAt: this.now() }
       }
+      // Defekte Segmente konsequent aus dem Checkpoint entfernen (Codex F37): sonst bleibt
+      // ihre Referenz stehen und das Zusammensetzen scheitert bei jedem Resume erneut.
       const stagedIn = new Map<string, string>() // rel → Segmentname (jüngstes Segment gewinnt)
+      const validSegments: StagingCheckpoint['segments'] = []
       for (const seg of checkpoint.segments) {
         const c = await loadSegment(stagingDir, seg.name, identity)
         if (!c) continue
+        validSegments.push(seg)
         for (const rel of Object.keys(c.meta.files)) stagedIn.set(rel, seg.name)
+      }
+      if (validSegments.length !== checkpoint.segments.length) {
+        checkpoint.segments = validSegments
+        for (const rel of Object.keys(checkpoint.files)) if (!stagedIn.has(rel)) delete checkpoint.files[rel]
+        checkpoint.updatedAt = this.now()
+        await saveCheckpoint(stagingDir, checkpoint)
       }
 
       // 3. Pakete

@@ -11,6 +11,8 @@ const embedLog: Array<{ text: string; at: number; aborted: boolean }> = []
 let embedDelayMs = 2
 let currentDigest = 'sha256:aaa'
 let resolveCalls = 0
+/** Texte, deren Embedding fehlschlagen soll (F31). */
+let failTexts: (t: string) => boolean = () => false
 
 vi.mock('./embed', () => {
   class EmbeddingAbortedError extends Error {
@@ -22,6 +24,10 @@ vi.mock('./embed', () => {
   const embedText = async (_model: string, text: string, opts: { signal?: AbortSignal } = {}): Promise<number[]> => {
     const entry = { text, at: Date.now(), aborted: false }
     embedLog.push(entry)
+    if (failTexts(text)) {
+      await new Promise((r) => setTimeout(r, embedDelayMs))
+      throw new Error('Ollama Embeddings Fehler 500')
+    }
     await new Promise<void>((resolve, reject) => {
       const t = setTimeout(resolve, embedDelayMs)
       opts.signal?.addEventListener('abort', () => {
@@ -103,6 +109,7 @@ beforeEach(async () => {
   embedDelayMs = 2
   currentDigest = 'sha256:aaa'
   resolveCalls = 0
+  failTexts = () => false
   ollamaActivityInternals.reset()
   await seedVault()
 })
@@ -310,6 +317,54 @@ describe('VaultIndexJob — Abbruch, Wiederaufnahme, Pause', () => {
     j.resume()
     const res = await p
     expect(res.status).toBe('done')
+  })
+})
+
+describe('VaultIndexJob — Fehler und defektes Staging', () => {
+  it('ein gescheiterter Worker stoppt alle: nach dem Fehler-Ergebnis keine weiteren Embedding-Aufrufe (F31)', async () => {
+    embedDelayMs = 15
+    failTexts = (t) => t.includes('Alpha Satz 1')
+    const { j } = job({ concurrency: 2, packetSize: 20 })
+    const res = await j.run()
+    expect(res.status).toBe('error')
+    expect(res.error).toMatch(/500/)
+    const countAtReturn = embedLog.length
+    await new Promise((r) => setTimeout(r, 120))
+    expect(embedLog.length).toBe(countAtReturn)
+    // Kein Container geschrieben, Staging bleibt für einen späteren Lauf erhalten
+    expect(await loadVaultIndexFile(vaultIndexPath(vault, identityFor(['400 - Archiv'])))).toBeNull()
+  })
+
+  it('defektes Staging-Segment blockiert die Wiederaufnahme nicht (F37)', async () => {
+    const identity = identityFor(['400 - Archiv'])
+    const staging = stagingDirFor(userData, vault, identity)
+    embedDelayMs = 15
+    const first = job()
+    const p = first.j.run()
+    for (let i = 0; i < 400; i++) {
+      const cp = await loadCheckpoint(staging, identity)
+      if (cp && cp.segments.length >= 1) break
+      await new Promise((r) => setTimeout(r, 5))
+    }
+    first.j.cancel()
+    await p
+    const cp = await loadCheckpoint(staging, identity)
+    expect(cp!.segments.length).toBeGreaterThanOrEqual(1)
+    // Erstes Segment abschneiden
+    const segFile = path.join(staging, cp!.segments[0].name)
+    const bytes = await fs.readFile(segFile)
+    await fs.writeFile(segFile, bytes.subarray(0, Math.floor(bytes.length / 2)))
+
+    embedLog.length = 0
+    const res = await job().j.run()
+    expect(res.status).toBe('done')
+    expect(res.fileCount).toBe(3)
+    const container = await loadVaultIndexFile(vaultIndexPath(vault, identity))
+    expect(container!.meta.chunks.length).toBe(res.chunkCount)
+    // Die Dateien des defekten Segments wurden neu eingebettet
+    const cpFiles = Object.keys(cp!.files)
+    expect(embedLog.some((e) => e.text !== 'Dimension')).toBe(true)
+    expect(cpFiles.every((rel) => container!.meta.files[rel])).toBe(true)
   })
 })
 

@@ -324,6 +324,59 @@ describe('Watcher-Warteschlange', () => {
   })
 })
 
+describe('Lebenszyklus-Generation und Änderungsmenge (F30, F32)', () => {
+  it('Vault-Wechsel während der Startphase verwirft den Start (F30)', async () => {
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-other-'))
+    try {
+      let releaseModel: (m: string) => void = () => undefined
+      const m = manager({ getEmbedModel: () => new Promise<string>((r) => { releaseModel = r }) })
+      await m.setConfig(vault, { enabled: true })
+      await m.setVault(vault)
+      const startA = m.startBuild(vault)
+      await new Promise((r) => setTimeout(r, 20))
+      await m.setVault(other)
+      releaseModel('bge-m3')
+      const res = await startA
+      expect(res.ok).toBe(false)
+      expect(res.error).toMatch(/gewechselt|verworfen/)
+      expect(fake.jobs).toHaveLength(0)
+    } finally {
+      await fs.rm(other, { recursive: true, force: true })
+    }
+  })
+
+  it('Laufzeitfehler legt die Änderungsmenge zurück; nächster Lauf trägt A und B (F32)', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    await writeContainer(['a.md', 'b.md'])
+    m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
+    await waitFor(() => fake.jobs.length === 1)
+    expect([...(fake.jobs[0].opts.changed as Set<string>)]).toEqual(['a.md'])
+    fake.jobs[0].finish({ status: 'error', error: 'Ollama weg' })
+    await new Promise((r) => setTimeout(r, 30))
+    m.noteFileEvent(vault, 'change', path.join(vault, 'b.md'))
+    await waitFor(() => fake.jobs.length === 2, 3000)
+    expect([...(fake.jobs[1].opts.changed as Set<string>)].sort()).toEqual(['a.md', 'b.md'])
+    fake.jobs[1].finish({ status: 'done' })
+    await m.shutdown()
+  })
+
+  it('Nutzer-Abbruch startet keinen neuen Lauf aus der Warteschlange; Änderungen bleiben erhalten (F32)', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    await writeContainer(['a.md'])
+    await m.startBuild(vault)
+    m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
+    await m.cancel(vault)
+    await new Promise((r) => setTimeout(r, 200))
+    expect(fake.jobs).toHaveLength(1)
+    expect((await m.getStatus(vault)).pendingChanges).toBe(1)
+    await m.shutdown()
+  })
+})
+
 describe('Pfadschutz (F34)', () => {
   it('Symlink auf .mindgraph/rag und vault-settings.json nach außen wird weder gelesen noch beschrieben noch aufgeräumt', async () => {
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-outside-'))

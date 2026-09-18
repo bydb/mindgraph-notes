@@ -85,6 +85,14 @@ export class VaultRagManager {
   private starting = false
   /** Zuletzt bekanntes Modul-Flag; Watcher-Fanout entscheidet synchron. */
   private moduleOn = true
+  /** Generation des Manager-Lebenszyklus: Vault-Wechsel, Abschalten und Shutdown zählen hoch;
+   *  ein Start, der über einen Wartepunkt hinweg eine alte Generation trägt, wird verworfen (Codex F30). */
+  private generation = 0
+  /** Änderungsmenge des laufenden inkrementellen Jobs — bis zum Commit behalten (Codex F32). */
+  private inFlightChanged: Set<string> | null = null
+  private retryCount = 0
+  /** Nutzer hat abgebrochen: keine automatische Wiederaufnahme aus der Warteschlange. */
+  private cancelRequested = false
   /** Alle Schreibweisen des aktiven Vaults (resolve + realpath) — Symlink-sicherer Vergleich. */
   private vaultAliases = new Set<string>()
   private readonly now: () => number
@@ -143,6 +151,7 @@ export class VaultRagManager {
   }
 
   async shutdown(): Promise<void> {
+    this.generation++
     if (this.queueTimer) {
       clearTimeout(this.queueTimer)
       this.queueTimer = null
@@ -181,6 +190,7 @@ export class VaultRagManager {
   async setModuleEnabled(on: boolean): Promise<void> {
     this.moduleOn = on
     if (!on) {
+      this.generation++
       this.pendingChanged.clear()
       this.firstPendingAt = null
       if (this.vaultPath) await this.cancel(this.vaultPath)
@@ -300,7 +310,10 @@ export class VaultRagManager {
   }
 
   private async startBuildLocked(vaultPath: string, mode: 'full' | 'incremental', changed?: Set<string>): Promise<{ ok: boolean; jobId?: string; error?: string }> {
+    const gen = this.generation
+    const stale = (): { ok: false; error: string } => ({ ok: false, error: 'Vault gewechselt oder Modul abgeschaltet — Start verworfen' })
     const config = await this.getConfig(vaultPath)
+    if (gen !== this.generation) return stale()
     if (!config.enabled) return { ok: false, error: 'Vault-Index ist für diesen Vault nicht eingeschaltet' }
 
     let embedModel: string
@@ -309,6 +322,7 @@ export class VaultRagManager {
     } catch (err) {
       return { ok: false, error: describeLocalModelError(err) }
     }
+    if (gen !== this.generation || this.job) return stale()
     const jobId = `build-${randomBytes(6).toString('hex')}`
     const existing = this.loaded?.container ?? null
     const job = new VaultIndexJob({
@@ -328,14 +342,26 @@ export class VaultRagManager {
       now: this.now
     })
     this.job = job
+    this.cancelRequested = false
+    this.inFlightChanged = mode === 'incremental' && changed ? new Set(changed) : null
+    const jobGen = this.generation
     this.jobPromise = job
       .run()
       .then(async (result) => {
         if (result.status === 'done' && result.file) {
+          this.retryCount = 0
+          this.inFlightChanged = null
           // Alten Snapshot freigeben und den frischen Container aus der Datei laden
           // (Validierung inklusive) — spart die Vollkopie im Job-Ergebnis.
           this.loaded = null
           await this.loadContainer(result.file)
+        } else if (this.inFlightChanged) {
+          // Fehler oder Abbruch: die Änderungsmenge zurücklegen, sonst gilt die geänderte
+          // Datei beim nächsten inkrementellen Lauf als unverändert (Codex F32).
+          for (const rel of this.inFlightChanged) this.pendingChanged.add(rel)
+          if (this.firstPendingAt === null) this.firstPendingAt = this.now()
+          this.inFlightChanged = null
+          if (result.status === 'error') this.retryCount++
         }
       })
       .catch((err) => {
@@ -346,8 +372,12 @@ export class VaultRagManager {
           this.job = null
           this.jobPromise = null
         }
-        // Während des Laufs gesammelte Änderungen jetzt nachziehen.
-        if (this.pendingChanged.size > 0) this.scheduleFlush(0)
+        // Gesammelte Änderungen nachziehen — aber nicht nach einem Nutzer-Abbruch und nicht
+        // für eine abgelaufene Generation; nach Fehlern mit begrenztem Backoff.
+        if (this.pendingChanged.size > 0 && !this.cancelRequested && jobGen === this.generation) {
+          const backoff = Math.min(this.queueMaxWaitMs, this.queueDebounceMs * 2 ** Math.min(this.retryCount, 4))
+          this.scheduleFlush(this.retryCount > 0 ? backoff : 0)
+        }
       })
     return { ok: true, jobId }
   }
@@ -366,6 +396,13 @@ export class VaultRagManager {
 
   async cancel(vaultPath: string): Promise<boolean> {
     if (!this.job || !this.sameVault(vaultPath)) return false
+    this.cancelRequested = true
+    // Auch einen bereits geplanten Flush stoppen: „Abbrechen" darf nicht Sekunden später
+    // aus der Warteschlange neu starten. Ein NEUES Dateiereignis plant wieder (F32).
+    if (this.queueTimer) {
+      clearTimeout(this.queueTimer)
+      this.queueTimer = null
+    }
     this.job.cancel()
     await this.jobPromise?.catch(() => undefined)
     return true

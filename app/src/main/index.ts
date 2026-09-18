@@ -7611,9 +7611,22 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
   const sendDone = (payload: Record<string, unknown>) => {
     if (!event.sender.isDestroyed()) event.sender.send('vault-rag-answer-done', { requestId, ...payload })
   }
+  // Lauf VOR dem ersten await registrieren, an Sender + ID gebunden (Codex F29): Abbruch
+  // greift damit schon während Modellauflösung und Retrieval; Duplikate werden abgelehnt;
+  // ein zerstörtes Fenster beendet den Lauf.
+  if (typeof requestId !== 'string' || !requestId) return { success: false, error: 'requestId fehlt' }
+  const runKey = `${event.sender.id}:${requestId}`
+  if (vaultAnswerControllers.has(runKey)) return { success: false, requestId, error: 'requestId bereits in Gebrauch' }
+  const controller = new AbortController()
+  vaultAnswerControllers.set(runKey, controller)
+  const onDestroyed = () => controller.abort()
+  event.sender.once('destroyed', onDestroyed)
+  const cleanup = () => {
+    vaultAnswerControllers.delete(runKey)
+    if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', onDestroyed)
+  }
   try {
     assertApprovedVault(vaultPath, 'vault-rag-answer')
-    if (typeof requestId !== 'string' || !requestId) return { success: false, error: 'requestId fehlt' }
     if (typeof query !== 'string' || !query.trim()) {
       sendDone({ kind: 'error', error: 'Leere Frage' })
       return { success: false, requestId, error: 'Leere Frage' }
@@ -7626,9 +7639,17 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
       sendDone({ kind: 'error', error })
       return { success: false, requestId, error }
     }
+    if (controller.signal.aborted) {
+      sendDone({ kind: 'cancelled' })
+      return { success: false, requestId, error: 'abgebrochen' }
+    }
 
     return await withOllamaActivity('vault-answer', async () => {
-      const retrieval = await getVaultRagManager().query(vaultPath, query.slice(0, 2000), undefined, {})
+      const retrieval = await getVaultRagManager().query(vaultPath, query.slice(0, 2000), undefined, { signal: controller.signal })
+      if (controller.signal.aborted) {
+        sendDone({ kind: 'cancelled' })
+        return { success: false, requestId, error: 'abgebrochen' }
+      }
       if (retrieval.belowFloor) {
         sendDone({ kind: 'not-found', bestScore: retrieval.bestScore, excludeMismatch: retrieval.excludeMismatch, model: chatModel })
         return { success: true, requestId, kind: 'not-found' }
@@ -7647,8 +7668,6 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
         sendDone({ kind: 'error', error })
         return { success: false, requestId, error }
       }
-      const controller = new AbortController()
-      vaultAnswerControllers.set(requestId, controller)
       const timeout = setTimeout(() => controller.abort(), 300000)
       const startedAt = Date.now()
       let firstTokenMs: number | undefined
@@ -7708,7 +7727,6 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
         throw err
       } finally {
         clearTimeout(timeout)
-        vaultAnswerControllers.delete(requestId)
       }
 
       const report = analyzeCitations(full, retrieval.hits.map((h) => h.text))
@@ -7723,14 +7741,21 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
       return { success: true, requestId, kind: 'answer' }
     })
   } catch (err) {
+    if (controller.signal.aborted) {
+      sendDone({ kind: 'cancelled' })
+      return { success: false, requestId, error: 'abgebrochen' }
+    }
     const error = describeLocalModelError(err)
     sendDone({ kind: 'error', error })
     return { success: false, requestId, error }
+  } finally {
+    cleanup()
   }
 })
 
-ipcMain.handle('vault-rag-answer-cancel', async (_event, requestId: string) => {
-  const c = vaultAnswerControllers.get(requestId)
+ipcMain.handle('vault-rag-answer-cancel', async (event, requestId: string) => {
+  // Nur der eigene Sender darf seine Läufe abbrechen.
+  const c = vaultAnswerControllers.get(`${event.sender.id}:${requestId}`)
   if (!c) return { success: false }
   c.abort()
   return { success: true }

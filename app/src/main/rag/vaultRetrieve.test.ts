@@ -128,6 +128,29 @@ describe('verifyHits — Frische und Relokalisierung', () => {
   })
 })
 
+describe('Relokalisierung mit frischen Metadaten (F36)', () => {
+  it('geänderte Kategorie im Frontmatter fällt aus dem aktiven Filter, obwohl der Chunk wiedergefunden wird', async () => {
+    const body = '# A\n\n' + Array.from({ length: 4 }, (_, i) => `Stabiler Satz ${i + 1}, lang genug für einen Chunk.`).join(' ') + '\n'
+    const before = '---\ncategory: red\n---\n' + body
+    const after = '---\ncategory: green\n---\n' + body
+    await fs.writeFile(path.join(vault, 'a.md'), after)
+    const [ch] = chunkMarkdown(before)
+    const cont = container(
+      [chunk('a.md', 0, ch.text, { sourceStart: ch.sourceStart, sourceEnd: ch.sourceEnd, startLine: ch.startLine })],
+      { 'a.md': file('alt', 'problem', null) },
+      [[1, 0, 0, 0]]
+    )
+    const sel = cont.meta.chunks.map((c) => ({ chunk: c, score: 0.9 }))
+    const withFilter = await verifyHits(vault, cont, sel, assertSafePath, { kinds: ['problem'] })
+    expect(withFilter.hits).toHaveLength(0)
+    expect(withFilter.staleFiles).toEqual(['a.md'])
+    const without = await verifyHits(vault, cont, sel, assertSafePath)
+    expect(without.hits).toHaveLength(1)
+    expect(without.hits[0].fresh).toBe('relocated')
+    expect(without.hits[0].kind).toBe('solution')
+  })
+})
+
 describe('queryVaultIndex', () => {
   it('Digest-Abweichung → VaultIdentityError, kein Cosine', async () => {
     const cont = container([chunk('a.md', 0, 'alpha')], { 'a.md': file('h') }, [[1, 0, 0, 0]])
