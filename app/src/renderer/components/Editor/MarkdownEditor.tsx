@@ -1153,23 +1153,26 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   useEffect(() => {
     const target = pendingSourceTarget
     if (!target || isSecondary || !effectiveNoteId || target.noteId !== effectiveNoteId) return
+    // Ziel aus einem anderen Vault: nie anwenden, aufräumen (F28).
+    if (target.vaultPath !== vaultPath) { setPendingSourceTarget(null); return }
     const content = viewMode === 'preview' ? previewContent : (viewRef.current?.state.doc.toString() ?? '')
     if (!content) return
     let cancelled = false
-    const run = async () => {
-      const canonical = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
-      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
-      const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
-      if (cancelled) return
-      setPendingSourceTarget(null)
-      if (hash !== target.sourceHash) {
-        window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'changed', noteId: target.noteId } }))
-        return
-      }
-      const lineIdx = Math.max(0, target.line - 1)
+    // Sprung zur 0-basierten Zeile: Lesen-Modus über `data-source-line` (größte Zeile ≤ Ziel,
+    // Ziel 0 = Anfang), Schreiben/Markdown über CodeMirror-Selection und Scroll.
+    const jumpTo = (lineIdx: number): void => {
       if (viewMode === 'preview') {
         const root = editablePreviewRef.current
         if (!root) return
+        if (lineIdx === 0) {
+          // Nächster scrollender Vorfahr (im Lesen-Modus `.editor-preview`), sonst der Wurzelknoten.
+          let scroller: HTMLElement | null = root
+          while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
+            scroller = scroller.parentElement
+          }
+          ;(scroller ?? root).scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        }
         let best: HTMLElement | null = null
         let bestLine = -1
         root.querySelectorAll<HTMLElement>('[data-source-line]').forEach(el => {
@@ -1188,16 +1191,37 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         const line = view.state.doc.line(Math.min(view.state.doc.lines, lineIdx + 1))
         view.dispatch({
           selection: { anchor: line.from },
-          effects: EditorView.scrollIntoView(line.from, { y: 'center' })
+          effects: EditorView.scrollIntoView(line.from, { y: lineIdx === 0 ? 'start' : 'center' })
         })
         view.focus()
       }
+    }
+    const run = async () => {
+      // Ohne Hash ist der Anfang das ausdrückliche Ziel (Quelle geändert, Codex F28).
+      if (target.sourceHash === null) {
+        setPendingSourceTarget(null)
+        jumpTo(0)
+        return
+      }
+      const canonical = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
+      const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+      if (cancelled) return
+      setPendingSourceTarget(null)
+      if (hash !== target.sourceHash) {
+        // Geladene Fassung weicht ab: sichtbarer Hinweis UND Rückfall auf den Anfang, nicht
+        // irgendwo stehen bleiben.
+        jumpTo(0)
+        window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'changed', noteId: target.noteId } }))
+        return
+      }
+      jumpTo(Math.max(0, target.line - 1))
       window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'ok', noteId: target.noteId } }))
     }
     // Zwei Frames warten, damit Vorschau/Editor den Inhalt gezeichnet haben.
     const raf = requestAnimationFrame(() => requestAnimationFrame(() => { void run() }))
     return () => { cancelled = true; cancelAnimationFrame(raf) }
-  }, [pendingSourceTarget, effectiveNoteId, viewMode, previewContent, isSecondary, setPendingSourceTarget])
+  }, [pendingSourceTarget, effectiveNoteId, viewMode, previewContent, isSecondary, vaultPath, setPendingSourceTarget])
 
   // Set up note click handler for dataview
   useEffect(() => {

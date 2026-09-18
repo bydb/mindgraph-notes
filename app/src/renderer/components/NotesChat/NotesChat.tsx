@@ -13,7 +13,8 @@ import { isCloudModel } from '../../../shared/modelCompatibility'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
 import type { NoteAgentAttachment, VaultRagAnswerDone, VaultRagHitDto } from '../../../shared/types'
 import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
-import { citationMarkdownPlugin, type CitationEnv } from '../../utils/citationMarkdown'
+import { citationMarkdownPlugin, markCitationRefs, type CitationEnv } from '../../utils/citationMarkdown'
+import { createSourceOpener, findNoteByVaultPath, type SourceJumpDeps } from '../../utils/sourceJump'
 import { useTabStore } from '../../stores/tabStore'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -292,15 +293,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
   // Quellen tragen den exakten vault-relativen Pfad — hier darf nichts unscharf sein.
   // Die Wikilink-Auflösung (resolveNoteId) vergleicht zuletzt „enthält" und traf bei
   // einer Mail-Notiz „…/2026-07-01 …" die Brain-Tagesnotiz „01.md" (real, 18.09.2026).
+  // Exakt heißt: Notizpfad gegen den Vault relativiert und gleich, kein Suffix-Raten (F28).
   const resolveSourceNoteId = useCallback((fileRel: string): string | null => {
-    const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\/+/, '')
-    const target = norm(fileRel)
-    const exact = notes.find(x => norm(x.path) === target)
-    if (exact) return exact.id
-    // Manche Stores führen den Pfad absolut — dann auf den Vault-relativen Teil vergleichen.
-    const suffix = notes.find(x => norm(x.path).endsWith('/' + target))
-    return suffix ? suffix.id : null
-  }, [notes])
+    if (!vaultPath) return null
+    return findNoteByVaultPath(notes, fileRel, vaultPath)?.id ?? null
+  }, [notes, vaultPath])
 
   // Quellenklick (F28): Hash im Main prüfen, Stelle relokalisieren, Sprungziel an Notiz
   // und Fassung binden. Geändert → Notiz öffnet oben mit sichtbarem Hinweis; fehlt → nur Hinweis.
@@ -319,45 +316,45 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     window.addEventListener('mindgraph:sourceJump', onJump)
     return () => window.removeEventListener('mindgraph:sourceJump', onJump)
   }, [showSourceNotice, t])
-  const openSource = useCallback(async (msg: ChatMessage, hit: VaultRagHitDto) => {
-    if (!vaultPath || msg.vaultPath !== vaultPath) {
-      showSourceNotice(t('notesChat.vaultOtherVault'))
-      return
+  // Klick-Token, Vault-Bindung und exakte Auflösung liegen in `sourceJump.ts` (testbar, F28).
+  const sourceDepsRef = useRef<SourceJumpDeps | null>(null)
+  sourceDepsRef.current = {
+    getVaultPath: () => useNotesStore.getState().vaultPath,
+    locate: (v, ref) => window.electronAPI.vaultRagLocateSource(v, ref),
+    resolveNoteId: (fileRel, v) => findNoteByVaultPath(useNotesStore.getState().notes, fileRel, v)?.id ?? null,
+    selectNote: (id) => useNotesStore.getState().selectNote(id),
+    setPendingTarget: (target) => useTabStore.getState().setPendingSourceTarget(target),
+    notify: (kind, detail) => {
+      if (kind === 'other-vault') showSourceNotice(t('notesChat.vaultOtherVault'))
+      else if (kind === 'missing') showSourceNotice(t('notesChat.vaultSourceMissing'))
+      else if (kind === 'changed') showSourceNotice(t('notesChat.vaultSourceChanged'))
+      else if (kind === 'relocated') showSourceNotice(t('notesChat.vaultSourceRelocated'))
+      else showSourceNotice((lang === 'de' ? 'Fehler: ' : 'Error: ') + (detail ?? ''))
     }
-    const noteId = resolveSourceNoteId(hit.fileRel)
-    const res = await window.electronAPI.vaultRagLocateSource(vaultPath, {
-      fileRel: hit.fileRel, sourceHash: hit.sourceHash, chunkHash: hit.chunkHash,
-      sourceStart: hit.sourceStart, sourceEnd: hit.sourceEnd, startLine: hit.startLine
-    })
-    if (!res.success || !res.result) {
-      showSourceNotice((lang === 'de' ? 'Fehler: ' : 'Error: ') + (res.error ?? ''))
-      return
-    }
-    const r = res.result
-    if (r.status === 'missing' || !noteId) {
-      showSourceNotice(t('notesChat.vaultSourceMissing'))
-      return
-    }
-    if (r.status === 'changed') {
-      useTabStore.getState().setPendingSourceTarget(null)
-      useNotesStore.getState().selectNote(noteId)
-      showSourceNotice(t('notesChat.vaultSourceChanged'))
-      return
-    }
-    useTabStore.getState().setPendingSourceTarget({ noteId, line: r.startLine, sourceHash: r.sourceHash, nonce: Date.now() })
-    useNotesStore.getState().selectNote(noteId)
-    if (r.status === 'relocated') showSourceNotice(t('notesChat.vaultSourceRelocated'))
-  }, [vaultPath, resolveSourceNoteId, showSourceNotice, t, lang])
+  }
+  const openSourceRef = useRef(createSourceOpener({
+    getVaultPath: () => sourceDepsRef.current!.getVaultPath(),
+    locate: (v, ref) => sourceDepsRef.current!.locate(v, ref),
+    resolveNoteId: (f, v) => sourceDepsRef.current!.resolveNoteId(f, v),
+    selectNote: (id) => sourceDepsRef.current!.selectNote(id),
+    setPendingTarget: (target) => sourceDepsRef.current!.setPendingTarget(target),
+    notify: (kind, detail) => sourceDepsRef.current!.notify(kind, detail)
+  }))
+  const openSource = useCallback((msg: ChatMessage, hit: VaultRagHitDto) => openSourceRef.current(msg, hit), [])
+  // Vault-Wechsel räumt ein noch nicht konsumiertes Sprungziel auf.
+  useEffect(() => {
+    const target = useTabStore.getState().pendingSourceTarget
+    if (target && target.vaultPath !== vaultPath) useTabStore.getState().setPendingSourceTarget(null)
+  }, [vaultPath])
 
-  // Vault-Antwort: Zitat-Hochzahlen entstehen als Markdown-Token aus den gültigen Nummern
-  // des Prüfers (Codex F25) — kein Platzhalter, keine Ersetzung im fertigen HTML.
+  // Vault-Antwort: Zitat-Hochzahlen entstehen an den Spannen des Prüfers (dieselbe
+  // Ersetzung wie der Export) als Markdown-Token — keine Ersetzung im fertigen HTML (F25).
   const renderMessageHtml = (msg: ChatMessage): string => {
     if (!msg.citations) return linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId)
     const { hits, report } = msg.citations
     const sameVault = msg.vaultPath === vaultPath
     const env: CitationEnv = {
       cites: {
-        valid: new Set(report.refs.filter(r => r.valid).map(r => r.n)),
         resolve: (n) => {
           const hit = hits[n - 1]
           if (!hit) return null
@@ -365,7 +362,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
         }
       }
     }
-    return linkifyWikilinks(sanitizeHtml(md.render(msg.content, env)), resolveNoteId)
+    return linkifyWikilinks(sanitizeHtml(md.render(markCitationRefs(msg.content, report), env)), resolveNoteId)
   }
 
   const renderVaultFooter = (msg: ChatMessage) => {

@@ -440,6 +440,43 @@ describe('Lebenszyklus-Generation und Änderungsmenge (F30, F32)', () => {
   })
 })
 
+describe('Nutzer-Abbruch eines inkrementellen Laufs (F32, Nachprüfung)', () => {
+  it('Abbruch behält die laufende Änderungsmenge; nächster Lauf trägt A und B, kein Selbststart', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    await writeContainer(['a.md', 'b.md'])
+    m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
+    await waitFor(() => fake.jobs.length === 1)
+    expect([...(fake.jobs[0].opts.changed as Set<string>)]).toEqual(['a.md'])
+    await m.cancel(vault)
+    expect(fake.jobs[0].cancelCalls).toBe(1)
+    // A liegt zurück in der Warteschlange, aber ohne Ereignis startet nichts von selbst.
+    expect((await m.getStatus(vault)).pendingChanges).toBe(1)
+    await new Promise((r) => setTimeout(r, 200))
+    expect(fake.jobs).toHaveLength(1)
+    // Ein neues Ereignis für B plant wieder — der Lauf trägt A UND B.
+    m.noteFileEvent(vault, 'change', path.join(vault, 'b.md'))
+    await waitFor(() => fake.jobs.length === 2, 3000)
+    expect([...(fake.jobs[1].opts.changed as Set<string>)].sort()).toEqual(['a.md', 'b.md'])
+    fake.jobs[1].finish({ status: 'done' })
+    await m.shutdown()
+  })
+
+  it('Opt-out während eines inkrementellen Laufs verwirft die Änderungsmenge weiterhin', async () => {
+    const m = manager()
+    await m.setConfig(vault, { enabled: true })
+    await m.setVault(vault)
+    await writeContainer(['a.md'])
+    m.noteFileEvent(vault, 'change', path.join(vault, 'a.md'))
+    await waitFor(() => fake.jobs.length === 1)
+    await m.setConfig(vault, { enabled: false })
+    expect(fake.jobs[0].cancelCalls).toBe(1)
+    expect((await m.getStatus(vault)).pendingChanges).toBe(0)
+    await m.shutdown()
+  })
+})
+
 describe('Warteschlangen-Obergrenze (F32)', () => {
   it('sehr viele Pfade verdichten sich zu einem Rescan-Lauf', async () => {
     const m = manager()

@@ -89,6 +89,9 @@ export class VaultRagManager {
   /** Generation des Manager-Lebenszyklus: Vault-Wechsel, Abschalten und Shutdown zählen hoch;
    *  ein Start, der über einen Wartepunkt hinweg eine alte Generation trägt, wird verworfen (Codex F30). */
   private generation = 0
+  /** Identität der laufenden Änderungsmenge: wechselt NUR bei Vault-Wechsel, Opt-out, Modul-Aus
+   *  und Shutdown — nicht beim Nutzer-Abbruch, der die Änderungen behalten muss (Codex F32). */
+  private changeEpoch = 0
   /** Änderungsmenge des laufenden inkrementellen Jobs — bis zum Commit behalten (Codex F32). */
   private inFlightChanged: Set<string> | null = null
   private retryCount = 0
@@ -153,6 +156,7 @@ export class VaultRagManager {
 
   async shutdown(): Promise<void> {
     this.generation++
+    this.changeEpoch++
     if (this.queueTimer) {
       clearTimeout(this.queueTimer)
       this.queueTimer = null
@@ -192,6 +196,7 @@ export class VaultRagManager {
     this.moduleOn = on
     if (!on) {
       this.generation++
+      this.changeEpoch++
       this.pendingChanged.clear()
       this.firstPendingAt = null
       if (this.vaultPath) await this.cancel(this.vaultPath)
@@ -232,7 +237,7 @@ export class VaultRagManager {
     if (this.sameVault(vaultPath)) this.configCache = merged
     if (!merged.enabled) {
       // Abschalten stoppt den Job und invalidiert vorbereitete Starts (F30).
-      if (this.sameVault(vaultPath)) this.generation++
+      if (this.sameVault(vaultPath)) { this.generation++; this.changeEpoch++ }
       await this.cancel(vaultPath)
       this.pendingChanged.clear()
       this.firstPendingAt = null
@@ -353,6 +358,7 @@ export class VaultRagManager {
     this.cancelRequested = false
     this.inFlightChanged = mode === 'incremental' ? (rescanAll ? new Set(['*']) : changed ? new Set(changed) : null) : null
     const jobGen = this.generation
+    const jobEpoch = this.changeEpoch
     this.jobPromise = job
       .run()
       .then(async (result) => {
@@ -363,10 +369,11 @@ export class VaultRagManager {
           // (Validierung inklusive) — spart die Vollkopie im Job-Ergebnis.
           this.loaded = null
           await this.loadContainer(result.file)
-        } else if (this.inFlightChanged && jobGen === this.generation) {
-          // Fehler oder Abbruch IM SELBEN Vault: die Änderungsmenge zurücklegen, sonst gilt
-          // die geänderte Datei beim nächsten inkrementellen Lauf als unverändert (Codex F32).
-          // Nach Vault-Wechsel/Abschalten (andere Generation) wird sie verworfen.
+        } else if (this.inFlightChanged && jobEpoch === this.changeEpoch) {
+          // Fehler oder NUTZER-Abbruch im selben Vault: die Änderungsmenge zurücklegen, sonst
+          // gilt die geänderte Datei beim nächsten inkrementellen Lauf als unverändert (Codex
+          // F32). Der Abbruch zählt nur die Start-Generation hoch, nicht die Epoche der
+          // Änderungsmenge; erst Vault-Wechsel/Opt-out/Modul-Aus verwerfen sie.
           for (const rel of this.inFlightChanged) this.pendingChanged.add(rel)
           if (this.firstPendingAt === null) this.firstPendingAt = this.now()
           this.inFlightChanged = null

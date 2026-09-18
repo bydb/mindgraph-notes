@@ -33,14 +33,17 @@ export interface CanvasTabState {
   viewport: { x: number; y: number; zoom: number }
 }
 
-/** Sprung zu einer Quellenstelle (Vault-Chat): an Notiz und Anfrage gebunden, wird erst nach
- *  Laden derselben Inhaltsfassung (sourceHash) konsumiert — nie ein stiller Sprung. */
+/** Sprung zu einer Quellenstelle (Vault-Chat, F28): an Notiz, Vault und Klick gebunden, wird
+ *  erst nach Laden derselben Inhaltsfassung (sourceHash) konsumiert — nie ein stiller Sprung.
+ *  `sourceHash: null` heißt ausdrücklich „Anfang der Notiz“ (Quelle geändert). */
 export interface PendingSourceTarget {
   noteId: string
+  vaultPath: string
   /** 1-basierte Zeile in der kanonischen Datei (inkl. Frontmatter). */
   line: number
-  sourceHash: string
-  nonce: number
+  sourceHash: string | null
+  /** Klick-Token des Öffners: neuere Klicks ersetzen ältere Ziele. */
+  token: number
 }
 
 interface TabState {

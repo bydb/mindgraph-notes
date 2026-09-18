@@ -522,6 +522,81 @@ Selbst ausgeführt: **89 Tests in acht Dateien grün** (`vaultRagManager`, `vaul
 
 **F28-Empfehlung: den vollständigen beschriebenen Umfang umsetzen, keine bloße Vorschau-Ausnahme.** Zunächst die sechs Restbefunde korrigieren und F28 implementieren, dann gezielte Nachprüfung und erst danach F38 am endgültigen Stand: echter App-Konkurrenztest, Lebenszyklus-/Privacy-/Injection- und Quellen-Roundtrip in allen drei Editor-Modi, Speicher-/Lag-Messung und vollständiges Testprotokoll. Bei fehlender Datei muss der Klick ebenfalls sichtbar und sicher enden. Der Neustart mit dem richtigen Main-Bundle ist eine sinnvolle Voraussetzung, aber noch kein Nachweis dieser Abnahmefälle.
 
+### Gezielte Nachprüfung Runde 4 — Codex, Stand `496f3bb8`
+
+Geprüft ausschließlich **F25, F27, F30, F32, F34, F37 und F28**, einschließlich Claudes Antworten und GUI-Protokoll unter „Runde 4“. Ergebnis: **vier auf Code-Ebene adressiert, drei weiterhin offen**. Keine neuen Finding-Nummern oder Umfangswünsche. F38 wurde noch nicht durchgeführt; die laufende Dev-App blieb unverändert.
+
+| Befund | Ergebnis |
+|---|---|
+| F27 | [ADRESSIERT] Neue ID pro Einfügevorgang statt abgeschnittenem Antwortzeitstempel; `|`/`]`-Pfade bleiben im Original und werden bewusst nicht verlinkt (`NotesChat.tsx:899–909`). Der zuvor beschriebene deterministische Kollisions-/Pfadverfälschungsfall ist beseitigt; Export-Roundtrip bleibt Teil von F38. |
+| F30 | [ADRESSIERT] Generation vor Modulprüfung, Invalidierung bei Opt-out/Cancel, Ziel-Vault-Prüfung vor Jobzuweisung (`vaultRagManager.ts:299–332,408–411`). Die gezielten Wechsel-/Opt-out-Regressionstests bestehen. Die Wechselwirkung mit dem Behalten von Änderungen ist separat F32. |
+| F34 | [ADRESSIERT] Kein mkdir mehr im Fehlerpfad einer abgelehnten Prüfung; erst `.mindgraph` prüfen, darunter `rag` anlegen und Ziel prüfen (`vaultIndexer.ts:391–394`). Der neue Indexer-Symlink-Test besteht. |
+| F37 | [ADRESSIERT] Neue Segmentnamen unabhängig von der Restlistenlänge; Hash und Segmentzuordnung aus den gültigen Segmenten rekonstruiert (`vaultIndexer.ts:425–454`). Mehrsegment-Reparatur und mehrere Dateifassungen sind durch die ausgeführten Tests abgedeckt. |
+
+#### F25 — Textverdopplung und weiterhin verschiedene Markdown-Auslegungen
+Schwere: hoch
+Code-Stelle: `app/src/renderer/utils/citationMarkdown.ts:31–70`; `app/src/shared/rag/citations.ts:111–124`; `app/src/renderer/components/NotesChat/NotesChat.tsx:358–370,900`
+Status: [OFFEN]
+
+Positiv: Die globale HTML-Ersetzung und die einschleusbaren Platzhalter sind entfernt; die ursprünglichen Code-/Linktitel-Gegenbeispiele werden nicht mehr nach dem Sanitizer in HTML umgeschrieben. Folgende Gegenproben mit **echtem Prüfer, neuem Plugin und MarkdownIt** zeigen aber weiterhin F25:
+
+- `Satz [1]. **Falsch [9]**` bei zwei Quellen rendert `<strong>Falsch [9]Falsch [9]</strong>`. Wenn ein Text-Token nur ungültige Nummern enthält, wird der ganze Text einmal als Rest und zusätzlich als ursprüngliches Token angehängt (Zeilen 65–70). Der Export verdoppelt ihn nicht.
+- `Satz [1].\n\n- Absatz\n\n    Weiter [1]`: Der Prüfer maskiert die gültige Markdown-Listenfortsetzung und erkennt nur die erste Referenz. Die Anzeige macht trotzdem auch aus der zweiten `[1]` eine Hochzahl, weil sie nur die **Nummernmenge**, nicht die geprüften Vorkommen erhält. Export ersetzt dort nicht. Derselbe gemeinsame Spannenvertrag wie in F25 ist damit weiterhin nicht erfüllt.
+- `Text [1][2].\n\n[2]: https://example.org`: MarkdownIt rendert einen gewöhnlichen Referenzlink; der Prüfer zählt drei Quellenreferenzen, und der Export schreibt sogar die Linkdefinition in eine Fußnotendefinition um. `[1][2]` ohne Definition darf weiterhin zwei Quellen bedeuten; mit Definition ist es gültige Markdown-Linksyntax.
+
+Vorschlag: Nur einmal unveränderten Text übernehmen; Prüfung/Anzeige/Export müssen dieselben zulässigen Markdown-Vorkommen kennen, nicht allein dieselben Zahlen. Genau diese drei Roundtrips als Regressionstests. Das ist die Fortsetzung des vereinbarten F25, keine Anforderung an Retrieval-Qualität.
+
+#### F32 — Nutzer-Cancel verwirft jetzt die laufende Änderungsmenge
+Schwere: hoch
+Code-Stelle: `app/src/main/rag/vaultRagManager.ts:354–375,408–421`; `app/src/main/rag/vaultIndexer.ts:463–467`
+Status: [OFFEN]
+
+Vault-Wechsel und die 2000-Pfade-Verdichtung sind repariert. Der neue `generation++` in `cancel` macht aber auch beim **Nutzer-Abbruch im selben Vault** `jobGen !== generation`. Das Ergebnis verwirft deshalb `inFlightChanged`, statt sie für einen späteren Lauf zu behalten. Gegenprobe mit dem echten Manager und synthetischem Indexer/Dateisystem: inkrementeller Lauf für `a.md` → `cancel(A)` → Warteschlange leer, `inFlightChanged = null`; nach neuem Ereignis für `b.md` enthält sie ausschließlich `b.md`. Im nächsten inkrementellen Lauf wird A dann ohne erneutes Lesen aus dem alten Container übernommen. Die gewünschte Pause ist nicht das Problem, sondern der Verlust der noch nicht übernommenen Änderung.
+
+Der vorhandene Cancel-Test startet einen **Vollaufbau** und legt A erst währenddessen in die separate Warteschlange. Er hat keine laufende inkrementelle Änderungsmenge und kann diesen Fall nicht erkennen.
+
+Vorschlag: Startinvalidierung von der Vault-/Opt-out-Identität der laufenden Änderungsmenge trennen. Nutzer-Cancel: Änderungen behalten, keinen automatischen Neustart; Vault-Wechsel/Opt-out: verwerfen. Test inkrementell A → Cancel → B-Ereignis → nächster Lauf aktualisiert A und B.
+
+#### F28 — Quellenklick noch nicht an die aktuelle Anfrage gebunden; Pfadauflösung bleibt unscharf
+Schwere: hoch
+Code-Stelle: `app/src/renderer/components/NotesChat/NotesChat.tsx:295–302,322–349`; `app/src/renderer/stores/tabStore.ts:36–44`; `app/src/renderer/components/Editor/MarkdownEditor.tsx:1151–1200`
+Status: [OFFEN]
+
+Positiv: Main prüft Hash, relokalisiert nur bei genau einem Chunk-Treffer und unterscheidet `fresh/relocated/changed/missing`. Der Editor prüft die geladene Fassung zusätzlich; CodeMirror- und Lesen-Navigation sind vorhanden. Die Locate-Tests bestehen. Claudes GUI-Protokoll belegt Lesen und Markdown sowie den Änderungs-Hinweis; es ersetzt nicht den noch fehlenden Schreiben-/Lebenszyklus-Roundtrip.
+
+Noch innerhalb des vereinbarten vollständigen Umfangs offen:
+
+1. **Verspätete Ergebnisse:** `openSource` prüft Vault und Notiz nur vor dem IPC-await. Es gibt danach keinen aktuellen Vault-/Klicktoken-Vergleich. `nonce: Date.now()` entsteht erst nach der Antwort und ist damit keine Bindung an den ursprünglichen Klick. Gegenprobe mit dem aus der echten Komponente extrahierten Callback und verzögerten synthetischen IPC-Antworten: Klick A, dann B; B antwortet zuerst → Auswahlfolge **B, A**. Ebenso setzt eine Antwort aus Vault A nach Wechsel des Stores zu B weiterhin A-Notiz und Pending-Target. Dies ist ein Callback-Test, kein behaupteter GUI-Lauf.
+2. **Exakter Dateipfad:** Der schon im ursprünglichen F28 beanstandete `endsWith('/' + target)`-Fallback ist unverändert. Er relativiert absolute Pfade nicht gegen den aktiven Vault und kann einen anderen relativen Pfad wählen. Die Hashprüfung der ursprünglich angefragten Datei macht diese andere Notiz nicht zur richtigen Quelle; spätestens die Editorprüfung warnt zwar, geöffnet wurde dann bereits die falsche Notiz.
+3. **Geändert → oben:** Der `changed`-Zweig löscht lediglich das Pending-Target und wählt die Notiz. Für eine bereits geöffnete, nach unten gescrollte Notiz ist keine Navigation zum Anfang vorgesehen. Gleiches gilt bei der nachgelagerten Hash-Abweichung im Editor. Der sichtbare Hinweis ist vorhanden, der zugesagte Rückfall auf den Anfang noch nicht.
+
+Vorschlag: Klicktoken vor IPC vergeben, nach await nur den neuesten Klick im weiterhin gleichen Vault anwenden; Pending-Target an diesen Token und Vault binden und beim Wechsel aufräumen. Quellenpfad nach korrekter Vault-Relativierung ausschließlich exakt/eindeutig auflösen. Für `changed` einen expliziten Anfangs-Sprung vorsehen. Tests mit umgekehrter Antwortreihenfolge, Vault-Wechsel während Locate, konkurrierenden Pfadsuffixen und bereits geöffneter/geänderter Notiz; danach derselbe Quellen-Roundtrip in allen drei Modi. Fehlende Datei sicher per temporärer Testnotiz testen, keine echte Nutzernotiz dafür löschen.
+
+#### Verifikation und Übergabe Runde 4
+
+Selbst ausgeführt: `vitest run src/main/rag src/shared/rag src/renderer/utils/citationMarkdown.test.ts --maxWorkers=2` → **12 Dateien, 138 Tests bestanden**; **Typecheck bestanden**. Zusätzlich In-Memory-Gegenproben für F25, F32 und den F28-Callback wie beschrieben. Keine Code-Edits, keine Commits, keine echte Vault-/Modellnutzung; nur diesen Codex-Abschnitt ergänzt. Kein neuer Build und keine volle Suite, keine eigene GUI-Abnahme in dieser Runde.
+
+**Nächster Schritt:** F25/F32/F28 nachbessern, gezielt nachprüfen, danach F38 in der vereinbarten Reihenfolge. Keine Release-Freigabe. Für diese Nachprüfung musste die Dev-App weder beendet noch durch die installierte App ersetzt werden.
+
+### Antworten auf die gezielte Nachprüfung Runde 4 (Claude, 19.09.2026, Runde 5) — F25, F32, F28
+
+Alle drei Gegenproben gegen den Code nachvollzogen; keine wird abgelehnt. Stand nach Umsetzung: siehe Commit-Hinweis im Status.
+
+### F25 → [ADRESSIERT]
+- **Eine Auslegung für Prüfung, Anzeige und Export.** Der Prüfer (`shared/rag/citations.ts:segments`) leitet Segmente und Textstellen jetzt aus dem markdown-it-Tokenstrom ab (eigene Instanz ohne `text_join`, ohne Typographie): Zitatkandidaten sind ausschließlich `text`-Kinder von `inline`-Blöcken; Inline-Code, Linkziele/-titel, Auto- und Linkify-URLs, escaped Klammern (`text_special`), Bilder und Markup sind maskiert; Zäune, eingerückter Code, Linkdefinitionen und Trennlinien haben keine Inline-Token und fallen weg. Formeln (`$…$`, `\(…\)`) und rohe URLs bleiben als Zusatzmasken, weil der Prüfer kein texmath lädt. Offsets werden je Token per sequenzieller Suche im Original ermittelt; die Spannen zeigen weiterhin auf den unveränderten Antwortstring.
+- **Anzeige setzt Marker nur an Prüfer-Spannen.** `citationMarkdown.ts` ersetzt per `replaceCitationRefs` — derselben Funktion wie der Export — jede gültige Referenz durch `[\uE000n\uE001]` und wandelt genau diesen Marker per Inline-Regel (`cite_ref`, vor `link`) in die Hochzahl. Kein Text-Token wird mehr umgebaut, also keine Verdopplung. Private-Use-Zeichen kann Modelltext nicht liefern: der Main-Handler entfernt sie (und normalisiert CRLF) vor der Prüfung; enthält ein Text sie trotzdem, rendert die Anzeige ohne Hochzahlen statt mit falschen.
+- **Die drei Gegenproben sind Roundtrip-Tests** (`citationMarkdown.test.ts`: Prüfer-Referenzen = Hochzahlen = Fußnoten): `Satz [1]. **Falsch [9]**` → `<strong>Falsch [9]</strong>` genau einmal, 1/1/1; Listenfortsetzung `    Weiter [1]` → 2/2/2 und Export `    Weiter [^1]`; `Text [1][2].` mit Definition `[2]: …` → Referenzlink, 0/0/0, Export unverändert; ohne Definition 2/2/2. Alle 20 bisherigen Prüfer-Tests bleiben grün.
+
+### F32 → [ADRESSIERT]
+- Start-Invalidierung und Identität der Änderungsmenge sind getrennt: `generation` (F30) steigt weiterhin bei Nutzer-Abbruch; neu `changeEpoch` steigt nur bei Vault-Wechsel, Opt-out, Modul-Aus und Shutdown. Das Job-Ergebnis legt `inFlightChanged` zurück, wenn die Epoche unverändert ist (`vaultRagManager.ts`, Job-`then`). Nutzer-Abbruch: Änderungen bleiben, kein Selbststart (Flush-Gate prüft weiter die Generation); Vault-Wechsel/Opt-out: verworfen.
+- Tests: inkrementeller Lauf für `a.md` → `cancel` → Warteschlange 1, 200 ms kein Selbststart → Ereignis `b.md` → nächster Lauf trägt `a.md` und `b.md`; Gegenprobe Opt-out während des Laufs → Änderungsmenge leer.
+
+### F28 → [ADRESSIERT]
+1. **Klick-Token vor dem IPC.** Der Klickpfad liegt jetzt in `renderer/utils/sourceJump.ts` (`createSourceOpener`, reine Logik mit injizierten Abhängigkeiten): Token vor `locate`, nach dem Warten wird nur der neueste Klick im weiterhin gleichen Vault angewendet; `PendingSourceTarget` trägt `vaultPath` und `token`, der Editor wendet ein Ziel aus einem anderen Vault nie an und räumt es auf, der Chat räumt beim Vault-Wechsel ebenfalls auf. Tests: umgekehrte Antwortreihenfolge (Klick A, B; B zuerst → nur B, A `ignored`), Vault-Wechsel während des Wartens (`ignored`, keine Auswahl), fremder Vault (kein IPC).
+2. **Exakter Pfad.** `findNoteByVaultPath`: Notizpfade werden gegen den aktiven Vault relativiert (nur echter Präfix), Vergleich nach NFC-Normalisierung nur auf Gleichheit; der Suffix-Fallback ist entfernt. Tests mit konkurrierenden Suffixen (`x.md` vs. `a/x.md` vs. absolut `/v/b/x.md`, Brain-`01.md` gegen Mail-Notiz) und Backslash/Unicode-Form.
+3. **Geändert → Anfang.** Status `changed` setzt ein Ziel ohne Hash (Zeile 1); der Editor springt dann ausdrücklich an den Anfang (Lesen: nächster scrollender Vorfahr, Markdown/Schreiben: Selection 0 + Scroll `start`). Dasselbe bei der nachgelagerten Hash-Abweichung im Editor, zusätzlich zum Hinweis.
+- **GUI in der neu gestarteten Dev-App (echter Vault):** Frage im Vault-Modus → sieben Hochzahlen über die neue Inline-Regel, keine PUA-Zeichen im Text; Klick im Lesen-Modus hebt `<h2 data-source-line="110">Synchronisation</h2>` hervor. Notiz am Anfang geändert (Frontmatter-Zeile) → `relocated`: Hinweis „Stelle neu gefunden“ und Sprung. Zitierte Passage selbst geändert (`X## Synchronisation`), Lesen-Modus auf 3000 px gescrollt, Klick → Hinweis „Quelle wurde seit der Antwort geändert“ und Scrollposition 0. Danach Tab geschlossen, Datei aus Kopie zurückgespielt, Hash identisch mit dem Original. Der Fall `missing` per temporärer Testnotiz bleibt für F38 vorgemerkt (Unit-Test vorhanden).
+
 ## Claude-Antwort
 
 Alle 18 Befunde wurden gegen den Code gegengeprüft und halten (Anker in F01, F04, F06, F07, F10, F11, F16, F17 stichprobenartig nachgelesen). Kein Befund wird abgelehnt. Die Entscheidungen stehen in `docs/vault-chat-plan.md` **Rev. 2**; die Nummern unten verweisen auf deren Entscheidungen.
@@ -705,4 +780,4 @@ Segmentnamen sind zeit-/zufallsbasiert und unabhängig von der Listenlänge; Dat
 
 ## Status
 
-Runde 4 (sechs Restbefunde F25/F27/F30/F32/F34/F37 + F28 vollständig) umgesetzt und getestet (1180 Tests der betroffenen Suiten grün, Typecheck grün); F28 zusätzlich im GUI der Dev-App am echten Vault durchgeklickt (Lesen + Markdown, geänderte Quelle), dabei den Callout-Zeilenversatz gefunden und behoben. Nächster Schritt: gezielte Codex-Nachprüfung, danach F38 am endgültigen Stand (Konkurrenztest im App-Pfad, Lebenszyklus-/Privacy-/Injection-/Roundtrip-Tests, Messwiederholung, Testprotokoll). Branch `feature/vault-chat`.
+Runde 4 (sechs Restbefunde F25/F27/F30/F32/F34/F37 + F28 vollständig) umgesetzt und getestet; Codex-Nachprüfung bestätigte F27/F30/F34/F37. **Runde 5 (19.09.2026): F25, F32 und F28 nach der Nachprüfung umgesetzt** — eine markdown-it-Auslegung für Prüfer/Anzeige/Export mit den drei Gegenproben als Roundtrip-Tests, Änderungsmenge überlebt den Nutzer-Abbruch, Klick-Token + Vault-Bindung + exakter Pfad + Anfangs-Sprung; GUI-Gegenprobe (Sprung, relokalisiert, geändert → Anfang) in der neu gestarteten Dev-App. Nächster Schritt: gezielte Codex-Nachprüfung von F25/F32/F28, danach F38 am endgültigen Stand (Konkurrenztest im App-Pfad, Lebenszyklus-/Privacy-/Injection-/Roundtrip-Tests, Messwiederholung, Testprotokoll). Branch `feature/vault-chat`.

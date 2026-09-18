@@ -8,11 +8,15 @@
  *   - ohne Quellenangabe (JEDER inhaltliche Satz ohne [n])
  * Nie „belegt", nie „wahr". Die Prüfung ist Wortüberlappung, kein Faktencheck.
  *
- * Arbeitet auf dem UNVERÄNDERTEN Antwortstring: alle Spannen sind Offsets darin.
- * Code-Zäune und Inline-Code werden übersprungen (dort sind `[1]` Array-Indizes).
+ * Arbeitet auf dem UNVERÄNDERTEN Antwortstring (LF-Zeilenenden, keine Private-Use-Zeichen —
+ * der Main-Handler normalisiert davor): alle Spannen sind Offsets darin. Welche Stellen
+ * sichtbarer Text sind, entscheidet der markdown-it-Tokenstrom (gleiche Auslegung wie die
+ * Anzeige); Code, Linkziele, Auto-URLs und Linkdefinitionen sind damit nie Zitate (F25).
  * Überleitungen sind nur dann ausgenommen, wenn das GANZE Segment exakt in der
  * Liste steht („Kurz gesagt:" allein) — nie als Präfix (Rückfrage 3).
  */
+
+import MarkdownIt from 'markdown-it'
 
 export type SentenceStatus =
   | 'cited-high'
@@ -94,89 +98,175 @@ export function contentWords(text: string): Set<string> {
   return out
 }
 
-/** Bereiche, die keine Prosa sind: Code-Zäune und Inline-Code. */
-function maskedRanges(text: string): Array<[number, number]> {
-  const ranges: Array<[number, number]> = []
-  // `(?![\s\S])` = Ende der Eingabe (mit dem m-Flag wäre `$` nur ein Zeilenende).
-  // Ein gültiger Zaun darf bis zu drei Leerzeichen eingerückt sein (F25).
-  const fence = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:\n {0,3}\1[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))/gm
-  let m: RegExpExecArray | null
-  while ((m = fence.exec(text)) !== null) ranges.push([m.index, m.index + m[0].length])
-  // Inline-Code: gleich lange Backtick-Läufe, ein oder mehrere (`` `x` ``, ``` ``a`b`` ```).
-  const inline = /(`+)(?!`)([^\n]*?[^`])\1(?!`)/g
-  while ((m = inline.exec(text)) !== null) {
-    const s = m.index
-    if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[0].length])
-  }
-  // Eingerückter Code (vier Leerzeichen/Tab nach einer Leerzeile) — Codex F25.
-  // Bewusst konservativ: auch eine eingerückte Listen-Fortsetzung wird maskiert.
-  const indented = /(?:^|\n\n)((?:(?: {4}|\t)[^\n]*\n?)+)/g
-  while ((m = indented.exec(text)) !== null) {
-    const s = m.index + m[0].length - m[1].length
-    if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[1].length])
-  }
-  // Linkziele und -titel `](…)`, Autolinks `<…>` und rohe URLs: dort ist `[1]` kein Zitat.
-  const dest = /\]\([^)\n]*\)|<https?:\/\/[^>\n]*>|https?:\/\/[^\s)]+/g
-  while ((m = dest.exec(text)) !== null) {
-    const s = m.index
-    if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[0].length])
-  }
-  return ranges.sort((a, b) => a[0] - b[0])
-}
-
-function isMasked(pos: number, ranges: Array<[number, number]>): boolean {
-  return ranges.some(([a, b]) => pos >= a && pos < b)
-}
-
 type SegmentKind = 'prose' | 'heading' | 'cell'
 
+interface Segment {
+  span: [number, number]
+  kind: SegmentKind
+  /** Nicht-Text innerhalb des Segments (Code, Linkziele, Markup): dort ist `[n]` kein Zitat. */
+  masked: Array<[number, number]>
+}
+
 /**
- * Segmente als Spannen: Absätze/Listenpunkte/Zeilen (Prosa), Tabellenzellen (geprüft wie
- * Sätze, F26) und Überschriften (sichtbar ungeprüft). Trennlinien und Code fallen weg.
+ * Markdown-Struktur aus demselben Tokenstrom wie die Anzeige (Codex F25, Runde 5): welche
+ * Stellen sichtbarer Text sind, entscheidet markdown-it, nicht eine zweite Regex-Auslegung.
+ * `text_join` bleibt aus, damit escaped `\[` (text_special) von Text unterscheidbar ist;
+ * Typographie aus, damit Token-Inhalte bytegetreu im Quelltext stehen.
  */
-function segments(text: string, ranges: Array<[number, number]>): Array<{ span: [number, number]; kind: SegmentKind }> {
-  const out: Array<{ span: [number, number]; kind: SegmentKind }> = []
-  let pos = 0
-  while (pos <= text.length) {
-    const nl = text.indexOf('\n', pos)
-    const end = nl === -1 ? text.length : nl
-    if (!isMasked(pos, ranges)) {
-      const line = text.slice(pos, end)
-      const trimmedStart = pos + (line.length - line.trimStart().length)
-      const trimmedEnd = end - (line.length - line.trimEnd().length)
-      const body = line.trim()
-      const headingMatch = body.match(/^(#{1,6})\s+/)
-      const isRule = /^(-{3,}|\*{3,}|_{3,})$/.test(body)
-      const isTableRow = body.startsWith('|')
-      const isTableSeparator = isTableRow && /^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(body + (body.endsWith('|') ? '' : '|'))
-      if (body && !isRule) {
-        if (headingMatch) {
-          const start = trimmedStart + headingMatch[0].length
-          if (start < trimmedEnd) out.push({ span: [start, trimmedEnd], kind: 'heading' })
-        } else if (isTableRow) {
-          if (!isTableSeparator) {
-            // Zellen einzeln: Pipe-Positionen im Original suchen
-            let cellStart = trimmedStart
-            for (let i = trimmedStart; i <= trimmedEnd; i++) {
-              if (i === trimmedEnd || text[i] === '|') {
-                const cell = text.slice(cellStart, i)
-                const lead = cell.length - cell.trimStart().length
-                const trail = cell.length - cell.trimEnd().length
-                if (cell.trim()) out.push({ span: [cellStart + lead, i - trail], kind: 'cell' })
-                cellStart = i + 1
-              }
+const structureMd = new MarkdownIt({ html: false, linkify: true, typographer: false })
+structureMd.core.ruler.disable('text_join')
+
+/** Zusatzmasken, die markdown-it nicht kennt: Formeln der Anzeige (texmath) und rohe URLs. */
+const EXTRA_MASKS = [
+  /\$\$[\s\S]+?\$\$/g,
+  /\$[^\n$]+?\$/g,
+  /\\\([\s\S]+?\\\)/g,
+  /\\\[[\s\S]+?\\\]/g,
+  /https?:\/\/[^\s)]+/g
+]
+
+function lineStarts(text: string): number[] {
+  const starts = [0]
+  for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 0x0a) starts.push(i + 1)
+  return starts
+}
+
+/** Schließende Klammer eines Linkziels `(…)` ab `open` (verschachtelt, escaped), sonst -1. */
+function closingParen(text: string, open: number): number {
+  let depth = 0
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === '\\') { i++; continue }
+    if (ch === '(') depth++
+    else if (ch === ')') { depth--; if (depth === 0) return i }
+    else if (ch === '\n' && text[i + 1] === '\n') return -1
+  }
+  return -1
+}
+
+/**
+ * Segmente (Absätze, Listenpunkte, Überschriften, Tabellenzellen) als Spannen im Original,
+ * mit den Text-Spannen ihrer `text`-Kinder. Code-Zäune, eingerückter Code, Linkdefinitionen
+ * und Trennlinien haben keine Inline-Token und fallen damit weg; Inline-Code, Linkziele,
+ * Auto-/Linkify-URLs und Markup sind maskiert.
+ */
+function segments(text: string): Segment[] {
+  const tokens = structureMd.parse(text, {})
+  const starts = lineStarts(text)
+  const out: Segment[] = []
+  let cur = 0
+  let kind: SegmentKind = 'prose'
+  for (const block of tokens) {
+    if (block.map && block.nesting !== -1) cur = Math.max(cur, starts[Math.min(block.map[0], starts.length - 1)])
+    if (block.type === 'heading_open') kind = 'heading'
+    else if (block.type === 'th_open' || block.type === 'td_open') kind = 'cell'
+    else if (block.type === 'paragraph_open') kind = 'prose'
+    if (block.type !== 'inline' || !block.children) continue
+
+    const eligible: Array<[number, number]> = []
+    let segStart = -1
+    let segEnd = -1
+    const note = (a: number, b: number, isText: boolean): void => {
+      if (segStart < 0) segStart = a
+      segEnd = Math.max(segEnd, b)
+      if (isText) eligible.push([a, b])
+    }
+    let autoLink = 0
+    for (const child of block.children) {
+      switch (child.type) {
+        case 'text': {
+          if (!child.content) break
+          const idx = text.indexOf(child.content, cur)
+          if (idx < 0) break
+          note(idx, idx + child.content.length, autoLink === 0)
+          cur = idx + child.content.length
+          break
+        }
+        case 'text_special': {
+          if (text[cur] === '\\') cur += 2
+          else if (text[cur] === '&') { const semi = text.indexOf(';', cur); cur = semi < 0 ? cur + 1 : semi + 1 }
+          else cur += child.content.length
+          note(cur, cur, false)
+          break
+        }
+        case 'code_inline': {
+          const open = text.indexOf(child.markup, cur)
+          if (open < 0) break
+          const close = text.indexOf(child.markup, open + child.markup.length)
+          const end = close < 0 ? open + child.markup.length : close + child.markup.length
+          note(open, end, false)
+          cur = end
+          break
+        }
+        case 'link_open':
+          if (child.info === 'auto') {
+            autoLink++
+            if (child.markup === 'autolink' && text[cur] === '<') cur += 1
+          } else if (text[cur] === '[') {
+            cur += 1
+          }
+          break
+        case 'link_close':
+          if (child.info === 'auto') {
+            autoLink = Math.max(0, autoLink - 1)
+            if (child.markup === 'autolink' && text[cur] === '>') { note(cur, cur + 1, false); cur += 1 }
+          } else if (text[cur] === ']') {
+            cur += 1
+            if (text[cur] === '(') {
+              const close = closingParen(text, cur)
+              const end = close < 0 ? cur + 1 : close + 1
+              note(cur, end, false)
+              cur = end
+            } else if (text[cur] === '[') {
+              const close = text.indexOf(']', cur)
+              const end = close < 0 ? cur + 1 : close + 1
+              note(cur, end, false)
+              cur = end
             }
           }
-        } else {
-          // Listen-/Zitatmarker gehören nicht zum Satz.
-          const markerMatch = body.match(/^(?:[-*+]\s+|\d+[.)]\s+|>\s*)+/)
-          const start = trimmedStart + (markerMatch ? markerMatch[0].length : 0)
-          if (start < trimmedEnd) out.push({ span: [start, trimmedEnd], kind: 'prose' })
+          break
+        case 'image': {
+          const open = text.indexOf('![', cur)
+          if (open < 0) break
+          const paren = text.indexOf('](', open)
+          const close = paren < 0 ? -1 : closingParen(text, paren + 1)
+          const end = close < 0 ? open + 2 : close + 1
+          note(open, end, false)
+          cur = end
+          break
         }
+        case 'softbreak':
+        case 'hardbreak': {
+          const nl = text.indexOf('\n', cur)
+          if (nl >= 0) cur = nl + 1
+          break
+        }
+        default:
+          if (child.markup && text.startsWith(child.markup, cur)) {
+            note(cur, cur + child.markup.length, false)
+            cur += child.markup.length
+          }
       }
     }
-    if (nl === -1) break
-    pos = nl + 1
+    if (segStart < 0 || segEnd <= segStart) continue
+    // Zusatzmasken schneiden Text-Spannen zurecht.
+    const extra: Array<[number, number]> = []
+    for (const re of EXTRA_MASKS) {
+      re.lastIndex = 0
+      let m: RegExpExecArray | null
+      while ((m = re.exec(text)) !== null) {
+        if (m.index < segEnd && m.index + m[0].length > segStart) extra.push([m.index, m.index + m[0].length])
+      }
+    }
+    const masked: Array<[number, number]> = []
+    let pos = segStart
+    for (const [a, b] of eligible.sort((x, y) => x[0] - y[0])) {
+      if (a > pos) masked.push([pos, a])
+      pos = Math.max(pos, b)
+    }
+    if (pos < segEnd) masked.push([pos, segEnd])
+    masked.push(...extra)
+    out.push({ span: [segStart, segEnd], kind, masked: masked.sort((x, y) => x[0] - y[0]) })
   }
   return out
 }
@@ -230,7 +320,6 @@ function findQuotes(sentence: string): string[] {
 export function analyzeCitations(answer: string, sources: string[], opts: CitationOptions = {}): CitationReport {
   const threshold = opts.supportThreshold ?? DEFAULT_THRESHOLD
   const K = sources.length
-  const ranges = maskedRanges(answer)
   const sourceWords = sources.map(contentWords)
   const sourceNorm = sources.map(normalizeWs)
 
@@ -238,7 +327,7 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   const sentenceChecks: SentenceCheck[] = []
   const used = new Set<number>()
 
-  for (const { span: seg, kind: segKind } of segments(answer, ranges)) {
+  for (const { span: seg, kind: segKind, masked: ranges } of segments(answer)) {
     if (segKind === 'heading') {
       sentenceChecks.push({ start: seg[0], end: seg[1], refs: [], status: 'unchecked', coverage: null, quotes: [] })
       continue
