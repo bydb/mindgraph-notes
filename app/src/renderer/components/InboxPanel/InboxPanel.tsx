@@ -18,7 +18,7 @@ import { PanelHeader, PanelHeaderButton, PanelHeaderIconButton } from '../Shared
 import { avatarInitial } from '../../utils/avatarInitial'
 import type { EmailMessage } from '../../../shared/types'
 import { EventDraftCard } from './EventDraftCard'
-import type { CalendarEventDraft } from '../../../shared/calendarEvent'
+import { localDateString, localDateToAllDayIso, type CalendarEventDraft } from '../../../shared/calendarEvent'
 import { CLOUD_PROVIDER_META, cloudProviderForSentinel, isCloudProviderReady } from '../../../shared/llmBackend'
 
 const isMac = window.electronAPI.platform === 'darwin'
@@ -58,7 +58,7 @@ function base64ToUtf8(b64: string): string {
   }
 }
 
-interface ParsedIcsEvent { title: string; startIso: string; durationMinutes: number; notes: string }
+interface ParsedIcsEvent { title: string; startIso: string; durationMinutes: number; notes: string; allDay?: boolean; endDate?: string }
 
 function parseIcsDate(value: string): Date | null {
   const m = value.trim().match(/^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/)
@@ -102,7 +102,24 @@ function parseIcsEvent(ics: string): ParsedIcsEvent | null {
   const title = decode(fields['SUMMARY'] || 'Termin')
   const loc = fields['LOCATION'] ? `Ort: ${decode(fields['LOCATION'])}` : ''
   const desc = fields['DESCRIPTION'] ? decode(fields['DESCRIPTION']) : ''
-  return { title, startIso: start.toISOString(), durationMinutes, notes: [loc, desc].filter(Boolean).join('\n\n') }
+  const notes = [loc, desc].filter(Boolean).join('\n\n')
+
+  // Ganztägig (DTSTART als reines Datum): Tage statt Minuten weitergeben. Vorher
+  // wurde daraus ein Termin ab 00:00 Uhr, dessen Dauer der Kalender-Handler auf
+  // 12 Stunden kappte — ein Zwei-Tage-Treffen stand als „0 bis 12 Uhr" im Kalender.
+  if (/^\d{8}$/.test(fields['DTSTART'].trim())) {
+    const startIso = localDateToAllDayIso(localDateString(start))
+    if (!startIso) return null
+    let endDate: string | undefined
+    const end = fields['DTEND'] && /^\d{8}$/.test(fields['DTEND'].trim()) ? parseIcsDate(fields['DTEND']) : null
+    if (end && !isNaN(end.getTime())) {
+      // DTEND ist ausschließend: der letzte Tag ist der davor.
+      const lastDay = localDateString(new Date(end.getFullYear(), end.getMonth(), end.getDate() - 1, 12))
+      if (lastDay > localDateString(start)) endDate = lastDay
+    }
+    return { title, startIso, durationMinutes: 60, notes, allDay: true, endDate }
+  }
+  return { title, startIso: start.toISOString(), durationMinutes, notes }
 }
 
 interface InboxPanelProps {

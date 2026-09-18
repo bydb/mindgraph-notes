@@ -12,7 +12,7 @@
 import React, { useState } from 'react'
 import { useTranslation } from '../../utils/translations'
 import { IconCalendar, IconClose } from '../Shared/Icons'
-import { DEFAULT_REMINDER_MINUTES, normalizeDraft, type CalendarEventDraft } from '../../../shared/calendarEvent'
+import { reminderMinutesFor, normalizeDraft, localDateToAllDayIso, type CalendarEventDraft } from '../../../shared/calendarEvent'
 import './EventDraftCard.css'
 
 // Der Weg direkt in den Kalender laeuft ueber EventKit und gibt es nur unter
@@ -41,11 +41,15 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
   const [busy, setBusy] = useState<'calendar' | 'ics' | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  // Nach dem Eintragen gesperrt, bis ein Feld geändert wird: EventKit erkennt keine
+  // Dubletten, ein zweiter Klick legte denselben Termin noch einmal an.
+  const [added, setAdded] = useState(false)
   const [editedFields, setEditedFields] = useState<Set<string>>(() => new Set())
 
   const set = <K extends keyof CalendarEventDraft>(key: K, value: CalendarEventDraft[K]) => {
     setDraft(d => ({ ...d, [key]: value }))
     setEditedFields(fields => new Set(fields).add(key))
+    setAdded(false)
     setMessage('')
     setError('')
   }
@@ -67,9 +71,11 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
         notes: cleanDraft.notes,
         location: cleanDraft.location,
         url: cleanDraft.url,
-        reminderMinutes: DEFAULT_REMINDER_MINUTES,
+        allDay: cleanDraft.allDay,
+        endDate: cleanDraft.endDate,
+        reminderMinutes: reminderMinutesFor(cleanDraft),
       })
-      if (r.success) setMessage(t('inbox.event.addedToCalendar'))
+      if (r.success) { setAdded(true); setMessage(t('inbox.event.addedToCalendar')) }
       else setError(r.error || t('inbox.event.failed'))
     } catch (e) {
       setError(e instanceof Error ? e.message : t('inbox.event.failed'))
@@ -81,7 +87,7 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
   const saveIcs = async () => {
     setBusy('ics'); setMessage(''); setError('')
     try {
-      const r = await window.electronAPI.calendarSaveIcs(cleanDraft, DEFAULT_REMINDER_MINUTES)
+      const r = await window.electronAPI.calendarSaveIcs(cleanDraft, reminderMinutesFor(cleanDraft))
       if (r.success) setMessage(t('inbox.event.icsSaved'))
       else if (!r.canceled) setError(r.error || t('inbox.event.failed'))
     } catch (e) {
@@ -92,6 +98,23 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
   }
 
   const startValue = toLocalInput(draft.startIso)
+  const startDay = startValue.slice(0, 10)
+
+  // Umschalten erfindet nichts: Ganztägig behält nur den Tag. Zurück auf „mit
+  // Uhrzeit" leert den Beginn — eine Uhrzeit, die niemand genannt hat, soll der
+  // Nutzer eintragen und nicht die Karte vorschlagen.
+  const toggleAllDay = (on: boolean) => {
+    setDraft(d => ({
+      ...d,
+      allDay: on,
+      endDate: on ? d.endDate : undefined,
+      startIso: on ? (localDateToAllDayIso(startDay) || '') : '',
+    }))
+    setEditedFields(fields => new Set(fields).add('allDay').add('startIso'))
+    setAdded(false)
+    setMessage('')
+    setError('')
+  }
   const canSubmit = liveProblems.length === 0 && !busy
 
   return (
@@ -125,34 +148,61 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
         <input value={draft.title} onChange={e => set('title', e.target.value)} />
       </label>
 
-      <div className="event-draft-row">
-        <label className="event-draft-field">
-          <span>{t('inbox.event.fieldStart')}</span>
-          <input
-            type="datetime-local"
-            value={startValue}
-            onChange={e => {
-              if (!e.target.value) {
-                set('startIso', '')
-                return
-              }
-              const d = new Date(e.target.value)
-              if (!Number.isNaN(d.getTime())) set('startIso', d.toISOString())
-            }}
-          />
-        </label>
-        <label className="event-draft-field event-draft-field--narrow">
-          <span>{t('inbox.event.fieldDuration')}</span>
-          <input
-            type="number"
-            min={5}
-            max={720}
-            step={5}
-            value={draft.durationMinutes}
-            onChange={e => set('durationMinutes', Number(e.target.value))}
-          />
-        </label>
-      </div>
+      <label className="event-draft-check">
+        <input type="checkbox" checked={draft.allDay === true} onChange={e => toggleAllDay(e.target.checked)} />
+        <span>{t('inbox.event.allDay')}</span>
+      </label>
+
+      {draft.allDay ? (
+        <div className="event-draft-row">
+          <label className="event-draft-field">
+            <span>{t('inbox.event.fieldStart')}</span>
+            <input
+              type="date"
+              value={startDay}
+              onChange={e => set('startIso', localDateToAllDayIso(e.target.value) || '')}
+            />
+          </label>
+          <label className="event-draft-field">
+            <span>{t('inbox.event.fieldEndDate')}</span>
+            <input
+              type="date"
+              min={startDay || undefined}
+              value={draft.endDate || startDay}
+              onChange={e => set('endDate', e.target.value && e.target.value !== startDay ? e.target.value : undefined)}
+            />
+          </label>
+        </div>
+      ) : (
+        <div className="event-draft-row">
+          <label className="event-draft-field">
+            <span>{t('inbox.event.fieldStart')}</span>
+            <input
+              type="datetime-local"
+              value={startValue}
+              onChange={e => {
+                if (!e.target.value) {
+                  set('startIso', '')
+                  return
+                }
+                const d = new Date(e.target.value)
+                if (!Number.isNaN(d.getTime())) set('startIso', d.toISOString())
+              }}
+            />
+          </label>
+          <label className="event-draft-field event-draft-field--narrow">
+            <span>{t('inbox.event.fieldDuration')}</span>
+            <input
+              type="number"
+              min={5}
+              max={720}
+              step={5}
+              value={draft.durationMinutes}
+              onChange={e => set('durationMinutes', Number(e.target.value))}
+            />
+          </label>
+        </div>
+      )}
 
       <label className="event-draft-field">
         <span>{t('inbox.event.fieldLocation')}</span>
@@ -169,11 +219,11 @@ export const EventDraftCard: React.FC<Props> = ({ draft: initial, problems = [],
         <textarea rows={3} value={draft.notes || ''} onChange={e => set('notes', e.target.value)} />
       </label>
 
-      <p className="event-draft-reminders">{t('inbox.event.reminderHint')}</p>
+      <p className="event-draft-reminders">{t(draft.allDay ? 'inbox.event.reminderHintAllDay' : 'inbox.event.reminderHint')}</p>
 
       <div className="event-draft-actions">
         {CAN_ADD_DIRECTLY && (
-          <button className="event-draft-btn event-draft-btn--primary" onClick={addToCalendar} disabled={!canSubmit}>
+          <button className="event-draft-btn event-draft-btn--primary" onClick={addToCalendar} disabled={!canSubmit || added}>
             {busy === 'calendar' ? t('inbox.event.working') : t('inbox.event.addToCalendar')}
           </button>
         )}

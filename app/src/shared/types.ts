@@ -1104,7 +1104,7 @@ export interface ElectronAPI {
 
   // Apple Calendar (macOS)
   calendarGetEvents: (startDate: string, endDate: string) => Promise<{ success: boolean; events: CalendarEvent[]; error?: string; needsPermission?: boolean; neverAsked?: boolean }>;
-  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string; location?: string; url?: string; reminderMinutes?: number[] }) => Promise<{ success: boolean; eventId?: string; error?: string; needsPermission?: boolean }>;
+  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string; location?: string; url?: string; reminderMinutes?: number[] ; allDay?: boolean; endDate?: string }) => Promise<{ success: boolean; eventId?: string; error?: string; needsPermission?: boolean }>;
   calendarSaveIcs: (draft: CalendarEventDraft, reminderMinutes?: number[]) => Promise<{ success: boolean; path?: string; canceled?: boolean; error?: string }>;
   emailExtractEvent: (payload: { model: string; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null; subject: string; body: string; from?: string; todayIso: string }) => Promise<{ success: boolean; draft?: CalendarEventDraft; problems?: Array<{ field: string; message: string }>; noEvent?: boolean; error?: string }>;
   calendarRequestAccess: () => Promise<{ success: boolean; status: 'granted' | 'alreadyGranted' | 'denied' | 'deniedPersistent' | 'unsupported' | 'error' | 'unknown'; error?: string; raw?: string }>;
