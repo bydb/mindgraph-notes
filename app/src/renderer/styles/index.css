@@ -22396,3 +22396,55 @@ body.presentation-mode *::after {
   transition: all var(--transition-fast);
 }
 .settings-btn:hover { background: var(--bg-tertiary); }
+
+
+/* ── Notiz-Chat: Vault-Modus, Fußnoten und Zitatprüfung ─────────────────── */
+.nc-cite {
+  font-size: 0.75em;
+  vertical-align: super;
+  color: var(--accent-color, #0f766e);
+  cursor: pointer;
+  margin-left: 1px;
+}
+.nc-cite:hover { text-decoration: underline; }
+.nc-vault-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--text-color) 12%, transparent);
+  font-size: 0.85em;
+}
+.nc-vault-footer h5 {
+  margin: 6px 0 4px;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.nc-vault-sources { list-style: none; padding: 0; margin: 0; }
+.nc-vault-sources li { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.nc-vault-sources .nc-source-n { opacity: 0.6; min-width: 1.6em; }
+.nc-vault-sources .nc-source-link { cursor: pointer; color: var(--accent-color, #0f766e); }
+.nc-vault-sources .nc-source-link:hover { text-decoration: underline; }
+.nc-vault-sources .nc-source-meta { opacity: 0.6; }
+.nc-vault-summary { opacity: 0.8; margin: 2px 0 4px; }
+.nc-vault-flags { list-style: none; padding: 0; margin: 0; }
+.nc-vault-flags li { padding: 2px 0; display: flex; gap: 6px; align-items: baseline; }
+.nc-vault-flags .nc-flag {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; position: relative; top: -1px;
+}
+.nc-flag.is-uncited { background: #d97706; }
+.nc-flag.is-low { background: #b45309; }
+.nc-flag.is-invalid { background: #d93d42; }
+.nc-flag.is-quote { background: #7c3aed; }
+.nc-vault-flags .nc-flag-text { opacity: 0.85; }
+.nc-vault-legend { opacity: 0.6; margin-top: 6px; font-size: 0.8em; }
+
+/* Vault-Knopf im Notiz-Chat: Symbol + sichtbares Wort statt nur Tooltip */
+.notes-chat-context-buttons button.has-label {
+  width: auto;
+  padding: 0 9px 0 7px;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}

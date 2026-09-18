@@ -162,6 +162,10 @@ const App: React.FC = () => {
   const [tagsPanelOpen, setTagsPanelOpen] = useState(false)
   const [smartConnectionsOpen, setSmartConnectionsOpen] = useState(false)
   const [notesChatOpen, setNotesChatOpen] = useState(false)
+  // Eigener Einstieg „Vault befragen“: öffnet den Notes-Chat (nie toggeln) und setzt den
+  // Kontextmodus Vault. Der Zähler macht wiederholte Aufrufe unterscheidbar.
+  const [notesChatModeRequest, setNotesChatModeRequest] = useState<{ mode: 'vault'; nonce: number } | null>(null)
+  const projectRagModuleOn = useIsModuleEnabled('project-rag')
   const { isPanelOpen: flashcardsPanelOpen, setPanel: setFlashcardsPanelOpen } = useFlashcardStore()
   const [inboxPanelOpen, setInboxPanelOpen] = useState(false)
   const [agentPanelOpen, setAgentPanelOpen] = useState(false)
@@ -228,6 +232,20 @@ const App: React.FC = () => {
       }
     }
   }, [overduePanelOpen, tagsPanelOpen, smartConnectionsOpen, notesChatOpen, flashcardsPanelOpen, setFlashcardsPanelOpen, inboxPanelOpen, agentPanelOpen, semanticScholarOpen])
+
+  // „Vault befragen“: Panel nur öffnen, nie toggeln (Hand-off-Lehre aus dem Workflow-Canvas),
+  // dann den Kontextmodus Vault anfordern.
+  const openVaultChat = useCallback(() => {
+    setOverduePanelOpen(false)
+    setTagsPanelOpen(false)
+    setSmartConnectionsOpen(false)
+    setFlashcardsPanelOpen(false)
+    setInboxPanelOpen(false)
+    setAgentPanelOpen(false)
+    setSemanticScholarOpen(false)
+    setNotesChatOpen(true)
+    setNotesChatModeRequest(prev => ({ mode: 'vault', nonce: (prev?.nonce ?? 0) + 1 }))
+  }, [setFlashcardsPanelOpen])
 
   // Notiz-Agent: Fortschritts- und Ergebnis-Events genau EINMAL pro Fenster abonnieren.
   // preload setzt die Hörer mit removeAllListeners — mehrere Abonnenten würden sich
@@ -1141,6 +1159,7 @@ const App: React.FC = () => {
     'panel-tags': () => switchRightPanel('tags'),
     'panel-smart': () => switchRightPanel('smartConnections'),
     'panel-chat': () => switchRightPanel('notesChat'),
+    'panel-vault-chat': () => openVaultChat(),
     'panel-flashcards': () => switchRightPanel('flashcards'),
     'panel-inbox': () => switchRightPanel('inbox'),
     'panel-agent': () => switchRightPanel('agent'),
@@ -1171,7 +1190,9 @@ const App: React.FC = () => {
     edoobox: edooboxEnabled,
     semanticScholar: semanticScholarEnabled,
     zotero: zoteroModuleEnabled,
-    transport: transportEnabled
+    transport: transportEnabled,
+    // Vault-Chat mit Belegen: braucht Notes-Chat UND das RAG-Modul (Vault-Index ist Opt-in pro Vault).
+    vaultChat: notesChatEnabled && projectRagModuleOn
   }
 
   const commandActions: CommandAction[] = COMMAND_CATALOG
@@ -1427,6 +1448,12 @@ const App: React.FC = () => {
                         <span>{t('titlebar.smartConnections')}</span>
                       </button>
                     )}
+                    {notesChatEnabled && projectRagModuleOn && (
+                      <button className="titlebar-tools-item" role="menuitem" onClick={() => { openVaultChat(); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="m9 10 2 2 4-4"/></svg>
+                        <span>{t('titlebar.vaultChat')}</span>
+                      </button>
+                    )}
                     {notesChatEnabled && (
                       <button className={`titlebar-tools-item ${notesChatOpen ? 'active' : ''}`} role="menuitem" onClick={() => { switchRightPanel('notesChat'); setToolsMenuOpen(false) }}>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1581,7 +1608,7 @@ const App: React.FC = () => {
                   ) : (smartConnectionsOpen && smartConnectionsEnabled) ? (
                     <SmartConnectionsPanel onClose={() => setSmartConnectionsOpen(false)} />
                   ) : (notesChatOpen && notesChatEnabled) ? (
-                    <NotesChat onClose={() => setNotesChatOpen(false)} />
+                    <NotesChat onClose={() => setNotesChatOpen(false)} modeRequest={notesChatModeRequest} />
                   ) : (flashcardsPanelOpen && flashcardsEnabled) ? (
                     <FlashcardsPanel onClose={() => setFlashcardsPanelOpen(false)} />
                   ) : inboxPanelOpen ? (

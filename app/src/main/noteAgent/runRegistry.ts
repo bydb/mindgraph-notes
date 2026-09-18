@@ -4,6 +4,7 @@
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
 import { randomBytes } from 'crypto'
+import { beginOllamaActivity } from '../rag/ollamaActivity'
 import type { WebResearchConfig, WebResearchPhase, WebFetchRecord } from '../../shared/webResearch'
 import type { CollectedTable } from '../../shared/tableCollect'
 import type { ShellState } from './shellExecution'
@@ -187,8 +188,12 @@ export function startRun(params: {
   activeBySender.set(params.senderId, run)
   runsById.set(run.runId, run)
   enforceRetention(params.senderId)
+  // Der Lauf zählt als Ollama-Vordergrund, bis finishRun ihn abschließt (Vault-Indexer pausiert solange).
+  activityEnds.set(run.runId, beginOllamaActivity('note-agent'))
   return run
 }
+
+const activityEnds = new Map<string, () => void>()
 
 // Sender-Bindung: liefert den Run nur, wenn er dem anfragenden Renderer gehört.
 export function getRunForSender(senderId: number, runId: string): AgentRun | null {
@@ -204,6 +209,8 @@ export function recordToolUse(run: AgentRun, toolName: string): void {
 
 export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'running'>): void {
   if (run.status === 'running') run.status = status
+  activityEnds.get(run.runId)?.()
+  activityEnds.delete(run.runId)
 }
 
 /** Summe aller einzeln gelesenen Ordner-Dateien — Grundlage der Fehlermeldung. */

@@ -396,6 +396,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
   projectRagRerankCandidates: (vaultPath: string, queryText: string, candidateFolderRels: string[], embedModel: string) =>
     ipcRenderer.invoke('project-rag-rerank-candidates', vaultPath, queryText, candidateFolderRels, embedModel),
 
+  // Vault-RAG (Phase 1): Abonnenten geben eine gezielte Abmeldung zurück statt
+  // removeAllListeners — mehrere Flächen dürfen gleichzeitig zuhören (F17).
+  vaultRagStatus: (vaultPath: string) => ipcRenderer.invoke('vault-rag-status', vaultPath),
+  vaultRagConfigSet: (vaultPath: string, patch: { enabled?: boolean; excludeFolders?: string[] }) =>
+    ipcRenderer.invoke('vault-rag-config-set', vaultPath, patch),
+  vaultRagEstimate: (vaultPath: string) => ipcRenderer.invoke('vault-rag-estimate', vaultPath),
+  vaultRagBuild: (vaultPath: string) => ipcRenderer.invoke('vault-rag-build', vaultPath),
+  vaultRagBuildControl: (vaultPath: string, action: 'pause' | 'resume' | 'cancel') =>
+    ipcRenderer.invoke('vault-rag-build-control', vaultPath, action),
+  vaultRagQuery: (vaultPath: string, query: string, filters: object | undefined, opts: object | undefined, requestId: string) =>
+    ipcRenderer.invoke('vault-rag-query', vaultPath, query, filters, opts, requestId),
+  onVaultRagProgress: (callback: (progress: unknown) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, progress: unknown) => callback(progress)
+    ipcRenderer.on('vault-rag-progress', listener)
+    return () => ipcRenderer.removeListener('vault-rag-progress', listener)
+  },
+  vaultRagAnswer: (vaultPath: string, query: string, requestId: string, language: 'de' | 'en' = 'de') =>
+    ipcRenderer.invoke('vault-rag-answer', vaultPath, query, requestId, language),
+  vaultRagAnswerCancel: (requestId: string) => ipcRenderer.invoke('vault-rag-answer-cancel', requestId),
+  onVaultRagAnswerChunk: (callback: (payload: { requestId: string; chunk: string }) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: { requestId: string; chunk: string }) => callback(payload)
+    ipcRenderer.on('vault-rag-answer-chunk', listener)
+    return () => ipcRenderer.removeListener('vault-rag-answer-chunk', listener)
+  },
+  onVaultRagAnswerDone: (callback: (payload: unknown) => void): (() => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, payload: unknown) => callback(payload)
+    ipcRenderer.on('vault-rag-answer-done', listener)
+    return () => ipcRenderer.removeListener('vault-rag-answer-done', listener)
+  },
+
   // LM Studio Local AI API (OpenAI-kompatibel)
   lmstudioCheck: (port?: number) => ipcRenderer.invoke('lmstudio-check', port),
   lmstudioModels: (port?: number) => ipcRenderer.invoke('lmstudio-models', port),

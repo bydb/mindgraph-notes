@@ -39,15 +39,27 @@ export function parseOllamaModels(value: unknown): OllamaModelInfo[] {
 
   return models.flatMap(model => {
     if (!model || typeof model !== 'object') return []
-    const raw = model as { name?: unknown; size?: unknown; capabilities?: unknown }
+    const raw = model as {
+      name?: unknown; size?: unknown; capabilities?: unknown
+      digest?: unknown; remote_model?: unknown; remote_host?: unknown
+    }
     if (typeof raw.name !== 'string' || !raw.name.trim()) return []
     // Fehlende Größe darf ein Modell NICHT aus allen Pickern verschwinden lassen —
     // ein Eintrag mit "0 B" ist die deutlich harmlosere Fehlerart.
     const capabilities = normalizeCapabilities(raw.capabilities)
+    // Digest und Remote-Felder durchreichen: der Vault-Index bindet seine Identität
+    // an den Digest (F20), und die lokale Modellprüfung lehnt Cloud-Modelle auch
+    // ohne Cloud-Suffix im Namen ab (F21). Vorher wurden beide still verworfen.
+    const digest = typeof raw.digest === 'string' && raw.digest.trim() ? raw.digest.trim() : undefined
+    const remoteModel = typeof raw.remote_model === 'string' && raw.remote_model.trim() ? raw.remote_model.trim() : undefined
+    const remoteHost = typeof raw.remote_host === 'string' && raw.remote_host.trim() ? raw.remote_host.trim() : undefined
     return [{
       name: raw.name,
       size: typeof raw.size === 'number' ? raw.size : 0,
-      ...(capabilities === null ? {} : { capabilities })
+      ...(capabilities === null ? {} : { capabilities }),
+      ...(digest ? { digest } : {}),
+      ...(remoteModel ? { remoteModel } : {}),
+      ...(remoteHost ? { remoteHost } : {})
     }]
   })
 }

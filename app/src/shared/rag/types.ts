@@ -10,7 +10,9 @@
  */
 
 /** Erhöhen, wenn sich Chunking oder das Index-Format ändert → Voll-Rebuild. */
-export const RAG_INDEX_VERSION = 1
+// 2 (2026-09-18): Chunker liefert zusammenhängende Quellspannen; Chunk-Texte sind
+// jetzt exakte Ausschnitte statt neu zusammengesetzter Absätze → Voll-Rebuild.
+export const RAG_INDEX_VERSION = 2
 
 /** Ein eingebetteter Chunk einer Projektdatei. */
 export interface RagChunk {

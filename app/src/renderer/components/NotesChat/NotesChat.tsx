@@ -11,7 +11,8 @@ import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
-import type { NoteAgentAttachment } from '../../../shared/types'
+import type { NoteAgentAttachment, VaultRagAnswerDone, VaultRagHitDto } from '../../../shared/types'
+import type { CitationReport } from '../../../shared/rag/citations'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -46,12 +47,22 @@ function linkifyWikilinks(html: string, resolve: (text: string) => string | null
   })
 }
 
+interface VaultCitations {
+  hits: VaultRagHitDto[]
+  report: CitationReport
+  excludeMismatch: boolean
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   question?: string      // Die vorherige User-Frage (nur bei assistant)
   model?: string         // Das verwendete Modell (nur bei assistant)
   timestamp?: Date       // Zeitpunkt der Antwort (nur bei assistant)
+  /** Vault-Antworten tragen Notiz- und Mail-Text: nie in den Verlauf des normalen Chats (F22). */
+  origin?: 'vault-rag'
+  vaultPath?: string
+  citations?: VaultCitations
 }
 
 interface OllamaModel {
@@ -59,7 +70,8 @@ interface OllamaModel {
   size: number
 }
 
-type ContextMode = 'current' | 'folder' | 'all' | 'project'
+// 'vault' ersetzt 'all', sobald das RAG-Modul an ist: der Modus Alle nahm die ersten 50 Notizen der Liste.
+type ContextMode = 'current' | 'folder' | 'all' | 'project' | 'vault'
 type ChatMode = 'direct' | 'socratic' | 'grill'
 
 interface ProjectOption {
@@ -69,9 +81,11 @@ interface ProjectOption {
 
 interface NotesChatProps {
   onClose: () => void
+  /** Von außen angeforderter Kontextmodus (Einstieg „Vault befragen“); nonce für Wiederholung. */
+  modeRequest?: { mode: 'vault'; nonce: number } | null
 }
 
-export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
+export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) => {
   const { t } = useTranslation()
   const { notes, selectedNoteId, vaultPath, selectedPdfPath, selectedOfficePath } = useNotesStore()
   const { ollama: llmSettings } = useUIStore()
@@ -84,6 +98,9 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   const [isBackendAvailable, setIsBackendAvailable] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [contextMode, setContextMode] = useState<ContextMode>('current')
+  useEffect(() => {
+    if (modeRequest?.mode === 'vault') setContextMode('vault')
+  }, [modeRequest])
   const [chatMode, setChatMode] = useState<ChatMode>('direct')
   // Cloud für Notes-Chat (OpenRouter/LLMBase): nur verfügbar, wenn in den Einstellungen
   // per zweitem Opt-in freigeschaltet. Default erster verfügbarer Provider; pro Sitzung umschaltbar.
@@ -268,8 +285,113 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     return n ? n.id : null
   }, [notes])
 
+  // Quellen tragen den exakten vault-relativen Pfad — hier darf nichts unscharf sein.
+  // Die Wikilink-Auflösung (resolveNoteId) vergleicht zuletzt „enthält" und traf bei
+  // einer Mail-Notiz „…/2026-07-01 …" die Brain-Tagesnotiz „01.md" (real, 18.09.2026).
+  const resolveSourceNoteId = useCallback((fileRel: string): string | null => {
+    const norm = (p: string) => p.replace(/\\/g, '/').replace(/^\/+/, '')
+    const target = norm(fileRel)
+    const exact = notes.find(x => norm(x.path) === target)
+    if (exact) return exact.id
+    // Manche Stores führen den Pfad absolut — dann auf den Vault-relativen Teil vergleichen.
+    const suffix = notes.find(x => norm(x.path).endsWith('/' + target))
+    return suffix ? suffix.id : null
+  }, [notes])
+
+  // Vault-Antwort: [n] wird zur klickbaren Hochzahl (Notiz öffnen), Rest wie gehabt.
+  const renderMessageHtml = (msg: ChatMessage): string => {
+    let html = linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId)
+    if (msg.citations && msg.vaultPath === vaultPath) {
+      const hits = msg.citations.hits
+      html = html.replace(/\[(\d{1,3})\]/g, (m, n: string) => {
+        const i = Number(n)
+        const hit = hits[i - 1]
+        if (!hit) return m
+        const id = resolveSourceNoteId(hit.fileRel)
+        return id
+          ? `<sup class="nc-cite" role="link" tabindex="0" data-source-note-id="${ncEscapeAttr(id)}" title="${ncEscapeAttr(hit.fileRel)}">[${i}]</sup>`
+          : `<sup class="nc-cite">[${i}]</sup>`
+      })
+    }
+    return html
+  }
+
+  const renderVaultFooter = (msg: ChatMessage) => {
+    const c = msg.citations
+    if (!c) return null
+    const sameVault = msg.vaultPath === vaultPath
+    const { report, hits } = c
+    const flagged = report.sentences.filter(s => s.status === 'uncited' || s.status === 'cited-low' || s.status === 'cited-invalid' || s.quotes.some(q => !q.found))
+    const flagLabel = (status: string) =>
+      status === 'uncited' ? t('notesChat.vaultStatusUncited')
+        : status === 'cited-low' ? t('notesChat.vaultStatusLow')
+          : status === 'cited-invalid' ? t('notesChat.vaultStatusInvalid')
+            : t('notesChat.vaultStatusQuote')
+    const flagClass = (status: string) =>
+      status === 'uncited' ? 'is-uncited' : status === 'cited-low' ? 'is-low' : status === 'cited-invalid' ? 'is-invalid' : 'is-quote'
+    return (
+      <div className="nc-vault-footer">
+        <h5>{t('notesChat.vaultSources')}</h5>
+        <ol className="nc-vault-sources">
+          {hits.map((h, i) => {
+            const base = (h.fileRel.split('/').pop() || h.fileRel).replace(/\.md$/i, '')
+            const id = sameVault ? resolveSourceNoteId(h.fileRel) : null
+            return (
+              <li key={i}>
+                <span className="nc-source-n">[{i + 1}]</span>
+                {id
+                  ? <span className="nc-source-link" role="link" tabIndex={0} data-source-note-id={id} title={h.fileRel}>{base}</span>
+                  : <span title={sameVault ? h.fileRel : t('notesChat.vaultOtherVault')}>{base}</span>}
+                <span className="nc-source-meta">
+                  {h.heading ? ` › ${h.heading}` : ''} · {lang === 'de' ? 'Zeile' : 'line'} {h.startLine}
+                  {h.fresh === 'relocated' ? ` · ${t('notesChat.vaultRelocated')}` : ''}
+                </span>
+              </li>
+            )
+          })}
+        </ol>
+        <h5>{t('notesChat.vaultCheck')}</h5>
+        <div className="nc-vault-summary">
+          {t('notesChat.vaultCheckSummary', {
+            sentences: report.summary.sentences, uncited: report.summary.uncited, low: report.summary.low,
+            invalid: report.summary.invalidRefs, quotes: report.summary.quotesNotFound
+          })}
+        </div>
+        {flagged.length > 0 && (
+          <ul className="nc-vault-flags">
+            {flagged.map((sn, i) => {
+              const quoteMissing = sn.quotes.some(q => !q.found)
+              const status = sn.status === 'cited-high' || sn.status === 'cited-unchecked' ? 'quote' : sn.status
+              const text = msg.content.slice(sn.start, sn.end).replace(/\s+/g, ' ')
+              return (
+                <li key={i}>
+                  <span className={`nc-flag ${flagClass(status)}`} />
+                  <span className="nc-flag-text">
+                    <b>{flagLabel(status)}{quoteMissing && status !== 'quote' ? `, ${t('notesChat.vaultStatusQuote')}` : ''}:</b> {text.length > 140 ? `${text.slice(0, 140)}…` : text}
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {c.excludeMismatch && <div className="nc-vault-legend">{t('notesChat.vaultExcludeMismatch')}</div>}
+        <div className="nc-vault-legend">{t('notesChat.vaultLegend')}</div>
+      </div>
+    )
+  }
+
   const handleMessagesClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement
+
+    // Quellen-Fußnote oder Zitatnummer → Notiz öffnen (Chat-Panel bleibt offen).
+    const source = target.closest('[data-source-note-id]') as HTMLElement | null
+    if (source) {
+      e.preventDefault()
+      e.stopPropagation()
+      const id = source.getAttribute('data-source-note-id')
+      if (id) useNotesStore.getState().selectNote(id)
+      return
+    }
 
     // Klickbarer Wikilink → Notiz im Editor öffnen (Chat-Panel bleibt offen).
     const wikilink = target.closest('.nc-wikilink') as HTMLElement | null
@@ -309,6 +431,11 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
 
   // Letzte Projekt-RAG-Quellen (werden nach dem Streaming an die Antwort gehängt)
   const lastSourcesRef = useRef<Array<{ fileRel: string; heading: string }>>([])
+  // Laufende Vault-Anfrage (requestId) — für Abbruch beim Schließen des Panels.
+  const vaultRequestRef = useRef<string | null>(null)
+  useEffect(() => () => {
+    if (vaultRequestRef.current) void window.electronAPI.vaultRagAnswerCancel(vaultRequestRef.current)
+  }, [])
 
   // Streaming-Listener einrichten — sowohl normaler Notiz-Chat als auch
   // Projekt-RAG speisen denselben streamingContent/isStreaming-Fluss (nur jeweils
@@ -501,6 +628,67 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     setIsStreaming(true)
     setStreamingContent('')
 
+    // Vault-Pfad (Phase 2, klein): einzelne Frage an den Vault-Index, Antwort mit
+    // Nummern-Zitaten, Zitatprüfung im Main. Jedes Ereignis trägt die requestId.
+    if (contextMode === 'vault') {
+      if (!vaultPath) { setIsStreaming(false); return }
+      const requestId = `vq-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+      vaultRequestRef.current = requestId
+      const finish = (content: string, extra: Partial<ChatMessage> = {}) => {
+        setStreamingContent('')
+        setIsStreaming(false)
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content,
+          question: userMessage,
+          timestamp: new Date(),
+          origin: 'vault-rag',
+          vaultPath,
+          ...extra
+        }])
+      }
+      const offChunk = window.electronAPI.onVaultRagAnswerChunk(({ requestId: id, chunk }) => {
+        if (id === requestId) setStreamingContent(prev => prev + chunk)
+      })
+      const offDone = window.electronAPI.onVaultRagAnswerDone((payload: VaultRagAnswerDone) => {
+        if (payload.requestId !== requestId) return
+        offChunk(); offDone()
+        vaultRequestRef.current = null
+        switch (payload.kind) {
+          case 'answer':
+            finish(payload.answer, { model: payload.model, citations: { hits: payload.hits, report: payload.report, excludeMismatch: payload.excludeMismatch } })
+            break
+          case 'not-found':
+            finish(t('notesChat.vaultNotFound'), { model: payload.model })
+            break
+          case 'no-fresh-source':
+            finish(t('notesChat.vaultNoFreshSource'), { model: payload.model })
+            break
+          case 'cancelled':
+            finish(t('notesChat.vaultCancelled'))
+            break
+          case 'error':
+            finish((lang === 'de' ? 'Fehler: ' : 'Error: ') + payload.error)
+            break
+        }
+      })
+      try {
+        const res = await window.electronAPI.vaultRagAnswer(vaultPath, userMessage, requestId, lang)
+        if (!res.success && res.error && vaultRequestRef.current === requestId) {
+          // Fehler vor dem ersten Ereignis (z.B. Vault ohne Index).
+          offChunk(); offDone()
+          vaultRequestRef.current = null
+          finish((lang === 'de' ? 'Fehler: ' : 'Error: ') + res.error + (/Kein Vault-Index|No vault index/i.test(res.error) ? ` ${t('notesChat.vaultNoIndexHint')}` : ''))
+        }
+      } catch (err) {
+        offChunk(); offDone()
+        vaultRequestRef.current = null
+        finish(lang === 'de' ? 'Fehler bei der Vault-Abfrage.' : 'Vault query failed.')
+        console.error('[NotesChat] Vault-RAG Fehler:', err)
+      }
+      return
+    }
+
     // Projekt-RAG-Pfad: semantisches Retrieval + verankerte Antwort (nur lokal).
     if (contextMode === 'project') {
       if (!vaultPath || !selectedProject) {
@@ -563,8 +751,10 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
         return
       }
 
-      // Nur die letzen 10 Nachrichten für den Chat-Verlauf
-      const recentMessages = messages.slice(-10).map(m => ({
+      // Nur die letzten 10 Nachrichten für den Chat-Verlauf — Vault-Antworten IMMER
+      // ausgeschlossen (sie tragen Notiz-/Mail-Text und könnten sonst über einen
+      // Cloud-Anbieter den Rechner verlassen, Codex F22), unabhängig vom Anbieter.
+      const recentMessages = messages.filter(m => m.origin !== 'vault-rag').slice(-10).map(m => ({
         role: m.role,
         content: m.content
       }))
@@ -621,6 +811,23 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
     return setAiProvenanceInContent(content, msg.model, date)
   }
 
+  // Fußnoten für Vault-Antworten: [n] → [^n], Quellenliste mit Wikilink und
+  // Überschrift, Prüfstatus als Kurzzeile. Wird beim Kopieren/Speichern angehängt.
+  const withVaultFootnotes = (msg: ChatMessage): string => {
+    if (!msg.citations) return msg.content
+    const { hits, report } = msg.citations
+    const body = msg.content.replace(/\[(\d{1,3})\]/g, (m, n) => (Number(n) >= 1 && Number(n) <= hits.length ? `[^${n}]` : m))
+    const lines = hits.map((h, i) => {
+      const base = (h.fileRel.split('/').pop() || h.fileRel).replace(/\.md$/i, '')
+      return `[^${i + 1}]: [[${base}]]${h.heading ? ` › ${h.heading}` : ''} (${lang === 'de' ? 'Zeile' : 'line'} ${h.startLine})`
+    })
+    const summary = t('notesChat.vaultCheckSummary', {
+      sentences: report.summary.sentences, uncited: report.summary.uncited, low: report.summary.low,
+      invalid: report.summary.invalidRefs, quotes: report.summary.quotesNotFound
+    })
+    return `${body}\n\n${lines.join('\n')}\n\n> ${t('notesChat.vaultCheck')}: ${summary}\n> ${t('notesChat.vaultLegend')}`
+  }
+
   const buildProvenanceBlock = (msg: ChatMessage): string => {
     const dateStr = msg.timestamp
       ? msg.timestamp.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -640,7 +847,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
   // Nachricht kopieren mit Metadaten
   const copyMessage = async (msg: ChatMessage, index: number) => {
     try {
-      await writeClipboardText(msg.content + buildProvenanceBlock(msg))
+      await writeClipboardText(withVaultFootnotes(msg) + buildProvenanceBlock(msg))
       setCopiedIndex(index)
       setTimeout(() => setCopiedIndex(null), 2000)
     } catch (err) {
@@ -685,7 +892,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       // Frontmatter-Stempel fürs KI-Badge im Lesen-Modus; der Provenienz-Callout im
       // Body bleibt zusätzlich (er trägt die gestellte Frage).
       const content = stampAi(
-        `${frontmatter}${msg.content}${buildProvenanceBlock(msg)}\n`,
+        `${frontmatter}${withVaultFootnotes(msg)}${buildProvenanceBlock(msg)}\n`,
         msg
       )
       const filePath = `${vaultPath}/${relativePath}`
@@ -717,7 +924,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
       const existing = await window.electronAPI.readFile(filePath)
       const sep = existing.endsWith('\n\n') ? '' : existing.endsWith('\n') ? '\n' : '\n\n'
       const newContent = stampAi(
-        `${existing}${sep}${msg.content}${buildProvenanceBlock(msg)}\n`,
+        `${existing}${sep}${withVaultFootnotes(msg)}${buildProvenanceBlock(msg)}\n`,
         msg
       )
       await window.electronAPI.writeFile(filePath, newContent)
@@ -748,6 +955,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
         return t('notesChat.noFolderSelected')
       case 'all':
         return `${t('notesChat.allNotes')} (${Math.min(notes.length, 50)} ${t('notesChat.ofNotes')} ${notes.length})`
+      case 'vault':
+        return t('notesChat.vaultMode')
       case 'project': {
         if (!selectedProject) return lang === 'de' ? 'Kein Projekt gewählt' : 'No project selected'
         const proj = projectList.find(p => p.folderRel === selectedProject)
@@ -846,19 +1055,35 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
-                <button
-                  className={contextMode === 'all' ? 'active' : ''}
-                  onClick={() => setContextMode('all')}
-                  disabled={isStreaming}
-                  title="Alle Notizen"
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
-                </button>
+                {projectRagEnabled ? (
+                  <button
+                    className={`has-label ${contextMode === 'vault' ? 'active' : ''}`}
+                    onClick={() => setContextMode('vault')}
+                    disabled={isStreaming}
+                    title={t('notesChat.vaultMode')}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                      <path d="m9 10 2 2 4-4"/>
+                    </svg>
+                    <span>{t('notesChat.vaultLabel')}</span>
+                  </button>
+                ) : (
+                  <button
+                    className={contextMode === 'all' ? 'active' : ''}
+                    onClick={() => setContextMode('all')}
+                    disabled={isStreaming}
+                    title="Alle Notizen"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                      <circle cx="9" cy="7" r="4"/>
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                    </svg>
+                  </button>
+                )}
                 {projectRagEnabled && (
                   <button
                     className={contextMode === 'project' ? 'active' : ''}
@@ -956,8 +1181,9 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose }) => {
                   <div key={idx} className={`notes-chat-message ${msg.role}`}>
                     <div
                       className="notes-chat-message-content markdown-content"
-                      dangerouslySetInnerHTML={{ __html: linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId) }}
+                      dangerouslySetInnerHTML={{ __html: renderMessageHtml(msg) }}
                     />
+                    {msg.citations && renderVaultFooter(msg)}
                     {msg.role === 'assistant' && (
                       <div className="notes-chat-msg-actions">
                         <button

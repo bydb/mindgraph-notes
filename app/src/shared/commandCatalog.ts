@@ -26,6 +26,7 @@ export type CommandRequirement =
   | 'semanticScholar'
   | 'zotero'
   | 'transport'
+  | 'vaultChat'
 
 export interface CommandDescriptor {
   id: string
@@ -49,6 +50,7 @@ const RAW_COMMAND_CATALOG = [
   { id: 'panel-tags', labelKey: 'commandPalette.panelTags', categoryKey: 'commandPalette.cat.panels', keywords: 'tags schlagworte' },
   { id: 'panel-smart', labelKey: 'commandPalette.panelSmart', categoryKey: 'commandPalette.cat.panels', keywords: 'smart connections similar aehnlich', requires: 'smartConnections' },
   { id: 'panel-chat', labelKey: 'commandPalette.panelChat', categoryKey: 'commandPalette.cat.panels', keywords: 'chat ki ai notes', requires: 'notesChat' },
+  { id: 'panel-vault-chat', labelKey: 'commandPalette.panelVaultChat', categoryKey: 'commandPalette.cat.panels', keywords: 'vault befragen quellen belege zitate fussnoten rag fragen sources citations', requires: 'vaultChat' },
   { id: 'panel-flashcards', labelKey: 'commandPalette.panelFlashcards', categoryKey: 'commandPalette.cat.panels', keywords: 'flashcards karteikarten lernen', requires: 'flashcards' },
   { id: 'panel-inbox', labelKey: 'commandPalette.panelInbox', categoryKey: 'commandPalette.cat.panels', keywords: 'email inbox posteingang mail', requires: 'email' },
   { id: 'panel-agent', labelKey: 'commandPalette.panelAgent', categoryKey: 'commandPalette.cat.panels', keywords: 'agent edoobox veranstaltungen events', requires: 'edoobox' },

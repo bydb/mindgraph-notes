@@ -13,6 +13,8 @@ interface VaultSettingsState {
   currentVaultPath: string
   features: VaultFeatures
   isLoaded: boolean
+  /** Alles, was Main-seitige Teile in der Datei halten (z.B. `vaultRag`) — wird beim Speichern erhalten. */
+  extra: Record<string, unknown>
 
   loadForVault: (vaultPath: string) => Promise<void>
   setFeatureActive: (key: keyof VaultFeatures, active: boolean) => Promise<void>
@@ -24,17 +26,20 @@ export const useVaultSettingsStore = create<VaultSettingsState>()((set, get) => 
   currentVaultPath: '',
   features: { ...DEFAULT_FEATURES },
   isLoaded: false,
+  extra: {},
 
   loadForVault: async (vaultPath: string) => {
     // Reset bei Vault-Wechsel
-    set({ currentVaultPath: vaultPath, features: { ...DEFAULT_FEATURES }, isLoaded: false })
+    set({ currentVaultPath: vaultPath, features: { ...DEFAULT_FEATURES }, isLoaded: false, extra: {} })
 
     try {
-      const saved = await window.electronAPI.loadVaultSettings(vaultPath) as VaultSettings | null
+      const saved = await window.electronAPI.loadVaultSettings(vaultPath) as (VaultSettings & Record<string, unknown>) | null
       if (saved && saved.features) {
         // Deep merge mit Defaults (Forward-Kompatibilität für neue Features)
         const merged = { ...DEFAULT_FEATURES, ...saved.features }
-        set({ features: merged, isLoaded: true })
+        const { schemaVersion: _sv, features: _f, ...extra } = saved
+        void _sv; void _f
+        set({ features: merged, isLoaded: true, extra })
         console.log('[VaultSettings] Loaded for vault:', vaultPath, merged)
       } else {
         // Keine vault-settings.json → Defaults verwenden (alle Features deaktiviert)
@@ -48,13 +53,15 @@ export const useVaultSettingsStore = create<VaultSettingsState>()((set, get) => 
   },
 
   setFeatureActive: async (key: keyof VaultFeatures, active: boolean) => {
-    const { currentVaultPath, features } = get()
+    const { currentVaultPath, features, extra } = get()
     if (!currentVaultPath) return
 
     const updated = { ...features, [key]: active }
     set({ features: updated })
 
-    const settings: VaultSettings = {
+    // Fremde Schlüssel mitschreiben — sonst löscht ein Feature-Toggle das Vault-RAG-Opt-in.
+    const settings: VaultSettings & Record<string, unknown> = {
+      ...extra,
       schemaVersion: 1,
       features: updated
     }

@@ -206,6 +206,12 @@ import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill,
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls, isNonGenerativeModel } from '../shared/modelCompatibility'
 import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
+import { VaultRagManager } from './rag/vaultRagManager'
+import { wrapIpcWithOllamaActivity, withOllamaActivity } from './rag/ollamaActivity'
+import { resolveLocalModel, describeLocalModelError } from './rag/localModel'
+import type { VaultQueryFilters } from '../shared/rag/vaultIndex'
+import { analyzeCitations } from '../shared/rag/citations'
+import { buildVaultPrompt } from './rag/vaultPrompt'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
 import { buildKeyring, RESERVED_PLUGIN_IDS } from './plugins/runtime/keyring'
@@ -837,6 +843,28 @@ function buildPluginHostServices(): HostServices {
 
 let mainWindow: BrowserWindow | null = null
 let fileWatcher: FSWatcher | null = null
+
+// Vault-RAG (quellenbelegter Chat über den ganzen Vault, Phase 1): ein Manager pro
+// Prozess, Vault-Wechsel über den Watcher. Lazy, weil app.getPath erst nach der
+// App-Initialisierung sicher ist.
+let vaultRagManagerInstance: VaultRagManager | null = null
+function getVaultRagManager(): VaultRagManager {
+  if (!vaultRagManagerInstance) {
+    vaultRagManagerInstance = new VaultRagManager({
+      userDataPath: app.getPath('userData'),
+      assertSafePath,
+      getEmbedModel: async () => {
+        const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+        const ollama = ui.ollama as { projectRagEmbeddingModel?: string } | undefined
+        return ollama?.projectRagEmbeddingModel || 'bge-m3'
+      },
+      onProgress: (p) => {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('vault-rag-progress', p)
+      }
+    })
+  }
+  return vaultRagManagerInstance
+}
 let ptyProcess: import('node-pty').IPty | null = null
 let isQuitting = false
 let syncEngine: SyncEngine | null = null
@@ -5444,7 +5472,7 @@ Antworte nur mit dem JSON-Array:`
 
 // Brain: Tagesverdichtung. Ruft AUSSCHLIESSLICH lokales Ollama (localhost:11434)
 // und schreibt eine neue Markdown-Notiz ins Vault. Niemals Cloud-APIs.
-ipcMain.handle('brain-consolidate-day', async (_event, input: BrainConsolidateInput) => {
+ipcMain.handle('brain-consolidate-day', wrapIpcWithOllamaActivity('brain', async (_event, input: BrainConsolidateInput) => {
   try {
     if (!input || typeof input !== 'object') {
       return { success: false, error: 'Ungültige Eingabe' }
@@ -5463,7 +5491,7 @@ ipcMain.handle('brain-consolidate-day', async (_event, input: BrainConsolidateIn
       error: err instanceof Error ? err.message : 'Unbekannter Fehler'
     }
   }
-})
+}))
 
 // ────────────────────────────────────────────────────────────────────────────
 // Projekt-Status-Crystallizer
@@ -5887,7 +5915,7 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 })
 
 // Chat mit Kontext (für Notes Chat)
-ipcMain.handle('ollama-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[]) => {
+ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[]) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat streamt auf eigenen Channels — Notes-Chat und Email-Chat können
@@ -6103,7 +6131,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'
     }
   }
-})
+}))
 
 // Holt verfügbare Embedding-Modelle
 ipcMain.handle('ollama-embedding-models', async () => {
@@ -6725,8 +6753,11 @@ ipcMain.on('watch-directory', async (_event, dirPath: string) => {
     persistent: true,
     ignoreInitial: true
   })
-  
+  // Vault-RAG folgt dem Watcher: gleicher Vault, gleiche Ereignisquelle (kein zweiter Watcher).
+  void getVaultRagManager().setVault(dirPath)
+
   fileWatcher.on('all', (eventName, filePath) => {
+    if (typeof filePath === 'string') getVaultRagManager().noteFileEvent(dirPath, eventName, filePath)
     // ALLE Änderungen melden, nicht nur `.md`. Vorher fiel hier alles andere
     // weg — Bilder, PDFs, die HTML-Seiten und Tabellen des Agenten und auch
     // neue Ordner (`addDir`). Sie tauchten im Dateibaum erst nach einem
@@ -6755,6 +6786,7 @@ ipcMain.on('unwatch-directory', () => {
     fileWatcher.close()
     fileWatcher = null
   }
+  void getVaultRagManager().setVault(null)
 })
 
 // Terminal (PTY) Handlers
@@ -7386,9 +7418,17 @@ ipcMain.handle('project-rag-query', async (_event, vaultPath: string, projectFol
 
 // Antwort-Streaming — spiegelt 'ollama-chat', aber mit eigenen Channels und einem
 // '-sources'-Event (die zitierten Chunks für die Quellen-UI).
-ipcMain.handle('project-rag-answer', async (event, vaultPath: string, projectFolderRel: string, query: string, embedModel: string, chatModel: string, language: 'de' | 'en' = 'de') => {
+ipcMain.handle('project-rag-answer', wrapIpcWithOllamaActivity('project-rag-answer', async (event, vaultPath: string, projectFolderRel: string, query: string, embedModel: string, chatModel: string, language: 'de' | 'en' = 'de') => {
   try {
     assertApprovedVault(vaultPath, 'project-rag-answer')
+    // Privacy: das Antwortmodell muss nachweislich lokal sein (Name UND Remote-
+    // Metadaten). Das Embedding-Modell prüft embed.ts an der gemeinsamen Grenze.
+    try {
+      await resolveLocalModel(chatModel)
+    } catch (err) {
+      event.sender.send('project-rag-answer-done')
+      return { success: false, error: describeLocalModelError(err) }
+    }
     const index = await ragEnsureIndex(vaultPath, projectFolderRel, embedModel, assertSafePath)
     const chunks = await ragRetrieve(index, query, embedModel)
     event.sender.send('project-rag-answer-sources', chunks)
@@ -7459,13 +7499,219 @@ ipcMain.handle('project-rag-answer', async (event, vaultPath: string, projectFol
     event.sender.send('project-rag-answer-done')
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
-})
+}))
 
 // Semantisches Re-Ranking ambiger Projekt-Kandidaten (Mail→Projekt).
 // WICHTIG: Das deterministische Gate (gateProjectMatch) bleibt die Quelle der
 // Wahrheit — dieser Handler ordnet NUR die UI-Kandidatenliste um, er ordnet NIE
 // autonom zu. Nutzt ausschließlich BEREITS gebaute Indizes (kein Auto-Build →
 // kein Ollama-Sturm beim Mail-Klick). Query wird genau EINMAL eingebettet.
+// ─── Vault-RAG (Phase 1): Opt-in, Index-Aufbau, Abfrage ───────────────────────
+// Konfiguration ist Vault-Eigenschaft (vault-settings.json), Build und Staging sind
+// gerätelokal. Alle Handler prüfen den Vault-Root; Modelle werden Main-seitig aus
+// den UI-Einstellungen gelesen und an der Embedding-Grenze auf „lokal" geprüft.
+
+ipcMain.handle('vault-rag-status', async (_event, vaultPath: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-status')
+    return { success: true, status: await getVaultRagManager().getStatus(vaultPath) }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('vault-rag-config-set', async (_event, vaultPath: string, patch: { enabled?: boolean; excludeFolders?: string[] }) => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-config-set')
+    const safePatch: { enabled?: boolean; excludeFolders?: string[] } = {}
+    if (typeof patch?.enabled === 'boolean') safePatch.enabled = patch.enabled
+    if (Array.isArray(patch?.excludeFolders)) safePatch.excludeFolders = patch.excludeFolders.filter((x): x is string => typeof x === 'string').slice(0, 200)
+    return { success: true, config: await getVaultRagManager().setConfig(vaultPath, safePatch) }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('vault-rag-estimate', async (_event, vaultPath: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-estimate')
+    return { success: true, estimate: await getVaultRagManager().estimate(vaultPath) }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('vault-rag-build', async (_event, vaultPath: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-build')
+    const res = await getVaultRagManager().startBuild(vaultPath, 'full')
+    return res.ok ? { success: true, jobId: res.jobId } : { success: false, error: res.error, jobId: res.jobId }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('vault-rag-build-control', async (_event, vaultPath: string, action: 'pause' | 'resume' | 'cancel') => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-build-control')
+    const m = getVaultRagManager()
+    const ok = action === 'pause' ? m.pause(vaultPath) : action === 'resume' ? m.resume(vaultPath) : await m.cancel(vaultPath)
+    return { success: ok, error: ok ? undefined : 'Kein laufender Index-Aufbau' }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
+ipcMain.handle('vault-rag-query', async (_event, vaultPath: string, query: string, filters: VaultQueryFilters | undefined, opts: { topK?: number; minScore?: number; perFileCap?: number } | undefined, requestId: string) => {
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-query')
+    if (typeof query !== 'string' || !query.trim()) return { success: false, requestId, error: 'Leere Frage' }
+    const safeOpts = {
+      topK: typeof opts?.topK === 'number' ? Math.max(1, Math.min(20, Math.floor(opts.topK))) : undefined,
+      minScore: typeof opts?.minScore === 'number' ? Math.max(0, Math.min(1, opts.minScore)) : undefined,
+      perFileCap: typeof opts?.perFileCap === 'number' ? Math.max(1, Math.min(10, Math.floor(opts.perFileCap))) : undefined
+    }
+    const result = await withOllamaActivity('vault-query', () => getVaultRagManager().query(vaultPath, query.slice(0, 2000), filters, safeOpts))
+    return { success: true, requestId, ...result }
+  } catch (err) {
+    return { success: false, requestId, error: describeLocalModelError(err) }
+  }
+})
+
+// ─── Vault-RAG (Phase 2, klein): Antwort mit Nummern-Zitaten + Zitatprüfung ────
+// Chat-Modell kommt Main-seitig aus ui-settings.json (Override `vault-rag`, sonst
+// selectedModel) und muss nachweislich lokal sein — der Vault enthält Mail-Notizen.
+// Jedes Ereignis trägt die requestId; Abbruch über eigenen IPC mit AbortController.
+
+const vaultAnswerControllers = new Map<string, AbortController>()
+
+async function resolveVaultChatModel(): Promise<string> {
+  const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+  const ollama = ui.ollama as { selectedModel?: string; moduleModelOverrides?: Record<string, string> } | undefined
+  return ollama?.moduleModelOverrides?.['vault-rag'] || ollama?.selectedModel || ''
+}
+
+ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: string, requestId: string, language: 'de' | 'en' = 'de') => {
+  const sendDone = (payload: Record<string, unknown>) => {
+    if (!event.sender.isDestroyed()) event.sender.send('vault-rag-answer-done', { requestId, ...payload })
+  }
+  try {
+    assertApprovedVault(vaultPath, 'vault-rag-answer')
+    if (typeof requestId !== 'string' || !requestId) return { success: false, error: 'requestId fehlt' }
+    if (typeof query !== 'string' || !query.trim()) {
+      sendDone({ kind: 'error', error: 'Leere Frage' })
+      return { success: false, requestId, error: 'Leere Frage' }
+    }
+    let chatModel: string
+    try {
+      chatModel = (await resolveLocalModel(await resolveVaultChatModel())).name
+    } catch (err) {
+      const error = describeLocalModelError(err)
+      sendDone({ kind: 'error', error })
+      return { success: false, requestId, error }
+    }
+
+    return await withOllamaActivity('vault-answer', async () => {
+      const retrieval = await getVaultRagManager().query(vaultPath, query.slice(0, 2000), undefined, {})
+      if (retrieval.belowFloor) {
+        sendDone({ kind: 'not-found', bestScore: retrieval.bestScore, excludeMismatch: retrieval.excludeMismatch, model: chatModel })
+        return { success: true, requestId, kind: 'not-found' }
+      }
+      if (retrieval.noFreshSource || retrieval.hits.length === 0) {
+        sendDone({ kind: 'no-fresh-source', staleFiles: retrieval.staleFiles, excludeMismatch: retrieval.excludeMismatch, model: chatModel })
+        return { success: true, requestId, kind: 'no-fresh-source' }
+      }
+
+      const systemPrompt = buildVaultPrompt(retrieval.hits, language, sanitizeUntrustedText)
+      const controller = new AbortController()
+      vaultAnswerControllers.set(requestId, controller)
+      const timeout = setTimeout(() => controller.abort(), 300000)
+      const startedAt = Date.now()
+      let firstTokenMs: number | undefined
+      let full = ''
+      try {
+        const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: chatModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: query }
+            ],
+            stream: true,
+            think: false
+          }),
+          signal: controller.signal
+        })
+        if (!response.ok || !response.body) {
+          const error = `Ollama API Fehler: ${response.status}`
+          sendDone({ kind: 'error', error })
+          return { success: false, requestId, error }
+        }
+        const reader = response.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        for (;;) {
+          const { done, value } = await reader.read()
+          if (done) break
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || ''
+          for (const line of lines) {
+            const t = line.trim()
+            if (!t) continue
+            try {
+              const json = JSON.parse(t) as { message?: { content?: string }; done?: boolean } & OllamaTimings
+              if (json.message?.content) {
+                if (firstTokenMs === undefined) firstTokenMs = Date.now() - startedAt
+                full += json.message.content
+                if (!event.sender.isDestroyed()) event.sender.send('vault-rag-answer-chunk', { requestId, chunk: json.message.content })
+              }
+              if (json.done) {
+                recordLlmRun(fromOllamaResponse(json, { module: 'vault-rag', model: chatModel, wallMs: Date.now() - startedAt, at: startedAt, firstTokenMs }))
+              }
+            } catch {
+              // ungültige JSON-Zeile ignorieren
+            }
+          }
+        }
+      } catch (err) {
+        if (controller.signal.aborted) {
+          sendDone({ kind: 'cancelled' })
+          return { success: false, requestId, error: 'abgebrochen' }
+        }
+        throw err
+      } finally {
+        clearTimeout(timeout)
+        vaultAnswerControllers.delete(requestId)
+      }
+
+      const report = analyzeCitations(full, retrieval.hits.map((h) => h.text))
+      sendDone({
+        kind: 'answer',
+        answer: full,
+        hits: retrieval.hits,
+        report,
+        excludeMismatch: retrieval.excludeMismatch,
+        model: chatModel
+      })
+      return { success: true, requestId, kind: 'answer' }
+    })
+  } catch (err) {
+    const error = describeLocalModelError(err)
+    sendDone({ kind: 'error', error })
+    return { success: false, requestId, error }
+  }
+})
+
+ipcMain.handle('vault-rag-answer-cancel', async (_event, requestId: string) => {
+  const c = vaultAnswerControllers.get(requestId)
+  if (!c) return { success: false }
+  c.abort()
+  return { success: true }
+})
+
 ipcMain.handle('project-rag-rerank-candidates', async (_event, vaultPath: string, queryText: string, candidateFolderRels: string[], embedModel: string) => {
   try {
     assertApprovedVault(vaultPath, 'project-rag-rerank-candidates')
@@ -11390,7 +11636,7 @@ function normalizeSuggestedActions(value: unknown): Array<{ action: string; date
 // scheiterte (siehe Kopf jener Datei).
 const parseEmailAnalysisJson = parseLooseJsonObject
 
-ipcMain.handle('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[], lowPowerMode: boolean = false, cloud?: { model: string; provider?: string } | null) => {
+ipcMain.handle('email-analyze', wrapIpcWithOllamaActivity('email-analyze', async (_event, vaultPath: string, model: string, emailIds?: string[], lowPowerMode: boolean = false, cloud?: { model: string; provider?: string } | null) => {
   console.log(`[Email] email-analyze called: vault=${vaultPath}, model=${model}, ids=${emailIds?.length ?? 'all'}, lowPower=${lowPowerMode}, cloud=${cloud?.model ? `${cloud.provider || 'openrouter'}/${cloud.model}` : 'no'}`)
   try {
     assertApprovedVault(vaultPath, 'email-analyze')
@@ -11798,7 +12044,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     console.error('[Email] Analysis error:', error)
     return { success: false, analyzed: 0, failed: 0, total: 0, error: error instanceof Error ? error.message : 'Analyse fehlgeschlagen' }
   }
-})
+}))
 
 // Email-Setup: Ordner + Instruktions-Notiz erstellen
 ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?: string) => {
@@ -14139,6 +14385,7 @@ ipcMain.handle('scheduler-status', async () => {
 app.on('before-quit', () => {
   isQuitting = true
   stopAgentShellProcesses()
+  void vaultRagManagerInstance?.shutdown()
 
   // Sync Engine stoppen
   if (syncEngine) {
