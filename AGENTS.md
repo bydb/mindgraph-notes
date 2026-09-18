@@ -38,8 +38,10 @@ Nach Code-Änderungen: **typecheck + test**; bei prozessgrenzen-relevanten Ände
   koordiniere ausschließlich über das Handoff-Doc, nicht durch stilles Überschreiben.
 
 ## Aktueller Strang (Kontext)
-Wir bauen eine neue Kern-Fähigkeit: einen **signaturbasierten Renderer-Plugin-Host** — das Renderer-JS
-eines extern installierten, signierten Plugins direkt in den Haupt-Renderer laden und als UI mounten.
-Ziel: **Excalidraw** als Plugin im eigenen Repo/Katalog möglich machen. Die Richtung ist beschlossen
-(**Option A**, Trust-per-Signatur wie VS Code/Obsidian). Das ADR steht in
-`docs/plugin-renderer-host-plan.md` und wartet auf dein adversariales Review (siehe Aufgaben-Datei).
+Wir planen einen **quellenbelegten Chat über den ganzen Vault**: den bestehenden Projekt-RAG
+(`app/src/main/rag/`, `shared/rag/`) auf alle Notizen ausweiten, Vektoren binär statt als JSON ablegen,
+das Modell mit Nummern `[n]` zitieren lassen und jede Aussage deterministisch gegen die zitierte Stelle
+prüfen (belegt / schwach / unbelegt / ungültig). Embedding und Antwort bleiben hart auf `localhost:11434`.
+Dein Review (F01–F22) ist eingearbeitet (`docs/vault-chat-plan.md` Rev. 3). **Phase 1 ist umgesetzt** (`app/src/main/rag/`,
+`shared/rag/vaultIndex.ts`, `Settings/VaultIndexSection.tsx`); Anker für deine Nachprüfung stehen in
+`docs/codex-collab/vault-chat-plan-review.md` unter „Umsetzungsnotiz Phase 1“. Nichts committet.
