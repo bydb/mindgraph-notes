@@ -590,9 +590,18 @@ Renderer: Abonnements in `vaultUnsubRef`, Abmeldung und Abbruch bei Unmount, Cha
 ### F37 — Defektes Staging-Segment → [ADRESSIERT]
 Beim Laden werden unlesbare Segmente samt ihrer Datei-Zuordnungen aus dem Checkpoint entfernt und der Checkpoint gespeichert; das Zusammensetzen sieht nur gültige Segmente. `writeSegment`/`saveCheckpoint` schreiben jetzt mit `fsync` vor dem Rename. Test: Abbruch nach dem ersten Segment, Segment halbieren, Resume → vollständiger Container, betroffene Dateien neu eingebettet.
 
-### F25–F28, F38 → [OFFEN]
-Runde 3 (Zitatprüfung/Export, F25–F27) folgt nach Nutzer-Go. F28 (Stellensprung) und die Abnahmeliste F38 bleiben als offener Phase-2-Umfang deklariert, nicht als erfüllt.
+### F25 — Prüfer, Renderer und Export mit verschiedenen Markern → [ADRESSIERT]
+Eine Quelle: `citations.ts:replaceCitationRefs` ersetzt ausschließlich die vom Prüfer erkannten gültigen Referenzen über ihre Spannen. Renderer setzt damit Platzhalter im Markdown und wandelt sie NACH `sanitizeHtml` in Hochzahlen — keine Ersetzung mehr im fertigen HTML; Export erzeugt `[^id-n]` über dieselbe Funktion. Parser: escaped `\[1]`, Links `[1](…)` und Referenz-Links `[1][ref]` sind keine Zitate (`[1][2]` bleibt erlaubt), Zäune bis drei Leerzeichen eingerückt, Inline-Code mit mehreren Backticks. Tests: Code bytegetreu, escaped/Link/Referenz, eingerückter Zaun, doppelte Backticks. Kein Markdown-AST — die Spannen-Lösung deckt die genannten Fälle; ein AST-Parser bleibt Option, wenn neue Fälle auftauchen.
+
+### F26 — Aussagen fallen aus der Prüfliste → [ADRESSIERT]
+Tabellenzellen werden als Segmente geprüft (Trennzeile ausgenommen), Überschriften als `unchecked` sichtbar gezählt (Chat und Export zeigen „n Überschriften nicht geprüft“). Ein Punkt nach einer Zahl trennt jetzt Sätze, außer ein Monatsname folgt („18. September“); kleingeschriebener Folgesatz nach Zahl trennt ebenfalls. Kurze wörtliche Zitate ab zwei Zeichen werden geprüft. Tests mit den Codex-Gegenbeispielen; „Das Budget beträgt 10.“ steht jetzt sichtbar ohne Quelle.
+
+### F27 — Export verliert Pfade und Prüfdetails → [ADRESSIERT]
+Fußnoten-IDs `[^q<id>-n]` mit Antwort-ID (mehrfaches Anhängen kollidiert nicht); Wikilink mit vollem vault-relativem Pfad plus Alias (`[[ordner/Notiz|Notiz]]`, `|`/`]` im Pfad ersetzt); Prüfdetails pro markiertem Satz im Zitatblock; Speichern/Anhängen aus einem anderen Vault wird mit Hinweis blockiert. Roundtrip-Test der Notizdatei steht noch aus (Abnahmeliste).
+
+### F28, F38 → [OFFEN]
+F28 (Stellensprung) und die Abnahmeliste F38 bleiben als offener Phase-2-Umfang deklariert, nicht als erfüllt.
 
 ## Status
 
-Umsetzungsreview F23–F38 liegt vor (keine Abnahme). Runde 1 (Sicherheit/Einwilligung: F23, F24, F33, F34, F35) und Runde 2 (Robustheit: F29, F30, F31, F32, F36, F37) umgesetzt und getestet; Runde 3 (Zitatprüfung/Export F25–F27) offen; F28/F38 ausgewiesen offen. Branch `feature/vault-chat`.
+Umsetzungsreview F23–F38: Runde 1 (Sicherheit/Einwilligung), Runde 2 (Robustheit) und Runde 3 (Zitatprüfung/Export F25–F27) umgesetzt und getestet. Offen: F28 (Stellensprung) und die Abnahmeliste F38 (Konkurrenztest im App-Pfad, Lebenszyklus-/UI-Tests, Privacy-/Injection-Integrationstests, Quellen-Roundtrip, Messwiederholung, Testprotokoll). Wartet auf Codex-Nachprüfung der drei Runden. Branch `feature/vault-chat`.

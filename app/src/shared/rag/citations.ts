@@ -21,6 +21,8 @@ export type SentenceStatus =
   | 'cited-invalid'
   | 'uncited'
   | 'transition'
+  /** Überschrift: bewusst nicht als Aussage geprüft, aber sichtbar gezählt (F26). */
+  | 'unchecked'
 
 export interface CitationRef {
   n: number
@@ -56,6 +58,8 @@ export interface CitationReport {
     low: number
     invalidRefs: number
     quotesNotFound: number
+    /** Überschriften, die nicht geprüft wurden. */
+    unchecked: number
   }
 }
 
@@ -71,7 +75,8 @@ const TRANSITIONS = new Set([
   'in short', 'in summary', 'summary', 'to sum up', 'conclusion'
 ])
 
-const REF_RE = /\[(\d{1,3})\]/g
+// Kein Zitat: escaped `\\[1]` und Markdown-Links `[1](…)`/`[1][…]` (F25).
+const REF_RE = /(?<!\\)\[(\d{1,3})\](?!\()(?!\[(?!\d{1,3}\]))/g // `[1][2]` bleibt erlaubt, `[1][ref]` nicht
 
 function normalizeWs(s: string): string {
   return s.toLowerCase().replace(/\s+/g, ' ').trim()
@@ -93,10 +98,12 @@ export function contentWords(text: string): Set<string> {
 function maskedRanges(text: string): Array<[number, number]> {
   const ranges: Array<[number, number]> = []
   // `(?![\s\S])` = Ende der Eingabe (mit dem m-Flag wäre `$` nur ein Zeilenende).
-  const fence = /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:\n\1[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))/gm
+  // Ein gültiger Zaun darf bis zu drei Leerzeichen eingerückt sein (F25).
+  const fence = /^ {0,3}(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:\n {0,3}\1[ \t]*(?=\n|(?![\s\S]))|(?![\s\S]))/gm
   let m: RegExpExecArray | null
   while ((m = fence.exec(text)) !== null) ranges.push([m.index, m.index + m[0].length])
-  const inline = /`[^`\n]+`/g
+  // Inline-Code: gleich lange Backtick-Läufe, ein oder mehrere (`` `x` ``, ``` ``a`b`` ```).
+  const inline = /(`+)(?!`)([^\n]*?[^`])\1(?!`)/g
   while ((m = inline.exec(text)) !== null) {
     const s = m.index
     if (!ranges.some(([a, b]) => s >= a && s < b)) ranges.push([s, s + m[0].length])
@@ -108,9 +115,14 @@ function isMasked(pos: number, ranges: Array<[number, number]>): boolean {
   return ranges.some(([a, b]) => pos >= a && pos < b)
 }
 
-/** Prosa-Segmente (Absätze, Listenpunkte, Zeilen) als Spannen, ohne Überschriften und Code. */
-function segments(text: string, ranges: Array<[number, number]>): Array<[number, number]> {
-  const out: Array<[number, number]> = []
+type SegmentKind = 'prose' | 'heading' | 'cell'
+
+/**
+ * Segmente als Spannen: Absätze/Listenpunkte/Zeilen (Prosa), Tabellenzellen (geprüft wie
+ * Sätze, F26) und Überschriften (sichtbar ungeprüft). Trennlinien und Code fallen weg.
+ */
+function segments(text: string, ranges: Array<[number, number]>): Array<{ span: [number, number]; kind: SegmentKind }> {
+  const out: Array<{ span: [number, number]; kind: SegmentKind }> = []
   let pos = 0
   while (pos <= text.length) {
     const nl = text.indexOf('\n', pos)
@@ -120,14 +132,34 @@ function segments(text: string, ranges: Array<[number, number]>): Array<[number,
       const trimmedStart = pos + (line.length - line.trimStart().length)
       const trimmedEnd = end - (line.length - line.trimEnd().length)
       const body = line.trim()
-      const isHeading = /^#{1,6}\s/.test(body)
+      const headingMatch = body.match(/^(#{1,6})\s+/)
       const isRule = /^(-{3,}|\*{3,}|_{3,})$/.test(body)
       const isTableRow = body.startsWith('|')
-      if (body && !isHeading && !isRule && !isTableRow) {
-        // Listen-/Zitatmarker gehören nicht zum Satz.
-        const markerMatch = body.match(/^(?:[-*+]\s+|\d+[.)]\s+|>\s*)+/)
-        const start = trimmedStart + (markerMatch ? markerMatch[0].length : 0)
-        if (start < trimmedEnd) out.push([start, trimmedEnd])
+      const isTableSeparator = isTableRow && /^\|?(\s*:?-{2,}:?\s*\|)+\s*$/.test(body + (body.endsWith('|') ? '' : '|'))
+      if (body && !isRule) {
+        if (headingMatch) {
+          const start = trimmedStart + headingMatch[0].length
+          if (start < trimmedEnd) out.push({ span: [start, trimmedEnd], kind: 'heading' })
+        } else if (isTableRow) {
+          if (!isTableSeparator) {
+            // Zellen einzeln: Pipe-Positionen im Original suchen
+            let cellStart = trimmedStart
+            for (let i = trimmedStart; i <= trimmedEnd; i++) {
+              if (i === trimmedEnd || text[i] === '|') {
+                const cell = text.slice(cellStart, i)
+                const lead = cell.length - cell.trimStart().length
+                const trail = cell.length - cell.trimEnd().length
+                if (cell.trim()) out.push({ span: [cellStart + lead, i - trail], kind: 'cell' })
+                cellStart = i + 1
+              }
+            }
+          }
+        } else {
+          // Listen-/Zitatmarker gehören nicht zum Satz.
+          const markerMatch = body.match(/^(?:[-*+]\s+|\d+[.)]\s+|>\s*)+/)
+          const start = trimmedStart + (markerMatch ? markerMatch[0].length : 0)
+          if (start < trimmedEnd) out.push({ span: [start, trimmedEnd], kind: 'prose' })
+        }
       }
     }
     if (nl === -1) break
@@ -136,17 +168,29 @@ function segments(text: string, ranges: Array<[number, number]>): Array<[number,
   return out
 }
 
+const MONTHS = /^(jan(uar|\.)?|feb(ruar|\.)?|m[äa]rz?|apr(il|\.)?|mai|jun[ie]?|jul[iy]?|aug(ust|\.)?|sep(t|tember|\.)?|okt(ober|\.)?|oct(ober|\.)?|nov(ember|\.)?|dez(ember|\.)?|dec(ember|\.)?)$/i
+
 /** Sätze innerhalb eines Segments: Schluss-Interpunktion + Leerraum + Großbuchstabe/Ziffer/Zitatzeichen/Klammer. */
 function sentences(text: string, seg: [number, number]): Array<[number, number]> {
   const out: Array<[number, number]> = []
   const s = text.slice(seg[0], seg[1])
   // Nachgestellte Quellennummern gehören zum Satz davor; ein `[` beginnt nie einen Satz.
-  // Ein Punkt direkt nach einer Ziffer ist eine Ordnungszahl („am 18. September"), kein Satzende.
-  const re = /(?:(?<!\p{N})\.|[!?])["“”»)\]]*(?:\s*\[\d{1,3}\])*(?:\s+(?=[\p{Lu}\p{N}„"“«(])|(?![\s\S]))/gu
+  // Ein Punkt nach einer Zahl ist nur dann eine Ordnungszahl, wenn ein Monatsname folgt
+  // („am 18. September"). Sonst trennt er („Das Budget beträgt 10. Die Freigabe …"), damit
+  // der erste Satz nicht still unter dem Zitat des zweiten verschwindet (F26).
+  const re = /[.!?]["“”»)\]]*(?:\s*\[\d{1,3}\])*(?:\s+(?=[\p{Lu}\p{N}\p{Ll}„"“«(])|(?![\s\S]))/gu
   let last = 0
   let m: RegExpExecArray | null
   while ((m = re.exec(s)) !== null) {
     const cut = m.index + m[0].length
+    const before = s.slice(0, m.index)
+    const after = s.slice(cut)
+    if (s[m.index] === '.' && /\p{N}$/u.test(before)) {
+      const nextWord = (after.match(/^([\p{L}.]+)/u)?.[1] ?? '').replace(/\.$/, '')
+      if (nextWord && (MONTHS.test(nextWord) || MONTHS.test(`${nextWord}.`))) continue
+    }
+    // Kleingeschriebener Satzanfang nur nach einer Zahl mit Punkt (Codex-Fall), sonst wie bisher.
+    if (/\p{Ll}/u.test(after[0] ?? '') && !/\p{N}$/u.test(before)) continue
     out.push([seg[0] + last, seg[0] + cut])
     last = cut
   }
@@ -164,7 +208,7 @@ function sentences(text: string, seg: [number, number]): Array<[number, number]>
 
 function findQuotes(sentence: string): string[] {
   const out: string[] = []
-  const re = /[„"“«]([^„"“”«»]{8,}?)["“”»]/g
+  const re = /[„"“«]([^„"“”«»]{2,}?)["“”»]/g // ab 2 Zeichen: „Nein" ist ein Zitat (F26)
   let m: RegExpExecArray | null
   while ((m = re.exec(sentence)) !== null) out.push(m[1].trim())
   return out
@@ -181,7 +225,11 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   const sentenceChecks: SentenceCheck[] = []
   const used = new Set<number>()
 
-  for (const seg of segments(answer, ranges)) {
+  for (const { span: seg, kind: segKind } of segments(answer, ranges)) {
+    if (segKind === 'heading') {
+      sentenceChecks.push({ start: seg[0], end: seg[1], refs: [], status: 'unchecked', coverage: null, quotes: [] })
+      continue
+    }
     for (const [start, end] of sentences(answer, seg)) {
       // Inline-Code innerhalb des Satzes ausblenden (dort ist `[3]` ein Index, kein Zitat).
       let raw = answer.slice(start, end)
@@ -241,7 +289,8 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   }
 
   const summary = {
-    sentences: sentenceChecks.filter((s) => s.status !== 'transition').length,
+    sentences: sentenceChecks.filter((s) => s.status !== 'transition' && s.status !== 'unchecked').length,
+    unchecked: sentenceChecks.filter((s) => s.status === 'unchecked').length,
     cited: sentenceChecks.filter((s) => s.status.startsWith('cited') && s.status !== 'cited-invalid').length,
     uncited: sentenceChecks.filter((s) => s.status === 'uncited').length,
     low: sentenceChecks.filter((s) => s.status === 'cited-low').length,
@@ -249,4 +298,21 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
     quotesNotFound: sentenceChecks.reduce((n, s) => n + s.quotes.filter((q) => !q.found).length, 0)
   }
   return { refs, sentences: sentenceChecks, usedSources: [...used].sort((a, b) => a - b), summary }
+}
+
+/**
+ * Ersetzt AUSSCHLIESSLICH die vom Prüfer erkannten gültigen Referenzen (Spannen aus dem
+ * Report) — Code, Links und escaped Klammern bleiben bytegetreu (F25). Anzeige und Export
+ * nutzen diese eine Funktion; keine Ersetzung über HTML-Strings.
+ */
+export function replaceCitationRefs(answer: string, report: CitationReport, replacement: (n: number) => string): string {
+  const refs = report.refs.filter((r) => r.valid).sort((a, b) => a.start - b.start)
+  let out = ''
+  let pos = 0
+  for (const r of refs) {
+    if (r.start < pos) continue
+    out += answer.slice(pos, r.start) + replacement(r.n)
+    pos = r.end
+  }
+  return out + answer.slice(pos)
 }

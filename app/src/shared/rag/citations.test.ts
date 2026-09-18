@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeCitations, contentWords } from './citations'
+import { analyzeCitations, contentWords, replaceCitationRefs } from './citations'
 
 const sources = [
   'Das Budget für die Digitalwoche beträgt 10.000 Euro und wurde am 3. März 2026 vom Schulamt bestätigt.',
@@ -68,12 +68,53 @@ describe('analyzeCitations', () => {
     expect(r.summary.invalidRefs).toBe(0)
   })
 
-  it('Überschriften, Trennlinien und Tabellen sind keine Sätze; Listenmarker gehören nicht zum Satz', () => {
-    const md = '## Ergebnis\n\n---\n\n| a | b |\n|---|---|\n\n- Frau Müller moderiert den Workshop. [2]\n1. Termin ist der 18. September. [2]'
+  it('Überschriften sind sichtbar ungeprüft, Tabellenzellen werden geprüft, Trennlinien fallen weg, Listenmarker gehören nicht zum Satz', () => {
+    const md = '## Ergebnis\n\n---\n\n| Posten | Stand |\n|---|---|\n| Budget 9000 Euro | genehmigt |\n\n- Frau Müller moderiert den Workshop. [2]\n1. Termin ist der 18. September. [2]'
     const r = analyzeCitations(md, sources)
-    expect(r.sentences).toHaveLength(2)
-    expect(r.sentences.every((s) => s.status === 'cited-high')).toBe(true)
-    expect(md.slice(r.sentences[0].start, r.sentences[0].end).startsWith('Frau')).toBe(true)
+    expect(r.sentences.map((s) => [md.slice(s.start, s.end), s.status])).toEqual([
+      ['Ergebnis', 'unchecked'],
+      ['Posten', 'uncited'],
+      ['Stand', 'uncited'],
+      ['Budget 9000 Euro', 'uncited'],
+      ['genehmigt', 'uncited'],
+      ['Frau Müller moderiert den Workshop. [2]', 'cited-high'],
+      ['Termin ist der 18. September. [2]', 'cited-high']
+    ])
+    expect(r.summary.unchecked).toBe(1)
+    expect(r.summary.sentences).toBe(6)
+  })
+
+  it('Punkt nach Zahl trennt Sätze, außer vor einem Monatsnamen; der erste Satz bleibt sichtbar ohne Quelle (F26)', () => {
+    const r = analyzeCitations('Das Budget beträgt 10. Die Freigabe ist erteilt. [1] Der Termin ist am 3. März 2026. [1]', sources)
+    // Satz 2 zitiert [1], seine Wörter stehen dort aber nicht → niedrige Deckung, ehrlich.
+    expect(r.sentences.map((s) => s.status)).toEqual(['uncited', 'cited-low', 'cited-high'])
+    const r2 = analyzeCitations('Das Budget beträgt 10. die Freigabe ist erteilt. [1]', sources)
+    expect(r2.sentences.map((s) => s.status)).toEqual(['uncited', 'cited-low'])
+  })
+
+  it('kurze wörtliche Zitate werden geprüft (F26)', () => {
+    const r = analyzeCitations('Er sagte „Nein". [1]', sources)
+    expect(r.sentences[0].quotes).toEqual([{ text: 'Nein', found: false }])
+  })
+
+  it('escaped Klammern, Links und Referenz-Links sind keine Zitate; [1][2] schon (F25)', () => {
+    const r = analyzeCitations('Siehe \\[1] und [1](https://example.org) und [1][ref]. Das Budget beträgt 10.000 Euro. [1][2]', sources)
+    expect(r.sentences[0].status).toBe('uncited')
+    expect(r.sentences[1].refs).toEqual([1, 2])
+    expect(r.refs.map((x) => x.n)).toEqual([1, 2])
+  })
+
+  it('eingerückte Zäune und mehrfache Backticks werden maskiert (F25)', () => {
+    const md = 'Text. [1]\n\n   ```\n   arr[7]\n   ```\n\nNutze ``a`b[8]`` hier. [2]'
+    const r = analyzeCitations(md, sources)
+    expect(r.refs.map((x) => x.n)).toEqual([1, 2])
+  })
+
+  it('replaceCitationRefs ersetzt nur gültige Prüfer-Referenzen und lässt Code bytegetreu', () => {
+    const md = 'Satz. [1] `code[1]` [9]\n\n```\nx[1]\n```'
+    const r = analyzeCitations(md, sources)
+    const out = replaceCitationRefs(md, r, (n) => `<${n}>`)
+    expect(out).toBe('Satz. <1> `code[1]` [9]\n\n```\nx[1]\n```')
   })
 
   it('wörtliche Zitate: gefunden bzw. nicht im Original', () => {

@@ -12,7 +12,7 @@ import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId }
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
 import type { NoteAgentAttachment, VaultRagAnswerDone, VaultRagHitDto } from '../../../shared/types'
-import type { CitationReport } from '../../../shared/rag/citations'
+import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
 import katex from 'katex'
@@ -298,22 +298,24 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     return suffix ? suffix.id : null
   }, [notes])
 
-  // Vault-Antwort: [n] wird zur klickbaren Hochzahl (Notiz öffnen), Rest wie gehabt.
+  // Vault-Antwort: NUR die vom Prüfer erkannten gültigen Referenzen werden zu Hochzahlen —
+  // über Platzhalter im Markdown, nie per Ersetzung im fertigen HTML (Codex F25). Code,
+  // Links und escaped Klammern bleiben unverändert.
+  const CITE_TOKEN = /⟦cite:(\d{1,3})⟧/g
   const renderMessageHtml = (msg: ChatMessage): string => {
-    let html = linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId)
-    if (msg.citations && msg.vaultPath === vaultPath) {
-      const hits = msg.citations.hits
-      html = html.replace(/\[(\d{1,3})\]/g, (m, n: string) => {
-        const i = Number(n)
-        const hit = hits[i - 1]
-        if (!hit) return m
-        const id = resolveSourceNoteId(hit.fileRel)
-        return id
-          ? `<sup class="nc-cite" role="link" tabindex="0" data-source-note-id="${ncEscapeAttr(id)}" title="${ncEscapeAttr(hit.fileRel)}">[${i}]</sup>`
-          : `<sup class="nc-cite">[${i}]</sup>`
-      })
-    }
-    return html
+    if (!msg.citations) return linkifyWikilinks(sanitizeHtml(md.render(msg.content)), resolveNoteId)
+    const { hits, report } = msg.citations
+    const sameVault = msg.vaultPath === vaultPath
+    const marked = replaceCitationRefs(msg.content, report, (n) => `⟦cite:${n}⟧`)
+    const html = linkifyWikilinks(sanitizeHtml(md.render(marked)), resolveNoteId)
+    return html.replace(CITE_TOKEN, (_m, n: string) => {
+      const i = Number(n)
+      const hit = hits[i - 1]
+      const id = hit && sameVault ? resolveSourceNoteId(hit.fileRel) : null
+      return id
+        ? `<sup class="nc-cite" role="link" tabindex="0" data-source-note-id="${ncEscapeAttr(id)}" title="${ncEscapeAttr(hit.fileRel)}">[${i}]</sup>`
+        : `<sup class="nc-cite">[${i}]</sup>`
+    })
   }
 
   const renderVaultFooter = (msg: ChatMessage) => {
@@ -321,12 +323,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     if (!c) return null
     const sameVault = msg.vaultPath === vaultPath
     const { report, hits } = c
-    const flagged = report.sentences.filter(s => s.status === 'uncited' || s.status === 'cited-low' || s.status === 'cited-invalid' || s.quotes.some(q => !q.found))
-    const flagLabel = (status: string) =>
-      status === 'uncited' ? t('notesChat.vaultStatusUncited')
-        : status === 'cited-low' ? t('notesChat.vaultStatusLow')
-          : status === 'cited-invalid' ? t('notesChat.vaultStatusInvalid')
-            : t('notesChat.vaultStatusQuote')
+    const flagged = flaggedSentences(report)
     const flagClass = (status: string) =>
       status === 'uncited' ? 'is-uncited' : status === 'cited-low' ? 'is-low' : status === 'cited-invalid' ? 'is-invalid' : 'is-quote'
     return (
@@ -357,17 +354,17 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
             invalid: report.summary.invalidRefs, quotes: report.summary.quotesNotFound
           })}
         </div>
+        {report.summary.unchecked > 0 && <div className="nc-vault-summary">{t('notesChat.vaultUnchecked', { n: report.summary.unchecked })}</div>}
         {flagged.length > 0 && (
           <ul className="nc-vault-flags">
             {flagged.map((sn, i) => {
-              const quoteMissing = sn.quotes.some(q => !q.found)
               const status = sn.status === 'cited-high' || sn.status === 'cited-unchecked' ? 'quote' : sn.status
               const text = msg.content.slice(sn.start, sn.end).replace(/\s+/g, ' ')
               return (
                 <li key={i}>
                   <span className={`nc-flag ${flagClass(status)}`} />
                   <span className="nc-flag-text">
-                    <b>{flagLabel(status)}{quoteMissing && status !== 'quote' ? `, ${t('notesChat.vaultStatusQuote')}` : ''}:</b> {text.length > 140 ? `${text.slice(0, 140)}…` : text}
+                    <b>{flagLabelFor(sn)}:</b> {text.length > 140 ? `${text.slice(0, 140)}…` : text}
                   </span>
                 </li>
               )
@@ -828,21 +825,48 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     return setAiProvenanceInContent(content, msg.model, date)
   }
 
-  // Fußnoten für Vault-Antworten: [n] → [^n], Quellenliste mit Wikilink und
-  // Überschrift, Prüfstatus als Kurzzeile. Wird beim Kopieren/Speichern angehängt.
+  // Fußnoten für Vault-Antworten (Codex F27): Marker nur aus dem Prüfer-Report, Fußnoten-IDs
+  // eindeutig pro Antwort (mehrfaches Anhängen kollidiert nicht), Wikilink mit vollem
+  // vault-relativen Pfad (gleichnamige Dateien in verschiedenen Ordnern bleiben unterscheidbar),
+  // Prüfdetails pro markiertem Satz statt nur Summen.
+  const flaggedSentences = (report: CitationReport): SentenceCheck[] =>
+    report.sentences.filter(s => s.status === 'uncited' || s.status === 'cited-low' || s.status === 'cited-invalid' || s.quotes.some(q => !q.found))
+  const flagLabelFor = (sn: SentenceCheck): string => {
+    const parts: string[] = []
+    if (sn.status === 'uncited') parts.push(t('notesChat.vaultStatusUncited'))
+    if (sn.status === 'cited-low') parts.push(t('notesChat.vaultStatusLow'))
+    if (sn.status === 'cited-invalid') parts.push(t('notesChat.vaultStatusInvalid'))
+    if (sn.quotes.some(q => !q.found)) parts.push(t('notesChat.vaultStatusQuote'))
+    return parts.join(', ')
+  }
   const withVaultFootnotes = (msg: ChatMessage): string => {
     if (!msg.citations) return msg.content
     const { hits, report } = msg.citations
-    const body = msg.content.replace(/\[(\d{1,3})\]/g, (m, n) => (Number(n) >= 1 && Number(n) <= hits.length ? `[^${n}]` : m))
+    const fid = (msg.timestamp ? msg.timestamp.getTime() : Date.now()).toString(36).slice(-5)
+    const body = replaceCitationRefs(msg.content, report, (n) => `[^q${fid}-${n}]`)
+    const wikiTarget = (rel: string) => rel.replace(/\.md$/i, '').replace(/\|/g, '¦').replace(/\]/g, '〕')
     const lines = hits.map((h, i) => {
       const base = (h.fileRel.split('/').pop() || h.fileRel).replace(/\.md$/i, '')
-      return `[^${i + 1}]: [[${base}]]${h.heading ? ` › ${h.heading}` : ''} (${lang === 'de' ? 'Zeile' : 'line'} ${h.startLine})`
+      return `[^q${fid}-${i + 1}]: [[${wikiTarget(h.fileRel)}|${base}]]${h.heading ? ` › ${h.heading}` : ''} (${lang === 'de' ? 'Zeile' : 'line'} ${h.startLine})`
     })
     const summary = t('notesChat.vaultCheckSummary', {
       sentences: report.summary.sentences, uncited: report.summary.uncited, low: report.summary.low,
       invalid: report.summary.invalidRefs, quotes: report.summary.quotesNotFound
     })
-    return `${body}\n\n${lines.join('\n')}\n\n> ${t('notesChat.vaultCheck')}: ${summary}\n> ${t('notesChat.vaultLegend')}`
+    const details = flaggedSentences(report).map(sn => {
+      const text = msg.content.slice(sn.start, sn.end).replace(/\s+/g, ' ')
+      return `> - **${flagLabelFor(sn)}:** ${text.length > 160 ? `${text.slice(0, 160)}…` : text}`
+    })
+    const unchecked = report.summary.unchecked > 0 ? `\n> ${t('notesChat.vaultUnchecked', { n: report.summary.unchecked })}` : ''
+    return `${body}\n\n${lines.join('\n')}\n\n> ${t('notesChat.vaultCheck')}: ${summary}${unchecked}${details.length ? `\n${details.join('\n')}` : ''}\n> ${t('notesChat.vaultLegend')}`
+  }
+  // Export in einen anderen Vault: Wikilinks zeigten ins Leere → blockieren, nicht still speichern.
+  const blockedByOtherVault = (msg: ChatMessage): boolean => {
+    if (msg.citations && msg.vaultPath !== vaultPath) {
+      setTransferError(t('notesChat.vaultOtherVault'))
+      return true
+    }
+    return false
   }
 
   const buildProvenanceBlock = (msg: ChatMessage): string => {
@@ -878,6 +902,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
   const saveAsNote = async (msg: ChatMessage, index: number) => {
     if (!vaultPath) return
     setTransferError(null)
+    if (blockedByOtherVault(msg)) return
     try {
       const rawTitle = (msg.question || '').replace(/\s+/g, ' ').trim()
       const safeTitle = rawTitle
@@ -936,6 +961,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
   const appendToCurrentNote = async (msg: ChatMessage, index: number) => {
     if (!vaultPath || !currentNote) return
     setTransferError(null)
+    if (blockedByOtherVault(msg)) return
     try {
       const filePath = `${vaultPath}/${currentNote.path}`
       const existing = await window.electronAPI.readFile(filePath)
