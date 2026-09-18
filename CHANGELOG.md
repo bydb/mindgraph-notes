@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.15-beta] - 2026-09-18
+
+**Termine aus E-Mails: Ganztägige und mehrtägige Veranstaltungen werden jetzt richtig erkannt und eingetragen.** Nennt eine Einladung nur Tage und keine Uhrzeit, schlägt die Prüfkarte einen ganztägigen Termin vor, bei mehreren Tagen mit Beginn und letztem Tag. Eine Uhrzeit oder Dauer, die gar nicht in der Mail steht, trägt die App nicht mehr ein; die Karte sagt stattdessen, was sie angenommen hat. Scheitert das Eintragen in den macOS-Kalender, nennt die App jetzt den Grund und den nächsten Schritt.
+
+### Hintergrund
+
+- Auslöser war die Vorankündigung eines zweitägigen Treffens ohne Uhrzeit. Das Sprachmodell lieferte trotzdem „9 Uhr, 60 Minuten“, die Karte zeigte das ohne Warnung, und der zweite Tag fehlte.
+- Uhrzeit, Dauer und Enddatum zählen nur noch, wenn sie im Text der Mail zu finden sind. Das prüft die App selbst, nicht das Modell. Dieselbe Regel gilt schon länger für den Konferenzlink.
+- Ganztägige Termine erinnern am Vortag um 9 Uhr. Die übliche Erinnerung „15 Minuten vorher“ läge bei einem ganztägigen Termin um 23:45 Uhr am Vorabend.
+- Nach dem Eintragen ist der Knopf gesperrt, bis ein Feld geändert wird. Ein zweiter Klick legte den Termin bisher doppelt an.
+- Kalenderdateien (.ics) im Anhang: Ganztägige Termine landeten bisher als „0 bis 12 Uhr“ im Kalender, jetzt als ganze Tage.
+- Das direkte Eintragen braucht unter macOS die Entwicklerwerkzeuge von Apple. Sind sie nach einem Update nicht einsatzbereit, erschien bisher nur „Unerwartete Antwort:“. Jetzt steht dort, was zu tun ist. „Als .ics speichern“ funktioniert unabhängig davon auf jedem System.
+- **Grenze:** Mehrtägige Termine mit Uhrzeiten (etwa Dienstag 10 Uhr bis Mittwoch 16 Uhr) werden als ganztägig vorbelegt; die genauen Uhrzeiten trägt die App nicht mit ein.
+
 ## [0.11.14-beta] - 2026-09-17
 
 **Die Windows-Version ist jetzt digital signiert.** Installer, portable Version und das Programm selbst tragen ab diesem Release eine gültige Signatur auf den Namen des Entwicklers. Windows zeigt damit einen geprüften Herausgeber statt „Unbekannter Herausgeber“, und verwaltete Firmenrechner, die unsignierte Programme gar nicht erst starten, lassen die App zu. An der App selbst ändert sich nichts; für macOS und Linux bleibt alles beim Alten.
