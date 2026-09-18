@@ -282,9 +282,10 @@ export function decodeVaultIndexHeader(bytes: Uint8Array): VaultIndexHeader {
 }
 
 /** Parst den Metadaten-Block und prüft ihn gegen den Header. */
-export function parseVaultIndexMeta(metaBytes: Uint8Array, header: VaultIndexHeader): VaultIndexMeta {
+export function parseVaultIndexMeta(metaBytes: Uint8Array, header: VaultIndexHeader, opts: { crcVerified?: boolean } = {}): VaultIndexMeta {
   if (metaBytes.length !== header.metaBytes) throw new VaultIndexFormatError('Metadatenblock hat die falsche Länge')
-  if (crc32(metaBytes) !== header.metaCrc) throw new VaultIndexFormatError('Metadaten-Prüfsumme falsch')
+  // Der Main-Lader prüft die Prüfsumme vorab in Stücken (Ereignisschleife frei) und meldet das hier.
+  if (!opts.crcVerified && crc32(metaBytes) !== header.metaCrc) throw new VaultIndexFormatError('Metadaten-Prüfsumme falsch')
   let meta: VaultIndexMeta
   try {
     meta = JSON.parse(new TextDecoder().decode(metaBytes)) as VaultIndexMeta

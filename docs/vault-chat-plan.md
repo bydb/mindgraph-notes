@@ -258,6 +258,70 @@ Bewusst klein, wie mit dem Nutzer vereinbart: erst Nutzung beobachten, dann ausb
 
 **Noch nicht abgenommen:** Handbewertung von 20 Antworten (Phase 3); Konkurrenztest im App-Pfad; Codex-Nachprüfung der Runden 1–3.
 
+## Abnahme F38 — Testprotokoll (Stand 19.09.2026, Branch `feature/vault-chat`)
+
+Reihenfolge wie vereinbart: (1) Konkurrenztest im echten App-Pfad, (2) Lebenszyklus-, Privacy-/Injection- und Exporttests, (3) Messwiederholung und Protokoll. Dev-App vor den Tests vollständig neu gestartet (Main-Bundle mit `vault-rag-locate-source`). Alle Werte am echten Vault (4547 Notizen, Ausschluss „400 - Archiv“), Embedding `bge-m3`, Chat-Modell `qwen3.8:27b-mlx`.
+
+### 1. Konkurrenztest im echten App-Pfad — bestanden für Chat, Vault-Frage, Mail-Analyse
+
+Erstaufbau in der App gestartet (Index und Staging beiseitegelegt, Klick „Vault-Index erstellen“ in den Einstellungen), Fortschrittsereignisse im Renderer mitgeschnitten; jede Vordergrundlast mitten im Embedding-Paket gestartet:
+
+| Vordergrundlast | Dauer | Pause-Ereignis nach | Neue Embeddings während der Last | Wiederaufnahme nach Ende |
+|---|---|---|---|---|
+| Vault-Frage (`vault-rag-answer`, 8 Treffer, 151 Chunks gestreamt) | 34,8 s | 5 ms | 3 (laufende Anfrage, dann Stopp) | 1,6 s |
+| Notiz-Chat (`ollama-chat`) | 10,3 s | 8 ms | 6 (laufende Anfrage) | 0,4 s |
+| Mail-Analyse (`email-analyze`, 1 Mail) | 38,4 s | 2 ms | 0 | 0,5 s |
+
+Während jeder Last blieb der Zähler eingebetteter Chunks bis auf die bereits laufende Anfrage stehen, kein Zwischen-Fortsetzen; nach dem Ende lief der Aufbau weiter (kein verwaister Worker: Zähler wuchs sofort wieder, Pause-Grund verschwand). Pause/Fortsetzen per Knopf: Pause-Ereignis 43 ms nach Klick, 20 s ohne neue Embeddings, „Pausiert“ in der Karte, Fortsetzen 4 ms nach Klick. Renderer-Frame-Lücken während der Lasten: maximal 116 ms (Mail-Analyse), sonst 51–68 ms. **Nicht im GUI geprüft: Brain und Notiz-Agent** — beide schreiben in den Vault (Tagesnotiz bzw. Staging) und laufen über denselben Zähler (`wrapIpcWithOllamaActivity`, `runRegistry`), der in `ollamaActivity.test.ts` getestet ist; ein GUI-Lauf im Modelltest-Vault ist vorgemerkt.
+
+### 2. Lebenszyklus, Privacy/Injection, Export
+
+- **Erstaufbau** in der App: scanning → embedding (Pakete à 20) → Checkpoint pro Paket in `userData/rag-staging/<hash>/` (10 Dateien nach 180 Notizen). **Neu aufbauen mit vorhandenem Index** übernimmt alle 19 037 Chunks: 4 s, Commit 506 ms, Laden 321 ms (Log `[VaultRAG] Lauf … fertig`).
+- **Neustart/Resume:** App bei 180/4547 Notizen (2550 Chunks) beendet; Checkpoint und Segmente blieben erhalten. **Der Wiederaufnahme-Lauf nach dem Neustart steht noch aus** — der Neustart lief in eine Schlüsselbund-Abfrage (gesperrter Anmelde-Schlüsselbund nach Bildschirmsperre), die den Main-Prozess blockiert; siehe „Offen“.
+- **Einstellungs-Karte** (Codex-Hinweis in F38): Fortschrittsereignisse tragen jetzt `vaultPath`, die Karte übernimmt nur Ereignisse ihres Vaults; ein Status ohne laufenden Build löscht den alten Fortschritt (`VaultIndexSection.tsx`).
+- **Privacy — Verlauf nach Anbieterwechsel:** der Verlauf für das Modell ist eine reine Funktion (`renderer/utils/chatHistory.ts`): Vault-Frage und Vault-Antwort fehlen darin unabhängig vom Anbieter, die Begrenzung greift nach dem Ausschluss, nur Rolle und Inhalt werden weitergegeben (Tests `chatHistory.test.ts`).
+- **Remote-Modellwechsel / manipulierte IPC-Aufrufe:** `vault-rag-answer` nimmt kein Modell vom Renderer an (Signatur `vaultPath, query, requestId, language`); das Chat-Modell kommt aus `ui-settings.json` und geht vor dem Senden durch `resolveLocalModel` (Cloud-Suffix, `remote_model`/`remote_host`, mehrdeutig → Ablehnung, `localModel.test.ts`); die Einbettung der Frage läuft durch dieselbe Sperre in `embed.ts` (`embed.test.ts`).
+- **Untrusted Köpfe / Injektionsnotiz:** Testnotiz mit Anweisung in der Überschrift, gefälschten Delimiter-Zeilen und erfundener Quellennummer `[99]` → genau ein echter untrusted Block, die Anweisung liegt vollständig darin, die Systemregel verbietet Anweisungen daraus (`vaultPrompt.test.ts`). Ein GUI-Lauf mit derselben Notiz im Modelltest-Vault (angelegt unter `06 - Vault-Chat-Abnahme/`) ist vorgemerkt.
+- **Quellen-Roundtrip:** Lesen- und Markdown-Modus, relokalisierte und geänderte Quelle im GUI belegt (Runde 4/5); **Schreiben-Modus, doppelter Dateiname und mehrfaches Anhängen** stehen noch aus (Testnotizen `A/Messreihe.md`, `B/Messreihe.md` im Modelltest-Vault angelegt).
+
+### 3. Messwiederholung am endgültigen Stand (headless, `npm run vault:bench`)
+
+Echter Erstaufbau ohne vorhandenen Index und ohne laufende App (Ollama allein, `bge-m3`):
+
+| Größe | Wert |
+|---|---|
+| Dauer Erstaufbau | 14 min 54 s (4547 Notizen, 19 037 Chunks) |
+| Peak-RSS des Build-Prozesses | 364 MB |
+| Event-Loop-Lag während des Aufbaus | p95 3 ms, max 303 ms (17 424 Messungen) |
+| Container | 96 MB, Commit (Segmente zusammensetzen, schreiben, fsync, rename) 410–506 ms Wanduhr |
+| Laden | 301–321 ms, RSS danach 503 MB |
+| Cosine über 19 037 Chunks | 36 ms |
+| Volle Abfrage (Einbettung + Suche + Frischeprüfung) | 193 ms, 8 Treffer, bester Score 0,692, 0 veraltet |
+
+**Die 303-ms-Spitze war der Commit, nicht das Chunking:** die CRC32 über den 96-MB-Vektorblock kostet am Stück 179 ms, dazu Metadaten-CRC 51 ms und JSON 40 ms — beim Schreiben UND beim Laden (Sonde `crc32(vec 96MB)`). Behoben in `vaultStore.ts` (`crc32Async`): Prüfsummen in 4-MB-Stücken mit Freigabe der Ereignisschleife, beim Laden vorab in Stücken statt synchron im Parser. Nachmessung mit Übernahme-Lauf (nur Commit + Laden): **max 39 ms, p95 19 ms** (vorher max 275–306 ms). Damit ist die 50-ms-Anforderung am tatsächlich blockierenden Schritt erfüllt; Chunking und Hashing bleiben im Main (p95 3 ms während des Aufbaus), ein `utilityProcess` ist nicht nötig. Indexgröße (96 MB Datei) und Prozessspeicher (364 MB Peak beim Build, 503 MB nach dem Laden inklusive geladenem Index) sind getrennt ausgewiesen; keine Quantisierung aus diesen Zahlen abgeleitet.
+
+Vergleich zur ersten Messung (18.09.): 22 min 19 s, Peak 389 MB, Lag max 261 ms, Laden 303 ms, Abfrage 143 ms — gleiche Größenordnung, der Aufbau war diesmal schneller (kein paralleler Chat), die Abfrage minimal langsamer (mehr Kandidaten durch Relokalisierungsprüfung).
+
+### 4. Testprotokoll des Fixstands
+
+Am Fixstand nach allen Änderungen dieser Abnahme (reguläre Limits, keine geänderten Timeouts):
+
+| Prüfung | Ergebnis |
+|---|---|
+| `npm run typecheck` | grün |
+| `npm run build` (main, preload, renderer) | grün |
+| `vitest run` (volle Suite, parallel) | 165 Dateien grün, 1 Datei rot: 2138 Tests bestanden, 1 übersprungen, 1 fehlgeschlagen |
+| Fehlgeschlagen | `noteAgent/shellExecution.test.ts › Umgebungsprobe › nennt Interpreter mit Pfad …` — Timeout 5 s **unter Last** |
+| Dieselbe Datei allein | 15 Tests bestanden, 1 übersprungen |
+
+Der Shell-Probe-Timeout trat schon am unveränderten Stand vor dem Vault-Chat in der vollen parallelen Suite auf und besteht isoliert; er ist damit kein Vault-Chat-Regressionsbefund und wird hier getrennt ausgewiesen, nicht durch einen Lauf mit geändertem Timeout ersetzt. Betroffene Vault-Chat-Suiten (`main/rag`, `shared/rag`, `renderer/utils/{citationMarkdown,sourceJump,chatHistory}`): alle grün.
+
+### Offen
+
+- **GUI-Teil, blockiert durch Bildschirmsperre (19.09., ab 00:50):** Neustart der Dev-App löste die Schlüsselbund-Abfrage „MindGraph Notes Safe Storage“ mit Passwortfeld aus (Anmelde-Schlüsselbund nach Sperre gesperrt); sie blockiert den Main-Prozess und lässt sich nicht per Skript beantworten. Damit stehen aus: Resume nach Neustart (Checkpoint 180/4547 liegt in `rag-staging` des Dev-Profils), Abbruch/Fehler, Modul-Aus und Vault-Wechsel während Start und Anfrage, Panel-Schließen bei Retrieval und Streaming, Injektionsnotiz und Brain/Notiz-Agent als Vordergrundlast (Modelltest-Vault), Quellen-Roundtrip im Schreiben-Modus mit doppeltem Dateinamen und mehrfachem Anhängen, fehlende Datei per temporärer Testnotiz.
+- Umfangsentscheidungen, ausdrücklich offen deklariert: kein Modell-Picker und keine Filterleiste im Vault-Modus (Phase 3), Retrieval-Qualität und Schwellen (Phase 3).
+
+
 ## Risiken und Gegenmittel
 
 - **Falsche Stelle als Beleg** (F01): Hash statt mtime, Spannen aus dem Chunker, nie mit alten Offsets schneiden.

@@ -12,7 +12,6 @@ import { createHash, randomBytes } from 'crypto'
 import {
   VAULT_INDEX_HEADER_SIZE,
   VaultIndexFormatError,
-  crc32,
   crc32Final,
   crc32Init,
   crc32Update,
@@ -98,7 +97,8 @@ export async function loadVaultIndexFile(file: string): Promise<VaultIndexContai
     const metaBuf = new Uint8Array(header.metaBytes)
     const mr = await handle.read(metaBuf, 0, header.metaBytes, VAULT_INDEX_HEADER_SIZE)
     if (mr.bytesRead !== header.metaBytes) throw new VaultIndexFormatError('Metadatenblock unvollständig')
-    const meta = parseVaultIndexMeta(metaBuf, header)
+    if (crc32Final(await crc32Async(metaBuf)) !== header.metaCrc) throw new VaultIndexFormatError('Metadaten-Prüfsumme falsch')
+    const meta = parseVaultIndexMeta(metaBuf, header, { crcVerified: true })
 
     const vectors = new Float32Array(header.chunkCount * header.dim)
     const vecView = new Uint8Array(vectors.buffer)
@@ -108,7 +108,7 @@ export async function loadVaultIndexFile(file: string): Promise<VaultIndexContai
       if (r.bytesRead === 0) throw new VaultIndexFormatError('Vektorblock unvollständig')
       offset += r.bytesRead
     }
-    if (crc32(vecView) !== header.vecCrc) throw new VaultIndexFormatError('Vektor-Prüfsumme falsch')
+    if (crc32Final(await crc32Async(vecView)) !== header.vecCrc) throw new VaultIndexFormatError('Vektor-Prüfsumme falsch')
     return { meta, vectors, generation: header.generation }
   } catch (err) {
     if (err instanceof VaultIndexFormatError) {
@@ -120,6 +120,20 @@ export async function loadVaultIndexFile(file: string): Promise<VaultIndexContai
   } finally {
     await handle.close().catch(() => undefined)
   }
+}
+
+/**
+ * CRC32 in Stücken mit Freigabe der Ereignisschleife: die Prüfsumme über den 96-MB-Vektorblock
+ * kostet am Stück rund 180 ms und blockierte den Main-Prozess bei jedem Commit und jedem Laden
+ * (F38-Messung, Ziel < 50 ms). 4-MB-Stücke kosten je ~8 ms.
+ */
+const CRC_SLICE = 4 << 20
+export async function crc32Async(bytes: Uint8Array, state = crc32Init()): Promise<number> {
+  for (let offset = 0; offset < bytes.length; offset += CRC_SLICE) {
+    state = crc32Update(state, bytes.subarray(offset, Math.min(bytes.length, offset + CRC_SLICE)))
+    if (offset + CRC_SLICE < bytes.length) await new Promise<void>((resolve) => setImmediate(resolve))
+  }
+  return state
 }
 
 // ─── Schreiben ────────────────────────────────────────────────────────────────
@@ -144,10 +158,17 @@ export async function writeVaultIndexAtomic(
   const metaBytes = encodeVaultIndexMeta(meta)
   let vecState = crc32Init()
   let vecBytesTotal = 0
+  let sinceYield = 0
   for (const part of vectorParts) {
     const bytes = new Uint8Array(part.buffer, part.byteOffset, part.byteLength)
     vecBytesTotal += bytes.length
-    vecState = crc32Update(vecState, bytes)
+    vecState = await crc32Async(bytes, vecState)
+    // Die Teile sind oft winzig (ein Chunk = 4 KB): trotzdem alle 4 MB die Ereignisschleife freigeben.
+    sinceYield += bytes.length
+    if (sinceYield >= CRC_SLICE) {
+      sinceYield = 0
+      await new Promise<void>((resolve) => setImmediate(resolve))
+    }
   }
   const header = encodeVaultIndexHeader({
     formatVersion: RAG_VAULT_FORMAT_VERSION,
@@ -156,7 +177,7 @@ export async function writeVaultIndexAtomic(
     dim,
     metaBytes: metaBytes.length,
     vecBytes: vecBytesTotal,
-    metaCrc: crc32(metaBytes),
+    metaCrc: crc32Final(await crc32Async(metaBytes)),
     vecCrc: crc32Final(vecState)
   })
 

@@ -525,6 +525,7 @@ export class VaultIndexJob {
       // 4. Digest erneut prüfen, zusammensetzen, atomar schreiben
       this.throwIfCancelled()
       this.emit(true, { phase: 'writing', message: 'Index schreiben', etaMs: null })
+      const writingStarted = this.now()
       const after = await resolveLocalModel(embedModel, { fresh: true })
       if (after.digest !== identity.digest) {
         throw new Error(`Modell „${embedModel}" hat sich während des Laufs geändert (Digest) — Lauf verworfen, bitte neu starten`)
@@ -577,6 +578,7 @@ export class VaultIndexJob {
 
       // Keine zusätzliche Vollkopie der Vektoren im Ergebnis (Messlauf 18.09.: Peak-RSS
       // 389 MB bei 19 030 Chunks) — der Manager lädt den Container aus der Datei (~300 ms).
+      console.info(`[VaultRAG] Commit (Segmente zusammensetzen, schreiben, fsync, rename) in ${Math.round(this.now() - writingStarted)} ms`)
       this.emit(true, { phase: 'done', message: undefined })
       return {
         status: 'done',

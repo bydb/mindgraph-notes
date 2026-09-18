@@ -40,7 +40,15 @@ const query = arg('query', 'Was war beim letzten Termin mit dem Schulamt besproc
 
 let vaultReal = ''
 const assertSafePath = async (p: string): Promise<string> => {
-  const real = await fs.realpath(p)
+  // Wie im Main: ein noch nicht existierendes Ziel (frischer Index) wird über den tiefsten
+  // vorhandenen Vorfahren aufgelöst, sonst scheitert der Erstaufbau an realpath(ENOENT).
+  const resolved = path.resolve(p)
+  let real: string
+  try {
+    real = await fs.realpath(resolved)
+  } catch {
+    real = path.join(await fs.realpath(path.dirname(resolved)), path.basename(resolved))
+  }
   if (!real.startsWith(vaultReal + path.sep) && real !== vaultReal) throw new Error(`außerhalb des Vaults: ${p}`)
   return real
 }

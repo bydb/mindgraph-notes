@@ -15,6 +15,7 @@ import type { NoteAgentAttachment, VaultRagAnswerDone, VaultRagHitDto } from '..
 import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
 import { citationMarkdownPlugin, markCitationRefs, type CitationEnv } from '../../utils/citationMarkdown'
 import { createSourceOpener, findNoteByVaultPath, type SourceJumpDeps } from '../../utils/sourceJump'
+import { chatHistoryForModel } from '../../utils/chatHistory'
 import { useTabStore } from '../../stores/tabStore'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -817,10 +818,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
       // Nur die letzten 10 Nachrichten für den Chat-Verlauf — Vault-Antworten IMMER
       // ausgeschlossen (sie tragen Notiz-/Mail-Text und könnten sonst über einen
       // Cloud-Anbieter den Rechner verlassen, Codex F22), unabhängig vom Anbieter.
-      const recentMessages = messages.filter(m => m.origin !== 'vault-rag').slice(-10).map(m => ({
-        role: m.role,
-        content: m.content
-      }))
+      const recentMessages = chatHistoryForModel(messages)
       recentMessages.push({ role: 'user', content: userMessage })
 
       // Cloud-Routing (OpenRouter): nur wenn freigeschaltet UND in dieser Sitzung gewählt.

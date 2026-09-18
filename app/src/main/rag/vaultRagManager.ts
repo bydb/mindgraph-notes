@@ -48,7 +48,7 @@ export interface VaultRagManagerDeps {
   getEmbedModel: () => Promise<string>
   /** Modul „Notizen befragen (RAG)" — Main-seitig aus ui-settings.json (Codex F33). */
   isModuleEnabled: () => Promise<boolean>
-  onProgress: (p: VaultBuildProgress) => void
+  onProgress: (p: VaultBuildProgress & { vaultPath: string }) => void
   now?: () => number
   /** Entprellung der Watcher-Warteschlange (Tests verkürzen sie). */
   queueDebounceMs?: number
@@ -350,7 +350,7 @@ export class VaultRagManager {
       assertSafePath: this.deps.assertSafePath,
       onProgress: (p) => {
         this.lastProgress = p
-        this.deps.onProgress(p)
+        this.deps.onProgress({ ...p, vaultPath })
       },
       now: this.now
     })
@@ -368,7 +368,9 @@ export class VaultRagManager {
           // Alten Snapshot freigeben und den frischen Container aus der Datei laden
           // (Validierung inklusive) — spart die Vollkopie im Job-Ergebnis.
           this.loaded = null
-          await this.loadContainer(result.file)
+          const t0 = this.now()
+          const loaded = await this.loadContainer(result.file)
+          console.info(`[VaultRAG] Lauf ${jobId} fertig nach ${Math.round(result.durationMs / 1000)} s (${mode}); Index geladen in ${Math.round(this.now() - t0)} ms, ${loaded?.meta.chunks.length ?? 0} Chunks`)
         } else if (this.inFlightChanged && jobEpoch === this.changeEpoch) {
           // Fehler oder NUTZER-Abbruch im selben Vault: die Änderungsmenge zurücklegen, sonst
           // gilt die geänderte Datei beim nächsten inkrementellen Lauf als unverändert (Codex

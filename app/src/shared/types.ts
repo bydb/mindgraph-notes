@@ -48,6 +48,8 @@ export interface VaultSettings {
 /** Fortschritt eines Vault-Index-Laufs (Spiegel von main/rag/vaultIndexer VaultBuildProgress). */
 export interface VaultBuildProgressDto {
   jobId: string
+  /** Vault des Laufs — die Einstellungs-Karte übernimmt nur Ereignisse ihres Vaults (F38). */
+  vaultPath: string
   mode: 'full' | 'incremental'
   phase: 'preparing' | 'scanning' | 'embedding' | 'writing' | 'done' | 'cancelled' | 'error'
   filesTotal: number

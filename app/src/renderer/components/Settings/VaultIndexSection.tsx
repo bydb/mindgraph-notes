@@ -40,7 +40,8 @@ export function VaultIndexSection() {
     const res = await window.electronAPI.vaultRagStatus(vaultPath)
     if (res.success && res.status) {
       setStatus(res.status)
-      if (res.status.build) progressRef.current = res.status.build
+      // Kein laufender Build im Status → alter Fortschritt verschwindet (F38).
+      progressRef.current = res.status.build
       setError(null)
     } else if (res.error) {
       setError(res.error)
@@ -54,6 +55,8 @@ export function VaultIndexSection() {
   useEffect(() => {
     if (!vaultPath) return
     const off = window.electronAPI.onVaultRagProgress((p) => {
+      // Nur Ereignisse des eigenen Vaults — ein Lauf des vorherigen Vaults darf hier nichts zeigen (F38).
+      if (p.vaultPath !== vaultPath) return
       progressRef.current = p
       force((n) => n + 1)
       if (p.phase === 'done' || p.phase === 'error' || p.phase === 'cancelled') void refresh()
