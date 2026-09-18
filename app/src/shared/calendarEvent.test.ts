@@ -2,6 +2,13 @@ import { describe, it, expect } from 'vitest'
 import {
   extractMeetingUrl, normalizeDraft, localDateTimeToIso, buildIcs, foldIcsLine, toIcsUtc, icsFileName,
   DEFAULT_DURATION_MINUTES, type CalendarEventDraft,
+  allDayRange,
+  daysBetween,
+  hasDurationEvidence,
+  isDateStatedInText,
+  isTimeStatedInText,
+  localDateToAllDayIso,
+  reminderMinutesFor,
 } from './calendarEvent'
 
 const BASE: CalendarEventDraft = {
@@ -198,5 +205,121 @@ describe('icsFileName', () => {
 
   it('entfernt Zeichen, die Dateisysteme nicht mögen', () => {
     expect(icsFileName({ ...BASE, title: 'Modul 8: Teil 1/2 <wichtig>' })).not.toMatch(/[/\\:*?"<>|]/)
+  })
+})
+
+// Wortlaut einer echten „Save the Date"-Mail (18.09.2026): zwei Tage, KEINE
+// Uhrzeit. Das Modell lieferte dazu 09:00 Uhr und 60 Minuten.
+const SAVE_THE_DATE = [
+  'Betreff: Save the Date – Präsenztreffen 2027 in Passau (09.–10.03.2027)',
+  'Termin: Dienstag, 09.03.2027, und Mittwoch, 10.03.2027',
+  'Das Kontingent wird von Montag bis Donnerstag abrufbar sein.',
+  'Telefon: 0123 4567-8910',
+].join('\n')
+
+describe('isTimeStatedInText', () => {
+  it('lehnt eine Uhrzeit ab, die das Modell erfunden hat', () => {
+    expect(isTimeStatedInText('09:00', SAVE_THE_DATE)).toBe(false)
+  })
+
+  it('hält ein Datum nicht für eine Uhrzeit', () => {
+    // „09.03.2027" enthält „09.03" — das ist kein 9 Uhr 3.
+    expect(isTimeStatedInText('09:03', SAVE_THE_DATE)).toBe(false)
+  })
+
+  it('erkennt die üblichen Schreibweisen', () => {
+    expect(isTimeStatedInText('14:30', 'Beginn 14:30 Uhr im Raum 2')).toBe(true)
+    expect(isTimeStatedInText('14:30', 'Beginn 14.30 Uhr')).toBe(true)
+    expect(isTimeStatedInText('09:00', 'Wir starten um 9 Uhr.')).toBe(true)
+    expect(isTimeStatedInText('09:00', 'von 9:00 bis 12:00')).toBe(true)
+    expect(isTimeStatedInText('14:00', 'Starts at 2 pm')).toBe(true)
+    expect(isTimeStatedInText('14:30', 'um 14 Uhr 30')).toBe(true)
+  })
+
+  it('verwechselt 9 Uhr nicht mit 19 Uhr', () => {
+    expect(isTimeStatedInText('09:00', 'Abends um 19 Uhr')).toBe(false)
+    expect(isTimeStatedInText('09:00', 'um 19:00')).toBe(false)
+  })
+})
+
+describe('hasDurationEvidence', () => {
+  it('findet in einer Mail ohne Uhrzeiten keine Dauer', () => {
+    expect(hasDurationEvidence(SAVE_THE_DATE)).toBe(false)
+  })
+
+  it('braucht zwei verschiedene Uhrzeiten oder eine genannte Dauer', () => {
+    expect(hasDurationEvidence('Beginn 14:00 Uhr')).toBe(false)
+    expect(hasDurationEvidence('14:00 bis 17:30 Uhr')).toBe(true)
+    expect(hasDurationEvidence('von 9 Uhr bis 12 Uhr')).toBe(true)
+    expect(hasDurationEvidence('Beginn 14:00 Uhr, Dauer 90 Minuten')).toBe(true)
+  })
+})
+
+describe('isDateStatedInText', () => {
+  it('findet das Enddatum der Mail', () => {
+    expect(isDateStatedInText('2027-03-10', SAVE_THE_DATE)).toBe(true)
+  })
+
+  it('lehnt einen Tag ab, der nirgends steht', () => {
+    expect(isDateStatedInText('2027-03-11', SAVE_THE_DATE)).toBe(false)
+  })
+
+  it('kennt ausgeschriebene Monate', () => {
+    expect(isDateStatedInText('2027-03-10', 'am 9. und 10. März')).toBe(true)
+    expect(isDateStatedInText('2027-03-10', 'on March 10th')).toBe(true)
+    expect(isDateStatedInText('2027-03-01', 'am 11. März')).toBe(false)
+  })
+})
+
+describe('ganztägige Termine', () => {
+  const startIso = localDateToAllDayIso('2027-03-09')!
+  const TWO_DAYS = { title: 'Präsenztreffen', startIso, durationMinutes: 60, allDay: true, endDate: '2027-03-10' }
+
+  it('legt den Tag auf den lokalen Mittag und weist ungültige Tage ab', () => {
+    expect(new Date(startIso).getHours()).toBe(12)
+    expect(localDateToAllDayIso('2027-02-31')).toBeUndefined()
+  })
+
+  it('zählt Tage über die Sommerzeit-Umstellung hinweg richtig', () => {
+    expect(daysBetween('2027-03-27', '2027-03-29')).toBe(2)
+    expect(daysBetween('2027-03-10', '2027-03-09')).toBe(-1)
+  })
+
+  it('beanstandet bei ganztägig keine Dauer und behält das Enddatum', () => {
+    const { draft, problems } = normalizeDraft({ ...TWO_DAYS, durationMinutes: NaN })
+    expect(problems).toEqual([])
+    expect(draft.allDay).toBe(true)
+    expect(draft.endDate).toBe('2027-03-10')
+  })
+
+  it('verwirft ein Ende vor dem Beginn sichtbar', () => {
+    const { draft, problems } = normalizeDraft({ ...TWO_DAYS, endDate: '2027-03-01' })
+    expect(draft.endDate).toBeUndefined()
+    expect(problems.map(p => p.field)).toEqual(['endDate'])
+  })
+
+  it('lässt Termine mit Uhrzeit unverändert', () => {
+    const { draft } = normalizeDraft(BASE)
+    expect(draft.allDay).toBeUndefined()
+    expect(draft.endDate).toBeUndefined()
+  })
+
+  it('rechnet das ausschließende Ende', () => {
+    expect(allDayRange(TWO_DAYS)).toEqual({ firstDay: '2027-03-09', lastDay: '2027-03-10', dayAfter: '2027-03-11' })
+    expect(allDayRange({ ...TWO_DAYS, endDate: undefined })?.dayAfter).toBe('2027-03-10')
+  })
+
+  it('schreibt reine Kalendertage in die .ics', () => {
+    const ics = buildIcs(TWO_DAYS)
+    expect(ics).toContain('DTSTART;VALUE=DATE:20270309')
+    expect(ics).toContain('DTEND;VALUE=DATE:20270311')
+    expect(ics).not.toMatch(/DTSTART:\d/)
+  })
+
+  it('erinnert am Vortag um 9 Uhr statt um 23:45 Uhr', () => {
+    expect(reminderMinutesFor(TWO_DAYS)).toEqual([900])
+    const ics = buildIcs(TWO_DAYS)
+    expect(ics).toContain('TRIGGER:-PT900M')
+    expect(ics.match(/BEGIN:VALARM/g)).toHaveLength(1)
   })
 })

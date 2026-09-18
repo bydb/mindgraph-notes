@@ -121,6 +121,18 @@
 
 .event-draft-field textarea { resize: vertical; }
 
+.event-draft-check {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.event-draft-check input { accent-color: var(--accent-color); margin: 0; }
+
 .event-draft-row {
   display: flex;
   gap: 10px;

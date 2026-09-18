@@ -20,6 +20,14 @@ export interface CalendarEventDraft {
   /** Link zur Videokonferenz. Eigenes Feld, damit Kalender ihn als Verknüpfung anbieten. */
   url?: string
   notes?: string
+  /**
+   * Ganztägig. `startIso` trägt dann nur den TAG — als lokaler Mittag, nicht
+   * Mitternacht: Mittag übersteht Sommerzeit-Lücken und eine verrutschte Stunde,
+   * ohne auf den Nachbartag zu kippen. `durationMinutes` zählt dann nicht.
+   */
+  allDay?: boolean
+  /** Letzter Tag (einschließlich) eines ganztägigen Termins, JJJJ-MM-TT. Ohne Angabe eintägig. */
+  endDate?: string
 }
 
 /**
@@ -31,6 +39,20 @@ export interface CalendarEventDraft {
  * in keinem der beiden Fälle schadet.
  */
 export const DEFAULT_REMINDER_MINUTES = [1440, 15]
+
+/**
+ * Ganztägige Termine beginnen rechnerisch um Mitternacht. „15 Minuten vorher"
+ * wäre 23:45 Uhr am Vorabend, „ein Tag vorher" Mitternacht — beides unbrauchbar.
+ * 15 Stunden vor Mitternacht ist 9 Uhr am Vortag.
+ */
+export const ALL_DAY_REMINDER_MINUTES = [900]
+
+export function reminderMinutesFor(draft: Pick<CalendarEventDraft, 'allDay'>): number[] {
+  return draft.allDay ? ALL_DAY_REMINDER_MINUTES : DEFAULT_REMINDER_MINUTES
+}
+
+/** Länger als ein Monat ist kein Termin mehr, sondern ein Lesefehler. */
+export const MAX_ALL_DAY_SPAN_DAYS = 31
 
 /** Sinnvolle Grenzen. 5 Minuten ist die kürzeste Besprechung, 12 Stunden ein voller Tag. */
 export const MIN_DURATION_MINUTES = 5
@@ -87,8 +109,28 @@ export function normalizeDraft(draft: Partial<CalendarEventDraft>): { draft: Cal
     startIso = parsed.toISOString()
   }
 
+  const allDay = draft.allDay === true
+  let endDate: string | undefined
+  if (allDay && startIso && draft.endDate) {
+    const startDay = localDateString(new Date(startIso))
+    const span = daysBetween(startDay, draft.endDate)
+    if (span === undefined || span < 0) {
+      problems.push({ field: 'endDate', message: 'Ende liegt vor dem Beginn — als eintägig behandelt' })
+    } else if (span > MAX_ALL_DAY_SPAN_DAYS) {
+      problems.push({ field: 'endDate', message: `Ende liegt mehr als ${MAX_ALL_DAY_SPAN_DAYS} Tage nach dem Beginn — als eintägig behandelt` })
+    } else if (span > 0) {
+      endDate = draft.endDate
+    }
+  }
+
   let durationMinutes = Math.round(Number(draft.durationMinutes))
-  if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+  if (allDay) {
+    // Zählt bei ganztägigen Terminen nicht; ein gültiger Wert bleibt stehen, damit
+    // das Abwählen von „Ganztägig" nicht mit einer Beanstandung beginnt.
+    if (!Number.isFinite(durationMinutes) || durationMinutes < MIN_DURATION_MINUTES || durationMinutes > MAX_DURATION_MINUTES) {
+      durationMinutes = DEFAULT_DURATION_MINUTES
+    }
+  } else if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
     durationMinutes = DEFAULT_DURATION_MINUTES
     problems.push({ field: 'durationMinutes', message: `Keine Dauer erkannt — ${DEFAULT_DURATION_MINUTES} Minuten angenommen` })
   } else if (durationMinutes < MIN_DURATION_MINUTES || durationMinutes > MAX_DURATION_MINUTES) {
@@ -110,7 +152,129 @@ export function normalizeDraft(draft: Partial<CalendarEventDraft>): { draft: Cal
 
   const notes = (draft.notes || '').trim().slice(0, 2000) || undefined
 
-  return { draft: { title, startIso, durationMinutes, location, url, notes }, problems }
+  const result: CalendarEventDraft = { title, startIso, durationMinutes, location, url, notes }
+  if (allDay) {
+    result.allDay = true
+    if (endDate) result.endDate = endDate
+  }
+  return { draft: result, problems }
+}
+
+// ─── Ganztägig: Rechnen mit Kalendertagen ────────────────────────────────────
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+
+/** Lokaler Kalendertag eines Zeitpunkts als JJJJ-MM-TT. */
+export function localDateString(date: Date): string {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+}
+
+function parseLocalDate(value: string): Date | undefined {
+  const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return undefined
+  const [year, month, day] = [Number(m[1]), Number(m[2]), Number(m[3])]
+  const d = new Date(year, month - 1, day, 12, 0, 0, 0)
+  // Kein stilles Weiterrollen: 31.02. ist kein Tag.
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return undefined
+  return d
+}
+
+/** Ganze Tage von `from` bis `to` (beide JJJJ-MM-TT); undefined bei ungültigem Datum. */
+export function daysBetween(from: string, to: string): number | undefined {
+  const a = parseLocalDate(from)
+  const b = parseLocalDate(to)
+  if (!a || !b) return undefined
+  // Beide stehen auf Mittag — eine Sommerzeit-Stunde verfälscht das Runden nicht.
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000)
+}
+
+/** ISO-Zeitstempel für einen ganztägigen Termin: lokaler Mittag des Tages. */
+export function localDateToAllDayIso(date: string): string | undefined {
+  return parseLocalDate(date)?.toISOString()
+}
+
+/**
+ * Erster und letzter Tag eines ganztägigen Termins, dazu der Tag DANACH —
+ * .ics und EventKit rechnen das Ende ausschließend.
+ */
+export function allDayRange(draft: CalendarEventDraft): { firstDay: string; lastDay: string; dayAfter: string } | undefined {
+  const start = new Date(draft.startIso)
+  if (Number.isNaN(start.getTime())) return undefined
+  const firstDay = localDateString(start)
+  const span = draft.endDate ? daysBetween(firstDay, draft.endDate) : 0
+  const lastDay = span !== undefined && span > 0 && span <= MAX_ALL_DAY_SPAN_DAYS ? draft.endDate! : firstDay
+  const last = parseLocalDate(lastDay)!
+  const after = new Date(last.getFullYear(), last.getMonth(), last.getDate() + 1, 12, 0, 0, 0)
+  return { firstDay, lastDay, dayAfter: localDateString(after) }
+}
+
+// ─── Belegprüfung: steht das wirklich in der Mail? ───────────────────────────
+//
+// Anlass (18.09.2026): Eine „Save the Date"-Mail nannte zwei Tage und KEINE
+// Uhrzeit. Das Modell lieferte trotz „Erfinde nichts" 09:00 Uhr und 60 Minuten,
+// und die Prüfkarte zeigte beides ohne jede Warnung. Deshalb dieselbe Regel wie
+// beim Konferenzlink: Was im Kalender landet, muss im Text zu finden sein.
+
+/** Steht die Uhrzeit (HH:MM) in irgendeiner üblichen Schreibweise im Text? */
+export function isTimeStatedInText(time: string, text: string): boolean {
+  const m = time.match(/^(\d{1,2}):(\d{2})$/)
+  if (!m || !text) return false
+  const hour = Number(m[1])
+  const minute = Number(m[2])
+  const hourForms = [String(hour), pad2(hour)]
+  const h12 = hour % 12 === 0 ? 12 : hour % 12
+  const meridiem = hour < 12 ? 'a' : 'p'
+  const mm = pad2(minute)
+  const patterns: RegExp[] = []
+  for (const h of new Set(hourForms)) {
+    // 14:30 — und 14.30 nur mit „Uhr"/„h" dahinter, sonst trifft „09.03.2027".
+    patterns.push(new RegExp(`(?<![\\d:.])${h}:${mm}(?![\\d])`))
+    patterns.push(new RegExp(`(?<![\\d:.])${h}\\.${mm}\\s*(?:Uhr|h\\b)`, 'i'))
+    patterns.push(new RegExp(`(?<![\\d:.])${h}\\s*Uhr\\s*${mm}(?!\\d)`, 'i'))
+    if (minute === 0) patterns.push(new RegExp(`(?<![\\d:.])${h}\\s*(?:Uhr|h\\b|o'clock)`, 'i'))
+  }
+  patterns.push(new RegExp(`(?<![\\d:.])0?${h12}[:.]${mm}\\s*${meridiem}\\.?m`, 'i'))
+  if (minute === 0) patterns.push(new RegExp(`(?<![\\d:.])0?${h12}\\s*${meridiem}\\.?m\\b`, 'i'))
+  return patterns.some(p => p.test(text))
+}
+
+const TIME_MENTION = /(?<![\d:.])(?:[01]?\d|2[0-3]):[0-5]\d(?!\d)|(?<![\d:.])(?:[01]?\d|2[0-3])(?:\.[0-5]\d)?\s*Uhr/gi
+const DURATION_PHRASE = /(?<!\d)\d+(?:[.,]\d+)?\s*(?:Minuten|Min\.?|Stunden?|Std\.?|hours?|hrs?|minutes?|mins?)(?![a-zäöü])/i
+
+/**
+ * Lässt sich aus dem Text überhaupt eine Dauer ablesen? Dafür braucht es zwei
+ * verschiedene Uhrzeiten (Beginn und Ende) oder eine ausgeschriebene Dauer.
+ */
+export function hasDurationEvidence(text: string): boolean {
+  if (!text) return false
+  if (DURATION_PHRASE.test(text)) return true
+  const mentions = new Set((text.match(TIME_MENTION) || []).map(t => t.replace(/\s+/g, '').toLowerCase()))
+  return mentions.size >= 2
+}
+
+const MONTH_NAMES: string[][] = [
+  ['januar', 'jan', 'january'], ['februar', 'feb', 'february'], ['märz', 'maerz', 'mrz', 'mar', 'march'],
+  ['april', 'apr'], ['mai', 'may'], ['juni', 'jun', 'june'], ['juli', 'jul', 'july'],
+  ['august', 'aug'], ['september', 'sep', 'sept'], ['oktober', 'okt', 'october', 'oct'],
+  ['november', 'nov'], ['dezember', 'dez', 'december', 'dec'],
+]
+
+/** Steht der Tag (JJJJ-MM-TT) als Datum im Text — „10.03.", „10. März", „March 10", ISO? */
+export function isDateStatedInText(date: string, text: string): boolean {
+  const m = date.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m || !text) return false
+  const month = Number(m[2])
+  const day = Number(m[3])
+  if (month < 1 || month > 12) return false
+  if (text.includes(date)) return true
+  const names = MONTH_NAMES[month - 1].join('|')
+  const patterns = [
+    new RegExp(`(?<!\\d)0?${day}\\.\\s?0?${month}\\.(?:\\d{2,4})?(?!\\d)`),
+    new RegExp(`(?<!\\d)0?${day}\\.?\\s*(?:${names})(?![a-zäöü])`, 'i'),
+    new RegExp(`(?<![a-zäöü])(?:${names})\\.?\\s+0?${day}(?:st|nd|rd|th)?(?!\\d)`, 'i'),
+    new RegExp(`(?<!\\d)0?${day}/0?${month}(?!\\d)|(?<!\\d)0?${month}/0?${day}(?!\\d)`),
+  ]
+  return patterns.some(p => p.test(text))
 }
 
 /**
@@ -219,6 +383,7 @@ export function buildIcs(draft: CalendarEventDraft, options: BuildIcsOptions = {
   const start = new Date(draft.startIso)
   if (Number.isNaN(start.getTime())) throw new Error('Ungültiger Startzeitpunkt')
   const end = new Date(start.getTime() + draft.durationMinutes * 60_000)
+  const range = draft.allDay ? allDayRange(draft) : undefined
   const stamp = options.stamp ?? start
   const uid = options.uid || `${toIcsUtc(start)}-${hashString(draft.title)}@mindgraph-notes`
 
@@ -231,8 +396,9 @@ export function buildIcs(draft: CalendarEventDraft, options: BuildIcsOptions = {
     'BEGIN:VEVENT',
     `UID:${uid}`,
     `DTSTAMP:${toIcsUtc(stamp)}`,
-    `DTSTART:${toIcsUtc(start)}`,
-    `DTEND:${toIcsUtc(end)}`,
+    // Ganztägig: reine Kalendertage ohne Zeitzone, Ende ausschließend (RFC 5545).
+    range ? `DTSTART;VALUE=DATE:${range.firstDay.replace(/-/g, '')}` : `DTSTART:${toIcsUtc(start)}`,
+    range ? `DTEND;VALUE=DATE:${range.dayAfter.replace(/-/g, '')}` : `DTEND:${toIcsUtc(end)}`,
     `SUMMARY:${escapeIcsText(draft.title)}`,
   ]
   if (draft.location) lines.push(`LOCATION:${escapeIcsText(draft.location)}`)
@@ -245,7 +411,7 @@ export function buildIcs(draft: CalendarEventDraft, options: BuildIcsOptions = {
     .join('\n\n')
   if (description) lines.push(`DESCRIPTION:${escapeIcsText(description)}`)
 
-  for (const minutes of options.reminderMinutes ?? DEFAULT_REMINDER_MINUTES) {
+  for (const minutes of options.reminderMinutes ?? reminderMinutesFor(draft)) {
     if (!Number.isFinite(minutes) || minutes < 0) continue
     lines.push(
       'BEGIN:VALARM',

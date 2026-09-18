@@ -4,6 +4,7 @@
 
 import { execFile } from 'child_process'
 import { promisify } from 'util'
+import { explainKnownSwiftProblem } from './swiftFailure'
 
 const execFileAsync = promisify(execFile)
 
@@ -111,10 +112,13 @@ for event in events {
     return { success: true, events }
   } catch (error) {
     console.error('[Calendar] Failed:', error)
+    const raw = error instanceof Error ? error.message : ''
     return {
       success: false,
       events: [],
-      error: error instanceof Error ? error.message : 'Kalender konnte nicht gelesen werden'
+      // Bekannte Startprobleme von `swift` (Xcode-Lizenz, fehlende Tools) mit
+      // nächstem Schritt statt der rohen „Command failed"-Zeile samt Quelltext.
+      error: explainKnownSwiftProblem(raw) || raw || 'Kalender konnte nicht gelesen werden'
     }
   }
 }

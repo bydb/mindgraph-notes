@@ -682,7 +682,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Apple Calendar (macOS)
   calendarGetEvents: (startDate: string, endDate: string) =>
     ipcRenderer.invoke('calendar-get-events', startDate, endDate),
-  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string; location?: string; url?: string; reminderMinutes?: number[] }) =>
+  calendarCreateEvent: (params: { title: string; startIso: string; durationMinutes: number; notes?: string; location?: string; url?: string; reminderMinutes?: number[] ; allDay?: boolean; endDate?: string }) =>
     ipcRenderer.invoke('calendar-create-event', params),
   // Termin als .ics speichern — plattformunabhaengig, im Gegensatz zum EventKit-Weg.
   calendarSaveIcs: (draft: unknown, reminderMinutes?: number[]) =>

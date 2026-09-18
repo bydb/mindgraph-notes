@@ -156,7 +156,8 @@ import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from '.
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
-import { DEFAULT_REMINDER_MINUTES, buildIcs, icsFileName, normalizeDraft, extractMeetingUrl, localDateTimeToIso, type CalendarEventDraft } from '../shared/calendarEvent'
+import { explainSwiftFailure, explainKnownSwiftProblem } from './calendar/swiftFailure'
+import { reminderMinutesFor, buildIcs, icsFileName, normalizeDraft, extractMeetingUrl, localDateTimeToIso, localDateToAllDayIso, allDayRange, daysBetween, isTimeStatedInText, isDateStatedInText, hasDurationEvidence, type CalendarEventDraft, type DraftProblem } from '../shared/calendarEvent'
 import { registerWorkflowActions, unregisterWorkflowActions, workflowModuleGate } from '../shared/workflow/registry'
 import type { Workflow, WorkflowFile, WorkflowRunTrigger } from '../shared/workflow/model'
 import type {
@@ -12764,7 +12765,8 @@ print(granted ? "GRANTED" : "DENIED_NOW")
     return { success: false, status: 'unknown' as const, raw: result }
   } catch (error) {
     console.error('[Calendar] Request access failed:', error)
-    return { success: false, status: 'error' as const, error: error instanceof Error ? error.message : String(error) }
+    const raw = error instanceof Error ? error.message : String(error)
+    return { success: false, status: 'error' as const, error: explainKnownSwiftProblem(raw) || raw }
   }
 })
 
@@ -12785,7 +12787,7 @@ ipcMain.handle('calendar-save-ics', async (_event, draft: CalendarEventDraft, re
     const blocking = problems.find(pr => pr.field === 'title' || pr.field === 'startIso')
     if (blocking) return { success: false, error: blocking.message }
 
-    const ics = buildIcs(clean, { reminderMinutes: reminderMinutes ?? DEFAULT_REMINDER_MINUTES })
+    const ics = buildIcs(clean, { reminderMinutes: reminderMinutes ?? reminderMinutesFor(clean) })
     const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0]
     const defaultPath = icsFileName(clean)
     const result = win
@@ -12847,9 +12849,10 @@ ipcMain.handle('email-extract-event', async (_event, payload: {
     '',
     'Felder:',
     '  "title"            kurzer Titel des Termins, ohne Datum und Uhrzeit',
-    '  "date"             Datum als JJJJ-MM-TT',
-    '  "time"             Startzeit als HH:MM (24 Stunden)',
-    '  "durationMinutes"  Dauer in Minuten, aus Start- und Endzeit gerechnet',
+    '  "date"             Datum als JJJJ-MM-TT, bei mehreren Tagen der ERSTE Tag',
+    '  "endDate"          letzter Tag als JJJJ-MM-TT, NUR wenn der Termin ueber mehrere Tage geht, sonst leerer String',
+    '  "time"             Startzeit als HH:MM (24 Stunden), NUR wenn in der Mail eine Uhrzeit steht, sonst leerer String',
+    '  "durationMinutes"  Dauer in Minuten, aus Start- und Endzeit gerechnet; ohne Endzeit und ohne genannte Dauer 0',
     '  "location"         Ort oder Adresse, sonst leerer String',
     '  "notes"            wichtige Hinweise, Vorbereitung und Zugangsdaten vollstaendig, aber knapp (hoechstens fuenf Saetze)',
     '',
@@ -12908,26 +12911,59 @@ ipcMain.handle('email-extract-event', async (_event, payload: {
     // ISO-Zeitstempel aus einem Sprachmodell ist erfahrungsgemaess die Stelle, an
     // der Zeitzonen und Sekunden durcheinandergeraten.
     const date = str(parsed.date)
-    const time = str(parsed.time)
-    const startIso = localDateTimeToIso(date, time) || ''
+    const modelTime = str(parsed.time)
 
-    const { draft, problems } = normalizeDraft({
+    // Belegpruefung (18.09.2026): Das Modell lieferte zu einer Mail OHNE Uhrzeit
+    // trotzdem 09:00 Uhr und 60 Minuten. Uhrzeit, Dauer und Enddatum gelten nur,
+    // wenn sie im Mailtext zu finden sind — sonst wird der Termin ganztaegig vorbelegt, und
+    // die Pruefkarte sagt, warum.
+    const evidenceText = `${payload.subject || ''}\n${rawBody}`
+    const evidenceNotes: DraftProblem[] = []
+    const timeStated = !!modelTime && isTimeStatedInText(modelTime, evidenceText)
+
+    let endDate = str(parsed.endDate)
+    if (endDate && ((daysBetween(date, endDate) ?? 0) <= 0)) endDate = ''
+    if (endDate && !isDateStatedInText(endDate, evidenceText)) {
+      evidenceNotes.push({ field: 'endDate', message: `Enddatum ${endDate} steht nicht in der Mail — verworfen` })
+      endDate = ''
+    }
+
+    const allDay = !!date && (!timeStated || !!endDate)
+    if (allDay) {
+      evidenceNotes.push({
+        field: 'allDay',
+        message: endDate
+          ? 'Mehrtägiger Termin — als ganztägig vorbelegt'
+          : modelTime
+            ? `Uhrzeit ${modelTime} steht nicht in der Mail — als ganztägig vorbelegt`
+            : 'Keine Uhrzeit in der Mail — als ganztägig vorbelegt',
+      })
+    }
+    const time = timeStated ? modelTime : ''
+    const startIso = (allDay ? localDateToAllDayIso(date) : localDateTimeToIso(date, time)) || ''
+
+    const { draft, problems: draftProblems } = normalizeDraft({
       title,
       startIso,
-      durationMinutes: Number(parsed.durationMinutes),
+      allDay,
+      endDate: endDate || undefined,
+      // Ohne zweite Uhrzeit und ohne genannte Dauer gibt es nichts zu rechnen —
+      // dann meldet normalizeDraft die angenommene Standarddauer sichtbar.
+      durationMinutes: hasDurationEvidence(evidenceText) ? Number(parsed.durationMinutes) : NaN,
       location: str(parsed.location),
       // Der Link kommt aus dem Mailtext, nicht vom Modell — eine erfundene oder
       // gekuerzte Konferenz-URL merkt man erst vor verschlossener Tuer.
       url: extractMeetingUrl(rawBody),
       notes: str(parsed.notes),
     })
+    const problems = [...evidenceNotes, ...draftProblems]
     const startProblem = problems.find(problem => problem.field === 'startIso')
     if (startProblem) {
       startProblem.message = !date
         ? 'Kein Datum erkannt'
         : !time
           ? 'Keine Uhrzeit erkannt — bitte Beginn eintragen'
-          : 'Datum oder Uhrzeit war ungueltig — bitte Beginn pruefen'
+          : 'Datum oder Uhrzeit war ungültig — bitte Beginn prüfen'
     }
     return { success: true, draft, problems }
   } catch (error) {
@@ -12946,6 +12982,10 @@ ipcMain.handle('calendar-create-event', async (_event, params: {
   url?: string
   /** Erinnerungen in Minuten VOR dem Termin. Ohne Angabe keine (Bestandsverhalten). */
   reminderMinutes?: number[]
+  /** Ganztägig; `startIso` trägt dann nur den Tag. Ohne Angabe wie bisher mit Uhrzeit. */
+  allDay?: boolean
+  /** Letzter Tag (einschließlich) eines ganztägigen Termins, JJJJ-MM-TT. */
+  endDate?: string
 }) => {
   if (process.platform !== 'darwin') {
     return { success: false, error: 'macOS only' }
@@ -12963,8 +13003,19 @@ ipcMain.handle('calendar-create-event', async (_event, params: {
   const startDate = new Date(startIso)
   if (isNaN(startDate.getTime())) return { success: false, error: 'Ungültiges Startdatum' }
   const duration = Math.max(5, Math.min(720, Number(durationMinutes) || 60))
-  const startEpoch = Math.floor(startDate.getTime() / 1000)
-  const endEpoch = startEpoch + duration * 60
+  let startEpoch = Math.floor(startDate.getTime() / 1000)
+  let endEpoch = startEpoch + duration * 60
+  const allDay = params.allDay === true
+  if (allDay) {
+    // EventKit will bei ganztägigen Terminen nur die TAGE wissen. Beide Zeitpunkte
+    // stehen auf dem lokalen Mittag des ersten bzw. letzten Tages — mitten im Tag
+    // kippt nichts auf den Nachbartag, egal was Sommerzeit oder Zeitzone tun.
+    const range = allDayRange({ title, startIso, durationMinutes: duration, allDay: true, endDate: params.endDate })
+    if (!range) return { success: false, error: 'Ungültiges Startdatum' }
+    const noon = (day: string) => Math.floor(new Date(`${day}T12:00:00`).getTime() / 1000)
+    startEpoch = noon(range.firstDay)
+    endEpoch = noon(range.lastDay)
+  }
   const safeTitle = limit(title, 500)
   if (!safeTitle) return { success: false, error: 'Titel fehlt' }
 
@@ -12977,6 +13028,7 @@ ipcMain.handle('calendar-create-event', async (_event, params: {
     url: /^https?:\/\/\S+$/i.test(url.trim()) ? url.trim() : '',
     start: startEpoch,
     end: endEpoch,
+    allDay,
     // Die zwei Mail-Termin-Erinnerungen setzt EventDraftCard ausdruecklich. Andere
     // bestehende Aufrufer (Schnelltermin, Timeblocking, .ics-Anhang) behalten ohne
     // Angabe ihr bisheriges Verhalten: keine zusaetzlichen Alarme.
@@ -13002,6 +13054,7 @@ struct Payload: Decodable {
     let url: String
     let start: Double
     let end: Double
+    let allDay: Bool
     let reminders: [Int]
 }
 
@@ -13073,6 +13126,7 @@ if !payload.location.isEmpty { event.location = payload.location }
 if !payload.url.isEmpty, let parsed = URL(string: payload.url) { event.url = parsed }
 event.startDate = Date(timeIntervalSince1970: payload.start)
 event.endDate = Date(timeIntervalSince1970: payload.end)
+event.isAllDay = payload.allDay
 for minutes in payload.reminders {
     event.addAlarm(EKAlarm(relativeOffset: -Double(minutes) * 60))
 }
@@ -13098,11 +13152,17 @@ do {
     // frei, Anführungszeichen und Dollarzeichen kommen unverändert an.
     const child = execFile('swift', ['-e', swiftCode], { timeout: 120000 })
     child.stdin?.end(payload)
-    const { stdout } = await new Promise<{ stdout: string }>((resolve, reject) => {
+    // Fehlerausgabe und Exit-Code mitlesen: Startet `swift` gar nicht erst (nicht
+    // bestätigte Xcode-Lizenz, fehlende Command Line Tools), steht der Grund NUR
+    // dort. Bis 18.09.2026 wurde beides verworfen — übrig blieb die leere Meldung
+    // „Unerwartete Antwort:".
+    const { stdout, stderr, code, signal } = await new Promise<{ stdout: string; stderr: string; code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
       let out = ''
+      let err = ''
       child.stdout?.on('data', (chunk: Buffer | string) => { out += String(chunk) })
+      child.stderr?.on('data', (chunk: Buffer | string) => { err += String(chunk) })
       child.on('error', reject)
-      child.on('close', () => resolve({ stdout: out }))
+      child.on('close', (exitCode, exitSignal) => resolve({ stdout: out, stderr: err, code: exitCode, signal: exitSignal }))
     })
     const result = stdout.trim()
     if (result.startsWith('NO_ACCESS')) {
@@ -13120,10 +13180,17 @@ do {
       console.log(`[Calendar] Event created: ${safeTitle} @ ${startDate.toISOString()} (${duration}min)`)
       return { success: true, eventId }
     }
-    return { success: false, error: 'Unerwartete Antwort: ' + result }
+    console.error(`[Calendar] Create failed: exit=${code} signal=${signal} stderr=${stderr.trim().slice(0, 500)}`)
+    return {
+      success: false,
+      error: explainSwiftFailure({ stderr, code, signal, stdout: result }),
+      needsPermission: false,
+    }
   } catch (error) {
     console.error('[Calendar] Create failed:', error)
     const raw = error instanceof Error ? error.message : String(error)
+    const known = explainKnownSwiftProblem(raw)
+    if (known) return { success: false, error: known, needsPermission: false }
     // Häufige Ursachen übersetzen, statt die rohe execFile-Fehlermeldung zu zeigen
     let friendly = raw
     if (raw.includes('Command failed') && raw.includes('swift')) {
