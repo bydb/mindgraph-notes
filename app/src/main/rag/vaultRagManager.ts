@@ -334,6 +334,10 @@ export class VaultRagManager {
     } catch (err) {
       return { ok: false, error: describeLocalModelError(err) }
     }
+    // Nur für die GUI-Abnahme (F30/F38): die Startphase künstlich verlängern, damit ein
+    // Vault-Wechsel von Hand genau in dieses Fenster fällt. Ohne Umgebungsvariable wirkungslos.
+    const startDelay = Number(process.env.MINDGRAPH_VAULT_RAG_START_DELAY_MS ?? 0)
+    if (startDelay > 0) await new Promise((resolve) => setTimeout(resolve, startDelay))
     if (gen !== this.generation || this.job || !this.sameVault(vaultPath)) return stale()
     const jobId = `build-${randomBytes(6).toString('hex')}`
     const existing = this.loaded?.container ?? null
