@@ -281,7 +281,7 @@ Während jeder Last blieb der Zähler eingebetteter Chunks bis auf die bereits l
 - **Neustart/Resume:** App bei 180/4547 Notizen beendet (10 Staging-Dateien blieben), neu gestartet, „Vault-Index erstellen“ geklickt: nach Modellprobe und Scan (0,5 s) sprangen die 180 Notizen aus dem Checkpoint in 0,1 s auf „erledigt“ (Zähler 20 → 180), danach neue Embeddings ab Notiz 181. **Kein Selbststart nach dem Neustart** (F33).
 - **Abbruch:** Ereignis „abgebrochen“ 6 ms nach Klick, eine laufende Anfrage noch abgeschlossen (289 → 290), 30 s kein Neustart, Staging erhalten, Karte zeigt „Vault-Index erstellen“ und den letzten Stand des abgebrochenen Laufs.
 - **Modul-Aus während des Laufs** (Einstellungen → Module → „Notizen befragen (RAG)“): abgebrochen nach 304 ms (Speicherweg der Einstellungen), 4 Chunks in Flug, kein Neustart; Modul wieder an → kein Selbststart.
-- **Vault-Wechsel** (nur über den Systemdialog, zweimal mit dem Nutzer durchgeführt): die Einstellungs-Karte des neuen Vaults zeigte keinen Fortschritt des alten (vault-gebundene Ereignisse), Status des alten Vaults ohne Job. Eine im alten Vault beantwortete Vault-Frage bleibt im Chat sichtbar, ist aber inert: Hochzahlen und Quellenzeilen tragen keine Notiz-ID mehr, ein Klick öffnet nichts. **Nicht getimt reproduziert:** Wechsel exakt während Modellprobe, Embedding oder laufender Antwort — beide Handwechsel kamen erst Minuten nach dem Ende von Lauf und Antwort; mit freiem Speicher dauert die Startphase unter 3 s. F30 bleibt durch die Manager-Tests belegt, die Antwort-Bindung durch `sourceJump.test.ts` (Vault-Wechsel während des Wartens).
+- **Vault-Wechsel** (nur über den Systemdialog, zweimal mit dem Nutzer durchgeführt): die Einstellungs-Karte des neuen Vaults zeigte keinen Fortschritt des alten (vault-gebundene Ereignisse), Status des alten Vaults ohne Job. Eine im alten Vault beantwortete Vault-Frage bleibt im Chat sichtbar, ist aber inert: Hochzahlen und Quellenzeilen tragen keine Notiz-ID mehr, ein Klick öffnet nichts. **Wechsel während einer laufenden Antwort** (Codex F41, dritter Versuch mit durch Modell-Entladen auf eine Minute verlängertem Fenster): nach 112 gestreamten Chunks gewechselt → Main meldete `cancelled`, keine verspätete Nachricht, kein Streaming-Cursor, Eingabe und Senden sofort frei. Vorher blieben Streaming-Zustand und Antwortpuffer stehen (Eingabe gesperrt); der Lebenszyklus der Vault-Anfrage liegt jetzt in `renderer/utils/vaultRequest.ts` mit Tests. **Nicht getimt reproduziert:** Wechsel exakt in der Startphase des Index-Aufbaus (mit freiem Speicher unter 3 s); F30 bleibt durch die Manager-Tests belegt.
 - **Panel schließen:** (A) 822 ms nach dem Senden, noch im Retrieval → Main meldet `cancelled` nach 860 ms, null Chunks; (B) nach 6 gestreamten Chunks → `cancelled` 53 ms nach dem Schließen, danach nur zwei bereits unterwegs befindliche Chunks, dann Stille.
 - **Einstellungs-Karte** (Codex-Hinweis in F38): Fortschrittsereignisse tragen `vaultPath`, die Karte übernimmt nur Ereignisse ihres Vaults; ein Status ohne laufenden Build löscht den alten Fortschritt.
 
@@ -327,7 +327,7 @@ Am Fixstand nach allen Änderungen dieser Abnahme (reguläre Limits, keine geän
 |---|---|
 | `npm run typecheck` | grün |
 | `npm run build` (main, preload, renderer) | grün |
-| `vitest run` (volle Suite, parallel, Stand Runde 6) | 167 Dateien grün, 1 Datei rot: 2145 Tests bestanden, 1 übersprungen, 1 fehlgeschlagen |
+| `vitest run` (volle Suite, parallel, Stand Runde 7) | 168 Dateien grün, 1 Datei rot: 2151 Tests bestanden, 1 übersprungen, 1 fehlgeschlagen |
 | Fehlgeschlagen | `noteAgent/shellExecution.test.ts › Umgebungsprobe › nennt Interpreter mit Pfad …` — Timeout 5 s **unter Last** |
 | Dieselbe Datei allein | 15 Tests bestanden, 1 übersprungen |
 
@@ -335,7 +335,7 @@ Der Shell-Probe-Timeout trat schon am unveränderten Stand vor dem Vault-Chat in
 
 ### Offen
 
-- **Nicht im GUI geprüft:** Vault-Wechsel exakt in der Startphase oder während einer Antwort (nicht von Hand zu timen; Manager- und Sprung-Tests).
+- **Nicht im GUI geprüft:** Vault-Wechsel exakt in der Startphase des Index-Aufbaus (nicht von Hand zu timen; Manager-Tests F30). Der Wechsel während einer Antwort ist seit Runde 7 belegt.
 - **Codex F39/F40 (Export) behoben:** `assertSafePath` löst jetzt den tiefsten vorhandenen Vorfahren auf (`main/safePath.ts`, Test mit zweistufig fehlendem Zielordner, Symlink nach außen, `..`), damit `ensure-dir` einen fehlenden verschachtelten Standard-Notizordner anlegen kann; der freie Dateiname wird für jeden Kandidaten inklusive `(20)` geprüft (`renderer/utils/noteFileName.ts`, Test), bei ausgeschöpfter Grenze sichtbarer Abbruch statt Überschreiben.
 - **Bildschirmsperre:** Ein Neustart der Dev-App bei gesperrtem Anmelde-Schlüsselbund blockiert im Schlüsselbund-Dialog (Passwortfeld); die Abnahme wurde nach dem Entsperren fortgesetzt.
 - Umfangsentscheidungen, ausdrücklich offen deklariert: kein Modell-Picker und keine Filterleiste im Vault-Modus (Phase 3), Retrieval-Qualität und Schwellen (Phase 3).

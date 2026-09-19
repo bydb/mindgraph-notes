@@ -11,12 +11,13 @@ import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
-import type { NoteAgentAttachment, VaultRagAnswerDone, VaultRagHitDto } from '../../../shared/types'
+import type { NoteAgentAttachment, VaultRagHitDto } from '../../../shared/types'
 import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
 import { citationMarkdownPlugin, markCitationRefs, type CitationEnv } from '../../utils/citationMarkdown'
 import { createSourceOpener, findNoteByVaultPath, type SourceJumpDeps } from '../../utils/sourceJump'
 import { chatHistoryForModel } from '../../utils/chatHistory'
 import { reserveFreeNoteName } from '../../utils/noteFileName'
+import { createVaultRequester, type VaultRequester } from '../../utils/vaultRequest'
 import { useTabStore } from '../../stores/tabStore'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -481,18 +482,62 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
 
   // Letzte Projekt-RAG-Quellen (werden nach dem Streaming an die Antwort gehängt)
   const lastSourcesRef = useRef<Array<{ fileRel: string; heading: string }>>([])
-  // Laufende Vault-Anfrage (requestId) + ihre Abonnements — Abbruch und Abmeldung bei
-  // Panel-Schließen, Chat-Leeren und Vault-Wechsel (Codex F29).
-  const vaultRequestRef = useRef<string | null>(null)
-  const vaultUnsubRef = useRef<Array<() => void>>([])
-  const cancelVaultRequest = useCallback(() => {
-    for (const off of vaultUnsubRef.current) off()
-    vaultUnsubRef.current = []
-    if (vaultRequestRef.current) {
-      void window.electronAPI.vaultRagAnswerCancel(vaultRequestRef.current)
-      vaultRequestRef.current = null
+  // Laufende Vault-Anfrage — Abbruch und Abmeldung bei Panel-Schließen, Chat-Leeren und
+  // Vault-Wechsel (Codex F29); der Abbruch setzt auch Streaming-Zustand und Puffer zurück (F41).
+  // Lebenszyklus in `utils/vaultRequest.ts` (testbar); die Abhängigkeiten lesen den aktuellen
+  // Render-Stand über eine Ref.
+  const vaultDepsRef = useRef<{ vaultPath: string | null; userMessage: string; lang: 'de' | 'en' }>({ vaultPath: null, userMessage: '', lang })
+  const vaultRequesterRef = useRef<VaultRequester | null>(null)
+  if (!vaultRequesterRef.current) {
+    const finish = (content: string, extra: Partial<ChatMessage> = {}) => {
+      const d = vaultDepsRef.current
+      setStreamingContent('')
+      setIsStreaming(false)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content,
+        question: d.userMessage,
+        timestamp: new Date(),
+        origin: 'vault-rag',
+        vaultPath: d.vaultPath ?? undefined,
+        ...extra
+      }])
     }
-  }, [])
+    vaultRequesterRef.current = createVaultRequester({
+      subscribeChunk: (cb) => window.electronAPI.onVaultRagAnswerChunk(cb),
+      subscribeDone: (cb) => window.electronAPI.onVaultRagAnswerDone(cb),
+      answer: (v, q, id, language) => window.electronAPI.vaultRagAnswer(v, q, id, language),
+      cancelRemote: (id) => { void window.electronAPI.vaultRagAnswerCancel(id) },
+      onChunk: (chunk) => setStreamingContent(prev => prev + chunk),
+      onDone: (payload) => {
+        const d = vaultDepsRef.current
+        switch (payload.kind) {
+          case 'answer':
+            finish(payload.answer, { model: payload.model, citations: { hits: payload.hits, report: payload.report, excludeMismatch: payload.excludeMismatch } })
+            break
+          case 'not-found':
+            finish(t('notesChat.vaultNotFound'), { model: payload.model })
+            break
+          case 'no-fresh-source':
+            finish(t('notesChat.vaultNoFreshSource'), { model: payload.model })
+            break
+          case 'cancelled':
+            finish(t('notesChat.vaultCancelled'))
+            break
+          case 'error':
+            finish((d.lang === 'de' ? 'Fehler: ' : 'Error: ') + payload.error)
+            break
+        }
+      },
+      onFailure: (error) => {
+        const d = vaultDepsRef.current
+        finish((d.lang === 'de' ? 'Fehler: ' : 'Error: ') + error + (/Kein Vault-Index|No vault index/i.test(error) ? ` ${t('notesChat.vaultNoIndexHint')}` : ''))
+      },
+      // Lokaler Abbruch: Eingabe wieder frei, kein alter Antwortteil (F41).
+      onReset: () => { setStreamingContent(''); setIsStreaming(false) }
+    })
+  }
+  const cancelVaultRequest = useCallback(() => { vaultRequesterRef.current?.cancel() }, [])
   useEffect(() => () => cancelVaultRequest(), [cancelVaultRequest])
   useEffect(() => { cancelVaultRequest() }, [vaultPath, cancelVaultRequest])
 
@@ -695,62 +740,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     // Nummern-Zitaten, Zitatprüfung im Main. Jedes Ereignis trägt die requestId.
     if (contextMode === 'vault') {
       if (!vaultPath) { setIsStreaming(false); return }
-      const requestId = `vq-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-      vaultRequestRef.current = requestId
-      const finish = (content: string, extra: Partial<ChatMessage> = {}) => {
-        setStreamingContent('')
-        setIsStreaming(false)
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content,
-          question: userMessage,
-          timestamp: new Date(),
-          origin: 'vault-rag',
-          vaultPath,
-          ...extra
-        }])
-      }
-      const offChunk = window.electronAPI.onVaultRagAnswerChunk(({ requestId: id, chunk }) => {
-        if (id === requestId) setStreamingContent(prev => prev + chunk)
-      })
-      const offDone = window.electronAPI.onVaultRagAnswerDone((payload: VaultRagAnswerDone) => {
-        if (payload.requestId !== requestId) return
-        offChunk(); offDone()
-        vaultUnsubRef.current = []
-        vaultRequestRef.current = null
-        switch (payload.kind) {
-          case 'answer':
-            finish(payload.answer, { model: payload.model, citations: { hits: payload.hits, report: payload.report, excludeMismatch: payload.excludeMismatch } })
-            break
-          case 'not-found':
-            finish(t('notesChat.vaultNotFound'), { model: payload.model })
-            break
-          case 'no-fresh-source':
-            finish(t('notesChat.vaultNoFreshSource'), { model: payload.model })
-            break
-          case 'cancelled':
-            finish(t('notesChat.vaultCancelled'))
-            break
-          case 'error':
-            finish((lang === 'de' ? 'Fehler: ' : 'Error: ') + payload.error)
-            break
-        }
-      })
-      vaultUnsubRef.current = [offChunk, offDone]
-      try {
-        const res = await window.electronAPI.vaultRagAnswer(vaultPath, userMessage, requestId, lang)
-        if (!res.success && res.error && vaultRequestRef.current === requestId) {
-          // Fehler vor dem ersten Ereignis (z.B. Vault ohne Index).
-          offChunk(); offDone()
-          vaultRequestRef.current = null
-          finish((lang === 'de' ? 'Fehler: ' : 'Error: ') + res.error + (/Kein Vault-Index|No vault index/i.test(res.error) ? ` ${t('notesChat.vaultNoIndexHint')}` : ''))
-        }
-      } catch (err) {
-        offChunk(); offDone()
-        vaultRequestRef.current = null
-        finish(lang === 'de' ? 'Fehler bei der Vault-Abfrage.' : 'Vault query failed.')
-        console.error('[NotesChat] Vault-RAG Fehler:', err)
-      }
+      vaultDepsRef.current = { vaultPath, userMessage, lang }
+      vaultRequesterRef.current?.start(vaultPath, userMessage, lang)
       return
     }
 
