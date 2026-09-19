@@ -16,6 +16,7 @@ import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '..
 import { citationMarkdownPlugin, markCitationRefs, type CitationEnv } from '../../utils/citationMarkdown'
 import { createSourceOpener, findNoteByVaultPath, type SourceJumpDeps } from '../../utils/sourceJump'
 import { chatHistoryForModel } from '../../utils/chatHistory'
+import { reserveFreeNoteName } from '../../utils/noteFileName'
 import { useTabStore } from '../../stores/tabStore'
 import MarkdownIt from 'markdown-it'
 import texmath from 'markdown-it-texmath'
@@ -979,15 +980,17 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
         await window.electronAPI.ensureDir(`${vaultPath}/${targetFolder}`)
       }
 
-      // Kollision vermeiden: nie überschreiben, Suffix anhängen.
-      let fileName = `${stamp} - ${safeTitle}.md`
-      let relativePath = targetFolder ? `${targetFolder}/${fileName}` : fileName
-      for (let attempt = 2; attempt <= 20; attempt++) {
-        const existing = await window.electronAPI.readFileOptional(`${vaultPath}/${relativePath}`)
-        if (existing === null || existing === undefined) break
-        fileName = `${stamp} - ${safeTitle} (${attempt}).md`
-        relativePath = targetFolder ? `${targetFolder}/${fileName}` : fileName
+      // Kollision vermeiden: jeder Kandidat wird vor der Wahl geprüft, nie überschreiben (F40).
+      const relFor = (name: string) => (targetFolder ? `${targetFolder}/${name}` : name)
+      const fileName = await reserveFreeNoteName(`${stamp} - ${safeTitle}`, async (name) => {
+        const existing = await window.electronAPI.readFileOptional(`${vaultPath}/${relFor(name)}`)
+        return existing !== null && existing !== undefined
+      })
+      if (!fileName) {
+        setTransferError(t('notesChat.saveAsNoteNoFreeName'))
+        return
       }
+      const relativePath = relFor(fileName)
 
       const frontmatter = `---\ntitle: "${safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: ${d.toISOString()}\n---\n\n`
       // Frontmatter-Stempel fürs KI-Badge im Lesen-Modus; der Provenienz-Callout im

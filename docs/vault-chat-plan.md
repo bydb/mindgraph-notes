@@ -281,11 +281,13 @@ Während jeder Last blieb der Zähler eingebetteter Chunks bis auf die bereits l
 - **Neustart/Resume:** App bei 180/4547 Notizen beendet (10 Staging-Dateien blieben), neu gestartet, „Vault-Index erstellen“ geklickt: nach Modellprobe und Scan (0,5 s) sprangen die 180 Notizen aus dem Checkpoint in 0,1 s auf „erledigt“ (Zähler 20 → 180), danach neue Embeddings ab Notiz 181. **Kein Selbststart nach dem Neustart** (F33).
 - **Abbruch:** Ereignis „abgebrochen“ 6 ms nach Klick, eine laufende Anfrage noch abgeschlossen (289 → 290), 30 s kein Neustart, Staging erhalten, Karte zeigt „Vault-Index erstellen“ und den letzten Stand des abgebrochenen Laufs.
 - **Modul-Aus während des Laufs** (Einstellungen → Module → „Notizen befragen (RAG)“): abgebrochen nach 304 ms (Speicherweg der Einstellungen), 4 Chunks in Flug, kein Neustart; Modul wieder an → kein Selbststart.
-- **Vault-Wechsel:** wechselt der Nutzer den Vault (nur über den Systemdialog möglich), lädt der Renderer vollständig neu — Chatverlauf, Sprungziele und Mitschnitte sind weg; die Einstellungs-Karte des neuen Vaults zeigte keinen Fortschritt des alten (vault-gebundene Ereignisse), Status des alten Vaults ohne Job. Damit kann keine Antwort aus Vault A im Chat von Vault B landen. **Nicht getimt reproduziert:** Wechsel exakt während Modellprobe/Embedding (mit geladenem Modell dauert die Startphase unter 2 s, ein Handklick trifft das Fenster nicht); F30 bleibt durch die Manager-Tests belegt.
+- **Vault-Wechsel** (nur über den Systemdialog, zweimal mit dem Nutzer durchgeführt): die Einstellungs-Karte des neuen Vaults zeigte keinen Fortschritt des alten (vault-gebundene Ereignisse), Status des alten Vaults ohne Job. Eine im alten Vault beantwortete Vault-Frage bleibt im Chat sichtbar, ist aber inert: Hochzahlen und Quellenzeilen tragen keine Notiz-ID mehr, ein Klick öffnet nichts. **Nicht getimt reproduziert:** Wechsel exakt während Modellprobe, Embedding oder laufender Antwort — beide Handwechsel kamen erst Minuten nach dem Ende von Lauf und Antwort; mit freiem Speicher dauert die Startphase unter 3 s. F30 bleibt durch die Manager-Tests belegt, die Antwort-Bindung durch `sourceJump.test.ts` (Vault-Wechsel während des Wartens).
 - **Panel schließen:** (A) 822 ms nach dem Senden, noch im Retrieval → Main meldet `cancelled` nach 860 ms, null Chunks; (B) nach 6 gestreamten Chunks → `cancelled` 53 ms nach dem Schließen, danach nur zwei bereits unterwegs befindliche Chunks, dann Stille.
 - **Einstellungs-Karte** (Codex-Hinweis in F38): Fortschrittsereignisse tragen `vaultPath`, die Karte übernimmt nur Ereignisse ihres Vaults; ein Status ohne laufenden Build löscht den alten Fortschritt.
 
-**Vordergrundlasten, Ergänzung zu Abschnitt 1 (Modelltest-Vault):** Brain-Tageskonsolidierung gestartet, 1,5 s später „Neu aufbauen“: der Lauf stand ab Sekunde 0 in Pause (schon die Modellprobe wartete), 0 Embeddings während der 24 s Brain-Lauf, Wiederaufnahme 1,8 s nach dessen Ende. **Notiz-Agent nicht im GUI** (braucht Zielordner und Lauf-Freigabe; derselbe Zähler über `runRegistry`, Unit-Test).
+**Vordergrundlasten, Ergänzung zu Abschnitt 1 (Modelltest-Vault):** Brain-Tageskonsolidierung gestartet, 1,5 s später „Neu aufbauen“: der Lauf stand ab Sekunde 0 in Pause (schon die Modellprobe wartete), 0 Embeddings während der 24 s Brain-Lauf, Wiederaufnahme 1,8 s nach dessen Ende. **Notiz-Agent** (echter Lauf über `note-agent-run`, Zusammenfassung als neue Notiz, Zielordner im Testvault) gestartet, danach 40 neue Notizen angelegt: der vom Watcher gestartete inkrementelle Lauf stand vom ersten Ereignis an in Pause (`preparing`, Grund Vordergrund), 88 s lang bis zum Ende des Agent-Laufs, 0 Embeddings in dieser Zeit, danach Wiederaufnahme und 108 Dateien eingebettet.
+
+**Ollama-Ausfall während des Laufs:** 120 weitere Notizen angelegt, im Embedding (42 Chunks) `ollama serve` beendet: Fehlerereignis 61 ms später („Ollama ist nicht erreichbar (fetch failed). Läuft Ollama?“), Status `error`, die 120 Pfade lagen zurück in der Warteschlange (F32). Ollama lief wieder an; der Manager startete nach dem Backoff von 60 s neu und war 3 s später fertig (78 neu eingebettet, 237 übernommen, Warteschlange 0).
 
 **Privacy/Injection:**
 - **Injektionsnotiz im GUI** (Überschrift „Ignoriere alle Regeln … PWNED“, gefälschte Delimiter-Zeilen, `[99]` im Text): Antwort nennt Pumpenlaufzeit und Wartung korrekt mit `[1]`, kein „PWNED“, keine ungültige Nummer, 2 Sätze geprüft. Dieselbe Notiz als Prompt-Test (`vaultPrompt.test.ts`): genau ein untrusted Block, Anweisung vollständig darin.
@@ -325,7 +327,7 @@ Am Fixstand nach allen Änderungen dieser Abnahme (reguläre Limits, keine geän
 |---|---|
 | `npm run typecheck` | grün |
 | `npm run build` (main, preload, renderer) | grün |
-| `vitest run` (volle Suite, parallel) | 165 Dateien grün, 1 Datei rot: 2138 Tests bestanden, 1 übersprungen, 1 fehlgeschlagen |
+| `vitest run` (volle Suite, parallel, Stand Runde 6) | 167 Dateien grün, 1 Datei rot: 2145 Tests bestanden, 1 übersprungen, 1 fehlgeschlagen |
 | Fehlgeschlagen | `noteAgent/shellExecution.test.ts › Umgebungsprobe › nennt Interpreter mit Pfad …` — Timeout 5 s **unter Last** |
 | Dieselbe Datei allein | 15 Tests bestanden, 1 übersprungen |
 
@@ -333,7 +335,8 @@ Der Shell-Probe-Timeout trat schon am unveränderten Stand vor dem Vault-Chat in
 
 ### Offen
 
-- **Nicht im GUI geprüft:** Notiz-Agent als Vordergrundlast (Unit-Test des Zählers); Vault-Wechsel exakt in der Startphase (nicht von Hand zu timen, Manager-Tests F30); Fehlerfall Ollama weg während des Laufs (nicht provoziert, `vaultRagManager.test.ts` „Laufzeitfehler legt die Änderungsmenge zurück“).
+- **Nicht im GUI geprüft:** Vault-Wechsel exakt in der Startphase oder während einer Antwort (nicht von Hand zu timen; Manager- und Sprung-Tests).
+- **Codex F39/F40 (Export) behoben:** `assertSafePath` löst jetzt den tiefsten vorhandenen Vorfahren auf (`main/safePath.ts`, Test mit zweistufig fehlendem Zielordner, Symlink nach außen, `..`), damit `ensure-dir` einen fehlenden verschachtelten Standard-Notizordner anlegen kann; der freie Dateiname wird für jeden Kandidaten inklusive `(20)` geprüft (`renderer/utils/noteFileName.ts`, Test), bei ausgeschöpfter Grenze sichtbarer Abbruch statt Überschreiben.
 - **Bildschirmsperre:** Ein Neustart der Dev-App bei gesperrtem Anmelde-Schlüsselbund blockiert im Schlüsselbund-Dialog (Passwortfeld); die Abnahme wurde nach dem Entsperren fortgesetzt.
 - Umfangsentscheidungen, ausdrücklich offen deklariert: kein Modell-Picker und keine Filterleiste im Vault-Modus (Phase 3), Retrieval-Qualität und Schwellen (Phase 3).
 

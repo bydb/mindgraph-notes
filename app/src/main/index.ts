@@ -212,6 +212,7 @@ import { wrapIpcWithOllamaActivity, withOllamaActivity } from './rag/ollamaActiv
 import { resolveLocalModel, describeLocalModelError } from './rag/localModel'
 import type { VaultQueryFilters } from '../shared/rag/vaultIndex'
 import { analyzeCitations } from '../shared/rag/citations'
+import { canonicalizeAllowingMissing } from './safePath'
 import { buildVaultPrompt } from './rag/vaultPrompt'
 import { createHostFactory, type HostServices } from './plugins/host'
 import * as nativeServices from './plugins/nativeServices'
@@ -1191,17 +1192,13 @@ async function assertSafePath(requestedPath: string, op: string): Promise<string
   }
   const resolved = path.resolve(requestedPath)
 
+  // Tiefster vorhandener Vorfahr per realpath, fehlende Segmente angehängt (Codex F39):
+  // auch ein zweistufig fehlender Zielordner ist so prüfbar und danach anlegbar.
   let canonical: string
   try {
-    canonical = await fs.realpath(resolved)
+    canonical = await canonicalizeAllowingMissing(resolved)
   } catch {
-    const parent = path.dirname(resolved)
-    try {
-      const realParent = await fs.realpath(parent)
-      canonical = path.join(realParent, path.basename(resolved))
-    } catch {
-      throw new Error(`Pfad nicht erreichbar (${op})`)
-    }
+    throw new Error(`Pfad nicht erreichbar (${op})`)
   }
 
   for (const root of approvedVaultRoots) {
