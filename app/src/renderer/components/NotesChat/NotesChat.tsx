@@ -972,6 +972,12 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
         String(d.getMinutes()).padStart(2, '0')
       ].join('')
       const targetFolder = notesRootFolder.trim().replace(/^\/+|\/+$/g, '')
+      // Zielordner VOR der Kollisionsprüfung anlegen: fehlt er in diesem Vault (Standard-
+      // Notizordner eines anderen Vaults), wies `readFileOptional` den Pfad ab und die
+      // Übernahme scheiterte (real, 19.09.2026, Modelltest-Vault).
+      if (targetFolder) {
+        await window.electronAPI.ensureDir(`${vaultPath}/${targetFolder}`)
+      }
 
       // Kollision vermeiden: nie überschreiben, Suffix anhängen.
       let fileName = `${stamp} - ${safeTitle}.md`
@@ -991,10 +997,6 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
         msg
       )
       const filePath = `${vaultPath}/${relativePath}`
-
-      if (targetFolder) {
-        await window.electronAPI.ensureDir(`${vaultPath}/${targetFolder}`)
-      }
       await window.electronAPI.writeFile(filePath, content)
       const note = await createNoteFromFile(filePath, relativePath, content)
       const store = useNotesStore.getState()

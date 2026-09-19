@@ -1150,6 +1150,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Inhalt dieselbe Fassung ist (sourceHash), sonst sichtbarer Hinweis statt stillem Sprung.
   const pendingSourceTarget = useTabStore(s => s.pendingSourceTarget)
   const setPendingSourceTarget = useTabStore(s => s.setPendingSourceTarget)
+  // Beim Notizwechsel per Quellenklick trägt `previewContent` für einen Render noch den Text der
+  // VORHERIGEN Notiz unter der neuen Notiz-ID — der Hash passt dann kurz nicht (real, 19.09.2026:
+  // falscher Hinweis „Quelle geändert" beim zweiten Klick). Deshalb gilt eine Abweichung erst als
+  // „geändert", wenn sie über eine kurze Karenz bestehen bleibt; passt der Inhalt vorher, wird gesprungen.
+  const SOURCE_JUMP_GRACE_MS = 1500
+  const sourceMismatchRef = useRef<{ token: number; since: number } | null>(null)
+  const [sourceJumpRetry, setSourceJumpRetry] = useState(0)
   useEffect(() => {
     const target = pendingSourceTarget
     if (!target || isSecondary || !effectiveNoteId || target.noteId !== effectiveNoteId) return
@@ -1158,13 +1165,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const content = viewMode === 'preview' ? previewContent : (viewRef.current?.state.doc.toString() ?? '')
     if (!content) return
     let cancelled = false
+    let graceTimer: ReturnType<typeof setTimeout> | null = null
     // Sprung zur 0-basierten Zeile: Lesen-Modus über `data-source-line` (größte Zeile ≤ Ziel,
     // Ziel 0 = Anfang), Schreiben/Markdown über CodeMirror-Selection und Scroll.
-    const jumpTo = (lineIdx: number): void => {
+    const jumpTo = (lineIdx: number, highlight = true): void => {
       if (viewMode === 'preview') {
         const root = editablePreviewRef.current
         if (!root) return
-        if (lineIdx === 0) {
+        if (lineIdx === 0 && !highlight) {
           // Nächster scrollender Vorfahr (im Lesen-Modus `.editor-preview`), sonst der Wurzelknoten.
           let scroller: HTMLElement | null = root
           while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
@@ -1200,28 +1208,38 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       // Ohne Hash ist der Anfang das ausdrückliche Ziel (Quelle geändert, Codex F28).
       if (target.sourceHash === null) {
         setPendingSourceTarget(null)
-        jumpTo(0)
+        jumpTo(0, false)
         return
       }
       const canonical = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
       const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
       if (cancelled) return
-      setPendingSourceTarget(null)
       if (hash !== target.sourceHash) {
-        // Geladene Fassung weicht ab: sichtbarer Hinweis UND Rückfall auf den Anfang, nicht
-        // irgendwo stehen bleiben.
-        jumpTo(0)
+        const now = Date.now()
+        const m = sourceMismatchRef.current
+        if (!m || m.token !== target.token) sourceMismatchRef.current = { token: target.token, since: now }
+        if (now - (sourceMismatchRef.current?.since ?? now) < SOURCE_JUMP_GRACE_MS) {
+          // Karenz: Ziel behalten, kurz später erneut prüfen (Inhalt der Notiz kommt evtl. noch).
+          graceTimer = setTimeout(() => setSourceJumpRetry(n => n + 1), 250)
+          return
+        }
+        // Abweichung bleibt: sichtbarer Hinweis UND Rückfall auf den Anfang, nicht irgendwo stehen bleiben.
+        sourceMismatchRef.current = null
+        setPendingSourceTarget(null)
+        jumpTo(0, false)
         window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'changed', noteId: target.noteId } }))
         return
       }
+      sourceMismatchRef.current = null
+      setPendingSourceTarget(null)
       jumpTo(Math.max(0, target.line - 1))
       window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'ok', noteId: target.noteId } }))
     }
     // Zwei Frames warten, damit Vorschau/Editor den Inhalt gezeichnet haben.
     const raf = requestAnimationFrame(() => requestAnimationFrame(() => { void run() }))
-    return () => { cancelled = true; cancelAnimationFrame(raf) }
-  }, [pendingSourceTarget, effectiveNoteId, viewMode, previewContent, isSecondary, vaultPath, setPendingSourceTarget])
+    return () => { cancelled = true; cancelAnimationFrame(raf); if (graceTimer) clearTimeout(graceTimer) }
+  }, [pendingSourceTarget, effectiveNoteId, viewMode, previewContent, isSecondary, vaultPath, setPendingSourceTarget, sourceJumpRetry])
 
   // Set up note click handler for dataview
   useEffect(() => {
