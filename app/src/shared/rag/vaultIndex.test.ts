@@ -1,22 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  encodeVaultIndex,
-  decodeVaultIndex,
-  VaultIndexFormatError,
-  VAULT_INDEX_HEADER_SIZE,
-  crc32,
-  identityString,
-  identitiesEqual,
-  excludeKeyFor,
-  isIndexable,
-  matchesFilters,
-  modelSlug,
-  cosineRow,
-  vectorNorm,
-  type VaultIndexContainer,
-  type VaultIndexMeta,
-  type VaultFileMeta
-} from './vaultIndex'
+import { encodeVaultIndex, decodeVaultIndex, VaultIndexFormatError, VAULT_INDEX_HEADER_SIZE, crc32, identityString, identitiesEqual, excludeKeyFor, isIndexable, matchesFilters, modelSlug, cosineRow, vectorNorm, type VaultIndexContainer, type VaultIndexMeta, type VaultFileMeta } from './vaultIndex'
 
 function sampleMeta(chunkCount = 3, dim = 4): VaultIndexMeta {
   const files: Record<string, VaultFileMeta> = {
@@ -200,5 +183,24 @@ describe('cosineRow', () => {
     const n = vectorNorm(q)
     expect(cosineRow(vectors, 0, 4, q, n)).toBeCloseTo(1)
     expect(cosineRow(vectors, 1, 4, q, n)).toBeCloseTo(0)
+  })
+})
+
+describe('Ordner-Abgleich in Vergleichsform (Variantenselektor, NFC, node_modules)', () => {
+  it('Ausschluss mit U+FE0F trifft den Ordner ohne — und umgekehrt', () => {
+    expect(isIndexable('400 - 🏛 Archiv/2021/x.md', ['400 - 🏛\uFE0F Archiv'])).toBe(false)
+    expect(isIndexable('400 - 🏛\uFE0F Archiv/2021/x.md', ['400 - 🏛 Archiv'])).toBe(false)
+    expect(isIndexable('401 - Aktiv/x.md', ['400 - 🏛\uFE0F Archiv'])).toBe(true)
+  })
+  it('NFD- und NFC-Schreibweise eines Umlauts gelten als derselbe Ordner', () => {
+    expect(isIndexable('Bu\u0308ro/x.md', ['B\u00fcro'])).toBe(false)
+  })
+  it('beide Schreibweisen ergeben denselben Ausschluss-Schlüssel (Identität)', () => {
+    expect(excludeKeyFor(['400 - 🏛\uFE0F Archiv'])).toBe(excludeKeyFor(['400 - 🏛 Archiv']))
+  })
+  it('node_modules ist nie indexierbar, Ordnerfilter der Abfrage nutzt dieselbe Vergleichsform', () => {
+    expect(isIndexable('Projekt/node_modules/jsonfile/CHANGELOG.md', [])).toBe(false)
+    const file = { sourceHash: 'h', mtime: 0, size: 1, chunkCount: 1 } as unknown as Parameters<typeof matchesFilters>[1]
+    expect(matchesFilters('400 - 🏛 Archiv/x.md', file, { folders: ['400 - 🏛\uFE0F Archiv'] })).toBe(true)
   })
 })

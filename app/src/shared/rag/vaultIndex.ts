@@ -159,12 +159,28 @@ export function normalizeFolderPrefix(p: string): string {
   return n ? `${n}/` : ''
 }
 
-/** Sortierter, deduplizierter Schlüssel der Ausschlussliste (Teil der Identität). */
-export function excludeKeyFor(excludeFolders: string[]): string {
-  return [...new Set(excludeFolders.map(normalizeFolderPrefix).filter(Boolean))].sort().join('\n')
+/**
+ * Vergleichsform für Ordner-Abgleiche (NICHT für gespeicherte Pfade): Unicode-NFC und ohne
+ * Variantenselektoren. Real (20.09.2026): der Ausschluss „400 - 🏛️ Archiv“ (Emoji mit U+FE0F)
+ * traf den Ordner „400 - 🏛 Archiv“ (ohne) nie — das Archiv wurde trotz Ausschluss indexiert.
+ */
+export function foldPathForMatch(p: string): string {
+  return normalizeRelPath(p).normalize('NFC').replace(/[\uFE0E\uFE0F]/g, '')
 }
 
-const ALWAYS_EXCLUDED_SEGMENTS = new Set(['templates', 'template', 'vorlagen'])
+function foldedFolderPrefix(p: string): string {
+  const n = foldPathForMatch(p)
+  return n ? `${n}/` : ''
+}
+
+/** Sortierter, deduplizierter Schlüssel der Ausschlussliste (Teil der Identität), in Vergleichsform. */
+export function excludeKeyFor(excludeFolders: string[]): string {
+  return [...new Set(excludeFolders.map(foldedFolderPrefix).filter(Boolean))].sort().join('\n')
+}
+
+// Vorlagen und Abhängigkeitsordner: nie Notizen (ein `node_modules/…/CHANGELOG.md` aus einem
+// Projektordner im Vault tauchte real als Quelle auf).
+const ALWAYS_EXCLUDED_SEGMENTS = new Set(['templates', 'template', 'vorlagen', 'node_modules'])
 
 /**
  * Gilt für Vollscan UND Watcher identisch (F16): Markdown, keine versteckten
@@ -181,9 +197,10 @@ export function isIndexable(relPath: string, excludeFolders: string[]): boolean 
   for (const seg of segments.slice(0, -1)) {
     if (ALWAYS_EXCLUDED_SEGMENTS.has(seg.toLowerCase())) return false
   }
+  const folded = foldPathForMatch(rel)
   for (const ex of excludeFolders) {
-    const prefix = normalizeFolderPrefix(ex)
-    if (prefix && rel.startsWith(prefix)) return false
+    const prefix = foldedFolderPrefix(ex)
+    if (prefix && folded.startsWith(prefix)) return false
   }
   return true
 }
@@ -202,9 +219,9 @@ export interface VaultQueryFilters {
 export function matchesFilters(fileRel: string, file: VaultFileMeta, filters: VaultQueryFilters | undefined): boolean {
   if (!filters) return true
   if (filters.folders && filters.folders.length > 0) {
-    const rel = normalizeRelPath(fileRel)
+    const rel = foldPathForMatch(fileRel)
     const hit = filters.folders.some((f) => {
-      const prefix = normalizeFolderPrefix(f)
+      const prefix = foldedFolderPrefix(f)
       return prefix ? rel.startsWith(prefix) : true
     })
     if (!hit) return false
