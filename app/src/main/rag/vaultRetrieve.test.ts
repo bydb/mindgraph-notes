@@ -11,7 +11,7 @@ vi.mock('./embed', () => ({
   embedText: async (_m: string, text: string) => (text.includes('alpha') ? [1, 0, 0, 0] : [0, 1, 0, 0])
 }))
 
-import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource } from './vaultRetrieve'
+import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource, rerankLexical } from './vaultRetrieve'
 import { sha256Hex } from './vaultStore'
 import { chunkMarkdown, canonicalizeMarkdown } from '../../shared/rag/chunking'
 import type { VaultIndexContainer, VaultChunkMeta, VaultFileMeta } from '../../shared/rag/vaultIndex'
@@ -223,5 +223,20 @@ describe('queryVaultIndex', () => {
     expect(r.hits).toHaveLength(1)
     expect(r.hits[0].fresh).toBe('fresh')
     expect(r.identity.digest).toBe('sha256:aaa')
+  })
+})
+
+describe('rerankLexical (Wortabgleich nur zur Umsortierung)', () => {
+  it('ein seltenes Fragewort hebt den passenden Chunk über einen knapp ähnlicheren; die Bedeutungsnähe bleibt als score', () => {
+    const container = { meta: { chunks: [
+      { fileRel: 'brain/2026/07/30.md', heading: 'Heute im Fokus', text: 'Medienzentrum, Termin, Neubewertung erwähnt, Team' },
+      { fileRel: 'inbox/Neubewertung Stelle Hitzel.md', heading: '', text: 'Stellenbewertung Stelle Hitzel im ersten Entwurf erstellt' },
+      { fileRel: 'x/Fortbildung.md', heading: '', text: 'Medienzentrum Fortbildung' }
+    ] } } as unknown as Parameters<typeof rerankLexical>[0]
+    const ranked = [{ row: 0, score: 0.60 }, { row: 1, score: 0.58 }, { row: 2, score: 0.57 }]
+    const out = rerankLexical(container, 'Wann war die Stellenbewertung der Stelle Hitzel?', ranked, 0.3)
+    expect(out[0].row).toBe(1)
+    expect(out[0].score).toBe(0.58)
+    expect(rerankLexical(container, 'egal', ranked, 0)).toEqual(ranked)
   })
 })

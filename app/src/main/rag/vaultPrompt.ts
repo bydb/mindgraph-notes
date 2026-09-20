@@ -49,7 +49,7 @@ export function buildVaultPrompt(
 REGELN:
 - Nutze NUR die Quellen. Erfinde nichts. Steht die Antwort nicht in den Quellen, sag das ehrlich in einem Satz.
 - Zitiere nach JEDEM inhaltlichen Satz die Quellennummer(n) in eckigen Klammern, z.B. [2] oder [1][3]. Nutze nur Nummern von 1 bis ${hits.length}. Keine Dateinamen, keine Wikilinks.
-- Fasse zusammen, statt wörtlich zu kopieren. Wörtliche Zitate nur in Anführungszeichen.
+- Fasse zusammen, statt wörtlich zu kopieren. Anführungszeichen NUR für Wort-für-Wort-Übernahmen aus einer Quelle; sinngemäße Wiedergaben ohne Anführungszeichen (die App vergleicht jedes Zitat mit dem Original).
 - Keine Quellenliste am Ende, keine Einleitung, keine Überschrift.
 
 SICHERHEIT:

@@ -32,10 +32,11 @@ import * as path from 'path'
 import { embedText } from '../src/main/rag/embed'
 import { resolveLocalModel } from '../src/main/rag/localModel'
 import { loadVaultIndexFile, listVaultIndexFiles, vaultRagDir } from '../src/main/rag/vaultStore'
-import { rankCandidates, selectHits, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, type VaultHit } from '../src/main/rag/vaultRetrieve'
+import { rankCandidates, selectHits, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, DEFAULT_LEXICAL_WEIGHT, type VaultHit } from '../src/main/rag/vaultRetrieve'
 import { buildVaultPrompt } from '../src/main/rag/vaultPrompt'
 import { analyzeCitations } from '../src/shared/rag/citations'
 import { keywordOverlapScore } from '../src/shared/rag/similarity'
+import { lexicalIndexFor, lexicalOverlap, chunkLexicalText } from '../src/shared/rag/lexical'
 import type { VaultIndexContainer } from '../src/shared/rag/vaultIndex'
 
 const OLLAMA = 'http://localhost:11434'
@@ -155,7 +156,7 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
           const mode = cfg.lexicalMode ?? 'plain'
           const overlap = mode === 'plain' ? keywordOverlapScore(c.question, `${base} ${ch.heading} ${ch.text}`)
             : mode === 'title' ? keywordOverlapScore(c.question, `${base} ${ch.heading}`)
-            : idfOverlap(c.question, `${base} ${ch.heading} ${ch.text}`)
+            : lexicalOverlap(lexicalIndexFor(container), c.question, chunkLexicalText(ch.fileRel, ch.heading, ch.text))
           return { row: r.row, score: r.score, combined: r.score + cfg.lexical * overlap }
         }).sort((a, b) => b.combined - a.combined)
       : ranked.map((r) => ({ ...r, combined: r.score }))
@@ -235,7 +236,7 @@ async function main(): Promise<void> {
   for (const c of cases) vecs.set(c.id, Float32Array.from(await embedText(embedModel, c.question)))
   console.log(`Fragen eingebettet: ${cases.length} in ${Date.now() - t0} ms\n`)
 
-  const base: Config = { name: 'aktuell', topK: Number(arg('topK', String(DEFAULT_VAULT_TOP_K))), floor: Number(arg('floor', String(DEFAULT_VAULT_MIN_SCORE))), cap: Number(arg('cap', String(DEFAULT_PER_FILE_CAP))), lexical: Number(arg('lexical', '0')) }
+  const base: Config = { name: 'aktuell', topK: Number(arg('topK', String(DEFAULT_VAULT_TOP_K))), floor: Number(arg('floor', String(DEFAULT_VAULT_MIN_SCORE))), cap: Number(arg('cap', String(DEFAULT_PER_FILE_CAP))), lexical: Number(arg('lexical', String(DEFAULT_LEXICAL_WEIGHT))), lexicalMode: 'idf' }
   const configs: Config[] = [base]
   if (flag('sweep')) {
     for (const floor of [0.3, 0.4, 0.45, 0.5, 0.55]) for (const topK of [5, 8, 12]) for (const cap of [1, 2, 3]) {

@@ -9,6 +9,7 @@
 import * as path from 'path'
 import { chunkMarkdown } from '../../shared/rag/chunking'
 import { cosineRow, isIndexable, matchesFilters, vectorNorm, type VaultChunkMeta, type VaultIndexContainer, type VaultQueryFilters } from '../../shared/rag/vaultIndex'
+import { chunkLexicalText, lexicalIndexFor, lexicalOverlap } from '../../shared/rag/lexical'
 import type { NoteKindId } from '../../shared/noteKind'
 import { embedText } from './embed'
 import { resolveLocalModel } from './localModel'
@@ -51,6 +52,8 @@ export interface VaultQueryOptions {
    * nicht bis zum Neuaufbau weiter als Quelle erscheinen.
    */
   excludeFolders?: string[]
+  /** Umsortierung der Kandidaten: Bedeutungsnähe + Gewicht × Wortabgleich (Floor bleibt auf der Bedeutungsnähe). */
+  lexicalWeight?: number
 }
 
 export interface VaultQueryResult {
@@ -68,7 +71,12 @@ export interface VaultQueryResult {
 
 export const DEFAULT_VAULT_TOP_K = 8
 // Startwert aus dem Projekt-RAG (gemessen 06.06.2026); wird in Phase 3 kalibriert.
-export const DEFAULT_VAULT_MIN_SCORE = 0.3
+// Kalibriert am Tuning-Set (20.09.2026, 42 positiv / 12 negativ, bge-m3): 0,30 verweigerte keinen
+// Negativfall; 0,50 verweigert 9/12 (die drei thematisch nahen verweigert das Antwortmodell)
+// und kostet einen Positivfall; 0,55 kostet vier. Holdout-Bestätigung: siehe Plan, Phase 3.
+export const DEFAULT_VAULT_MIN_SCORE = 0.5
+/** Gewicht des seltenheitsgewichteten Wortabgleichs bei der Umsortierung (0 = aus). */
+export const DEFAULT_LEXICAL_WEIGHT = 0.3
 export const DEFAULT_PER_FILE_CAP = 2
 export const DEFAULT_OVERSAMPLE = 4
 
@@ -109,6 +117,27 @@ export function rankCandidates(
   }
   scored.sort((a, b) => b.score - a.score)
   return scored.slice(0, limit)
+}
+
+/**
+ * Umsortierung der Floor-Kandidaten nach Bedeutungsnähe + Gewicht × seltenheitsgewichtetem
+ * Wortabgleich (`shared/rag/lexical.ts`). `score` bleibt die Bedeutungsnähe (Anzeige, Floor).
+ */
+export function rerankLexical(
+  container: VaultIndexContainer,
+  query: string,
+  ranked: Array<{ row: number; score: number }>,
+  weight: number
+): Array<{ row: number; score: number }> {
+  if (weight <= 0 || ranked.length === 0) return ranked
+  const index = lexicalIndexFor(container)
+  return ranked
+    .map((r) => {
+      const ch = container.meta.chunks[r.row]
+      return { ...r, combined: r.score + weight * lexicalOverlap(index, query, chunkLexicalText(ch.fileRel, ch.heading, ch.text)) }
+    })
+    .sort((a, b) => b.combined - a.combined)
+    .map(({ row, score }) => ({ row, score }))
 }
 
 /** Dedupe (exakt, normalisiert) und Pro-Datei-Deckel in Score-Reihenfolge bis Top-K. */
@@ -288,7 +317,7 @@ export async function queryVaultIndex(
   if (bestScore === null || bestScore < minScore) {
     return empty({ belowFloor: true, bestScore, candidatesConsidered: ranked.length })
   }
-  const passing = ranked.filter((r) => r.score >= minScore)
+  const passing = rerankLexical(container, opts.query, ranked.filter((r) => r.score >= minScore), opts.lexicalWeight ?? DEFAULT_LEXICAL_WEIGHT)
   const selected = selectHits(container, passing, topK, perFileCap)
   const { hits, staleFiles } = await verifyHits(vaultPath, container, selected, assertSafePath, opts.filters)
   return {
