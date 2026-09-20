@@ -25,6 +25,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
 import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink, findNoteForWikilink, straightenQuotes } from '../../utils/linkExtractor'
+import { applyHighlights, clearHighlights, matchRanges } from '../../utils/inNoteSearch'
 import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, parsePluginEmbedSize } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
@@ -973,6 +974,29 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const containerRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const editablePreviewRef = useRef<HTMLDivElement>(null)
+
+  // ─── Suche in der Notiz (Lesen-Modus, ⌘F) ─────────────────────────────────
+  // Markierung über die CSS-Highlight-Schnittstelle: das DOM bleibt unberührt, sonst
+  // schriebe das Autosave des Lesen-Modus die Markierungen über turndown in die Notiz.
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const [findIndex, setFindIndex] = useState(0)
+  const [findCount, setFindCount] = useState(0)
+  const findRangesRef = useRef<Range[]>([])
+  const findInputRef = useRef<HTMLInputElement>(null)
+
+  const scrollToMatch = useCallback((index: number) => {
+    const range = findRangesRef.current[index]
+    const scroller = previewRef.current
+    if (!range || !scroller) return
+    const rect = range.getBoundingClientRect()
+    const box = scroller.getBoundingClientRect()
+    if (rect.height === 0 && rect.width === 0) return
+    if (rect.top < box.top + 60 || rect.bottom > box.bottom - 60) {
+      scroller.scrollBy({ top: rect.top - box.top - box.height / 3, behavior: 'smooth' })
+    }
+  }, [])
+
   // Aktive Plugin-Embed-Mounts der Preview, per Platzhalter-Element getrackt (R2).
   const pluginEmbedMountsRef = useRef(new Map<Element, { dispose: () => void }>())
   const viewRef = useRef<EditorView | null>(null)
@@ -3738,6 +3762,44 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContent, processHeadingFolds, imagesLoadedVersion])
 
+  // Treffer neu suchen, wenn Suchtext oder gerenderter Inhalt sich ändern.
+  useEffect(() => {
+    if (!findOpen || viewMode !== 'preview') {
+      clearHighlights()
+      findRangesRef.current = []
+      setFindCount(0)
+      return
+    }
+    const root = editablePreviewRef.current
+    if (!root) return
+    const ranges = matchRanges(root, findQuery)
+    findRangesRef.current = ranges
+    setFindCount(ranges.length)
+    setFindIndex((prev) => (ranges.length === 0 ? 0 : Math.min(prev, ranges.length - 1)))
+  }, [findOpen, findQuery, viewMode, renderedMarkdown])
+
+  // Markierung setzen und zum aktuellen Treffer scrollen.
+  useEffect(() => {
+    if (!findOpen || viewMode !== 'preview') return
+    applyHighlights(findRangesRef.current, findIndex)
+    scrollToMatch(findIndex)
+  }, [findOpen, findIndex, findCount, viewMode, scrollToMatch])
+
+  useEffect(() => () => clearHighlights(), [])
+
+  const findStep = useCallback((delta: number) => {
+    const n = findRangesRef.current.length
+    if (n === 0) return
+    setFindIndex((prev) => (prev + delta + n) % n)
+  }, [])
+
+  const closeFind = useCallback(() => {
+    setFindOpen(false)
+    clearHighlights()
+    findRangesRef.current = []
+    setFindCount(0)
+  }, [])
+
   // Add copy buttons to fenced code blocks in preview mode
   useEffect(() => {
     if (viewMode !== 'preview' || !previewRef.current) return
@@ -4482,6 +4544,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         e.preventDefault()
         toggleViewMode()
       }
+      // ⌘F: Suche in der Notiz — nur im Lesen-Modus (Markdown/Schreiben hat die CodeMirror-Suche).
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !e.shiftKey && viewMode === 'preview' && !isSecondary) {
+        e.preventDefault()
+        setFindOpen(true)
+        requestAnimationFrame(() => { findInputRef.current?.focus(); findInputRef.current?.select() })
+      }
       // Formatierungs-Shortcuts im Edit- und Live-Preview-Modus
       if ((viewMode === 'edit' || viewMode === 'live-preview') && viewRef.current && (e.metaKey || e.ctrlKey)) {
         switch (e.key) {
@@ -4506,7 +4574,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [viewMode, applyFormat])
+  }, [viewMode, applyFormat, isSecondary])
 
   // Annotation aus dem Lesen-Modus: Zitat + Zitation an die co-lokierte Sammeldatei
   // anhängen und die Stelle sitzungsweise einfärben. Quelle bleibt unverändert (Overlay).
@@ -5235,6 +5303,33 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         onContextMenu={handlePreviewContextMenu}
         ref={previewRef}
       >
+        {findOpen && viewMode === 'preview' && (
+          <div className="note-find-bar" onMouseDown={(e) => e.stopPropagation()}>
+            <input
+              ref={findInputRef}
+              type="text"
+              value={findQuery}
+              placeholder={t('editor.findPlaceholder')}
+              onChange={(e) => { setFindQuery(e.target.value); setFindIndex(0) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { e.preventDefault(); closeFind() }
+                if (e.key === 'Enter') { e.preventDefault(); findStep(e.shiftKey ? -1 : 1) }
+              }}
+            />
+            <span className="note-find-count">
+              {findQuery.trim().length < 2 ? '' : findCount === 0 ? t('editor.findNone') : `${findIndex + 1}/${findCount}`}
+            </span>
+            <button onClick={() => findStep(-1)} disabled={findCount === 0} title={t('editor.findPrev')} aria-label={t('editor.findPrev')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+            </button>
+            <button onClick={() => findStep(1)} disabled={findCount === 0} title={t('editor.findNext')} aria-label={t('editor.findNext')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button onClick={closeFind} title={t('editor.findClose')} aria-label={t('editor.findClose')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        )}
         {previewToolbar && viewMode === 'preview' && (
           <div
             className="preview-edit-toolbar"
