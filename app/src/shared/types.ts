@@ -33,10 +33,109 @@ export interface VaultFeatures {
   remarkable: boolean
 }
 
+/** Opt-in für den Vault-Index (Vault-Chat-Plan Rev. 3, Entscheidung 1) — Vault-Eigenschaft. */
+export interface VaultRagSettings {
+  enabled: boolean
+  excludeFolders: string[]
+}
+
 export interface VaultSettings {
   schemaVersion: number
   features: VaultFeatures
+  vaultRag?: VaultRagSettings
 }
+
+/** Fortschritt eines Vault-Index-Laufs (Spiegel von main/rag/vaultIndexer VaultBuildProgress). */
+export interface VaultBuildProgressDto {
+  jobId: string
+  /** Vault des Laufs — die Einstellungs-Karte übernimmt nur Ereignisse ihres Vaults (F38). */
+  vaultPath: string
+  mode: 'full' | 'incremental'
+  phase: 'preparing' | 'scanning' | 'embedding' | 'writing' | 'done' | 'cancelled' | 'error'
+  filesTotal: number
+  filesDone: number
+  chunksPlanned: number
+  chunksEmbedded: number
+  chunksReused: number
+  paused: null | 'user' | 'foreground'
+  startedAt: number
+  etaMs: number | null
+  message?: string
+  error?: string
+}
+
+export interface VaultRagStatusDto {
+  vaultPath: string
+  config: VaultRagSettings
+  embedModel: string
+  index: {
+    exists: boolean
+    file: string | null
+    chunkCount: number
+    fileCount: number
+    generation: number
+    createdAt: number | null
+    model: string | null
+    digest: string | null
+    bytes: number
+    excludeMismatch: boolean
+    /** Der Index wurde nach älteren Indexregeln gebaut (z. B. vor dem Ausschluss von Brain-Notizen). */
+    policyOutdated: boolean
+  }
+  build: VaultBuildProgressDto | null
+  pendingChanges: number
+}
+
+export interface VaultQueryFiltersDto {
+  folders?: string[]
+  kinds?: Array<'problem' | 'solution' | 'info'>
+  dateFrom?: number | null
+  dateTo?: number | null
+}
+
+export interface VaultRagHitDto {
+  fileRel: string
+  chunkIndex: number
+  heading: string
+  text: string
+  score: number
+  sourceStart: number
+  sourceEnd: number
+  startLine: number
+  sourceHash: string
+  chunkHash: string
+  fresh: 'fresh' | 'relocated'
+  kind: 'problem' | 'solution' | 'info' | null
+  dateValue: number | null
+}
+
+export interface VaultRagQueryResponse {
+  success: boolean
+  requestId: string
+  error?: string
+  hits?: VaultRagHitDto[]
+  belowFloor?: boolean
+  noFreshSource?: boolean
+  bestScore?: number | null
+  candidatesConsidered?: number
+  staleFiles?: string[]
+  identity?: { model: string; digest: string }
+  /** Ausschlussliste weicht vom Index ab: Ausschlüsse greifen sofort, Freigaben erst nach Neuaufbau. */
+  excludeMismatch?: boolean
+}
+
+export type VaultLocateSourceResult =
+  | { status: 'fresh' | 'relocated'; fileRel: string; sourceHash: string; sourceStart: number; sourceEnd: number; startLine: number; heading: string }
+  | { status: 'changed'; fileRel: string; sourceHash: string }
+  | { status: 'missing'; fileRel: string }
+
+/** Abschluss-Ereignis einer Vault-Antwort (jedes Ereignis trägt die requestId). */
+export type VaultRagAnswerDone =
+  | { requestId: string; kind: 'answer'; answer: string; hits: VaultRagHitDto[]; report: import('./rag/citations').CitationReport; excludeMismatch: boolean; model: string }
+  | { requestId: string; kind: 'not-found'; bestScore: number | null; excludeMismatch: boolean; model: string }
+  | { requestId: string; kind: 'no-fresh-source'; staleFiles: string[]; excludeMismatch: boolean; model: string }
+  | { requestId: string; kind: 'cancelled' }
+  | { requestId: string; kind: 'error'; error: string }
 
 // FileTree Icon Customization
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
@@ -86,6 +185,11 @@ export interface OllamaModelInfo {
   name: string
   size: number
   capabilities?: string[]
+  /** Aus `/api/tags` — Identität der Gewichte (Vault-Index, F20). */
+  digest?: string
+  /** Ollama-Cloud-Modelle tragen diese Felder; ein Name ohne Cloud-Suffix reicht nicht (F21). */
+  remoteModel?: string
+  remoteHost?: string
 }
 
 // Update-Checker Types
@@ -847,6 +951,19 @@ export interface ElectronAPI {
   onProjectRagAnswerDone: (callback: () => void) => void;
   onProjectRagAnswerSources: (callback: (sources: RetrievedChunk[]) => void) => void;
   projectRagRerankCandidates: (vaultPath: string, queryText: string, candidateFolderRels: string[], embedModel: string) => Promise<{ success: boolean; ranking: Array<{ folderRel: string; score: number | null }>; error?: string }>;
+  // Vault-RAG (Phase 1)
+  vaultRagStatus: (vaultPath: string) => Promise<{ success: boolean; status?: VaultRagStatusDto; error?: string }>;
+  vaultRagConfigSet: (vaultPath: string, patch: Partial<VaultRagSettings>) => Promise<{ success: boolean; config?: VaultRagSettings; error?: string }>;
+  vaultRagEstimate: (vaultPath: string) => Promise<{ success: boolean; estimate?: { files: number; bytes: number; chunksApprox: number }; error?: string }>;
+  vaultRagBuild: (vaultPath: string) => Promise<{ success: boolean; jobId?: string; error?: string }>;
+  vaultRagBuildControl: (vaultPath: string, action: 'pause' | 'resume' | 'cancel') => Promise<{ success: boolean; error?: string }>;
+  vaultRagQuery: (vaultPath: string, query: string, filters: VaultQueryFiltersDto | undefined, opts: { topK?: number; minScore?: number; perFileCap?: number } | undefined, requestId: string) => Promise<VaultRagQueryResponse>;
+  onVaultRagProgress: (callback: (progress: VaultBuildProgressDto) => void) => () => void;
+  vaultRagAnswer: (vaultPath: string, query: string, requestId: string, language?: 'de' | 'en') => Promise<{ success: boolean; requestId?: string; kind?: string; error?: string }>;
+  vaultRagAnswerCancel: (requestId: string) => Promise<{ success: boolean }>;
+  vaultRagLocateSource: (vaultPath: string, ref: { fileRel: string; sourceHash: string; chunkHash: string; sourceStart: number; sourceEnd: number; startLine: number }) => Promise<{ success: boolean; result?: VaultLocateSourceResult; error?: string }>;
+  onVaultRagAnswerChunk: (callback: (payload: { requestId: string; chunk: string }) => void) => () => void;
+  onVaultRagAnswerDone: (callback: (payload: VaultRagAnswerDone) => void) => () => void;
 
   // LM Studio Local AI API (OpenAI-kompatibel)
   lmstudioCheck: (port?: number) => Promise<boolean>;

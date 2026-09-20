@@ -24,7 +24,8 @@ import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
-import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink, findNoteForWikilink } from '../../utils/linkExtractor'
+import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink, findNoteForWikilink, straightenQuotes } from '../../utils/linkExtractor'
+import { applyHighlights, clearHighlights, matchRanges } from '../../utils/inNoteSearch'
 import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, parsePluginEmbedSize } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
@@ -346,6 +347,27 @@ const md = new MarkdownIt({
   typographer: true,
   breaks: true,
   highlight: highlightCode
+})
+
+// Quellzeile an Block-Elementen (Sprung zur Textstelle aus dem Vault-Chat, F28): 0-basierte
+// Body-Zeile + `env.sourceLineOffset` (Zeilen des Frontmatters) = 0-basierte Dateizeile.
+// Callouts werden VOR dem Rendern durch HTML ersetzt, das mehr Zeilen hat als der Quelltext —
+// danach wären alle Zeilenangaben verschoben (real: Sprung sechs Zeilen zu früh). Deshalb trägt
+// jeder Callout-Wrapper `data-line-delta` (Zeilen im HTML minus Zeilen im Quelltext), und die
+// Regel zieht die aufgelaufene Differenz von allen folgenden Blöcken ab.
+md.core.ruler.push('source_lines', (state) => {
+  const offset = Number((state.env as { sourceLineOffset?: number })?.sourceLineOffset ?? 0)
+  let delta = 0
+  for (const token of state.tokens) {
+    if (!token.map) continue
+    if (token.nesting === 1) {
+      token.attrSet('data-source-line', String(Math.max(0, token.map[0] - delta + offset)))
+    }
+    if (token.type === 'html_block') {
+      const m = /data-line-delta="(-?\d+)"/.exec(token.content)
+      if (m) delta += Number(m[1])
+    }
+  }
 })
 
 // Task-Listen Plugin aktivieren (für - [ ] und - [x] Syntax)
@@ -703,7 +725,7 @@ md.renderer.rules.text = (tokens, idx) => {
     const fragment = hashIndex > -1 ? linkText.substring(hashIndex + 1) : ''
     const isBlock = fragment.startsWith('^')
 
-    return `<div class="wikilink-embed" data-note="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}" data-is-block="${isBlock}">
+    return `<div class="wikilink-embed" data-note="${md.utils.escapeHtml(straightenQuotes(noteName))}" data-fragment="${md.utils.escapeHtml(straightenQuotes(fragment))}" data-is-block="${isBlock}">
       <div class="wikilink-embed-loading">Lade ${md.utils.escapeHtml(linkText)}...</div>
     </div>`
   })
@@ -724,7 +746,10 @@ md.renderer.rules.text = (tokens, idx) => {
     // Display: explizit gesetzt → den nehmen, sonst den vollen Target-Part (mit Fragment)
     const displayText = explicitDisplay !== null ? explicitDisplay : targetPart
 
-    return `<a href="#" class="wikilink" data-link="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}">${md.utils.escapeHtml(displayText)}</a>`
+    // Das Ziel gerade schreiben: der Typograph hat im gerenderten Text bereits `'` → `’`
+    // ersetzt; so bleibt das Ziel auflösbar und der WYSIWYG-Roundtrip schreibt keine
+    // veränderten Wikilinks zurück (Anzeige darf typografisch bleiben).
+    return `<a href="#" class="wikilink" data-link="${md.utils.escapeHtml(straightenQuotes(noteName))}" data-fragment="${md.utils.escapeHtml(straightenQuotes(fragment))}">${md.utils.escapeHtml(displayText)}</a>`
   })
 
   return result
@@ -852,7 +877,7 @@ const calloutIcons: Record<string, string> = {
 }
 
 // Konvertiert Obsidian Callouts zu HTML (mit Verschachtelung und Markdown im Titel)
-function processCallouts(content: string): string {
+function processCallouts(content: string, lineBase = 0): string {
   // Callout Pattern: > [!type](+|-) optional title
   // Gefolgt von > content lines
   // `[ \t]+` statt `\s+`: `\s` frisst den Zeilenumbruch, dann wurde bei einem Callout
@@ -860,7 +885,7 @@ function processCallouts(content: string): string {
   // „! > erste Zeile …" im Lesen-Modus).
   const calloutRegex = /^>\s*\[!(\w+)\]([+-])?(?:[ \t]+(.+))?\n((?:>.*\n?)*)/gm
 
-  const result = content.replace(calloutRegex, (_match, type, foldModifier, customTitle, body) => {
+  const result = content.replace(calloutRegex, (_match: string, type: string, foldModifier: string | undefined, customTitle: string | undefined, body: string, matchIndex: number) => {
     const calloutType = type.toLowerCase()
     const title = customTitle || type.charAt(0).toUpperCase() + type.slice(1)
     const isFoldable = foldModifier === '+' || foldModifier === '-'
@@ -891,17 +916,24 @@ function processCallouts(content: string): string {
     const foldAttr = isFoldable ? (isCollapsed ? '-' : '+') : ''
     const dataAttrs = `data-callout-type="${escapedType}" data-callout-fold="${foldAttr}" data-callout-title="${escapedTitle}"`
 
-    if (isFoldable) {
-      return `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'} ${dataAttrs}>
+    // Zeilenversatz für die Quellzeilen-Regel (`source_lines`): nur der äußere Wrapper trägt
+    // ihn, innere Marker verschachtelter Callouts werden entfernt, sonst zählten sie doppelt.
+    // Innere Blöcke tragen Zeilen relativ zum Callout-Text — für den Quellsprung wertlos und
+    // irreführend, deshalb raus; der Wrapper selbst bekommt die Dateizeile des Callouts.
+    const innerBody = renderedBody.replace(/ data-line-delta="-?\d+"/g, '').replace(/ data-source-line="\d+"/g, '')
+    const countNl = (text: string): number => (text.match(/\n/g) ?? []).length
+    const startLine = lineBase + countNl(content.slice(0, matchIndex))
+    const html = isFoldable
+      ? `<details class="callout callout-${escapedType}"${isCollapsed ? '' : ' open'} ${dataAttrs}>
       <summary class="callout-title">${icon} ${renderedTitle}<span class="callout-fold-indicator"></span></summary>
-      <div class="callout-content">${renderedBody}</div>
+      <div class="callout-content">${innerBody}</div>
     </details>\n`
-    }
-
-    return `<div class="callout callout-${escapedType}" ${dataAttrs}>
+      : `<div class="callout callout-${escapedType}" ${dataAttrs}>
       <div class="callout-title">${icon} ${renderedTitle}</div>
-      <div class="callout-content">${renderedBody}</div>
+      <div class="callout-content">${innerBody}</div>
     </div>\n`
+    const lineDelta = countNl(html) - countNl(_match)
+    return html.replace(/^<(details|div)/, `<$1 data-line-delta="${lineDelta}" data-source-line="${startLine}"`)
   })
 
   return result
@@ -942,6 +974,31 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const containerRef = useRef<HTMLDivElement>(null)
   const previewRef = useRef<HTMLDivElement>(null)
   const editablePreviewRef = useRef<HTMLDivElement>(null)
+
+  // ─── Suche in der Notiz (Lesen-Modus, ⌘F) ─────────────────────────────────
+  // Markierung über die CSS-Highlight-Schnittstelle: das DOM bleibt unberührt, sonst
+  // schriebe das Autosave des Lesen-Modus die Markierungen über turndown in die Notiz.
+  const [findOpen, setFindOpen] = useState(false)
+  const [findQuery, setFindQuery] = useState('')
+  const [findIndex, setFindIndex] = useState(0)
+  const [findCount, setFindCount] = useState(0)
+  /** Zähler, der die Trefferberechnung erneut anstößt (nach DOM-Austausch, Codex F47). */
+  const [findRefresh, setFindRefresh] = useState(0)
+  const findRangesRef = useRef<Range[]>([])
+  const findInputRef = useRef<HTMLInputElement>(null)
+
+  const scrollToMatch = useCallback((index: number) => {
+    const range = findRangesRef.current[index]
+    const scroller = previewRef.current
+    if (!range || !scroller) return
+    const rect = range.getBoundingClientRect()
+    const box = scroller.getBoundingClientRect()
+    if (rect.height === 0 && rect.width === 0) return
+    if (rect.top < box.top + 60 || rect.bottom > box.bottom - 60) {
+      scroller.scrollBy({ top: rect.top - box.top - box.height / 3, behavior: 'smooth' })
+    }
+  }, [])
+
   // Aktive Plugin-Embed-Mounts der Preview, per Platzhalter-Element getrackt (R2).
   const pluginEmbedMountsRef = useRef(new Map<Element, { dispose: () => void }>())
   const viewRef = useRef<EditorView | null>(null)
@@ -1117,6 +1174,101 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       })
     }
   }, [viewMode])
+
+  // Sprung zur Quellenstelle (Vault-Chat, F28): nur für DIESE Notiz, nur wenn der geladene
+  // Inhalt dieselbe Fassung ist (sourceHash), sonst sichtbarer Hinweis statt stillem Sprung.
+  const pendingSourceTarget = useTabStore(s => s.pendingSourceTarget)
+  const setPendingSourceTarget = useTabStore(s => s.setPendingSourceTarget)
+  // Beim Notizwechsel per Quellenklick trägt `previewContent` für einen Render noch den Text der
+  // VORHERIGEN Notiz unter der neuen Notiz-ID — der Hash passt dann kurz nicht (real, 19.09.2026:
+  // falscher Hinweis „Quelle geändert" beim zweiten Klick). Deshalb gilt eine Abweichung erst als
+  // „geändert", wenn sie über eine kurze Karenz bestehen bleibt; passt der Inhalt vorher, wird gesprungen.
+  const SOURCE_JUMP_GRACE_MS = 1500
+  const sourceMismatchRef = useRef<{ token: number; since: number } | null>(null)
+  const [sourceJumpRetry, setSourceJumpRetry] = useState(0)
+  useEffect(() => {
+    const target = pendingSourceTarget
+    if (!target || isSecondary || !effectiveNoteId || target.noteId !== effectiveNoteId) return
+    // Ziel aus einem anderen Vault: nie anwenden, aufräumen (F28).
+    if (target.vaultPath !== vaultPath) { setPendingSourceTarget(null); return }
+    const content = viewMode === 'preview' ? previewContent : (viewRef.current?.state.doc.toString() ?? '')
+    if (!content) return
+    let cancelled = false
+    let graceTimer: ReturnType<typeof setTimeout> | null = null
+    // Sprung zur 0-basierten Zeile: Lesen-Modus über `data-source-line` (größte Zeile ≤ Ziel,
+    // Ziel 0 = Anfang), Schreiben/Markdown über CodeMirror-Selection und Scroll.
+    const jumpTo = (lineIdx: number, highlight = true): void => {
+      if (viewMode === 'preview') {
+        const root = editablePreviewRef.current
+        if (!root) return
+        if (lineIdx === 0 && !highlight) {
+          // Nächster scrollender Vorfahr (im Lesen-Modus `.editor-preview`), sonst der Wurzelknoten.
+          let scroller: HTMLElement | null = root
+          while (scroller && !(scroller.scrollHeight > scroller.clientHeight && /(auto|scroll)/.test(getComputedStyle(scroller).overflowY))) {
+            scroller = scroller.parentElement
+          }
+          ;(scroller ?? root).scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        }
+        let best: HTMLElement | null = null
+        let bestLine = -1
+        root.querySelectorAll<HTMLElement>('[data-source-line]').forEach(el => {
+          const l = Number(el.getAttribute('data-source-line'))
+          if (l <= lineIdx && l >= bestLine) { bestLine = l; best = el }
+        })
+        const el = best ?? root.querySelector<HTMLElement>('[data-source-line]')
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+          el.classList.add('source-jump-highlight')
+          setTimeout(() => el.classList.remove('source-jump-highlight'), 2500)
+        }
+      } else {
+        const view = viewRef.current
+        if (!view) return
+        const line = view.state.doc.line(Math.min(view.state.doc.lines, lineIdx + 1))
+        view.dispatch({
+          selection: { anchor: line.from },
+          effects: EditorView.scrollIntoView(line.from, { y: lineIdx === 0 ? 'start' : 'center' })
+        })
+        view.focus()
+      }
+    }
+    const run = async () => {
+      // Ohne Hash ist der Anfang das ausdrückliche Ziel (Quelle geändert, Codex F28).
+      if (target.sourceHash === null) {
+        setPendingSourceTarget(null)
+        jumpTo(0, false)
+        return
+      }
+      const canonical = content.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonical))
+      const hash = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('')
+      if (cancelled) return
+      if (hash !== target.sourceHash) {
+        const now = Date.now()
+        const m = sourceMismatchRef.current
+        if (!m || m.token !== target.token) sourceMismatchRef.current = { token: target.token, since: now }
+        if (now - (sourceMismatchRef.current?.since ?? now) < SOURCE_JUMP_GRACE_MS) {
+          // Karenz: Ziel behalten, kurz später erneut prüfen (Inhalt der Notiz kommt evtl. noch).
+          graceTimer = setTimeout(() => setSourceJumpRetry(n => n + 1), 250)
+          return
+        }
+        // Abweichung bleibt: sichtbarer Hinweis UND Rückfall auf den Anfang, nicht irgendwo stehen bleiben.
+        sourceMismatchRef.current = null
+        setPendingSourceTarget(null)
+        jumpTo(0, false)
+        window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'changed', noteId: target.noteId } }))
+        return
+      }
+      sourceMismatchRef.current = null
+      setPendingSourceTarget(null)
+      jumpTo(Math.max(0, target.line - 1))
+      window.dispatchEvent(new CustomEvent('mindgraph:sourceJump', { detail: { status: 'ok', noteId: target.noteId } }))
+    }
+    // Zwei Frames warten, damit Vorschau/Editor den Inhalt gezeichnet haben.
+    const raf = requestAnimationFrame(() => requestAnimationFrame(() => { void run() }))
+    return () => { cancelled = true; cancelAnimationFrame(raf); if (graceTimer) clearTimeout(graceTimer) }
+  }, [pendingSourceTarget, effectiveNoteId, viewMode, previewContent, isSecondary, vaultPath, setPendingSourceTarget, sourceJumpRetry])
 
   // Set up note click handler for dataview
   useEffect(() => {
@@ -3583,8 +3735,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Rendered markdown (mit Frontmatter-Titel, Callouts, Figures und interaktiven Checkboxen)
   const { frontmatterTitle, renderedMarkdown, bodyStartsWithH1 } = useMemo(() => {
     const { title, body } = parseFrontmatter(previewContent)
-    const withCallouts = processCallouts(body)
-    const htmlContent = md.render(withCallouts)
+    const sourceLineOffset = (previewContent.slice(0, previewContent.length - body.length).match(/\n/g) ?? []).length
+    const withCallouts = processCallouts(body, sourceLineOffset)
+    const htmlContent = md.render(withCallouts, { sourceLineOffset })
     const withFigures = processFigures(htmlContent)
     const withInteractiveCheckboxes = processTaskCheckboxes(withFigures, previewContent)
     const withFoldableHeadings = processHeadingFolds(withInteractiveCheckboxes)
@@ -3610,6 +3763,60 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewContent, processHeadingFolds, imagesLoadedVersion])
+
+  // Treffer neu suchen, wenn Suchtext oder gerenderter Inhalt sich ändern.
+  useEffect(() => {
+    if (!findOpen || viewMode !== 'preview') {
+      clearHighlights()
+      findRangesRef.current = []
+      setFindCount(0)
+      return
+    }
+    const root = editablePreviewRef.current
+    if (!root) return
+    const ranges = matchRanges(root, findQuery)
+    findRangesRef.current = ranges
+    setFindCount(ranges.length)
+    setFindIndex((prev) => (ranges.length === 0 ? 0 : Math.min(prev, ranges.length - 1)))
+  }, [findOpen, findQuery, viewMode, renderedMarkdown, findRefresh])
+
+  // Markierung setzen und zum aktuellen Treffer scrollen.
+  useEffect(() => {
+    if (!findOpen || viewMode !== 'preview') return
+    applyHighlights(findRangesRef.current, findIndex)
+    scrollToMatch(findIndex)
+  }, [findOpen, findIndex, findCount, viewMode, scrollToMatch])
+
+  useEffect(() => () => clearHighlights(), [])
+
+  // Wird die Vorschau neu aufgebaut (nachgeladene Bilder, Faltungen, Dataview), zeigen die Ranges
+  // auf abgehängte Knoten und die Markierung verschwindet lautlos (Codex F47). Ein Beobachter
+  // sucht dann neu; `findRefresh` stößt denselben Effekt an wie eine Änderung des Suchtexts.
+  useEffect(() => {
+    if (!findOpen || viewMode !== 'preview') return
+    const root = editablePreviewRef.current
+    if (!root) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const observer = new MutationObserver(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => setFindRefresh((n) => n + 1), 120)
+    })
+    observer.observe(root, { childList: true, subtree: true, characterData: true })
+    return () => { observer.disconnect(); if (timer) clearTimeout(timer) }
+  }, [findOpen, viewMode])
+
+  const findStep = useCallback((delta: number) => {
+    const n = findRangesRef.current.length
+    if (n === 0) return
+    setFindIndex((prev) => (prev + delta + n) % n)
+  }, [])
+
+  const closeFind = useCallback(() => {
+    setFindOpen(false)
+    clearHighlights()
+    findRangesRef.current = []
+    setFindCount(0)
+  }, [])
 
   // Add copy buttons to fenced code blocks in preview mode
   useEffect(() => {
@@ -4355,6 +4562,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         e.preventDefault()
         toggleViewMode()
       }
+      // ⌘F: Suche in der Notiz — nur im Lesen-Modus (Markdown/Schreiben hat die CodeMirror-Suche).
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f' && !e.shiftKey && viewMode === 'preview' && !isSecondary) {
+        e.preventDefault()
+        setFindOpen(true)
+        requestAnimationFrame(() => { findInputRef.current?.focus(); findInputRef.current?.select() })
+      }
       // Formatierungs-Shortcuts im Edit- und Live-Preview-Modus
       if ((viewMode === 'edit' || viewMode === 'live-preview') && viewRef.current && (e.metaKey || e.ctrlKey)) {
         switch (e.key) {
@@ -4379,7 +4592,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [viewMode, applyFormat])
+  }, [viewMode, applyFormat, isSecondary])
 
   // Annotation aus dem Lesen-Modus: Zitat + Zitation an die co-lokierte Sammeldatei
   // anhängen und die Stelle sitzungsweise einfärben. Quelle bleibt unverändert (Overlay).
@@ -5108,6 +5321,33 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         onContextMenu={handlePreviewContextMenu}
         ref={previewRef}
       >
+        {findOpen && viewMode === 'preview' && (
+          <div className="note-find-bar" onMouseDown={(e) => e.stopPropagation()}>
+            <input
+              ref={findInputRef}
+              type="text"
+              value={findQuery}
+              placeholder={t('editor.findPlaceholder')}
+              onChange={(e) => { setFindQuery(e.target.value); setFindIndex(0) }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') { e.preventDefault(); closeFind() }
+                if (e.key === 'Enter') { e.preventDefault(); findStep(e.shiftKey ? -1 : 1) }
+              }}
+            />
+            <span className="note-find-count">
+              {findQuery.trim().length < 2 ? '' : findCount === 0 ? t('editor.findNone') : `${findIndex + 1}/${findCount}`}
+            </span>
+            <button onClick={() => findStep(-1)} disabled={findCount === 0} title={t('editor.findPrev')} aria-label={t('editor.findPrev')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+            </button>
+            <button onClick={() => findStep(1)} disabled={findCount === 0} title={t('editor.findNext')} aria-label={t('editor.findNext')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button onClick={closeFind} title={t('editor.findClose')} aria-label={t('editor.findClose')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        )}
         {previewToolbar && viewMode === 'preview' && (
           <div
             className="preview-edit-toolbar"

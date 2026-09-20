@@ -36,6 +36,7 @@ import { PageHeader, SectionTitle, Card, ServiceHead, IconTile, TILE_GLYPH, Row,
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { ModelPicker } from '../Shared/ModelPicker'
+import { VaultIndexSection } from './VaultIndexSection'
 import { ExternalLink } from '../Shared/ExternalLink'
 
 import {
@@ -1757,6 +1758,16 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   </Card>
 
                   {/* ── Cloud-Anbieter (Opt-in) ── */}
+                  {!isLm && projectRagOn && (
+                    <>
+                      <SectionTitle title={t('settings.vaultIndex.title')} />
+                      <Card anchor="ai-vault-index">
+                        <p className="sui-hint">{t('settings.vaultIndex.subtitle')}</p>
+                        <VaultIndexSection />
+                      </Card>
+                    </>
+                  )}
+
                   <SectionTitle title={t('settings.aiTab.cloud')} meta={t('settings.aiTab.cloudActive', { n: cloudActiveCount, total: 3 })} />
                   <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>
                   <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>

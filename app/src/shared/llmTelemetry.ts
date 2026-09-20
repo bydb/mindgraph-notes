@@ -40,6 +40,7 @@ export const LLM_MODULES = [
   'synonyms',          // Projekt-Synonyme
   'zettel',            // Zettel-Vorschlag (Tags, Emojis)
   'project-rag',
+  'vault-rag',
   'vision-ocr',        // Vision-OCR und OCR-Textbereinigung
   'image',             // Bildgenerierung über Ollama
   'connection-test',   // „Antworte nur mit: OK"

@@ -22396,3 +22396,130 @@ body.presentation-mode *::after {
   transition: all var(--transition-fast);
 }
 .settings-btn:hover { background: var(--bg-tertiary); }
+
+
+/* ── Notiz-Chat: Vault-Modus, Fußnoten und Zitatprüfung ─────────────────── */
+.nc-cite {
+  font-size: 0.75em;
+  vertical-align: super;
+  color: var(--accent-color, #0f766e);
+  cursor: pointer;
+  margin-left: 1px;
+}
+.nc-cite:hover { text-decoration: underline; }
+.nc-vault-footer {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid color-mix(in srgb, var(--text-color) 12%, transparent);
+  font-size: 0.85em;
+}
+.nc-vault-footer h5 {
+  margin: 6px 0 4px;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.7;
+}
+.nc-vault-sources { list-style: none; padding: 0; margin: 0; }
+.nc-vault-sources li { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.nc-vault-sources .nc-source-n { opacity: 0.6; min-width: 1.6em; }
+.nc-vault-sources .nc-source-link { cursor: pointer; color: var(--accent-color, #0f766e); }
+.nc-vault-sources .nc-source-link:hover { text-decoration: underline; }
+.nc-vault-sources .nc-source-meta { opacity: 0.6; }
+.nc-vault-summary { opacity: 0.8; margin: 2px 0 4px; }
+.nc-vault-flags { list-style: none; padding: 0; margin: 0; }
+.nc-vault-flags li { padding: 2px 0; display: flex; gap: 6px; align-items: baseline; }
+.nc-vault-flags .nc-flag {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex: none; position: relative; top: -1px;
+}
+.nc-flag.is-uncited { background: #d97706; }
+.nc-flag.is-low { background: #b45309; }
+.nc-flag.is-invalid { background: #d93d42; }
+.nc-flag.is-quote { background: #7c3aed; }
+.nc-vault-flags .nc-flag-text { opacity: 0.85; }
+.nc-vault-legend { opacity: 0.6; margin-top: 6px; font-size: 0.8em; }
+
+/* Vault-Knopf im Notiz-Chat: Symbol + sichtbares Wort statt nur Tooltip */
+.notes-chat-context-buttons button.has-label {
+  width: auto;
+  padding: 0 9px 0 7px;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* Sprung zur Quellenstelle (Vault-Chat, F28) */
+.source-jump-highlight {
+  background: color-mix(in srgb, var(--accent-color, #0f766e) 18%, transparent);
+  transition: background 1.2s ease;
+  border-radius: 4px;
+}
+.nc-source-notice {
+  margin: 6px 12px 0;
+  padding: 6px 10px;
+  font-size: 0.85em;
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, #d97706 14%, transparent);
+  border: 1px solid color-mix(in srgb, #d97706 40%, transparent);
+}
+
+
+/* Suche in der Notiz (Lesen-Modus, ⌘F). Die Markierung läuft über die CSS-Highlight-
+   Schnittstelle — kein DOM-Eingriff, damit das WYSIWYG-Autosave nichts zurückschreibt. */
+/* `::highlight()` kennt nur wenige Eigenschaften — `background-color`, NICHT die Kurzform
+   `background`. Und die Akzentfarbe heißt `--accent-color`; mit `var(--accent)` war der
+   `color-mix()`-Wert ungültig und die ganze Regel fiel weg (real, 20.09.2026: Zähler zählte,
+   nichts war markiert). */
+::highlight(mg-find) {
+  background-color: color-mix(in srgb, var(--accent-color) 30%, transparent);
+}
+::highlight(mg-find-current) {
+  background-color: var(--accent-color);
+  color: #fff;
+}
+.note-find-bar {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: var(--bg-elevated, var(--bg-secondary));
+  border: 1px solid var(--border-color);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+.note-find-bar input {
+  width: 220px;
+  padding: 5px 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.note-find-bar input:focus { outline: none; border-color: var(--accent); }
+.note-find-count {
+  min-width: 62px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.note-find-bar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.note-find-bar button:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+.note-find-bar button:disabled { opacity: 0.4; cursor: default; }

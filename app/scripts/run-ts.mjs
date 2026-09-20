@@ -20,6 +20,15 @@ if (!entry) {
 const outdir = mkdtempSync(join(tmpdir(), 'mg-runts-'))
 const outfile = join(outdir, 'bundle.cjs')
 
+// `electron` wird auf einen Stub umgebogen: Telemetrie/Ledger importieren es
+// statisch, in reinem Node wirft das echte Paket beim Laden.
+const electronStub = {
+  name: 'electron-stub',
+  setup(b) {
+    b.onResolve({ filter: /^electron$/ }, () => ({ path: new URL('./electron-stub.cjs', import.meta.url).pathname }))
+  }
+}
+
 await build({
   entryPoints: [entry],
   bundle: true,
@@ -27,7 +36,8 @@ await build({
   format: 'cjs',
   target: 'node18',
   outfile,
-  logLevel: 'warning'
+  logLevel: 'warning',
+  plugins: [electronStub]
 })
 
 const child = spawn(process.execPath, [outfile, ...process.argv.slice(3)], { stdio: 'inherit' })

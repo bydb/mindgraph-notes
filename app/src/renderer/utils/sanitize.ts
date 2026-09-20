@@ -32,7 +32,9 @@ const ALLOWED_ATTR = [
   // Data attributes (used extensively by our app)
   'data-src', 'data-link', 'data-fragment', 'data-note', 'data-embed-type',
   'data-callout-type', 'data-processed', 'data-heading-id', 'data-checkbox-index',
-  'data-line', 'data-block-id',
+  'data-line', 'data-block-id', 'data-source-line', 'data-cite',
+  // Zitat-Hochzahlen (Vault-Chat) und Tastaturfokus
+  'role', 'tabindex',
   // SVG attributes
   'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
   'd', 'cx', 'cy', 'r', 'rx', 'ry', 'x', 'y', 'x1', 'y1', 'x2', 'y2',
@@ -46,6 +48,9 @@ const ALLOWED_ATTR = [
   'accentunder', 'columnalign', 'columnlines', 'columnspacing',
   'rowalign', 'rowlines', 'rowspacing', 'displaystyle', 'scriptlevel',
 ]
+
+/** Exportiert, damit Tests belegen können, welche Attribute die Zitat-Hochzahlen überleben. */
+export const SANITIZE_ALLOWED_ATTR: readonly string[] = ALLOWED_ATTR
 
 /**
  * Sanitize HTML content for safe rendering via dangerouslySetInnerHTML.

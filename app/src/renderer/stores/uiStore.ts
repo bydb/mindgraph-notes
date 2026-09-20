@@ -578,7 +578,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'docling',          label: 'Docling',          description: 'PDF-Textextraktion via Docling-Server', category: 'documents' },
   { id: 'vision-ocr',       label: 'Vision OCR',       description: 'Bilder und Scans per Vision-Modell in Text umwandeln', category: 'documents' },
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
-  { id: 'project-rag',      label: 'Projekt-RAG',      description: 'Projektordner semantisch befragen — On-demand-Index, Embedding & Antwort lokal', category: 'ai' },
+  { id: 'project-rag',      label: 'Notizen befragen (RAG)', description: 'Projektordner oder den ganzen Vault semantisch befragen — Index, Embedding & Antwort lokal; der Vault-Index braucht ein eigenes Opt-in pro Vault', category: 'ai' },
   { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' },
   { id: 'agent-shell',      label: 'Agent-Shell',      description: 'Der Notiz-Agent darf nach Freigabe pro Lauf Befehle und Skripte ausführen — in einer Sandbox mit Schutzgrenzen (nur Anhänge lesen, nur Arbeitsordner schreiben, kein Netz); experimentell, derzeit macOS', category: 'ai' },
   { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Nano Banana erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und Notiz-Agenten', category: 'ai' }

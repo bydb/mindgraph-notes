@@ -2,6 +2,22 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.16-beta] - 2026-09-20
+
+**Du kannst deinen ganzen Notizspeicher befragen und bekommst Antworten mit anklickbaren Quellenangaben.** Ein Klick auf eine Quellennummer öffnet die Notiz genau an der Stelle, aus der die Aussage stammt. Unter jeder Antwort steht, was die App geprüft hat: Sätze ohne Quellenangabe, schwache Übereinstimmung mit der Quelle, Quellennummern, die es nicht gibt, und Zitate, die so nicht im Original stehen — geprüft wird also die Herkunft, nicht ob eine Aussage wahr ist. Findet die Suche keinen ausreichend ähnlichen Treffer, sagt die App das, statt zu raten; Suche und Antwort laufen auf deinem Rechner.
+
+### Hintergrund
+
+- Du entscheidest je Notizspeicher, ob er durchsuchbar wird. Der Index entsteht erst nach einem Klick in den Einstellungen unter KI und Modelle, nie von selbst im Hintergrund. Vorher siehst du, wie viele Notizen betroffen sind, und kannst Ordner ausnehmen.
+- Der Aufbau eines großen Notizspeichers dauert je nach Menge einige Minuten. Er pausiert, sobald du mit der KI arbeitest, und macht danach weiter; du kannst ihn jederzeit anhalten oder abbrechen und später fortsetzen. Ein abgebrochener Lauf verliert nichts.
+- Antworten entstehen nur mit einem Modell auf deinem Rechner. Cloud-Modelle lehnt die App für diese Funktion ab, auch wenn sie unter einer lokalen Adresse erreichbar sind. Eine Vault-Frage und ihre Antwort gehen außerdem nie in den Verlauf des normalen Notizen-Chats, damit sie auch später keinen Anbieter erreichen.
+- Jede Quelle wird vor der Antwort gegen die Datei auf der Festplatte geprüft. Hat sich eine Notiz seit dem Index geändert, sucht die App die Stelle neu; findet sie sie nicht eindeutig wieder, lässt sie die Quelle weg, statt auf eine falsche Zeile zu zeigen.
+- Nicht jede Notiz ist eine Quelle: gespeicherte Antworten aus diesem Chat, die Tagesnotizen des Gehirns und das Anweisungsmaterial des Agenten bleiben draußen, sonst zitiert die App am Ende sich selbst. Wer schon einen Index hat, bekommt in den Einstellungen einen Hinweis und baut ihn in Sekunden neu auf; die vorhandenen Einbettungen bleiben erhalten.
+- **Neu im Lesen-Modus:** Mit Befehlstaste F durchsuchst du die geöffnete Notiz. Treffer werden hervorgehoben, Eingabe springt zum nächsten, Escape schließt.
+- **Grenze:** Die Prüfung unter der Antwort vergleicht Quellennummern, wörtliche Zitate und die Wortübereinstimmung zwischen Satz und Quelle. Sie sagt nichts darüber, ob eine Aussage stimmt oder aus der genannten Stelle folgt. Ein unauffälliger Prüfsatz ist kein Beleg, nur ein Hinweis, dass nichts Offensichtliches fehlt. Nicht als Zitat gewertet wird ein Ausdruck, der genau dem Titel einer der genannten Quellen entspricht — dann nennt die Antwort ein Dokument, statt daraus zu zitieren.
+- **Grenze:** Fragen, die viele Notizen überblicken sollen, werden dünn beantwortet. Für eine Antwort gehen nur wenige Stellen an das Modell; Nachschlagefragen liegen ihm deutlich besser als Zusammenfassungen über Dutzende Notizen.
+- Die Schwellen für „ähnlich genug“ wurden an einem echten Notizspeicher gemessen und nicht geraten. Sie gelten als vorläufig: eine unabhängige Gegenprobe mit weiteren selbst gestellten Fragen steht noch aus.
+
 ## [0.11.15-beta] - 2026-09-18
 
 **Termine aus E-Mails: Ganztägige und mehrtägige Veranstaltungen werden jetzt richtig erkannt und eingetragen.** Nennt eine Einladung nur Tage und keine Uhrzeit, schlägt die Prüfkarte einen ganztägigen Termin vor, bei mehreren Tagen mit Beginn und letztem Tag. Eine Uhrzeit oder Dauer, die gar nicht in der Mail steht, trägt die App nicht mehr ein; die Karte sagt stattdessen, was sie angenommen hat. Scheitert das Eintragen in den macOS-Kalender, nennt die App jetzt den Grund und den nächsten Schritt.
