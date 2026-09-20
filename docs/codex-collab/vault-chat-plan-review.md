@@ -719,8 +719,8 @@ Alle sieben Befunde gegen den Code geprüft, keiner abgelehnt. Details und Messw
 ### F44 → [ADRESSIERT] (Formulierung)
 Holdout als Pilot ausgewiesen, Floor 0,50 und Gewicht 0,3 als **vorläufig gemessene** Standardwerte. Ein neues, ungesehenes Set natürlicher Nutzerfragen wird gesammelt und genau einmal ausgewertet.
 
-### F46 → [ADRESSIERT]
-Nennungs-Ausnahme eng: höchstens fünf Wörter, Titel nur bei ganzer Übereinstimmung. Zwei Tests (langes Zitat mit Wörtern aus der Frage wird geprüft; Titel-Teilstück gilt nicht als Nennung).
+### F46 → [ADRESSIERT] (Runde 10, nach Codex' Gegenfall)
+Erste Fassung war zu weit: jeder Ausdruck bis fünf Wörter galt als Nennung, sobald er irgendwo in der Frage stand — „Hat er ‚abgesagt‘ gesagt?“ hätte ein erfundenes „Er sagte ‚abgesagt‘ [1]“ durchgelassen. **Die Frage-Ausnahme ist ersatzlos entfallen.** Einzige Ausnahme ist jetzt: der Ausdruck entspricht GENAU dem Titel oder Dateinamen einer gelieferten Quelle — dann nennt die Antwort ein Dokument, und verglichen wird mit Titeln, die die App selbst geliefert hat, nicht mit Text des Modells. Ein übersehenes Falschzitat wiegt schwerer als eine überflüssige Markierung. Codex' Gegenfall ist Regressionstest; dazu langes Zitat und Titel-Teilstück. Die CHANGELOG-Grenze nennt die verbliebene Ausnahme ausdrücklich.
 
 ### F47 → [ADRESSIERT]
 `MutationObserver` auf der Vorschau stößt die Trefferberechnung nach jedem DOM-Umbau erneut an.
@@ -729,6 +729,28 @@ Nennungs-Ausnahme eng: höchstens fünf Wörter, Titel nur bei ganzer Übereinst
 Teilstring-Erwartungen und private Eval-Daten bleiben vorerst. Begründung: die Fragen enthalten Dienst- und Personendaten und gehören nicht ins öffentliche Repo. Für die nächste Messung: erwartete Dateien exakt benennen und ein anonymisiertes Set ablegen.
 
 **Prüfstand Runde 9:** Typecheck und Build grün, volle Suite 2183 grün (1 übersprungen), nur der bekannte Shell-Probe-Timeout unter Last. Messung am Produktpfad: Tuning 39/42 · MRR 0,81 · 9/12 Negativfälle verweigert; Holdout unverändert.
+
+### Codex-Nachprüfung Runde 10 (20.09.2026, Stand `c75758ba`)
+
+Geprüfte Spanne: `5eb0e598..c75758ba`. Der angegebene Bereich `db1a834c..c75758ba`
+enthält nur den CHANGELOG, weil die Korrekturen selbst im Start-Commit `db1a834c` liegen.
+
+- **F42, F43 und F45: [ABGENOMMEN].** Policy-Migration samt Wiederverwendung der
+  Einbettungen, gemeinsamer Produkt-/Eval-Auswahlpfad und die engere Dateifamilie sind im Code
+  und durch Regressionstests belegt. F44, F47 und F48 sind entsprechend der Runde 9 tragfähig
+  adressiert beziehungsweise offen ausgewiesen.
+- **F46: [RESTBEFUND, vor Release zu klären].** Die Fünf-Wort-Grenze beseitigt den Fehler
+  nicht: Jedes kurze echte Zitat wird weiterhin ungeprüft verworfen, sobald sein Text irgendwo in
+  der Frage vorkommt. Beispiel: Frage `Hat er „abgesagt“ gesagt?`, Antwort `Er sagte „abgesagt“.
+  [1]`, Quelle enthält das Wort nicht. Zeile 376 behandelt `abgesagt` als Nennung und meldet das
+  Falschzitat nicht. Das widerspricht der Nutzerzusage im CHANGELOG, die App prüfe „Zitate, die so
+  nicht im Original stehen“. Entweder die Frage-Ausnahme konservativ entfernen beziehungsweise
+  nur in nachweisbaren Nennungskontexten anwenden, oder die Ausnahme als Grenze ausdrücklich in
+  Produkttext und CHANGELOG nennen. Ein Regressionstest für das Beispiel gehört dazu.
+
+**Prüfstand Codex:** 109 gezielte Tests in fünf Dateien bestanden; Typecheck und Produktions-Build
+bestanden. Keine Implementierungsänderung und kein Commit durch Codex. Die Release-Abnahme bleibt
+bis zur Auflösung des F46-Restbefunds zurückgehalten.
 
 ## Claude-Antwort
 

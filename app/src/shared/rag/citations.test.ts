@@ -158,23 +158,25 @@ describe('analyzeCitations', () => {
   })
 })
 
-describe('Nennungen in Anführungszeichen sind keine Zitate', () => {
-  it('Suchbegriff aus der Frage und Notiztitel werden nicht als „Zitat nicht im Original“ geführt', () => {
-    const r = analyzeCitations('Zum Thema „Computer use“ verweist die Notiz „Lokale Modelle in MindGraph Notes“ auf das Budget von 10.000 Euro. [1] Er sagte „das wird teuer“. [1]', sources,
-      { question: 'Findest du etwas zum Thema Computer use?', sourceTitles: ['Lokale Modelle in MindGraph Notes', 'Budget.md'] })
+describe('Nennung eines Notiztitels ist kein Zitat — sonst wird geprüft (F46)', () => {
+  it('ein genannter Quellentitel zählt nicht, eine erfundene Aussage schon', () => {
+    const r = analyzeCitations('Die Notiz „Lokale Modelle in MindGraph Notes“ nennt das Budget von 10.000 Euro. [1] Er sagte „das wird teuer“. [1]', sources,
+      { sourceTitles: ['Lokale Modelle in MindGraph Notes', 'Budget.md'] })
     expect(r.sentences[0].quotes).toEqual([])
     expect(r.sentences[1].quotes).toEqual([{ text: 'das wird teuer', found: false }])
     expect(r.summary.quotesNotFound).toBe(1)
   })
 
-  it('lange Zitate werden geprüft, auch wenn ihre Wörter in der Frage stehen (F46)', () => {
-    const lang = 'Das Budget der Digitalwoche beträgt laut Schulamt genau zehntausend Euro'
-    const r = analyzeCitations(`Er schrieb „${lang}". [1]`, sources, { question: `Stimmt es, dass ${lang}?`, sourceTitles: [] })
-    expect(r.sentences[0].quotes).toEqual([{ text: lang, found: false }])
+  it('kurzes Zitat wird geprüft, auch wenn sein Wortlaut in der Frage steht (Codex-Gegenfall F46)', () => {
+    const r = analyzeCitations('Er sagte „abgesagt“. [1]', sources, { sourceTitles: ['Protokoll'] })
+    expect(r.sentences[0].quotes).toEqual([{ text: 'abgesagt', found: false }])
+    expect(r.summary.quotesNotFound).toBe(1)
   })
 
-  it('Titel-Nennung nur bei ganzer Übereinstimmung, nicht bei einem Teilstück (F46)', () => {
-    const r = analyzeCitations('Die Notiz „Lokale Modelle" sagt etwas. [1]', sources, { question: 'x', sourceTitles: ['Lokale Modelle in MindGraph Notes'] })
+  it('langes Zitat wird geprüft; ein Titel-Teilstück gilt nicht als Nennung', () => {
+    const lang = 'Das Budget der Digitalwoche beträgt laut Schulamt genau zehntausend Euro'
+    expect(analyzeCitations(`Er schrieb „${lang}“. [1]`, sources).sentences[0].quotes).toEqual([{ text: lang, found: false }])
+    const r = analyzeCitations('Die Notiz „Lokale Modelle“ sagt etwas. [1]', sources, { sourceTitles: ['Lokale Modelle in MindGraph Notes'] })
     expect(r.sentences[0].quotes).toEqual([{ text: 'Lokale Modelle', found: false }])
   })
 })

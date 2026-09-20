@@ -70,15 +70,20 @@ export interface CitationReport {
 export interface CitationOptions {
   /** Startwert 0,3 — wird in Phase 3 kalibriert. */
   supportThreshold?: number
-  /** Die gestellte Frage: in Anführungszeichen wiederholte Begriffe daraus sind keine Zitate (real: „Computer use“). */
-  question?: string
-  /** Überschrift und Dateiname je Quelle: in Anführungszeichen genannte Notiztitel sind keine Zitate. */
+  /**
+   * Überschriften und Dateinamen der Quellen. Steht genau einer davon in Anführungszeichen, ist das
+   * die Nennung eines Dokuments, keine Behauptung über seinen Inhalt — und die App vergleicht dabei
+   * mit Titeln, die sie selbst geliefert hat, nicht mit Text des Modells.
+   *
+   * Eine frühere Ausnahme für Begriffe aus der FRAGE ist wieder entfallen (Codex F46): sie hätte
+   * ein erfundenes Kurzzitat durchgelassen, sobald sein Wortlaut zufällig in der Frage stand
+   * („Hat er ‚abgesagt‘ gesagt?“ → „Er sagte ‚abgesagt‘“). Ein übersehenes Falschzitat wiegt
+   * schwerer als eine überflüssige Markierung.
+   */
   sourceTitles?: string[]
 }
 
 const DEFAULT_THRESHOLD = 0.3
-/** Nennungen sind kurz; ein ganzer Satz in Anführungszeichen ist ein Zitat und wird geprüft. */
-const MAX_MENTION_WORDS = 5
 
 const TRANSITIONS = new Set([
   'kurz gesagt', 'zusammengefasst', 'zusammenfassung', 'fazit', 'kurzum', 'in kürze',
@@ -328,7 +333,6 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   const K = sources.length
   const sourceWords = sources.map(contentWords)
   const sourceNorm = sources.map(normalizeWs)
-  const questionNorm = opts.question ? normalizeWs(opts.question) : ''
   const titleNorm = (opts.sourceTitles ?? []).map(normalizeWs).filter(Boolean)
 
   const refs: CitationRef[] = []
@@ -368,13 +372,9 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
       const normalized = normalizeWs(plain).replace(/[.:!…]+$/g, '').trim()
       const quotes = findQuotes(plain).flatMap((q) => {
         const nq = normalizeWs(q)
-        // Nennungen sind keine Zitate: ein in Anführungszeichen gesetzter Suchbegriff oder
-        // Notiztitel. Die Ausnahme ist ENG gefasst (Codex F46) — höchstens fünf Wörter, und der
-        // Titel muss ganz übereinstimmen. Sonst verschwände ein echtes Falschzitat, nur weil seine
-        // Wörter zufällig in der Frage stehen.
-        const words = nq.split(' ').filter(Boolean).length
-        if (words <= MAX_MENTION_WORDS && questionNorm && questionNorm.includes(nq)) return []
-        if (words <= MAX_MENTION_WORDS && titleNorm.some((t) => t === nq)) return []
+        // Einzige Ausnahme: der Ausdruck ist GENAU der Titel einer gelieferten Quelle (Nennung
+        // eines Dokuments). Alles andere wird gegen die Quelle geprüft (Codex F46).
+        if (titleNorm.some((t) => t === nq)) return []
         const target = localRefs.length > 0 ? localRefs.map((n) => sourceNorm[n - 1]) : sourceNorm
         return [{ text: q, found: target.some((s) => s.includes(nq)) }]
       })
