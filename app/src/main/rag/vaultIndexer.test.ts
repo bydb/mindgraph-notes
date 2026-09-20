@@ -165,6 +165,23 @@ describe('VaultIndexJob — Voll-Build', () => {
     expect(resolveCalls).toBeGreaterThanOrEqual(2)
   })
 
+  it('abgeleitete KI-Notizen (gespeicherte Antwort, Brain-Tagesnotiz) landen nicht im Index', async () => {
+    await writeNote('00 - Inbox/202609201144 - Antwort.md', '---\ntitle: "Antwort"\nki-modell: qwen3.8:27b-mlx\nki-typ: vault-chat-antwort\n---\n\nDie App hat geantwortet, dass die Pumpe täglich läuft [^q-1].\n')
+    await writeNote('emails/2026-09-20 Mail.md', '---\ntitle: Mail\nki-modell: qwen3.8:27b-mlx\n---\n\nVon: Schulamt. Die Aula ist bis 16:30 frei.\n')
+    await writeNote('800 - brain/2026/09/19.md', '---\ntype: brain-day\ndate: 2026-09-19\n---\n\n## Heute im Fokus\n- Neubewertung Stelle erwähnt\n')
+    const { j } = job()
+    const res = await j.run()
+    expect(res.status).toBe('done')
+    const container = await loadVaultIndexFile(vaultIndexPath(vault, identityFor(['400 - Archiv'])))
+    const rels = Object.keys(container!.meta.files)
+    expect(rels.some((r) => r.includes('Antwort.md'))).toBe(false)
+    expect(rels.some((r) => r.includes('brain/'))).toBe(false)
+    expect(container!.meta.chunks.some((c) => /Pumpe täglich|Neubewertung Stelle/.test(c.text))).toBe(false)
+    // Mail-Notiz mit bloßer KI-Provenienz bleibt Quelle
+    expect(rels.some((r) => r.includes('Mail.md'))).toBe(true)
+    expect(res.fileCount).toBe(4)
+  })
+
   it('Ausschlussliste ändert die Identität und damit den Dateinamen', async () => {
     await job({ excludeFolders: [] }).j.run()
     await job({ excludeFolders: ['400 - Archiv'] }).j.run()

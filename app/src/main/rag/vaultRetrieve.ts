@@ -54,6 +54,8 @@ export interface VaultQueryOptions {
   excludeFolders?: string[]
   /** Umsortierung der Kandidaten: Bedeutungsnähe + Gewicht × Wortabgleich (Floor bleibt auf der Bedeutungsnähe). */
   lexicalWeight?: number
+  /** Cosine-Schwelle, ab der ein Kandidat als Near-Duplikat eines gewählten Treffers gilt (0 = aus). */
+  nearDupCosine?: number
 }
 
 export interface VaultQueryResult {
@@ -77,6 +79,30 @@ export const DEFAULT_VAULT_TOP_K = 8
 export const DEFAULT_VAULT_MIN_SCORE = 0.5
 /** Gewicht des seltenheitsgewichteten Wortabgleichs bei der Umsortierung (0 = aus). */
 export const DEFAULT_LEXICAL_WEIGHT = 0.3
+/**
+ * Near-Duplikate über Dateien hinweg: ein Kandidat, dessen Embedding einem bereits gewählten
+ * Treffer mit Cosine ≥ Schwelle gleicht, wird übersprungen (0 = aus). Real: Kopien einer
+ * Statusnotiz („_STATUS-2026-W21“, „W21 (2)“, „W20 (6)“) und „10000 Euro Erlass“ neben
+ * „… - Ueberprueft“ belegten je drei bis vier der acht Quellenplätze. Schwelle: Phase-3-Messung.
+ */
+export const DEFAULT_NEAR_DUP_COSINE = 0
+// Gemessen 20.09.2026: die realen Kopien liegen im Embedding-Raum bei Cosine 0,64–0,90 (Erlass vs.
+// „Ueberprueft“ max 0,77; Statusnotiz vs. „(2)“-Kopie 0,70–0,99) — eine Schwelle ≥ 0,93 änderte am
+// Tuning-Set nichts (Ø Dateien je Antwort 5,9 in allen Stufen), niedrigere Schwellen träfen echte
+// Nachbarabschnitte. Deshalb aus; stattdessen greift der Deckel pro Dateifamilie (`familyKey`).
+
+/**
+ * Dateifamilie: Kopien wie „Notiz (2).md“, „Notiz (6).md“ oder „Notiz - Ueberprueft.md“ teilen sich
+ * den Pro-Datei-Deckel mit dem Original. Real belegten vier Fassungen einer Statusnotiz vier der
+ * acht Quellenplätze.
+ */
+export function familyKey(fileRel: string): string {
+  return fileRel
+    .replace(/\.md$/i, '')
+    .replace(/ \(\d+\)$/, '')
+    .replace(/ - (?:ueberprueft|überprüft|kopie|copy|alt|neu|final|v\d+)$/i, '')
+    .toLowerCase()
+}
 export const DEFAULT_PER_FILE_CAP = 2
 export const DEFAULT_OVERSAMPLE = 4
 
@@ -145,19 +171,36 @@ export function selectHits(
   container: VaultIndexContainer,
   ranked: Array<{ row: number; score: number }>,
   topK: number,
-  perFileCap: number
+  perFileCap: number,
+  nearDupCosine = DEFAULT_NEAR_DUP_COSINE
 ): Array<{ chunk: VaultChunkMeta; score: number }> {
   const seen = new Set<string>()
   const perFile = new Map<string, number>()
+  /** Je Dateifamilie zählt nur die zuerst gewählte Datei — Kopien bekommen keinen eigenen Platz. */
+  const familyFile = new Map<string, string>()
   const out: Array<{ chunk: VaultChunkMeta; score: number }> = []
+  const chosenRows: number[] = []
+  const { vectors } = container
+  const dim = container.meta.identity.dim
   for (const r of ranked) {
     const chunk = container.meta.chunks[r.row]
     const key = dedupeKey(chunk.text)
     if (seen.has(key)) continue
-    const n = perFile.get(chunk.fileRel) ?? 0
+    const family = familyKey(chunk.fileRel)
+    const owner = familyFile.get(family)
+    if (owner !== undefined && owner !== chunk.fileRel) continue
+    const n = perFile.get(family) ?? 0
     if (n >= perFileCap) continue
+    if (nearDupCosine > 0 && chosenRows.length > 0) {
+      // Near-Duplikat eines schon gewählten Treffers (Kopie derselben Notiz, leicht geändert)?
+      const cand = vectors.subarray(r.row * dim, (r.row + 1) * dim)
+      const candNorm = vectorNorm(cand)
+      if (chosenRows.some((row) => cosineRow(vectors, row, dim, cand, candNorm) >= nearDupCosine)) continue
+    }
     seen.add(key)
-    perFile.set(chunk.fileRel, n + 1)
+    perFile.set(family, n + 1)
+    familyFile.set(family, chunk.fileRel)
+    chosenRows.push(r.row)
     out.push({ chunk, score: r.score })
     if (out.length >= topK) break
   }
@@ -318,7 +361,7 @@ export async function queryVaultIndex(
     return empty({ belowFloor: true, bestScore, candidatesConsidered: ranked.length })
   }
   const passing = rerankLexical(container, opts.query, ranked.filter((r) => r.score >= minScore), opts.lexicalWeight ?? DEFAULT_LEXICAL_WEIGHT)
-  const selected = selectHits(container, passing, topK, perFileCap)
+  const selected = selectHits(container, passing, topK, perFileCap, opts.nearDupCosine ?? DEFAULT_NEAR_DUP_COSINE)
   const { hits, staleFiles } = await verifyHits(vaultPath, container, selected, assertSafePath, opts.filters)
   return {
     hits,

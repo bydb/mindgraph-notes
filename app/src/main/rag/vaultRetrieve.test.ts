@@ -11,7 +11,7 @@ vi.mock('./embed', () => ({
   embedText: async (_m: string, text: string) => (text.includes('alpha') ? [1, 0, 0, 0] : [0, 1, 0, 0])
 }))
 
-import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource, rerankLexical } from './vaultRetrieve'
+import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource, rerankLexical, familyKey } from './vaultRetrieve'
 import { sha256Hex } from './vaultStore'
 import { chunkMarkdown, canonicalizeMarkdown } from '../../shared/rag/chunking'
 import type { VaultIndexContainer, VaultChunkMeta, VaultFileMeta } from '../../shared/rag/vaultIndex'
@@ -70,7 +70,8 @@ describe('rankCandidates + selectHits', () => {
   it('Dedupe exakt (normalisiert) und Pro-Datei-Deckel in Score-Reihenfolge', () => {
     const q = new Float32Array([1, 0, 0, 0])
     const ranked = rankCandidates(c, q, undefined, 20)
-    const sel = selectHits(c, ranked, 8, 2)
+    // Synthetische Vektoren sind hier teils identisch — Near-Duplikat-Schwelle aus, geprüft wird exaktes Dedupe + Deckel.
+    const sel = selectHits(c, ranked, 8, 2, 0)
     const files = sel.map((s) => s.chunk.fileRel)
     expect(files.filter((f) => f === 'a.md')).toHaveLength(2)
     // b.md ist ein Duplikat von a.md/0 → nicht dabei
@@ -238,5 +239,43 @@ describe('rerankLexical (Wortabgleich nur zur Umsortierung)', () => {
     expect(out[0].row).toBe(1)
     expect(out[0].score).toBe(0.58)
     expect(rerankLexical(container, 'egal', ranked, 0)).toEqual(ranked)
+  })
+})
+
+describe('selectHits: Near-Duplikate über Dateien hinweg', () => {
+  const dim = 4
+  const vectors = Float32Array.from([1, 0, 0, 0,  0.999, 0.04, 0, 0,  0, 1, 0, 0])
+  const container = { meta: { identity: { dim }, chunks: [
+    { fileRel: 'a/_STATUS.md', text: 'Risiken: Termin offen' },
+    { fileRel: 'a/_STATUS (2).md', text: 'Risiken: Termin offen.' },
+    { fileRel: 'b/Anderes.md', text: 'Etwas ganz anderes' }
+  ] }, vectors } as unknown as Parameters<typeof selectHits>[0]
+  const ranked = [{ row: 0, score: 0.7 }, { row: 1, score: 0.69 }, { row: 2, score: 0.6 }]
+  it('die Kopie mit fast gleichem Embedding wird übersprungen, der andere Chunk rückt nach', () => {
+    expect(selectHits(container, ranked, 8, 2, 0.97).map((h) => h.chunk.fileRel)).toEqual(['a/_STATUS.md', 'b/Anderes.md'])
+  })
+  it('Schwelle 0 = aus: exakte Dedupe greift nicht (Punkt am Ende), aber die „(2)“-Kopie fällt über die Dateifamilie', () => {
+    expect(selectHits(container, ranked, 8, 2, 0).map((h) => h.chunk.fileRel)).toEqual(['a/_STATUS.md', 'b/Anderes.md'])
+  })
+})
+
+describe('familyKey / Deckel pro Dateifamilie', () => {
+  it('Kopien-Suffixe gehören zur Familie des Originals', () => {
+    expect(familyKey('p/_STATUS-2026-W20 (6).md')).toBe(familyKey('p/_STATUS-2026-W20.md'))
+    expect(familyKey('n/10000 Euro Erlass - Ueberprueft.md')).toBe(familyKey('n/10000 Euro Erlass.md'))
+    expect(familyKey('p/_STATUS-2026-W21.md')).not.toBe(familyKey('p/_STATUS-2026-W22.md'))
+    expect(familyKey('a/Notiz.md')).not.toBe(familyKey('b/Notiz.md'))
+  })
+  it('nur die zuerst gewählte Datei einer Familie liefert Quellen; die Kopie bekommt keinen Platz', () => {
+    const dim = 2
+    const vectors = Float32Array.from([1, 0,  0, 1,  1, 0,  0, 1])
+    const container = { meta: { identity: { dim }, chunks: [
+      { fileRel: 'p/Erlass.md', text: 'A' }, { fileRel: 'p/Erlass.md', text: 'B' },
+      { fileRel: 'p/Erlass - Ueberprueft.md', text: 'C' }, { fileRel: 'q/Anderes.md', text: 'D' }
+    ] }, vectors } as unknown as Parameters<typeof selectHits>[0]
+    const ranked = [0, 1, 2, 3].map((row, i) => ({ row, score: 0.9 - i * 0.1 }))
+    expect(selectHits(container, ranked, 8, 2, 0).map((h) => h.chunk.fileRel)).toEqual(['p/Erlass.md', 'p/Erlass.md', 'q/Anderes.md'])
+    // Deckel 3: der dritte Platz der Familie geht NICHT an die Kopie
+    expect(selectHits(container, ranked, 8, 3, 0).map((h) => h.chunk.fileRel)).toEqual(['p/Erlass.md', 'p/Erlass.md', 'q/Anderes.md'])
   })
 })

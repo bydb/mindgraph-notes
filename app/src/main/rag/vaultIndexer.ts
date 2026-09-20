@@ -32,6 +32,7 @@ import {
   type VaultIndexIdentity,
   type VaultIndexMeta
 } from '../../shared/rag/vaultIndex'
+import { isDerivedAiNote } from '../../shared/rag/indexPolicy'
 import { getNoteKindStrict, resolveNoteDate } from '../../shared/noteKind'
 import { embedText, EmbeddingAbortedError } from './embed'
 import { resolveLocalModel } from './localModel'
@@ -474,6 +475,9 @@ export class VaultIndexJob {
           } catch {
             continue // verschwunden → nicht im Index
           }
+          // Abgeleitete KI-Notizen (gespeicherte Chat-Antworten, Brain-Tagesnotizen) sind keine
+          // Quellen — sonst zitiert die App ihre eigene Antwort (Phase 3, `indexPolicy.ts`).
+          if (isDerivedAiNote(file.canonical)) continue
           const prevMeta = existing?.meta.files[f.rel]
           if (prevMeta && prevMeta.sourceHash === file.sourceHash && existingRows.has(f.rel)) {
             decisions.set(f.rel, { kind: 'existing' })

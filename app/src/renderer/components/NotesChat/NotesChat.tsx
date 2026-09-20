@@ -16,6 +16,7 @@ import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '..
 import { citationMarkdownPlugin, markCitationRefs, type CitationEnv } from '../../utils/citationMarkdown'
 import { createSourceOpener, findNoteByVaultPath, type SourceJumpDeps } from '../../utils/sourceJump'
 import { chatHistoryForModel } from '../../utils/chatHistory'
+import { VAULT_CHAT_ANSWER_TYPE } from '../../../shared/rag/indexPolicy'
 import { reserveFreeNoteName } from '../../utils/noteFileName'
 import { createVaultRequester, type VaultRequester } from '../../utils/vaultRequest'
 import { useTabStore } from '../../stores/tabStore'
@@ -983,7 +984,9 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
       }
       const relativePath = relFor(fileName)
 
-      const frontmatter = `---\ntitle: "${safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: ${d.toISOString()}\n---\n\n`
+      // `ki-typ`: gespeicherte Antworten sind keine Quellen für den Vault-Index (sonst zitiert
+      // die App beim nächsten Mal ihre eigene Antwort; `shared/rag/indexPolicy.ts`).
+      const frontmatter = `---\ntitle: "${safeTitle.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"\ncreated: ${d.toISOString()}\nki-typ: ${VAULT_CHAT_ANSWER_TYPE}\n---\n\n`
       // Frontmatter-Stempel fürs KI-Badge im Lesen-Modus; der Provenienz-Callout im
       // Body bleibt zusätzlich (er trägt die gestellte Frage).
       const content = stampAi(

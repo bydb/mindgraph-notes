@@ -32,7 +32,7 @@ import * as path from 'path'
 import { embedText } from '../src/main/rag/embed'
 import { resolveLocalModel } from '../src/main/rag/localModel'
 import { loadVaultIndexFile, listVaultIndexFiles, vaultRagDir } from '../src/main/rag/vaultStore'
-import { rankCandidates, selectHits, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, DEFAULT_LEXICAL_WEIGHT, type VaultHit } from '../src/main/rag/vaultRetrieve'
+import { rankCandidates, selectHits, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, DEFAULT_LEXICAL_WEIGHT, DEFAULT_NEAR_DUP_COSINE, familyKey, type VaultHit } from '../src/main/rag/vaultRetrieve'
 import { buildVaultPrompt } from '../src/main/rag/vaultPrompt'
 import { analyzeCitations } from '../src/shared/rag/citations'
 import { keywordOverlapScore } from '../src/shared/rag/similarity'
@@ -61,7 +61,7 @@ const answerMode = flag('answer')
 interface EvalCase { id: string; kind: 'positive' | 'negative'; question: string; expected?: string[]; note?: string }
 /** `lexical` = Gewicht des Wortabgleichs (Anteil der Fragewörter in Titel/Pfad/Text) beim Umsortieren
  *  der Kandidaten; der Floor bleibt auf der reinen Bedeutungsnähe (Verweigerung unverändert). */
-interface Config { name: string; topK: number; floor: number; cap: number; lexical: number; lexicalMode?: 'plain' | 'idf' | 'title' }
+interface Config { name: string; topK: number; floor: number; cap: number; lexical: number; lexicalMode?: 'plain' | 'idf' | 'title'; nearDup?: number }
 
 let vaultReal = ''
 const assertSafePath = async (p: string): Promise<string> => {
@@ -177,7 +177,7 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
       continue
     }
     const passing = rescored.filter((r) => r.score >= cfg.floor).slice(0, cfg.topK * DEFAULT_OVERSAMPLE).map((r) => ({ row: r.row, score: r.combined }))
-    const selected = selectHits(container, passing, cfg.topK, cfg.cap)
+    const selected = selectHits(container, passing, cfg.topK, cfg.cap, cfg.nearDup ?? DEFAULT_NEAR_DUP_COSINE)
     const { hits } = await verifyHits(vaultReal, container, selected, assertSafePath, undefined)
     const files: string[] = []
     for (const h of hits) if (!files.includes(h.fileRel)) files.push(h.fileRel)
@@ -203,7 +203,10 @@ function summarize(runs: CaseRun[]): Record<string, number | string> {
   const refusedNeg = neg.filter((r) => r.belowFloor).length
   const refusedPos = pos.filter((r) => r.belowFloor).length
   const refusedAll = refusedNeg + refusedPos
+  const answered = runs.filter((r) => !r.belowFloor)
+  const distinct = answered.length ? answered.reduce((s, r) => s + new Set(r.hits.map((h) => familyKey(h.fileRel))).size, 0) / answered.length : 0
   return {
+    'Ø Familien/Antwort': distinct.toFixed(1),
     'Positiv': pos.length, 'Hit@K': pos.length ? `${hits}/${pos.length} (${Math.round((100 * hits) / pos.length)} %)` : '–',
     'MRR': mrr.toFixed(2), 'Ø Kandidatenrang': Number.isNaN(meanCandRank) ? '–' : meanCandRank.toFixed(1),
     'Negativ': neg.length, 'verweigert (neg)': neg.length ? `${refusedNeg}/${neg.length}` : '–',
@@ -218,7 +221,9 @@ async function main(): Promise<void> {
   const raw = JSON.parse(await fs.readFile(casesFile!, 'utf-8')) as { cases: EvalCase[] }
   const cases = raw.cases
   if (!cases?.length) { console.error('keine Fälle in der Fragen-Datei'); process.exit(1) }
-  const excludes = await readExcludes()
+  // Zusätzliche Ausschlüsse nur für diesen Lauf (Messung, z. B. Brain-Tagesnotizen): --exclude "800 - 🧠 brain"
+  const extraExcludes = process.argv.flatMap((a, i, all) => (a === '--exclude' && all[i + 1] ? [all[i + 1]] : []))
+  const excludes = [...(await readExcludes()), ...extraExcludes]
   const outDir = arg('out', path.join(vaultReal, '.mindgraph', 'rag-eval', 'results'))!
   await fs.mkdir(outDir, { recursive: true })
 
@@ -238,13 +243,16 @@ async function main(): Promise<void> {
   for (const c of cases) vecs.set(c.id, Float32Array.from(await embedText(embedModel, c.question)))
   console.log(`Fragen eingebettet: ${cases.length} in ${Date.now() - t0} ms\n`)
 
-  const base: Config = { name: 'aktuell', topK: Number(arg('topK', String(DEFAULT_VAULT_TOP_K))), floor: Number(arg('floor', String(DEFAULT_VAULT_MIN_SCORE))), cap: Number(arg('cap', String(DEFAULT_PER_FILE_CAP))), lexical: Number(arg('lexical', String(DEFAULT_LEXICAL_WEIGHT))), lexicalMode: 'idf' }
+  const base: Config = { name: 'aktuell', topK: Number(arg('topK', String(DEFAULT_VAULT_TOP_K))), floor: Number(arg('floor', String(DEFAULT_VAULT_MIN_SCORE))), cap: Number(arg('cap', String(DEFAULT_PER_FILE_CAP))), lexical: Number(arg('lexical', String(DEFAULT_LEXICAL_WEIGHT))), lexicalMode: 'idf', nearDup: Number(arg('neardup', String(DEFAULT_NEAR_DUP_COSINE))) }
   const configs: Config[] = [base]
   if (flag('sweep')) {
     for (const floor of [0.3, 0.4, 0.45, 0.5, 0.55]) for (const topK of [5, 8, 12]) for (const cap of [1, 2, 3]) {
       if (floor === base.floor && topK === base.topK && cap === base.cap && base.lexical === 0) continue
       configs.push({ name: `K${topK} floor${floor} cap${cap}`, topK, floor, cap, lexical: 0 })
     }
+  }
+  if (flag('sweep-neardup')) {
+    for (const nearDup of [0, 0.93, 0.95, 0.97, 0.99]) configs.push({ ...base, name: `neardup ${nearDup || 'aus'}`, nearDup })
   }
   if (flag('sweep-lexical')) {
     for (const mode of ['plain', 'idf', 'title'] as const) for (const lexical of [0.1, 0.2, 0.3, 0.5]) {
@@ -268,7 +276,7 @@ async function main(): Promise<void> {
   console.log('\nPro Fall (aktuelle Konfiguration):')
   for (const r of results[base.name].runs) {
     const status = r.kind === 'negative' ? (r.belowFloor ? 'verweigert ✓' : `beantwortet ✗ (best ${r.bestScore?.toFixed(3)})`)
-      : r.belowFloor ? `verweigert ✗ (best ${r.bestScore?.toFixed(3)})` : r.expected.length === 0 ? `beantwortet (best ${r.bestScore?.toFixed(3)}) · Quellen: ${r.hits.slice(0, 3).map((h) => h.fileRel.split('/').pop()?.replace(/\.md$/i, '')).join(' | ')}` : r.hit ? `Treffer Rang ${r.rank}` : `kein Treffer (Kandidatenrang ${r.candidateRank ?? '>100'})`
+      : r.belowFloor ? `verweigert ✗ (best ${r.bestScore?.toFixed(3)})` : r.expected.length === 0 ? `beantwortet (best ${r.bestScore?.toFixed(3)}) · Quellen: ${r.hits.map((h) => h.fileRel.split('/').pop()?.replace(/\.md$/i, '')).join(' | ')}` : r.hit ? `Treffer Rang ${r.rank} · Quellen: ${r.hits.map((h) => h.fileRel.split('/').pop()?.replace(/\.md$/i, '')).join(' | ')}` : `kein Treffer (Kandidatenrang ${r.candidateRank ?? '>100'})`
     console.log(`  ${r.id.padEnd(14)} ${status}`)
   }
 

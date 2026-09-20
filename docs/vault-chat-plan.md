@@ -183,6 +183,13 @@ Einfacher Wortanteil und Titel-Abgleich fallen durch (häufige Wörter dominiere
 - A/B Deckel und Dedupe; Konkurrenz- und Lebenszyklus-Tests als dauerhafte Testfälle.
 - CHANGELOG-Eintrag in Nutzerfassung mit der ehrlichen Formulierung aus Entscheidung 13.
 
+**Feinschliff Teil 2 (20.09.2026), jeweils am Tuning-Set (42/12) und Holdout gemessen:**
+
+- **Near-Duplikate per Embedding-Ähnlichkeit — verworfen.** Gemessen: die realen Kopien liegen bei Cosine 0,64–0,90 (Erlass vs. „Ueberprueft“ max 0,77; Statusnotiz vs. „(2)“-Kopie 0,70–0,99), eine Schwelle ≥ 0,93 änderte nichts (Ø Familien je Antwort 5,9 in allen Stufen), niedrigere Schwellen träfen echte Nachbarabschnitte. Option bleibt im Code (`nearDupCosine`, Standard 0).
+- **Deckel pro Dateifamilie — übernommen.** Kopien wie „Notiz (2)“, „Notiz (6)“, „Notiz - Ueberprueft“ gehören zur Familie des Originals; nur die zuerst gewählte Datei einer Familie liefert Quellen (`familyKey`, `selectHits`). Holdout „10 000-Euro-Erlass“: statt Original + Original + Kopie jetzt Original + Original + zwei weitere Notizen. Tuning unverändert 39/42.
+- **Abgeleitete KI-Notizen nicht indexieren — übernommen, nach einem Fehlversuch.** Erster Versuch mit `ki-modell` als Kriterium warf 591 von 2964 Notizen aus dem Index (Mail-Notizen und Agent-Recherchen tragen den Stempel auch) und kostete drei Treffer (36/42) — verworfen. Regel jetzt: `ki-typ: vault-chat-antwort` (setzt „Als neue Notiz speichern“) oder `type: brain-day` (`shared/rag/indexPolicy.ts`, Indexer überspringt beim Lesen). Ergebnis: 2860 statt 2964 Notizen (104 Brain-Tagesnotizen, 1 gespeicherte Antwort), **MRR 0,78 → 0,80** bei 39/42, Holdout-Frage „Computer use“ findet jetzt die Handschrift-Recherche auf Rang 1 statt die eigene gespeicherte Antwort.
+- Offen im Feinschliff: 42 s „Modell prüfen“ (Anzeige beim Laden des Embedding-Modells), Skills-Ordner, Suche in der Notiz im Lesen-Modus, Filterleiste (Teil 3).
+
 ### Phase 4 — Notiz-Agent: `vault_search` und geprüfte Quellen in `write_note` (nach Abnahme von Phase 1–3)
 
 Ausgangslage (gegen den Code geprüft, 18.09.2026): Der Notiz-Agent sucht heute mit `note_search`, einem Adapter auf das Telegram-Werkzeug (`main/noteAgent/skills.ts:583`), **rein nach Stichworten** und mit leerem `embeddingModel`. Semantisch verwandte Notizen findet er nicht. Quellen landen als Wikilink in `run.sources`, ohne Textstelle und ohne Prüfung. Der Agent läuft über den einheitlichen Chat-Client (`main/llm/chatClient.ts:5`), der neben Ollama auch OpenRouter und LLMBase bedient; das Cloud-Routing ist per `CloudFeatureId 'note-agent'` freischaltbar (`main/index.ts:4279`).
