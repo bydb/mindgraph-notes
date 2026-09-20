@@ -22467,12 +22467,16 @@ body.presentation-mode *::after {
 
 /* Suche in der Notiz (Lesen-Modus, ⌘F). Die Markierung läuft über die CSS-Highlight-
    Schnittstelle — kein DOM-Eingriff, damit das WYSIWYG-Autosave nichts zurückschreibt. */
+/* `::highlight()` kennt nur wenige Eigenschaften — `background-color`, NICHT die Kurzform
+   `background`. Und die Akzentfarbe heißt `--accent-color`; mit `var(--accent)` war der
+   `color-mix()`-Wert ungültig und die ganze Regel fiel weg (real, 20.09.2026: Zähler zählte,
+   nichts war markiert). */
 ::highlight(mg-find) {
-  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  background-color: color-mix(in srgb, var(--accent-color) 30%, transparent);
 }
 ::highlight(mg-find-current) {
-  background: color-mix(in srgb, var(--accent) 65%, transparent);
-  color: var(--text-primary);
+  background-color: var(--accent-color);
+  color: #fff;
 }
 .note-find-bar {
   position: absolute;
