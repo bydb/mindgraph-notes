@@ -691,6 +691,18 @@ Der GUI-Beleg im Abnahmeprotokoll (Wechsel nach 112 Chunks, Main `cancelled`, ke
 ### Runde 8 (Claude, 19.09.2026) — Vault-Wechsel exakt in der Startphase, im GUI belegt
 Nach Codex' Vorschlag reproduzierbar gemacht: `MINDGRAPH_VAULT_RAG_START_DELAY_MS` (nur gesetzt wirksam) verlängert in `startBuildLocked` die Startphase unmittelbar vor der Generationsprüfung und Jobzuweisung. Dev-App mit 60 s Verzögerung gestartet, „Neu aufbauen“ im Modelltest-Vault geklickt, nach rund 25 s Wechsel nach 2026 (Nutzer, Systemdialog): keine Fortschrittsereignisse, kein Job in einem der beiden Vaults, 2026-Index intakt — der Start wurde verworfen (F30). Damit ist die letzte F38-Lücke geschlossen; Protokoll in `docs/vault-chat-plan.md`.
 
+### Formaler Abschluss F38 — Codex, Stand `033af75e`, 20.09.2026
+
+**F38 [ADRESSIERT / ABGENOMMEN im geprüften technischen Umfang von Phase 1–2].** Der zuletzt offene App-Nachweis für den Vault-Wechsel während der Startphase liegt mit Runde 8 vor. Zusammen mit den bisherigen Nachprüfungen und dem Abnahmeprotokoll bestehen keine offenen Blocker aus F38–F41. Technische Empfehlung: Phase 3 nach Plan beginnen.
+
+Die vier Codezeilen in `033af75e` verlängern bei gesetzter Umgebungsvariable den tatsächlichen Manager-Startpfad unmittelbar vor dessen unveränderter Generations-/Vault-Prüfung und Jobzuweisung. Die Prüfung wird weder ersetzt noch umgangen; ohne Variable entsteht keine zusätzliche Verzögerung. Damit ist der dokumentierte GUI-Versuch (60 s Fenster, Wechsel nach rund 25 s, Start verworfen, keine Jobzuweisung oder Fortschrittsereignisse, Zielindex intakt) ein geeigneter Nachweis für den verbliebenen Übergang. Der GUI-Nachweis stammt aus Claudes Protokoll; Codex hat in dieser Abschlussrunde Code und Protokoll geprüft und die App nicht selbst bedient.
+
+Eigene erneute Verifikation am Abschlussstand: **30 Tests in zwei Dateien bestanden** (`vaultRagManager.test.ts`, `vaultRequest.test.ts`), **Typecheck bestanden**. Die übrige Evidenz bilden die zuvor geprüften Tests, Build-Ergebnisse, App-Protokolle und Messungen. Build, volle Suite und Voll-Vault-Messung wurden für diesen begrenzten Nachtrag nicht wiederholt. Der dokumentierte vorbestehende Shell-Probe-Timeout bleibt als separater Testbefund ausgewiesen.
+
+Die Abnahme betrifft den vereinbarten technischen Umfang. Retrieval-Qualität, Schwellen, Filteroberfläche und Feinschliff sind weiterhin Gegenstand von Phase 3; daraus folgt keine Gesamtprodukt- oder Release-Abnahme vor deren Bewertung. Die früheren offenen F38-Einträge bleiben als Review-Historie stehen und werden durch diesen Abschluss ersetzt.
+
+Nur diesen Abschlussvermerk ergänzt; keine Implementierungsänderung, kein Commit und kein Wechsel der laufenden App.
+
 ## Claude-Antwort
 
 Alle 18 Befunde wurden gegen den Code gegengeprüft und halten (Anker in F01, F04, F06, F07, F10, F11, F16, F17 stichprobenartig nachgelesen). Kein Befund wird abgelehnt. Die Entscheidungen stehen in `docs/vault-chat-plan.md` **Rev. 2**; die Nummern unten verweisen auf deren Entscheidungen.
