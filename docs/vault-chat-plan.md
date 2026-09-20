@@ -145,6 +145,30 @@ Frage im NotesChat (Modus vault, Filter Ordner/Kategorie/Zeitraum)
 
 **Stand 20.09.2026 — Schritt 1 begonnen:** `npm run vault:eval -- --vault <V> --cases <fragen.json> [--sweep] [--answer]` (`app/scripts/vault-eval.ts`) misst am echten Index Hit@K, MRR, Kandidatenrang der erwarteten Datei (feste Tiefe 100) sowie Verweigerung (Precision/Recall über Negativfälle), sweept Floor/K/Deckel auf einmal eingebetteten Fragen und schreibt mit `--answer` ein Markdown-Protokoll mit Prüfzeile und Bewertungsfeld für die Handbewertung. Fragen und Ergebnisse liegen im Vault unter `.mindgraph/rag-eval/` (nicht im Repo). Erste sechs Fälle (zwei echte Nutzerfragen zur Stellenbewertung, ein Kontrollfall mit Namen, eine Nachschlagefrage, zwei Negativfälle): Hit@8 3/4, die frei formulierte Frage Rang 7, die abgewandelte kein Treffer (Kandidatenrang 26); **beide Negativfälle wurden beantwortet** (beste Scores 0,49 und 0,43 liegen über dem Floor 0,30) — der Floor ist für bge-m3 an diesem Vault deutlich zu niedrig, Kalibrierung folgt mit dem vollen Tuning-Set.
 
+**Tuning-Set 54 Fälle (42 positiv aus einer Zufallsstichprobe über alle Hauptordner, 12 negativ), Sweep 20.09.2026:**
+
+| Konfiguration | Hit@K | MRR | Negativ verweigert | Positiv fälschlich verweigert |
+|---|---|---|---|---|
+| K8, Floor 0,30, Deckel 2 (aktuell) | 38/42 (90 %) | 0,70 | 0/12 | 0/42 |
+| K8, Floor 0,45 | 38/42 | 0,70 | 4/12 | 0/42 |
+| K8, Floor 0,50 | 37/42 (88 %) | 0,69 | 9/12 | 1/42 |
+| K12, Floor 0,50 | 38/42 (90 %) | 0,69 | 9/12 | 1/42 |
+| K8, Floor 0,55 | 33/42 (79 %) | 0,66 | 10/12 | 1/42 |
+
+Der Deckel (1/2/3) ändert bei K8 nichts. Die drei Negativfälle, die auch bei 0,50 beantwortet werden, liegen thematisch nah am Vault (MindGraph-Funktion, die es nicht gibt; Telefonnummer einer erwähnten Werkstatt; Aussage einer Person zur Digitalwoche) mit besten Scores 0,55–0,66 — dort kann kein Floor trennen, dort muss die Antwort „steht nicht in den Quellen“ sagen (Handbewertung mit `--answer`). Vier Positivfälle ohne Treffer: zwei Hitzel-Fragen (Rang 7 bzw. Kandidatenrang 26), zwei mit Kandidatenrang über 100 (Frage nach dem „Warum Pico“, Frage nach einer Person aus einer Mail) — Kandidaten für den Wortabgleich.
+
+**A/B Wortabgleich (Umsortierung der 100 Kandidaten nach Bedeutungsnähe + Gewicht × Wortabgleich; Floor bleibt auf der Bedeutungsnähe, Verweigerung damit identisch), Tuning-Set, K8, Floor 0,50, Deckel 2:**
+
+| Variante | Hit@8 | MRR | Ø Kandidatenrang |
+|---|---|---|---|
+| ohne (aktuell) | 37/42 (88 %) | 0,69 | 2,7 |
+| einfacher Wortanteil, Gewicht 0,1 … 0,5 | 37 … 36/42 | 0,72 … 0,68 | 2,4 … 4,5 |
+| nur Titel/Überschrift, 0,1 … 0,5 | 35 … 34/42 | 0,70 … 0,64 | 2,7 … 4,5 |
+| **seltenheitsgewichtet (log N/df), 0,3** | **39/42 (93 %)** | **0,78** | **1,5** |
+| seltenheitsgewichtet, 0,5 | 39/42 (93 %) | 0,80 | 1,4 |
+
+Einfacher Wortanteil und Titel-Abgleich fallen durch (häufige Wörter dominieren). Der seltenheitsgewichtete Abgleich verbessert zehn Fälle und verschlechtert keinen: beide Hitzel-Fragen von Rang 7 bzw. „kein Treffer“ auf Rang 2 und 3, MINT-Space-Konzept von „kein Treffer“ auf Rang 3, fünf weitere Fälle um ein bis vier Ränge nach oben. **Noch kein Default-Wechsel:** Bestätigung am Holdout-Set (vom Nutzer selbst formulierte Fragen) steht aus; Gewicht 0,3 als Kandidat (0,5 ist am Tuning-Set minimal besser, aber näher am Überanpassen).
+
 - Tuning- und Holdout-Set, `--scope vault`, Metriken aus Entscheidung 17; Kalibrierung Floor / Support / K / Deckel nur auf dem Tuning-Set, Endzahlen vom Holdout in Rev. 3 und Memory.
 - A/B Deckel und Dedupe; Konkurrenz- und Lebenszyklus-Tests als dauerhafte Testfälle.
 - CHANGELOG-Eintrag in Nutzerfassung mit der ehrlichen Formulierung aus Entscheidung 13.

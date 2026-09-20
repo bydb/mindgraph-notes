@@ -35,6 +35,7 @@ import { loadVaultIndexFile, listVaultIndexFiles, vaultRagDir } from '../src/mai
 import { rankCandidates, selectHits, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, type VaultHit } from '../src/main/rag/vaultRetrieve'
 import { buildVaultPrompt } from '../src/main/rag/vaultPrompt'
 import { analyzeCitations } from '../src/shared/rag/citations'
+import { keywordOverlapScore } from '../src/shared/rag/similarity'
 import type { VaultIndexContainer } from '../src/shared/rag/vaultIndex'
 
 const OLLAMA = 'http://localhost:11434'
@@ -57,7 +58,9 @@ const chatModel = arg('chatModel', 'qwen3.8:27b-mlx')!
 const answerMode = flag('answer')
 
 interface EvalCase { id: string; kind: 'positive' | 'negative'; question: string; expected?: string[]; note?: string }
-interface Config { name: string; topK: number; floor: number; cap: number }
+/** `lexical` = Gewicht des Wortabgleichs (Anteil der Fragewörter in Titel/Pfad/Text) beim Umsortieren
+ *  der Kandidaten; der Floor bleibt auf der reinen Bedeutungsnähe (Verweigerung unverändert). */
+interface Config { name: string; topK: number; floor: number; cap: number; lexical: number; lexicalMode?: 'plain' | 'idf' | 'title' }
 
 let vaultReal = ''
 const assertSafePath = async (p: string): Promise<string> => {
@@ -80,6 +83,28 @@ function sanitizeUntrustedText(text: string): string {
     .replace(/(?:system\s*prompt|systemnachricht|neue\s+rolle|new\s+role|change\s+(?:your\s+)?instructions?)/gi, '[ENTFERNT]')
     .replace(/```[\s\S]*?```/g, '[CODE-BLOCK]')
     .trim()
+}
+
+// Seltenheitsgewichteter Wortabgleich: Fragewörter zählen mit log(N/df) — „Neubewertung“ wiegt
+// mehr als „Medienzentrum“. df wird einmal über alle Chunks gezählt.
+const STOP = new Set(['der', 'die', 'das', 'und', 'oder', 'ist', 'sind', 'was', 'wie', 'wer', 'wann', 'wo', 'ich', 'meine', 'mein', 'ein', 'eine', 'einen', 'einer', 'zu', 'zur', 'zum', 'im', 'in', 'am', 'an', 'auf', 'für', 'von', 'mit', 'bei', 'nach', 'über', 'aus', 'des', 'dem', 'den', 'es', 'gibt', 'steht', 'notiz', 'habe', 'hat', 'hatte', 'war', 'wurde', 'werden', 'sich', 'nicht', 'auch', 'welche', 'welcher', 'welches', 'laut', 'meinem', 'meiner', 'unsere', 'wir', 'the', 'of', 'and', 'to', 'is', 'a'])
+const tok = (t: string): string[] => (t.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []).filter((w) => !STOP.has(w))
+let df = new Map<string, number>()
+let docCount = 1
+function buildDf(container: VaultIndexContainer): void {
+  df = new Map(); docCount = container.meta.chunks.length || 1
+  for (const ch of container.meta.chunks) {
+    const base = ch.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? ''
+    for (const w of new Set(tok(`${base} ${ch.heading} ${ch.text}`))) df.set(w, (df.get(w) ?? 0) + 1)
+  }
+}
+function idfOverlap(query: string, text: string): number {
+  const q = [...new Set(tok(query))]
+  if (!q.length) return 0
+  const t = new Set(tok(text))
+  let sum = 0, hit = 0
+  for (const w of q) { const idf = Math.log(docCount / ((df.get(w) ?? 0) + 1)); sum += idf; if (t.has(w)) hit += idf }
+  return sum > 0 ? hit / sum : 0
 }
 
 const matchesExpected = (fileRel: string, expected: string[]): boolean => {
@@ -121,12 +146,25 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
     const ranked = rankCandidates(container, qv, undefined, Math.max(cfg.topK * DEFAULT_OVERSAMPLE, 100), excludes)
     const bestScore = ranked.length ? ranked[0].score : null
     const expected = c.expected ?? []
+    // Wortabgleich als Umsortierung: Bedeutungsnähe + Gewicht × Anteil der Fragewörter, die in
+    // Dateiname, Überschrift oder Chunk-Text vorkommen. Kandidatenmenge und Floor bleiben gleich.
+    const rescored = cfg.lexical > 0
+      ? ranked.map((r) => {
+          const ch = container.meta.chunks[r.row]
+          const base = ch.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? ''
+          const mode = cfg.lexicalMode ?? 'plain'
+          const overlap = mode === 'plain' ? keywordOverlapScore(c.question, `${base} ${ch.heading} ${ch.text}`)
+            : mode === 'title' ? keywordOverlapScore(c.question, `${base} ${ch.heading}`)
+            : idfOverlap(c.question, `${base} ${ch.heading} ${ch.text}`)
+          return { row: r.row, score: r.score, combined: r.score + cfg.lexical * overlap }
+        }).sort((a, b) => b.combined - a.combined)
+      : ranked.map((r) => ({ ...r, combined: r.score }))
     // Diagnose: Rang der erwarteten Datei unter ALLEN Kandidaten (nach Datei dedupliziert)
     let candidateRank: number | null = null
     if (expected.length) {
       const seen = new Set<string>()
       let r = 0
-      for (const cand of ranked) {
+      for (const cand of rescored) {
         const rel = container.meta.chunks[cand.row].fileRel
         if (seen.has(rel)) continue
         seen.add(rel); r++
@@ -137,7 +175,7 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
       out.push({ id: c.id, kind: c.kind, question: c.question, expected, belowFloor: true, bestScore, hits: [], hit: c.kind === 'positive' ? false : null, rank: null, candidateRank })
       continue
     }
-    const passing = ranked.slice(0, cfg.topK * DEFAULT_OVERSAMPLE).filter((r) => r.score >= cfg.floor)
+    const passing = rescored.filter((r) => r.score >= cfg.floor).slice(0, cfg.topK * DEFAULT_OVERSAMPLE).map((r) => ({ row: r.row, score: r.combined }))
     const selected = selectHits(container, passing, cfg.topK, cfg.cap)
     const { hits } = await verifyHits(vaultReal, container, selected, assertSafePath, undefined)
     const files: string[] = []
@@ -191,17 +229,23 @@ async function main(): Promise<void> {
   if (model.digest !== identity.digest) { console.error(`Index-Digest passt nicht zu ${embedModel} (${model.digest}) — Index neu aufbauen`); process.exit(4) }
   console.log(`Vault: ${vaultReal}\nIndex: ${path.basename(newest.file)} · ${container.meta.chunks.length} Chunks · Ausschlüsse: ${excludes.join(', ') || '–'}\nFälle: ${cases.length} (${cases.filter((c) => c.kind === 'positive').length} positiv, ${cases.filter((c) => c.kind === 'negative').length} negativ)\n`)
 
+  buildDf(container)
   const vecs = new Map<string, Float32Array>()
   const t0 = Date.now()
   for (const c of cases) vecs.set(c.id, Float32Array.from(await embedText(embedModel, c.question)))
   console.log(`Fragen eingebettet: ${cases.length} in ${Date.now() - t0} ms\n`)
 
-  const base: Config = { name: 'aktuell', topK: Number(arg('topK', String(DEFAULT_VAULT_TOP_K))), floor: Number(arg('floor', String(DEFAULT_VAULT_MIN_SCORE))), cap: Number(arg('cap', String(DEFAULT_PER_FILE_CAP))) }
+  const base: Config = { name: 'aktuell', topK: Number(arg('topK', String(DEFAULT_VAULT_TOP_K))), floor: Number(arg('floor', String(DEFAULT_VAULT_MIN_SCORE))), cap: Number(arg('cap', String(DEFAULT_PER_FILE_CAP))), lexical: Number(arg('lexical', '0')) }
   const configs: Config[] = [base]
   if (flag('sweep')) {
     for (const floor of [0.3, 0.4, 0.45, 0.5, 0.55]) for (const topK of [5, 8, 12]) for (const cap of [1, 2, 3]) {
-      if (floor === base.floor && topK === base.topK && cap === base.cap) continue
-      configs.push({ name: `K${topK} floor${floor} cap${cap}`, topK, floor, cap })
+      if (floor === base.floor && topK === base.topK && cap === base.cap && base.lexical === 0) continue
+      configs.push({ name: `K${topK} floor${floor} cap${cap}`, topK, floor, cap, lexical: 0 })
+    }
+  }
+  if (flag('sweep-lexical')) {
+    for (const mode of ['plain', 'idf', 'title'] as const) for (const lexical of [0.1, 0.2, 0.3, 0.5]) {
+      configs.push({ name: `K8 floor0.5 cap2 ${mode}${lexical}`, topK: 8, floor: 0.5, cap: 2, lexical, lexicalMode: mode })
     }
   }
 
