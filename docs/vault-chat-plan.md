@@ -169,6 +169,8 @@ Der Deckel (1/2/3) ändert bei K8 nichts. Die drei Negativfälle, die auch bei 0
 
 Einfacher Wortanteil und Titel-Abgleich fallen durch (häufige Wörter dominieren). Der seltenheitsgewichtete Abgleich verbessert zehn Fälle und verschlechtert keinen: beide Hitzel-Fragen von Rang 7 bzw. „kein Treffer“ auf Rang 2 und 3, MINT-Space-Konzept von „kein Treffer“ auf Rang 3, fünf weitere Fälle um ein bis vier Ränge nach oben. **Noch kein Default-Wechsel:** Bestätigung am Holdout-Set (vom Nutzer selbst formulierte Fragen) steht aus; Gewicht 0,3 als Kandidat (0,5 ist am Tuning-Set minimal besser, aber näher am Überanpassen).
 
+**Antwortlauf (`--answer`, K8, Floor 0,50, Deckel 2, `qwen3.8:27b-mlx`, 44 beantwortete Fälle, 20.09.2026):** 187 Sätze, davon 20 ohne Quellenangabe (11 %), 39 mit niedriger Wortdeckung (21 %), 0 ungültige Nummern, 6 Zitate nicht im Original. **Alle drei Negativfälle, die der Floor durchließ, hat das Antwortmodell korrekt verweigert** („Die genannten Quellen enthalten keine Information über …“) — mit Floor 0,50 enden damit 12 von 12 Negativfällen in einer Verweigerung (9 durch die Suche, 3 durch das Modell). Handbewertung der 44 Antworten (richtig/teilweise/falsch, falsch grün/falsch rot) durch den Nutzer steht aus: `.mindgraph/rag-eval/results/handbewertung-2026-09-20-08-48.md`. Antwortzeit 8–72 s pro Frage (Median ~25 s) bei Modell im Speicher.
+
 - Tuning- und Holdout-Set, `--scope vault`, Metriken aus Entscheidung 17; Kalibrierung Floor / Support / K / Deckel nur auf dem Tuning-Set, Endzahlen vom Holdout in Rev. 3 und Memory.
 - A/B Deckel und Dedupe; Konkurrenz- und Lebenszyklus-Tests als dauerhafte Testfälle.
 - CHANGELOG-Eintrag in Nutzerfassung mit der ehrlichen Formulierung aus Entscheidung 13.
