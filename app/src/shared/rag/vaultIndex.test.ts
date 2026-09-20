@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { INDEX_POLICY_VERSION } from './indexPolicy'
 import { embeddingsCompatible, encodeVaultIndex, decodeVaultIndex, VaultIndexFormatError, VAULT_INDEX_HEADER_SIZE, crc32, identityString, identitiesEqual, excludeKeyFor, isIndexable, matchesFilters, modelSlug, cosineRow, vectorNorm, type VaultIndexContainer, type VaultIndexMeta, type VaultFileMeta } from './vaultIndex'
 
 function sampleMeta(chunkCount = 3, dim = 4): VaultIndexMeta {
@@ -17,7 +18,7 @@ function sampleMeta(chunkCount = 3, dim = 4): VaultIndexMeta {
     text: `Text ${i} mit Umlauten äöü`
   }))
   return {
-    identity: { model: 'bge-m3:latest', digest: 'sha256:abc', dim, formatVersion: 1, chunkingVersion: 2, excludeKey: '' },
+    identity: { model: 'bge-m3:latest', digest: 'sha256:abc', dim, formatVersion: 1, chunkingVersion: 2, policyVersion: INDEX_POLICY_VERSION, excludeKey: '' },
     createdAt: 123,
     files,
     chunks
@@ -206,7 +207,7 @@ describe('Ordner-Abgleich in Vergleichsform (Variantenselektor, NFC, node_module
 })
 
 describe('embeddingsCompatible', () => {
-  const base = { model: 'bge-m3', digest: 'sha256:a', dim: 1024, formatVersion: 1, chunkingVersion: 2, excludeKey: '' }
+  const base = { model: 'bge-m3', digest: 'sha256:a', dim: 1024, formatVersion: 1, chunkingVersion: 2, policyVersion: INDEX_POLICY_VERSION, excludeKey: '' }
   it('andere Ausschlussliste: Embeddings bleiben wiederverwendbar, Identität ist trotzdem verschieden', () => {
     const other = { ...base, excludeKey: '400 - Archiv/' }
     expect(embeddingsCompatible(base, other)).toBe(true)

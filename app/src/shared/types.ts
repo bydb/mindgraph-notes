@@ -79,6 +79,8 @@ export interface VaultRagStatusDto {
     digest: string | null
     bytes: number
     excludeMismatch: boolean
+    /** Der Index wurde nach älteren Indexregeln gebaut (z. B. vor dem Ausschluss von Brain-Notizen). */
+    policyOutdated: boolean
   }
   build: VaultBuildProgressDto | null
   pendingChanges: number

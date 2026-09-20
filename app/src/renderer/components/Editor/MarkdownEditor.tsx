@@ -982,6 +982,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [findQuery, setFindQuery] = useState('')
   const [findIndex, setFindIndex] = useState(0)
   const [findCount, setFindCount] = useState(0)
+  /** Zähler, der die Trefferberechnung erneut anstößt (nach DOM-Austausch, Codex F47). */
+  const [findRefresh, setFindRefresh] = useState(0)
   const findRangesRef = useRef<Range[]>([])
   const findInputRef = useRef<HTMLInputElement>(null)
 
@@ -3776,7 +3778,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     findRangesRef.current = ranges
     setFindCount(ranges.length)
     setFindIndex((prev) => (ranges.length === 0 ? 0 : Math.min(prev, ranges.length - 1)))
-  }, [findOpen, findQuery, viewMode, renderedMarkdown])
+  }, [findOpen, findQuery, viewMode, renderedMarkdown, findRefresh])
 
   // Markierung setzen und zum aktuellen Treffer scrollen.
   useEffect(() => {
@@ -3786,6 +3788,22 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   }, [findOpen, findIndex, findCount, viewMode, scrollToMatch])
 
   useEffect(() => () => clearHighlights(), [])
+
+  // Wird die Vorschau neu aufgebaut (nachgeladene Bilder, Faltungen, Dataview), zeigen die Ranges
+  // auf abgehängte Knoten und die Markierung verschwindet lautlos (Codex F47). Ein Beobachter
+  // sucht dann neu; `findRefresh` stößt denselben Effekt an wie eine Änderung des Suchtexts.
+  useEffect(() => {
+    if (!findOpen || viewMode !== 'preview') return
+    const root = editablePreviewRef.current
+    if (!root) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const observer = new MutationObserver(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => setFindRefresh((n) => n + 1), 120)
+    })
+    observer.observe(root, { childList: true, subtree: true, characterData: true })
+    return () => { observer.disconnect(); if (timer) clearTimeout(timer) }
+  }, [findOpen, viewMode])
 
   const findStep = useCallback((delta: number) => {
     const n = findRangesRef.current.length

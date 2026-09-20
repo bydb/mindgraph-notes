@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { INDEX_POLICY_VERSION } from '../../shared/rag/indexPolicy'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
@@ -116,7 +117,7 @@ async function writeNote(rel: string, content: string) {
 /** Echter Container auf der Platte: ein Chunk pro Datei, Vektor [1,0,0,0]. */
 async function writeContainer(rels: string[], excludeFolders: string[] = []): Promise<string> {
   const identity: VaultIndexIdentity = {
-    model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, excludeKey: excludeKeyFor(excludeFolders)
+    model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, policyVersion: INDEX_POLICY_VERSION, excludeKey: excludeKeyFor(excludeFolders)
   }
   const meta: VaultIndexMeta = { identity, createdAt: 1, files: {}, chunks: [] }
   for (const rel of rels) {
@@ -498,7 +499,7 @@ describe('Pfadschutz (F34)', () => {
     const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-mgr-outside-'))
     try {
       // Fremder Ordner mit Container + Temp-Datei, fremde Settings-Datei
-      const foreignIdentity: VaultIndexIdentity = { model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, excludeKey: '' }
+      const foreignIdentity: VaultIndexIdentity = { model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, policyVersion: INDEX_POLICY_VERSION, excludeKey: '' }
       const foreignRag = path.join(outside, 'rag')
       await fs.mkdir(foreignRag, { recursive: true })
       const foreignMeta: VaultIndexMeta = { identity: foreignIdentity, createdAt: 1, files: {}, chunks: [] }

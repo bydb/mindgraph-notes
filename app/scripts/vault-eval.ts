@@ -32,7 +32,7 @@ import * as path from 'path'
 import { embedText } from '../src/main/rag/embed'
 import { resolveLocalModel } from '../src/main/rag/localModel'
 import { loadVaultIndexFile, listVaultIndexFiles, vaultRagDir } from '../src/main/rag/vaultStore'
-import { rankCandidates, selectHits, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, DEFAULT_LEXICAL_WEIGHT, DEFAULT_NEAR_DUP_COSINE, familyKey, type VaultHit } from '../src/main/rag/vaultRetrieve'
+import { rankCandidates, selectForQuery, verifyHits, DEFAULT_VAULT_TOP_K, DEFAULT_VAULT_MIN_SCORE, DEFAULT_PER_FILE_CAP, DEFAULT_OVERSAMPLE, DEFAULT_LEXICAL_WEIGHT, DEFAULT_NEAR_DUP_COSINE, familyKey, type VaultHit } from '../src/main/rag/vaultRetrieve'
 import { buildVaultPrompt } from '../src/main/rag/vaultPrompt'
 import { analyzeCitations } from '../src/shared/rag/citations'
 import { keywordOverlapScore } from '../src/shared/rag/similarity'
@@ -142,43 +142,33 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
   const out: CaseRun[] = []
   for (const c of cases) {
     const qv = vecs.get(c.id)!
-    // Kandidatentiefe für die Diagnose fest (100), unabhängig von K — sonst wandert der
-    // „Kandidatenrang“ mit der Konfiguration.
-    const ranked = rankCandidates(container, qv, undefined, Math.max(cfg.topK * DEFAULT_OVERSAMPLE, 100), excludes)
-    const bestScore = ranked.length ? ranked[0].score : null
+    // Gemessen wird der PRODUKTIVE Auswahlpfad (Codex F43): dieselbe Funktion wie die App,
+    // dieselbe Kandidatentiefe (topK × oversample), derselbe Score.
+    const picked = selectForQuery(container, qv, c.question, {
+      topK: cfg.topK, minScore: cfg.floor, perFileCap: cfg.cap, oversample: DEFAULT_OVERSAMPLE,
+      excludeFolders: excludes, lexicalWeight: cfg.lexical, nearDupCosine: cfg.nearDup ?? DEFAULT_NEAR_DUP_COSINE
+    })
+    const bestScore = picked.bestScore
     const expected = c.expected ?? []
-    // Wortabgleich als Umsortierung: Bedeutungsnähe + Gewicht × Anteil der Fragewörter, die in
-    // Dateiname, Überschrift oder Chunk-Text vorkommen. Kandidatenmenge und Floor bleiben gleich.
-    const rescored = cfg.lexical > 0
-      ? ranked.map((r) => {
-          const ch = container.meta.chunks[r.row]
-          const base = ch.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? ''
-          const mode = cfg.lexicalMode ?? 'plain'
-          const overlap = mode === 'plain' ? keywordOverlapScore(c.question, `${base} ${ch.heading} ${ch.text}`)
-            : mode === 'title' ? keywordOverlapScore(c.question, `${base} ${ch.heading}`)
-            : lexicalOverlap(lexicalIndexFor(container), c.question, chunkLexicalText(ch.fileRel, ch.heading, ch.text))
-          return { row: r.row, score: r.score, combined: r.score + cfg.lexical * overlap }
-        }).sort((a, b) => b.combined - a.combined)
-      : ranked.map((r) => ({ ...r, combined: r.score }))
+    // Nur für die Diagnose: wie weit hinten läge die erwartete Datei bei 100 Kandidaten?
+    const deep = rankCandidates(container, qv, undefined, 100, excludes)
     // Diagnose: Rang der erwarteten Datei unter ALLEN Kandidaten (nach Datei dedupliziert)
     let candidateRank: number | null = null
     if (expected.length) {
       const seen = new Set<string>()
       let r = 0
-      for (const cand of rescored) {
+      for (const cand of deep) {
         const rel = container.meta.chunks[cand.row].fileRel
         if (seen.has(rel)) continue
         seen.add(rel); r++
         if (matchesExpected(rel, expected)) { candidateRank = r; break }
       }
     }
-    if (bestScore === null || bestScore < cfg.floor) {
+    if (picked.belowFloor) {
       out.push({ id: c.id, kind: c.kind, question: c.question, expected, belowFloor: true, bestScore, hits: [], hit: c.kind === 'positive' ? false : null, rank: null, candidateRank })
       continue
     }
-    const passing = rescored.filter((r) => r.score >= cfg.floor).slice(0, cfg.topK * DEFAULT_OVERSAMPLE).map((r) => ({ row: r.row, score: r.combined }))
-    const selected = selectHits(container, passing, cfg.topK, cfg.cap, cfg.nearDup ?? DEFAULT_NEAR_DUP_COSINE)
-    const { hits } = await verifyHits(vaultReal, container, selected, assertSafePath, undefined)
+    const { hits } = await verifyHits(vaultReal, container, picked.selected, assertSafePath, undefined)
     const files: string[] = []
     for (const h of hits) if (!files.includes(h.fileRel)) files.push(h.fileRel)
     const rank = expected.length ? files.findIndex((f) => matchesExpected(f, expected)) + 1 || null : null

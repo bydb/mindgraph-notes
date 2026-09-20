@@ -9,6 +9,7 @@
  */
 
 import * as fs from 'fs/promises'
+import { INDEX_POLICY_VERSION } from '../../shared/rag/indexPolicy'
 import * as path from 'path'
 import { randomBytes } from 'crypto'
 import type { VaultRagSettings } from '../../shared/types'
@@ -36,6 +37,7 @@ export interface VaultRagStatus {
     bytes: number
     /** Ausschlussliste weicht vom Index ab → Voll-Rebuild nötig. */
     excludeMismatch: boolean
+    policyOutdated: boolean
   }
   build: VaultBuildProgress | null
   pendingChanges: number
@@ -251,7 +253,7 @@ export class VaultRagManager {
     const config = await this.getConfig(vaultPath)
     const embedModel = await this.deps.getEmbedModel()
     const index: VaultRagStatus['index'] = {
-      exists: false, file: null, chunkCount: 0, fileCount: 0, generation: 0, createdAt: null, model: null, digest: null, bytes: 0, excludeMismatch: false
+      exists: false, file: null, chunkCount: 0, fileCount: 0, generation: 0, createdAt: null, model: null, digest: null, bytes: 0, excludeMismatch: false, policyOutdated: false
     }
     const dir = await this.safeRagDir(vaultPath, 'vault-rag-status')
     const files = dir ? await listVaultIndexFiles(dir, this.deps.assertSafePath) : []
@@ -270,6 +272,9 @@ export class VaultRagManager {
         index.digest = container.meta.identity.digest
         index.bytes = newest.bytes
         index.excludeMismatch = container.meta.identity.excludeKey !== excludeKeyFor(config.excludeFolders)
+        // Nach einem App-Update mit neuen Indexregeln: sichtbar machen, dass der Index veraltet ist
+        // (die Abfrage filtert bereits, aber der Index enthält noch nicht mehr erlaubte Dateien).
+        index.policyOutdated = (container.meta.identity.policyVersion ?? 1) !== INDEX_POLICY_VERSION
       }
     }
     return {

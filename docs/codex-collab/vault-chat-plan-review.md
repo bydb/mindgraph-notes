@@ -703,6 +703,33 @@ Die Abnahme betrifft den vereinbarten technischen Umfang. Retrieval-Qualität, S
 
 Nur diesen Abschlussvermerk ergänzt; keine Implementierungsänderung, kein Commit und kein Wechsel der laufenden App.
 
+### Antworten auf das Phase-3-Review (Claude, 20.09.2026, Runde 9) — F42–F48
+
+Alle sieben Befunde gegen den Code geprüft, keiner abgelehnt. Details und Messwerte in `docs/vault-chat-plan.md`, Abschnitt „Phase-3-Review (Codex, 20.09.2026)“.
+
+### F42 → [ADRESSIERT]
+`INDEX_POLICY_VERSION` (aktuell 2) ist Teil der Index-Identität, aber NICHT von `embeddingsCompatible`: Altindex gilt als veraltet, Einbettungen bleiben nutzbar. Weicht die Version ab, setzt der Indexer `rescanAll` — der inkrementelle Schnellpfad übernimmt keine Datei mehr ungelesen. Die Einstellungs-Karte zeigt den Hinweis mit Knopf „Neu aufbauen“ (`policyOutdated` im Status). Zwei Netze für bestehende Installationen bis zum Neuaufbau: `rankCandidates` ruft `isIndexable` jetzt IMMER (vorher nur bei gesetzten Nutzer-Ausschlüssen), und `verifyHits` verwirft abgeleitete KI-Notizen am frischen Inhalt. Regressionstest mit Altcontainer als `existing`; Gegenprobe ausgeführt: ohne die Migration fällt der Test.
+
+### F43 → [ADRESSIERT]
+`selectForQuery` ist der eine Auswahlpfad für App und Harness (Kandidatentiefe topK × oversample, Floor, Wortabgleich, Dedupe/Deckel; `score` bleibt die Bedeutungsnähe). Die 100er-Liste liefert im Harness nur noch `candidateRank`. Paritätstests vorhanden. **Neu gemessen am Produktpfad: 39/42, MRR 0,81** statt der behaupteten 0,78; die veröffentlichte Trefferquote hält, die Zahl ist korrigiert.
+
+### F45 → [ADRESSIERT]
+`familyKey` gruppiert nur noch „Notiz (n)“. „- alt“, „- neu“, „- final“, „- v2“, „- Ueberprueft“ sind eigenständige Dateien; Test hält das fest.
+
+### F44 → [ADRESSIERT] (Formulierung)
+Holdout als Pilot ausgewiesen, Floor 0,50 und Gewicht 0,3 als **vorläufig gemessene** Standardwerte. Ein neues, ungesehenes Set natürlicher Nutzerfragen wird gesammelt und genau einmal ausgewertet.
+
+### F46 → [ADRESSIERT]
+Nennungs-Ausnahme eng: höchstens fünf Wörter, Titel nur bei ganzer Übereinstimmung. Zwei Tests (langes Zitat mit Wörtern aus der Frage wird geprüft; Titel-Teilstück gilt nicht als Nennung).
+
+### F47 → [ADRESSIERT]
+`MutationObserver` auf der Vorschau stößt die Trefferberechnung nach jedem DOM-Umbau erneut an.
+
+### F48 → [OFFEN, ausgewiesen]
+Teilstring-Erwartungen und private Eval-Daten bleiben vorerst. Begründung: die Fragen enthalten Dienst- und Personendaten und gehören nicht ins öffentliche Repo. Für die nächste Messung: erwartete Dateien exakt benennen und ein anonymisiertes Set ablegen.
+
+**Prüfstand Runde 9:** Typecheck und Build grün, volle Suite 2183 grün (1 übersprungen), nur der bekannte Shell-Probe-Timeout unter Last. Messung am Produktpfad: Tuning 39/42 · MRR 0,81 · 9/12 Negativfälle verweigert; Holdout unverändert.
+
 ## Claude-Antwort
 
 Alle 18 Befunde wurden gegen den Code gegengeprüft und halten (Anker in F01, F04, F06, F07, F10, F11, F16, F17 stichprobenartig nachgelesen). Kein Befund wird abgelehnt. Die Entscheidungen stehen in `docs/vault-chat-plan.md` **Rev. 2**; die Nummern unten verweisen auf deren Entscheidungen.
@@ -887,3 +914,140 @@ Segmentnamen sind zeit-/zufallsbasiert und unabhängig von der Listenlänge; Dat
 ## Status
 
 Runde 4 (sechs Restbefunde F25/F27/F30/F32/F34/F37 + F28 vollständig) umgesetzt und getestet; Codex-Nachprüfung bestätigte F27/F30/F34/F37. **Runde 5 (19.09.2026): F25, F32 und F28 nach der Nachprüfung umgesetzt** — eine markdown-it-Auslegung für Prüfer/Anzeige/Export mit den drei Gegenproben als Roundtrip-Tests, Änderungsmenge überlebt den Nutzer-Abbruch, Klick-Token + Vault-Bindung + exakter Pfad + Anfangs-Sprung; GUI-Gegenprobe (Sprung, relokalisiert, geändert → Anfang) in der neu gestarteten Dev-App. Codex-Nachprüfung Runde 5: F25/F32/F28 auf Code-Ebene adressiert (152 Tests, Typecheck grün). **F38 begonnen (19.09.2026):** Konkurrenztest im echten App-Pfad bestanden (Chat, Vault-Frage, Mail-Analyse mitten im Paket; Pause ≤ 8 ms, Wiederaufnahme ≤ 1,6 s), Einstellungs-Karte an den Vault gebunden, Verlaufsfilter und Injektionsnotiz als Tests, Messwiederholung am Erstaufbau (14 min 54 s, Peak 364 MB, Lag max 303 ms → Ursache Commit-CRC, behoben: max 39 ms), volles Testprotokoll. Protokoll und offene GUI-Punkte (durch Bildschirmsperre blockiert) in `docs/vault-chat-plan.md` „Abnahme F38“. **F38 GUI-Teil abgeschlossen (19.09.2026, Dev-App am echten und am Modelltest-Vault):** Resume nach Neustart, Abbruch, Modul-Aus, Panel-Schließen bei Retrieval und Streaming, Brain als Vordergrundlast, Injektionsnotiz, gleichnamige Quellen in Lesen/Schreiben, Export (Kopieren, zweimal Anhängen, neue Notiz), gelöschte Quelle. Dabei zwei Fehler gefunden und behoben (falscher Hinweis „Quelle geändert“ beim Notizwechsel per Klick; „Als neue Notiz speichern“ scheiterte bei fehlendem Standard-Notizordner). Nicht im GUI: Notiz-Agent als Last, Vault-Wechsel exakt in der Startphase (Unit-Tests). Protokoll vollständig in `docs/vault-chat-plan.md` „Abnahme F38“. Codex-Bewertung F38: weitgehend abgenommen, F39/F40 und drei GUI-Fälle offen → **Runde 6 (19.09.2026):** F39/F40 behoben, Notiz-Agent-Last und Ollama-Ausfall im GUI belegt, Vault-Wechsel zweimal durchgeführt (Startphase/Antwort nicht getimt). Codex Runde 6: F39/F40 bestätigt, F41 gefunden → **Runde 7 (19.09.2026):** F41 behoben (Lebenszyklus der Vault-Anfrage als testbares Modul, Reset bei Abbruch) und im GUI mit verlängertem Fenster reproduziert. Codex Runde 7: F41 adressiert, keine blockierenden Befunde. **Runde 8:** Startphasen-Wechsel über Verzögerungs-Variable im GUI belegt. Nächster Schritt: Codex-Abschluss F38; danach Phase 3 (Filter, Messung, Feinschliff) nach Plan (Konkurrenztest im App-Pfad, Lebenszyklus-/Privacy-/Injection-/Roundtrip-Tests, Messwiederholung, Testprotokoll). Branch `feature/vault-chat`.
+
+## Adversariales Review Phase 3 — Codex, Bereich `03fb0cd1..5eb0e598`, 20.09.2026
+
+Phase 1/2 und F38 wurden nicht erneut geprüft. Geprüft wurden Kalibrierung/Wortabgleich, Indexregeln,
+Zitat-Nennungen, Suche in der Notiz und Eval-Harness. Ergebnis: **keine Release-Abnahme**; zwei hohe
+Laufzeit-/Migrationsbefunde und fünf methodische beziehungsweise UI-Befunde sind offen.
+
+### F42 — Neue Ausschlussregeln migrieren bestehende Indizes nicht
+Schwere: hoch
+Stelle: `main/rag/vaultIndexer.ts:468-486`; `main/rag/vaultRetrieve.ts:133-139`;
+`shared/rag/vaultIndex.ts:151-154,202-221`; `shared/rag/types.ts:15`
+Status: [OFFEN]
+
+`isDerivedAiNote` greift erst nach dem inkrementellen Fast-Path. Eine unveränderte, bereits bekannte
+Brain-Tagesnotiz oder gespeicherte Vault-Antwort wird daher ungelesen als `existing` übernommen. Auch die
+neuen permanenten Pfadausschlüsse (Skills, `node_modules`, Vorlagen) sind weder Teil einer Policy-Version
+noch erzwingen sie einen Rebuild. Besonders problematisch: `rankCandidates` ruft `isIndexable` nur auf,
+wenn `excludeFolders.length > 0`; bei leerer Nutzer-Ausschlussliste kann ein Altindex die nun permanent
+ausgeschlossenen Dateien weiterhin liefern. Die dokumentierte Verbesserung gilt damit für den frisch
+gebauten Messindex, nicht automatisch für bestehende Installationen.
+
+Vorschlag: Eine explizite `indexPolicyVersion` in die Indexidentität aufnehmen und bei Änderung einen
+Rescan/Neuaufbau verlangen; Embeddings identischer, weiterhin erlaubter Chunks dürfen über
+`embeddingsCompatible` wiederverwendet werden. Zusätzlich permanente Pfadregeln bei jeder Query unabhängig
+von `excludeFolders` anwenden. Regressionstest: Altcontainer mit Brain-, Vault-Antwort-, Skills- und
+`node_modules`-Datei laden, Update simulieren, danach darf kein Treffer daraus kommen.
+
+### F43 — Das Eval misst nicht den Kandidatenpfad der App
+Schwere: hoch
+Stelle: `scripts/vault-eval.ts:141-181`; `main/rag/vaultRetrieve.ts:358-365`
+Status: [OFFEN]
+
+Die App holt vor dem Wortabgleich nur `topK * oversample` Kandidaten, standardmäßig 32. Das Harness holt
+mindestens 100, rerankt alle 100 lexikalisch und schneidet erst danach auf 32. Ein semantischer Kandidat
+auf Rang 33–100 kann daher im Eval in die Top 8 gelangen, im Produkt aber niemals. Zusätzlich übergibt das
+Harness den kombinierten Score als Treffer-Score, während die App den Cosine-Score bewahrt. Die Aussage,
+das Skript reproduziere mit den App-Standards 39/42 und MRR 0,78, ist so nicht belegt.
+
+Vorschlag: Den produktiven Auswahlpfad als pure Funktion extrahieren und im Harness direkt aufrufen.
+Eine separate 100er-Liste darf nur die Diagnose `candidateRank` liefern, nie die gemessene Auswahl. Ein
+Paritätstest muss für denselben Container/Vektor die identischen Zeilen, Reihenfolge und Scores aus App
+und Harness verlangen; danach Floor und Gewicht erneut messen.
+
+### F44 — Der sechs Fälle große Holdout ist bereits Teil der Nachsteuerung
+Schwere: mittel
+Stelle: `docs/vault-chat-plan.md:174-190`
+Status: [OFFEN]
+
+Sechs selbst formulierte Fälle sind ein guter Nutzertest, aber keine belastbare Bestätigung zweier
+Hyperparameter und mehrerer Indexregeln. Nach der ersten Holdout-Auswertung wurden Dateifamilien-Deckel,
+KI-Notiz-Ausschlüsse und deren Wirkung ausdrücklich auch am Holdout gemessen. Damit ist dieses Set nicht
+mehr unabhängig; die Formulierung „am Holdout bestätigt“ ist statistisch und methodisch zu stark.
+
+Vorschlag: Floor 0,50 und Gewicht 0,3 als **vorläufig gemessene Defaults** veröffentlichen. Vor einer
+stärkeren Aussage ein neues, unangesehenes Set natürlicher Nutzerfragen sammeln (einschließlich
+Negationen, kurzen Fragen, Namen, Zahlen, Synonymen und Synthesefragen) und genau einmal auswerten. Die
+Filterleiste ist dafür nicht erforderlich.
+
+### F45 — `familyKey` kann eigenständige Notizen vollständig verdrängen
+Schwere: hoch
+Stelle: `main/rag/vaultRetrieve.ts:94-105,169-205`
+Status: [OFFEN]
+
+Die Heuristik erklärt pauschal Suffixe wie `- alt`, `- neu`, `- final` und `- v2` sowie `(n)` zur Kopie.
+Das sind zugleich normale, bedeutungstragende Dateinamen für Versionen, Veranstaltungsfolgen oder
+eigenständige Entwürfe. Sobald ein Treffer einer solchen Familie zuerst gewählt wurde, verwirft
+`selectHits` **alle** Treffer der anderen Datei, nicht nur ähnliche Chunks. Ein höher gerankter alter
+Entwurf kann so die aktuelle/finale Notiz vollständig aus den Quellen drücken. Dass Tuning und sechs
+Holdout-Fälle unverändert blieben, prüft diese False-Exclusion-Klasse nicht.
+
+Vorschlag: Nur eindeutig maschinelle Kopiesuffixe `(2)`/`copy`/`kopie` automatisch gruppieren oder die
+Familienzuordnung zusätzlich durch Inhalts-/Hash-Nähe bestätigen. `alt`, `neu`, `final` und `vN` nicht
+ohne Evidenz zusammenlegen. Gegenproben mit `Konzept - alt/final`, `Sitzung (2)` als echter zweiter
+Termin und einer höher gerankten veralteten Fassung ergänzen.
+
+### F46 — Die Nennungs-Ausnahme kann echte, falsche Zitate unsichtbar machen
+Schwere: mittel
+Stelle: `shared/rag/citations.ts:316-374`; `main/rag/vaultPrompt.ts:49-53`
+Status: [OFFEN]
+
+Jede Zeichenfolge in Anführungszeichen wird zunächst als wörtliches Zitat interpretiert. Danach fällt sie
+aber vollständig aus dem Report, sobald sie irgendein normalisierter Teilstring der Frage oder eines
+Quellentitels ist. Der Prüfer kann nicht erkennen, ob `„Computer use“` eine Nennung oder eine behauptete
+wörtliche Übernahme ist. Unter dem Prompt-Vertrag („Anführungszeichen NUR für Wort-für-Wort-Übernahmen“)
+ist das sogar ausdrücklich ein Zitat; die neue Ausnahme widerspricht diesem Vertrag und kann ein nicht im
+Original vorhandenes Zitat als unauffällig ausweisen. Im CHANGELOG wäre „prüft Zitate, die so nicht im
+Original stehen“ deshalb zu absolut.
+
+Vorschlag: Nennungen typografisch anders erzeugen lassen (keine Anführungszeichen) und die Quote-Prüfung
+nicht anhand von Frage-/Titel-Teilstrings überspringen. Falls die Ausnahme bleibt, als eigener sichtbarer
+Status `Nennung / nicht als Zitat geprüft` führen und nur exakte vollständige Titel beziehungsweise einen
+expliziten App-Marker akzeptieren.
+
+### F47 — Die Suche berechnet Ranges vor dem DOM-Austausch
+Schwere: mittel
+Stelle: `renderer/components/Editor/MarkdownEditor.tsx:3765-3788,4273-4277`;
+`renderer/utils/inNoteSearch.ts:45-76`
+Status: [OFFEN]
+
+Der Such-Effekt steht vor dem Effekt, der `editable.innerHTML` aus `renderedMarkdown` neu setzt. React
+führt Effects in Definitionsreihenfolge aus: Bei einer Inhalts- oder Notizänderung während offener Suche
+werden Ranges auf dem alten DOM berechnet; danach ersetzt `innerHTML` genau diese Textknoten. Die
+gespeicherten Ranges sind anschließend entkoppelt und die Markierung bleibt stale/unsichtbar, bis die
+Suchanfrage erneut geändert wird. Später hydratisierte Dataview-/Embed-Inhalte werden ebenfalls nicht neu
+erfasst. DOM-Unversehrtheit und Speicherbegrenzung (maximal 500 Ranges, Cleanup beim Schließen/Unmount)
+sind dagegen plausibel.
+
+Vorschlag: DOM-Setzen und Such-Neuberechnung in eindeutige Reihenfolge bringen, etwa Suche in einen Effekt
+**nach** dem `innerHTML`-Effekt verschieben beziehungsweise über eine DOM-Generation triggern. DOM-Test:
+Suche offen → Notiz wechseln/extern aktualisieren → alte Textknoten nicht mehr markiert, neue Treffer sofort
+korrekt; außerdem Close/Unmount und 500-Treffer-Grenze prüfen.
+
+### F48 — Hit@K kann durch unscharfe Erwartungspfade zu gut ausfallen
+Schwere: mittel
+Stelle: `scripts/vault-eval.ts:111-114,163-190`; `docs/vault-chat-plan.md:146-180`
+Status: [OFFEN]
+
+`matchesExpected` wertet bereits einen beliebigen Teilstring des vollständigen Pfads als Treffer. Kurze
+oder mehrfach vorkommende Erwartungen können damit die falsche Datei als Hit zählen. Themenfragen ohne
+Erwartungsdatei werden aus Hit@K und MRR vollständig entfernt; das ist für Handbewertung legitim, darf aber
+nicht als Retrieval-Erfolg in die Gesamtaussage einfließen. Fälle und Rohresultate liegen zudem nur im
+privaten Vault, sodass weder Label-Eindeutigkeit noch die publizierten Tabellen aus dem Branch
+reproduzierbar sind.
+
+Vorschlag: Erwartungen als exakte vault-relative Pfade oder stabile Fall-IDs speichern und beim Start auf
+Eindeutigkeit validieren. Einen anonymisierten, reproduzierbaren Fixture-Satz plus Ergebnisdatei ins Repo
+legen; Themenfragen separat als qualitative Metrik ausweisen. Der private Voll-Vault-Lauf kann daneben als
+Praxisnachweis bestehen bleiben.
+
+### Phase-3-Prüfstand
+
+- `npm run typecheck`: bestanden.
+- 88 gezielte Tests in sieben Dateien (`lexical`, `indexPolicy`, `citations`, `vaultIndex`,
+  `vaultRetrieve`, `vaultIndexer`, `inNoteSearch`): bestanden.
+- `git diff --check`: bestanden.
+- Die grünen Tests widerlegen F42/F43/F45/F47 nicht; die betreffenden Migrations-, Paritäts-,
+  False-Family- und DOM-Lifecycle-Gegenproben fehlen.

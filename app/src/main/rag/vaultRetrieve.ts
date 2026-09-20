@@ -10,6 +10,7 @@ import * as path from 'path'
 import { chunkMarkdown } from '../../shared/rag/chunking'
 import { cosineRow, isIndexable, matchesFilters, vectorNorm, type VaultChunkMeta, type VaultIndexContainer, type VaultQueryFilters } from '../../shared/rag/vaultIndex'
 import { chunkLexicalText, lexicalIndexFor, lexicalOverlap } from '../../shared/rag/lexical'
+import { isDerivedAiNote } from '../../shared/rag/indexPolicy'
 import type { NoteKindId } from '../../shared/noteKind'
 import { embedText } from './embed'
 import { resolveLocalModel } from './localModel'
@@ -92,16 +93,17 @@ export const DEFAULT_NEAR_DUP_COSINE = 0
 // Nachbarabschnitte. Deshalb aus; stattdessen greift der Deckel pro Dateifamilie (`familyKey`).
 
 /**
- * Dateifamilie: Kopien wie „Notiz (2).md“, „Notiz (6).md“ oder „Notiz - Ueberprueft.md“ teilen sich
- * den Pro-Datei-Deckel mit dem Original. Real belegten vier Fassungen einer Statusnotiz vier der
- * acht Quellenplätze.
+ * Dateifamilie: nur das maschinell erzeugte Kopie-Muster „Notiz (2).md“, „Notiz (6).md“ — so legen
+ * Finder und die App selbst Kopien an. Real belegten vier Fassungen einer Statusnotiz vier der acht
+ * Quellenplätze.
+ *
+ * BEWUSST NICHT gruppiert werden Endungen wie „- alt“, „- neu“, „- final“, „- v2“ oder
+ * „- Ueberprueft“ (Codex F45): das sind vom Nutzer vergebene Namen für eigenständige Fassungen.
+ * Da `selectHits` die zweite Datei einer Familie VOLLSTÄNDIG verwirft, würde eine solche Heuristik
+ * einen legitimen Entwurf unsichtbar machen — teurer als die doppelte Quelle, die sie spart.
  */
 export function familyKey(fileRel: string): string {
-  return fileRel
-    .replace(/\.md$/i, '')
-    .replace(/ \(\d+\)$/, '')
-    .replace(/ - (?:ueberprueft|überprüft|kopie|copy|alt|neu|final|v\d+)$/i, '')
-    .toLowerCase()
+  return fileRel.replace(/\.md$/i, '').replace(/ \(\d+\)$/, '').toLowerCase()
 }
 export const DEFAULT_PER_FILE_CAP = 2
 export const DEFAULT_OVERSAMPLE = 4
@@ -115,6 +117,40 @@ export class VaultIdentityError extends Error {
 
 function dedupeKey(text: string): string {
   return sha256Hex(text.toLowerCase().replace(/\s+/g, ' ').trim())
+}
+
+export interface SelectForQueryOptions {
+  topK: number
+  minScore: number
+  perFileCap: number
+  oversample: number
+  excludeFolders: string[]
+  filters?: VaultQueryFilters
+  lexicalWeight: number
+  nearDupCosine: number
+}
+
+/**
+ * Der produktive Auswahlpfad in EINER Funktion: Kandidaten (topK × oversample) → Floor →
+ * Wortabgleich zur Umsortierung → Dedupe/Deckel. Das Eval-Skript ruft genau diese Funktion auf,
+ * damit Messung und App nicht auseinanderlaufen (Codex F43: das Harness rerankte zuvor 100
+ * Kandidaten und schnitt erst danach auf 32 — ein Treffer auf Rang 40 konnte dort in die Top 8
+ * gelangen, im Produkt nie). `score` bleibt überall die Bedeutungsnähe.
+ */
+export function selectForQuery(
+  container: VaultIndexContainer,
+  queryVec: Float32Array,
+  query: string,
+  opts: SelectForQueryOptions
+): { selected: Array<{ chunk: VaultChunkMeta; score: number }>; bestScore: number | null; belowFloor: boolean; candidatesConsidered: number } {
+  const ranked = rankCandidates(container, queryVec, opts.filters, opts.topK * opts.oversample, opts.excludeFolders)
+  const bestScore = ranked.length > 0 ? ranked[0].score : null
+  if (bestScore === null || bestScore < opts.minScore) {
+    return { selected: [], bestScore, belowFloor: true, candidatesConsidered: ranked.length }
+  }
+  const passing = rerankLexical(container, query, ranked.filter((r) => r.score >= opts.minScore), opts.lexicalWeight)
+  const selected = selectHits(container, passing, opts.topK, opts.perFileCap, opts.nearDupCosine)
+  return { selected, bestScore, belowFloor: false, candidatesConsidered: ranked.length }
 }
 
 /** Reine Rangfolge über einen geladenen Container (ohne Frischeprüfung). */
@@ -135,7 +171,9 @@ export function rankCandidates(
     let ok = allowed.get(rel)
     if (ok === undefined) {
       const file = meta.files[rel]
-      ok = file ? matchesFilters(rel, file, filters) && (excludeFolders.length === 0 || isIndexable(rel, excludeFolders)) : false
+      // `isIndexable` IMMER, nicht nur bei gesetzten Nutzer-Ausschlüssen: die permanenten Regeln
+      // (Vorlagen, Skills, node_modules) müssen auch einen Altindex sofort filtern (Codex F42).
+      ok = file ? matchesFilters(rel, file, filters) && isIndexable(rel, excludeFolders) : false
       allowed.set(rel, ok)
     }
     if (!ok) continue
@@ -254,6 +292,13 @@ export async function verifyHits(
       stale.add(chunk.fileRel)
       continue
     }
+    // Abgeleitete KI-Notizen (gespeicherte Antworten, Brain-Tage) sind keine Quellen. Die Prüfung
+    // am FRISCHEN Inhalt wirkt sofort, auch wenn ein vor der Regel gebauter Index sie noch
+    // enthält oder eine Notiz nachträglich zur Antwortnotiz wurde (Codex F42).
+    if (isDerivedAiNote(fresh.canonical)) {
+      stale.add(chunk.fileRel)
+      continue
+    }
     // Aktive Filter gegen die FRISCHEN Metadaten prüfen — eine geänderte Kategorie oder
     // ein geändertes Datum darf keinen Treffer im falschen Filter liefern (F36).
     if (!matchesFilters(chunk.fileRel, fresh.meta, filters)) {
@@ -355,20 +400,24 @@ export async function queryVaultIndex(
     throw new VaultIdentityError(`Embedding-Dimension ${qv.length} passt nicht zum Index (${identity.dim})`)
   }
 
-  const ranked = rankCandidates(container, Float32Array.from(qv), opts.filters, topK * oversample, opts.excludeFolders ?? [])
-  const bestScore = ranked.length > 0 ? ranked[0].score : null
-  if (bestScore === null || bestScore < minScore) {
-    return empty({ belowFloor: true, bestScore, candidatesConsidered: ranked.length })
+  const picked = selectForQuery(container, Float32Array.from(qv), opts.query, {
+    topK, minScore, perFileCap, oversample,
+    excludeFolders: opts.excludeFolders ?? [],
+    filters: opts.filters,
+    lexicalWeight: opts.lexicalWeight ?? DEFAULT_LEXICAL_WEIGHT,
+    nearDupCosine: opts.nearDupCosine ?? DEFAULT_NEAR_DUP_COSINE
+  })
+  const { bestScore, selected } = picked
+  if (picked.belowFloor) {
+    return empty({ belowFloor: true, bestScore, candidatesConsidered: picked.candidatesConsidered })
   }
-  const passing = rerankLexical(container, opts.query, ranked.filter((r) => r.score >= minScore), opts.lexicalWeight ?? DEFAULT_LEXICAL_WEIGHT)
-  const selected = selectHits(container, passing, topK, perFileCap, opts.nearDupCosine ?? DEFAULT_NEAR_DUP_COSINE)
   const { hits, staleFiles } = await verifyHits(vaultPath, container, selected, assertSafePath, opts.filters)
   return {
     hits,
     belowFloor: false,
     noFreshSource: hits.length === 0,
     bestScore,
-    candidatesConsidered: ranked.length,
+    candidatesConsidered: picked.candidatesConsidered,
     staleFiles,
     identity: { model: identity.model, digest: identity.digest }
   }

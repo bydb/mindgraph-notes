@@ -166,4 +166,15 @@ describe('Nennungen in Anführungszeichen sind keine Zitate', () => {
     expect(r.sentences[1].quotes).toEqual([{ text: 'das wird teuer', found: false }])
     expect(r.summary.quotesNotFound).toBe(1)
   })
+
+  it('lange Zitate werden geprüft, auch wenn ihre Wörter in der Frage stehen (F46)', () => {
+    const lang = 'Das Budget der Digitalwoche beträgt laut Schulamt genau zehntausend Euro'
+    const r = analyzeCitations(`Er schrieb „${lang}". [1]`, sources, { question: `Stimmt es, dass ${lang}?`, sourceTitles: [] })
+    expect(r.sentences[0].quotes).toEqual([{ text: lang, found: false }])
+  })
+
+  it('Titel-Nennung nur bei ganzer Übereinstimmung, nicht bei einem Teilstück (F46)', () => {
+    const r = analyzeCitations('Die Notiz „Lokale Modelle" sagt etwas. [1]', sources, { question: 'x', sourceTitles: ['Lokale Modelle in MindGraph Notes'] })
+    expect(r.sentences[0].quotes).toEqual([{ text: 'Lokale Modelle', found: false }])
+  })
 })

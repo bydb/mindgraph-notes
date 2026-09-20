@@ -16,6 +16,19 @@
 
 export const VAULT_CHAT_ANSWER_TYPE = 'vault-chat-antwort'
 
+/**
+ * Version der Indexregeln (welche Dateien überhaupt Quellen sein dürfen). Ändert sie sich, ist ein
+ * bestehender Index inhaltlich veraltet: unveränderte Dateien würden im inkrementellen Lauf ungelesen
+ * übernommen, eine schon indexierte Brain-Notiz bliebe also Quelle. Die Version gehört deshalb in die
+ * Index-Identität (neuer Dateiname, sichtbarer Hinweis „neu aufbauen“), NICHT in
+ * `embeddingsCompatible` — die Vektoren unveränderter Chunks bleiben gültig und werden übernommen.
+ *
+ * 1: Ausgangsstand (nur Nutzer-Ausschlüsse, Vorlagen-Ordner)
+ * 2: Skills-Ordner und node_modules permanent aus; Ordnervergleich in Normalform;
+ *    gespeicherte Vault-Antworten (`ki-typ`) und Brain-Tagesnotizen nicht mehr indexieren
+ */
+export const INDEX_POLICY_VERSION = 2
+
 const FRONTMATTER_RE = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/
 
 export function isDerivedAiNote(content: string): boolean {

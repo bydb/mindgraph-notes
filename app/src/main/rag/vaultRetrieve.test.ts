@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { INDEX_POLICY_VERSION } from '../../shared/rag/indexPolicy'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
@@ -11,7 +12,7 @@ vi.mock('./embed', () => ({
   embedText: async (_m: string, text: string) => (text.includes('alpha') ? [1, 0, 0, 0] : [0, 1, 0, 0])
 }))
 
-import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource, rerankLexical, familyKey } from './vaultRetrieve'
+import { rankCandidates, selectHits, verifyHits, queryVaultIndex, VaultIdentityError, locateSource, rerankLexical, familyKey, selectForQuery } from './vaultRetrieve'
 import { sha256Hex } from './vaultStore'
 import { chunkMarkdown, canonicalizeMarkdown } from '../../shared/rag/chunking'
 import type { VaultIndexContainer, VaultChunkMeta, VaultFileMeta } from '../../shared/rag/vaultIndex'
@@ -29,7 +30,7 @@ function file(sourceHash: string, kind: VaultFileMeta['kind'] = null, dateValue:
 function container(chunks: VaultChunkMeta[], files: Record<string, VaultFileMeta>, rows: number[][]): VaultIndexContainer {
   const vectors = new Float32Array(rows.flat())
   return {
-    meta: { identity: { model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: 2, excludeKey: '' }, createdAt: 1, files, chunks },
+    meta: { identity: { model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: 2, policyVersion: INDEX_POLICY_VERSION, excludeKey: '' }, createdAt: 1, files, chunks },
     vectors,
     generation: 1
   }
@@ -77,6 +78,28 @@ describe('rankCandidates + selectHits', () => {
     // b.md ist ein Duplikat von a.md/0 → nicht dabei
     expect(files).not.toContain('b.md')
     expect(files).toContain('c.md')
+  })
+})
+
+describe('Altindex-Migration (F42)', () => {
+  it('abgeleitete KI-Notizen fallen bei der Frischeprüfung weg, auch wenn ein alter Index sie noch enthält', async () => {
+    const text = Array.from({ length: 5 }, (_, i) => `Satz ${i + 1} mit genug Text für einen eigenen Chunk im Index.`).join(' ')
+    const brain = `---\ntype: brain-day\ndate: 2026-09-19\n---\n\n${text}\n`
+    const answer = `---\ntitle: "Antwort"\nki-typ: vault-chat-antwort\n---\n\n${text}\n`
+    const normal = `# Echte Notiz\n\n${text}\n`
+    await fs.writeFile(path.join(vault, 'brain.md'), brain)
+    await fs.writeFile(path.join(vault, 'antwort.md'), answer)
+    await fs.writeFile(path.join(vault, 'echt.md'), normal)
+    const mk = (rel: string, content: string) => {
+      const c = chunkMarkdown(canonicalizeMarkdown(content))[0]
+      return chunk(rel, 0, c.text, { sourceStart: c.sourceStart, sourceEnd: c.sourceEnd, startLine: c.startLine })
+    }
+    const selected = [mk('brain.md', brain), mk('antwort.md', answer), mk('echt.md', normal)]
+      .map((c) => ({ chunk: c, score: 0.9 }))
+    const files = Object.fromEntries(selected.map((x) => [x.chunk.fileRel, file(sha256Hex(canonicalizeMarkdown(x.chunk.text)))]))
+    const c = container(selected.map((x) => x.chunk), files, selected.map(() => [1, 0, 0, 0]))
+    const { hits } = await verifyHits(vault, c, selected, assertSafePath)
+    expect(hits.map((h) => h.fileRel)).toEqual(['echt.md'])
   })
 })
 
@@ -260,9 +283,13 @@ describe('selectHits: Near-Duplikate über Dateien hinweg', () => {
 })
 
 describe('familyKey / Deckel pro Dateifamilie', () => {
-  it('Kopien-Suffixe gehören zur Familie des Originals', () => {
+  it('nur das maschinelle Kopie-Muster „(n)“ gruppiert; eigene Fassungsnamen bleiben getrennt (F45)', () => {
     expect(familyKey('p/_STATUS-2026-W20 (6).md')).toBe(familyKey('p/_STATUS-2026-W20.md'))
-    expect(familyKey('n/10000 Euro Erlass - Ueberprueft.md')).toBe(familyKey('n/10000 Euro Erlass.md'))
+    // Vom Nutzer vergebene Namen sind eigenständige Dateien — sie dürfen sich nicht verdrängen.
+    expect(familyKey('n/Konzept - alt.md')).not.toBe(familyKey('n/Konzept.md'))
+    expect(familyKey('n/Konzept - final.md')).not.toBe(familyKey('n/Konzept - alt.md'))
+    expect(familyKey('n/Notiz v2.md')).not.toBe(familyKey('n/Notiz.md'))
+    expect(familyKey('n/10000 Euro Erlass - Ueberprueft.md')).not.toBe(familyKey('n/10000 Euro Erlass.md'))
     expect(familyKey('p/_STATUS-2026-W21.md')).not.toBe(familyKey('p/_STATUS-2026-W22.md'))
     expect(familyKey('a/Notiz.md')).not.toBe(familyKey('b/Notiz.md'))
   })
@@ -271,11 +298,48 @@ describe('familyKey / Deckel pro Dateifamilie', () => {
     const vectors = Float32Array.from([1, 0,  0, 1,  1, 0,  0, 1])
     const container = { meta: { identity: { dim }, chunks: [
       { fileRel: 'p/Erlass.md', text: 'A' }, { fileRel: 'p/Erlass.md', text: 'B' },
-      { fileRel: 'p/Erlass - Ueberprueft.md', text: 'C' }, { fileRel: 'q/Anderes.md', text: 'D' }
+      { fileRel: 'p/Erlass (2).md', text: 'C' }, { fileRel: 'q/Anderes.md', text: 'D' }
     ] }, vectors } as unknown as Parameters<typeof selectHits>[0]
     const ranked = [0, 1, 2, 3].map((row, i) => ({ row, score: 0.9 - i * 0.1 }))
     expect(selectHits(container, ranked, 8, 2, 0).map((h) => h.chunk.fileRel)).toEqual(['p/Erlass.md', 'p/Erlass.md', 'q/Anderes.md'])
     // Deckel 3: der dritte Platz der Familie geht NICHT an die Kopie
     expect(selectHits(container, ranked, 8, 3, 0).map((h) => h.chunk.fileRel)).toEqual(['p/Erlass.md', 'p/Erlass.md', 'q/Anderes.md'])
+  })
+})
+
+describe('selectForQuery — ein Auswahlpfad für App und Messung (F43)', () => {
+  const dim = 4
+  // 40 Kandidaten: der semantisch beste steht vorn, ein lexikalisch perfekter Treffer auf Rang 35.
+  const chunks = Array.from({ length: 40 }, (_, i) => ({
+    fileRel: `n/${i}.md`, chunkIndex: 0, heading: '', text: i === 34 ? 'Zirkoniumstifte Regal Vierzehn' : `Allgemeiner Text ${i}`,
+    sourceStart: 0, sourceEnd: 10, startLine: 1, sourceHash: `h${i}`, chunkHash: `c${i}`, kind: null, dateValue: null
+  }))
+  const vectors = new Float32Array(chunks.length * dim)
+  // Cosine ignoriert die Länge: die Richtung muss variieren, sonst sind alle Vektoren gleich nah.
+  chunks.forEach((_, i) => { vectors[i * dim] = 1; vectors[i * dim + 1] = i * 0.02 })
+  const cosineOf = (i: number) => 1 / Math.sqrt(1 + (i * 0.02) ** 2)
+  const files = Object.fromEntries(chunks.map((c) => [c.fileRel, { sourceHash: c.sourceHash, mtime: 1, size: 1, kind: null, dateValue: null, dateSource: null }]))
+  const container = { meta: { identity: { dim }, createdAt: 1, files, chunks }, vectors } as unknown as Parameters<typeof selectForQuery>[0]
+  const q = Float32Array.from([1, 0, 0, 0])
+  const opts = { topK: 8, minScore: 0, perFileCap: 2, oversample: 4, excludeFolders: [], lexicalWeight: 0.3, nearDupCosine: 0 }
+
+  it('die Kandidatentiefe ist topK × oversample — ein Treffer dahinter kommt NICHT in die Auswahl', () => {
+    const r = selectForQuery(container, q, 'Zirkoniumstifte Regal Vierzehn', opts)
+    expect(r.candidatesConsidered).toBe(32)
+    expect(r.selected.some((h) => h.chunk.fileRel === 'n/34.md')).toBe(false)
+  })
+  it('innerhalb der Tiefe hebt der Wortabgleich den passenden Treffer nach vorn', () => {
+    const near = { ...container, meta: { ...container.meta, chunks: chunks.map((c, i) => i === 10 ? { ...c, text: 'Zirkoniumstifte Regal Vierzehn' } : c) } } as typeof container
+    const r = selectForQuery(near, q, 'Zirkoniumstifte Regal Vierzehn', opts)
+    expect(r.selected[0].chunk.fileRel).toBe('n/10.md')
+    // `score` bleibt die Bedeutungsnähe, nicht der kombinierte Wert
+    expect(r.selected[0].score).toBeCloseTo(cosineOf(10), 5)
+  })
+  it('unter dem Floor: keine Auswahl, bester Score wird gemeldet', () => {
+    const orthogonal = Float32Array.from([0, 0, 1, 0])
+    const r = selectForQuery(container, orthogonal, 'egal', { ...opts, minScore: 0.5 })
+    expect(r.belowFloor).toBe(true)
+    expect(r.selected).toEqual([])
+    expect(r.bestScore).toBeCloseTo(0, 5)
   })
 })

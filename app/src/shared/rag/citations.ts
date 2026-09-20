@@ -77,6 +77,8 @@ export interface CitationOptions {
 }
 
 const DEFAULT_THRESHOLD = 0.3
+/** Nennungen sind kurz; ein ganzer Satz in Anführungszeichen ist ein Zitat und wird geprüft. */
+const MAX_MENTION_WORDS = 5
 
 const TRANSITIONS = new Set([
   'kurz gesagt', 'zusammengefasst', 'zusammenfassung', 'fazit', 'kurzum', 'in kürze',
@@ -366,10 +368,13 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
       const normalized = normalizeWs(plain).replace(/[.:!…]+$/g, '').trim()
       const quotes = findQuotes(plain).flatMap((q) => {
         const nq = normalizeWs(q)
-        // Begriffe aus der Frage und Notiztitel in Anführungszeichen sind Nennungen, keine Zitate —
-        // sie werden gar nicht als Zitat geführt (sonst „nicht im Original“ für den eigenen Suchbegriff).
-        if (questionNorm && questionNorm.includes(nq)) return []
-        if (titleNorm.some((t) => t === nq || t.includes(nq))) return []
+        // Nennungen sind keine Zitate: ein in Anführungszeichen gesetzter Suchbegriff oder
+        // Notiztitel. Die Ausnahme ist ENG gefasst (Codex F46) — höchstens fünf Wörter, und der
+        // Titel muss ganz übereinstimmen. Sonst verschwände ein echtes Falschzitat, nur weil seine
+        // Wörter zufällig in der Frage stehen.
+        const words = nq.split(' ').filter(Boolean).length
+        if (words <= MAX_MENTION_WORDS && questionNorm && questionNorm.includes(nq)) return []
+        if (words <= MAX_MENTION_WORDS && titleNorm.some((t) => t === nq)) return []
         const target = localRefs.length > 0 ? localRefs.map((n) => sourceNorm[n - 1]) : sourceNorm
         return [{ text: q, found: target.some((s) => s.includes(nq)) }]
       })

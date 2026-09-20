@@ -32,7 +32,7 @@ import {
   type VaultIndexIdentity,
   type VaultIndexMeta
 } from '../../shared/rag/vaultIndex'
-import { isDerivedAiNote } from '../../shared/rag/indexPolicy'
+import { INDEX_POLICY_VERSION, isDerivedAiNote } from '../../shared/rag/indexPolicy'
 import { getNoteKindStrict, resolveNoteDate } from '../../shared/noteKind'
 import { embedText, EmbeddingAbortedError } from './embed'
 import { resolveLocalModel } from './localModel'
@@ -386,6 +386,7 @@ export class VaultIndexJob {
         dim,
         formatVersion: RAG_VAULT_FORMAT_VERSION,
         chunkingVersion: RAG_INDEX_VERSION,
+        policyVersion: INDEX_POLICY_VERSION,
         excludeKey: excludeKeyFor(excludeFolders)
       }
       // Ordner NUR unter einem geprüften Elternpfad anlegen (F34): erst `.mindgraph` prüfen
@@ -408,6 +409,11 @@ export class VaultIndexJob {
       if (existing && !embeddingsCompatible(existing.meta.identity, identity)) existing = null
       if (!existing) existing = await loadVaultIndexFile(indexFile)
       if (existing && !embeddingsCompatible(existing.meta.identity, identity)) existing = null
+      // Policy-Migration (Codex F42): Wurde der Altindex nach anderen Regeln gebaut, darf der
+      // inkrementelle Schnellpfad keine Datei ungelesen übernehmen — sonst bliebe eine schon
+      // indexierte Brain-Notiz Quelle. Embeddings werden trotzdem wiederverwendet.
+      const policyChanged = !!existing && (existing.meta.identity.policyVersion ?? 1) !== identity.policyVersion
+      const rescanAll = this.opts.rescanAll || policyChanged
       const existingRows = new Map<string, number[]>()
       if (existing) {
         existing.meta.chunks.forEach((c, i) => {
@@ -466,7 +472,7 @@ export class VaultIndexJob {
 
         for (const f of packet) {
           // Inkrementell: unveränderte, bekannte Dateien ohne Lesen übernehmen (außer rescanAll).
-          if (this.opts.mode === 'incremental' && !this.opts.rescanAll && existing && existingRows.has(f.rel) && !(changed?.has(f.rel))) {
+          if (this.opts.mode === 'incremental' && !rescanAll && existing && existingRows.has(f.rel) && !(changed?.has(f.rel))) {
             decisions.set(f.rel, { kind: 'existing' })
             this.progress.chunksReused += existingRows.get(f.rel)!.length
             continue

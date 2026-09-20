@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { INDEX_POLICY_VERSION } from '../../shared/rag/indexPolicy'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
@@ -51,7 +52,7 @@ vi.mock('./localModel', () => ({
 }))
 
 import { VaultIndexJob, scanVaultFiles, estimateVault, coalesceParts, type VaultBuildProgress } from './vaultIndexer'
-import { loadVaultIndexFile, vaultIndexPath, stagingDirFor, loadCheckpoint, sha256Hex } from './vaultStore'
+import { loadVaultIndexFile, vaultIndexPath, stagingDirFor, loadCheckpoint, sha256Hex, writeVaultIndexAtomic } from './vaultStore'
 import { beginOllamaActivity, ollamaActivityInternals } from './ollamaActivity'
 import { canonicalizeMarkdown } from '../../shared/rag/chunking'
 import { RAG_INDEX_VERSION } from '../../shared/rag/types'
@@ -81,7 +82,7 @@ async function seedVault() {
 }
 
 function identityFor(exclude: string[]): VaultIndexIdentity {
-  return { model: 'bge-m3:latest', digest: currentDigest, dim: 4, formatVersion: RAG_VAULT_FORMAT_VERSION, chunkingVersion: RAG_INDEX_VERSION, excludeKey: excludeKeyFor(exclude) }
+  return { model: 'bge-m3:latest', digest: currentDigest, dim: 4, formatVersion: RAG_VAULT_FORMAT_VERSION, chunkingVersion: RAG_INDEX_VERSION, policyVersion: INDEX_POLICY_VERSION, excludeKey: excludeKeyFor(exclude) }
 }
 
 function job(overrides: Partial<ConstructorParameters<typeof VaultIndexJob>[0]> = {}) {
@@ -180,6 +181,35 @@ describe('VaultIndexJob — Voll-Build', () => {
     // Mail-Notiz mit bloßer KI-Provenienz bleibt Quelle
     expect(rels.some((r) => r.includes('Mail.md'))).toBe(true)
     expect(res.fileCount).toBe(4)
+  })
+
+  it('Policy-Migration: ein nach alten Regeln gebauter Index übernimmt die Brain-Notiz nicht ungelesen (F42)', async () => {
+    const brainRel = '800 - brain/2026/09/19.md'
+    const brain = '---\ntype: brain-day\ndate: 2026-09-19\n---\n\n## Heute im Fokus\n- Etwas Wichtiges stand hier drin\n'
+    await writeNote(brainRel, brain)
+
+    // Altindex: gebaut nach Policy 1, enthält die Brain-Notiz als Quelle.
+    const oldIdentity: VaultIndexIdentity = { ...identityFor(['400 - Archiv']), policyVersion: 1 }
+    const canonical = canonicalizeMarkdown(brain)
+    const oldMeta = {
+      identity: oldIdentity,
+      createdAt: 1,
+      files: { [brainRel]: { sourceHash: sha256Hex(canonical), mtime: 1, size: canonical.length, kind: null, dateValue: null, dateSource: null } },
+      chunks: [{ fileRel: brainRel, chunkIndex: 0, heading: '', text: canonical, sourceStart: 0, sourceEnd: canonical.length, startLine: 1, sourceHash: sha256Hex(canonical), chunkHash: sha256Hex(canonical), kind: null, dateValue: null }]
+    }
+    await writeVaultIndexAtomic(vaultIndexPath(vault, oldIdentity), oldMeta as unknown as Parameters<typeof writeVaultIndexAtomic>[1], [Float32Array.from([1, 0, 0, 0])], 1)
+    const oldContainer = await loadVaultIndexFile(vaultIndexPath(vault, oldIdentity))
+
+    // Inkrementeller Lauf nach dem Update. Der Manager reicht den geladenen Altindex als
+    // `existing` weiter (daher die schnelle Wiederverwendung); ohne die Policy-Migration
+    // liefe die unveränderte Brain-Notiz hier ungelesen durch den Schnellpfad.
+    const { j } = job({ mode: 'incremental', existing: oldContainer })
+    const res = await j.run()
+    expect(res.status).toBe('done')
+    const fresh = await loadVaultIndexFile(vaultIndexPath(vault, identityFor(['400 - Archiv'])))
+    expect(Object.keys(fresh!.meta.files)).not.toContain(brainRel)
+    expect(fresh!.meta.chunks.some((c) => c.fileRel === brainRel)).toBe(false)
+    expect(fresh!.meta.identity.policyVersion).toBe(INDEX_POLICY_VERSION)
   })
 
   it('Ausschlussliste ändert die Identität und damit den Dateinamen', async () => {

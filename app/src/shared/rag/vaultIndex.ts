@@ -41,6 +41,8 @@ export interface VaultIndexIdentity {
   dim: number
   formatVersion: number
   chunkingVersion: number
+  /** Version der Indexregeln (`shared/rag/indexPolicy.ts`). Änderung = Neuaufbau nötig. */
+  policyVersion: number
   /** Normalisierte, sortierte Ausschlussordner — Teil der Identität (F19). */
   excludeKey: string
 }
@@ -133,6 +135,7 @@ export function identityString(id: VaultIndexIdentity): string {
     dim: id.dim,
     formatVersion: id.formatVersion,
     chunkingVersion: id.chunkingVersion,
+    policyVersion: id.policyVersion ?? 1,
     excludeKey: id.excludeKey
   })
 }

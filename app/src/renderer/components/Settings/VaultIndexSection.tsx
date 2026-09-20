@@ -164,6 +164,12 @@ export function VaultIndexSection() {
             <Note tone="muted">{t('settings.vaultIndex.noIndex')}</Note>
           )}
 
+          {status.index.exists && status.index.policyOutdated && !running && (
+            <Note tone="warn" action={t('settings.vaultIndex.rebuild')} onAction={() => void startBuild()} actionDisabled={busy}>
+              {t('settings.vaultIndex.policyOutdated')}
+            </Note>
+          )}
+
           {status.index.exists && status.index.excludeMismatch && !running && (
             <Note tone="warn" action={t('settings.vaultIndex.rebuild')} onAction={() => void startBuild()} actionDisabled={busy}>
               {t('settings.vaultIndex.excludeMismatch')}

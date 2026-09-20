@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { INDEX_POLICY_VERSION } from '../../shared/rag/indexPolicy'
 import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
@@ -21,7 +22,7 @@ import {
 import type { VaultIndexIdentity, VaultIndexMeta } from '../../shared/rag/vaultIndex'
 
 let tmp: string
-const identity: VaultIndexIdentity = { model: 'bge-m3:latest', digest: 'sha256:abc', dim: 3, formatVersion: 1, chunkingVersion: 2, excludeKey: '' }
+const identity: VaultIndexIdentity = { model: 'bge-m3:latest', digest: 'sha256:abc', dim: 3, formatVersion: 1, chunkingVersion: 2, policyVersion: INDEX_POLICY_VERSION, excludeKey: '' }
 
 function meta(chunkCount: number): VaultIndexMeta {
   return {
