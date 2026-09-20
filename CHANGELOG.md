@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.17-beta] - 2026-09-20
+
+**Im KI-Chat des Posteingangs ist deine eigene Frage wieder lesbar.** Sie stand bisher als weiße Schrift auf hellem Grund und war damit unsichtbar, ebenso der Senden-Knopf daneben. Dieselbe Ursache traf weitere Stellen: Die aktiven Knöpfe in der Kopfzeile des Posteingangs leuchteten blauviolett statt im Petrol der App, und das Suchfeld in der Notiz zeigte beim Hineinklicken keinen Rahmen.
+
+### Hintergrund
+
+- Aufgefallen ist es beim Nachfragen zu einer E-Mail: Die abgeschickte Frage erschien oben im Fenster als leere Zeile, die Antwort darunter war normal zu lesen.
+- Ursache war ein Farbname, den es in der App nicht gibt. Steht in einer Gestaltungsregel ein unbekannter Name, verwirft die Anzeige stillschweigend die ganze Zeile. Hier fiel damit die Hintergrundfarbe weg, die weiße Schrift darauf blieb — weiß auf hell.
+- Betroffen waren dreiundzwanzig Stellen, die alle denselben Tippfehler trugen. Sie sind jetzt auf den richtigen Namen umgestellt.
+- Auf farbig gefüllten Flächen richtet sich die Schriftfarbe jetzt nach dem Erscheinungsbild, statt fest weiß zu sein. Im dunklen Erscheinungsbild ist das Petrol hell; weiße Schrift wäre dort kaum zu lesen.
+- Vier weitere Stellen verwendeten eine ebenfalls unbekannte Farbe mit einem hinterlegten Ersatzwert aus einer früheren Farbgebung. Daher das Blauviolett in einer sonst petrolfarbenen Oberfläche.
+- **Grenze:** Das ist eine reine Anzeigekorrektur. An Funktionen, Daten und Einstellungen ändert sich nichts.
+
 ## [0.11.16-beta] - 2026-09-20
 
 **Du kannst deinen ganzen Notizspeicher befragen und bekommst Antworten mit anklickbaren Quellenangaben.** Ein Klick auf eine Quellennummer öffnet die Notiz genau an der Stelle, aus der die Aussage stammt. Unter jeder Antwort steht, was die App geprüft hat: Sätze ohne Quellenangabe, schwache Übereinstimmung mit der Quelle, Quellennummern, die es nicht gibt, und Zitate, die so nicht im Original stehen — geprüft wird also die Herkunft, nicht ob eine Aussage wahr ist. Findet die Suche keinen ausreichend ähnlichen Treffer, sagt die App das, statt zu raten; Suche und Antwort laufen auf deinem Rechner.

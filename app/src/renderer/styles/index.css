@@ -11729,13 +11729,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .panel-header-btn:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  border-color: var(--accent);
+  border-color: var(--accent-color);
 }
 
 .panel-header-btn.active {
-  background: var(--accent-bg, rgba(100, 130, 255, 0.15));
-  color: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 /* ─── Geteilte ruhige Karte (Karteikarten-Standard für Listen-Items) ──────
@@ -13376,7 +13376,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .inbox-attachment-btn:hover:not(:disabled) {
   color: var(--text-primary);
-  border-color: var(--accent);
+  border-color: var(--accent-color);
 }
 
 .inbox-attachment-btn:disabled {
@@ -13409,7 +13409,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .inbox-bodyview-toggle:hover {
   color: var(--text-primary);
-  border-color: var(--accent);
+  border-color: var(--accent-color);
 }
 
 .inbox-body-link {
@@ -13503,8 +13503,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .inbox-panel-close.active {
-  color: var(--accent);
-  background: var(--accent-bg, rgba(100, 130, 255, 0.1));
+  color: var(--accent-color);
+  background: var(--accent-subtle);
 }
 
 /* Header buttons with text labels */
@@ -13526,13 +13526,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .inbox-header-btn:hover {
   background: var(--bg-tertiary);
   color: var(--text-primary);
-  border-color: var(--accent);
+  border-color: var(--accent-color);
 }
 
 .inbox-header-btn.active {
-  background: var(--accent-bg, rgba(100, 130, 255, 0.15));
-  color: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  border-color: var(--accent-color);
 }
 
 /* Email Actions in Detail View */
@@ -13572,8 +13572,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 .inbox-action-btn:hover {
   background: var(--bg-tertiary);
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 /* Petrol redesign (Claude Design): „Antwort entwerfen" ist der Primär-Button (accent + accent-on). */
@@ -13590,8 +13590,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 
 /* Sent email indicator */
 .inbox-email-item.sent .inbox-email-avatar {
-  background: var(--accent-bg, rgba(100, 130, 255, 0.15));
-  color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
 }
 
 /* Compose View — Apple Mail style */
@@ -14047,8 +14047,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .inbox-aichat-suggestions button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
 }
 
 .inbox-aichat-message {
@@ -14056,8 +14056,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .inbox-aichat-message.user .inbox-aichat-message-content {
-  background: var(--accent);
-  color: white;
+  background: var(--accent-color);
+  color: var(--accent-on);
   border-radius: var(--radius-sm) var(--radius-sm) 4px var(--radius-sm);
   margin-left: 24px;
 }
@@ -14090,16 +14090,16 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-primary);
-  color: var(--accent);
+  color: var(--accent-color);
   font-size: 11px;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .inbox-aichat-use-draft:hover {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent);
+  background: var(--accent-color);
+  color: var(--accent-on);
+  border-color: var(--accent-color);
 }
 
 .inbox-aichat-input-bar {
@@ -14123,7 +14123,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 .inbox-aichat-input:focus {
-  border-color: var(--accent);
+  border-color: var(--accent-color);
 }
 
 .inbox-aichat-send {
@@ -14134,8 +14134,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   height: 32px;
   border: none;
   border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: white;
+  background: var(--accent-color);
+  color: var(--accent-on);
   cursor: pointer;
   transition: opacity 0.15s;
   align-self: flex-end;
@@ -18912,8 +18912,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--text-primary);
 }
 .flashcard-tts-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-color);
+  border-color: var(--accent-color);
   color: var(--bg-primary);
 }
 
@@ -22501,7 +22501,7 @@ body.presentation-mode *::after {
   color: var(--text-primary);
   font-size: 13px;
 }
-.note-find-bar input:focus { outline: none; border-color: var(--accent); }
+.note-find-bar input:focus { outline: none; border-color: var(--accent-color); }
 .note-find-count {
   min-width: 62px;
   text-align: right;
