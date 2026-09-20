@@ -185,14 +185,16 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
     out.push({
       id: c.id, kind: c.kind, question: c.question, expected, belowFloor: false, bestScore,
       hits: hits.map((h: VaultHit) => ({ fileRel: h.fileRel, score: h.score, heading: h.heading, startLine: h.startLine })),
-      hit: c.kind === 'positive' ? rank !== null : null, rank, candidateRank
+      // Positivfall ohne erwartete Datei (Themenfrage): nicht in Hit@K gezählt, nur Antwort/Quellen für die Handbewertung.
+      hit: c.kind === 'positive' && expected.length ? rank !== null : null, rank, candidateRank
     })
   }
   return out
 }
 
 function summarize(runs: CaseRun[]): Record<string, number | string> {
-  const pos = runs.filter((r) => r.kind === 'positive')
+  const posAll = runs.filter((r) => r.kind === 'positive')
+  const pos = posAll.filter((r) => r.expected.length > 0)
   const neg = runs.filter((r) => r.kind === 'negative')
   const hits = pos.filter((r) => r.hit).length
   const mrr = pos.length ? pos.reduce((s, r) => s + (r.rank ? 1 / r.rank : 0), 0) / pos.length : 0
@@ -205,7 +207,7 @@ function summarize(runs: CaseRun[]): Record<string, number | string> {
     'Positiv': pos.length, 'Hit@K': pos.length ? `${hits}/${pos.length} (${Math.round((100 * hits) / pos.length)} %)` : '–',
     'MRR': mrr.toFixed(2), 'Ø Kandidatenrang': Number.isNaN(meanCandRank) ? '–' : meanCandRank.toFixed(1),
     'Negativ': neg.length, 'verweigert (neg)': neg.length ? `${refusedNeg}/${neg.length}` : '–',
-    'fälschlich verweigert (pos)': `${refusedPos}/${pos.length}`,
+    'fälschlich verweigert (pos)': `${posAll.filter((r) => r.belowFloor).length}/${posAll.length}`,
     'Verweigerung Precision': refusedAll ? (refusedNeg / refusedAll).toFixed(2) : '–',
     'Verweigerung Recall': neg.length ? (refusedNeg / neg.length).toFixed(2) : '–'
   }
@@ -266,7 +268,7 @@ async function main(): Promise<void> {
   console.log('\nPro Fall (aktuelle Konfiguration):')
   for (const r of results[base.name].runs) {
     const status = r.kind === 'negative' ? (r.belowFloor ? 'verweigert ✓' : `beantwortet ✗ (best ${r.bestScore?.toFixed(3)})`)
-      : r.belowFloor ? `verweigert ✗ (best ${r.bestScore?.toFixed(3)})` : r.hit ? `Treffer Rang ${r.rank}` : `kein Treffer (Kandidatenrang ${r.candidateRank ?? '>100'})`
+      : r.belowFloor ? `verweigert ✗ (best ${r.bestScore?.toFixed(3)})` : r.expected.length === 0 ? `beantwortet (best ${r.bestScore?.toFixed(3)}) · Quellen: ${r.hits.slice(0, 3).map((h) => h.fileRel.split('/').pop()?.replace(/\.md$/i, '')).join(' | ')}` : r.hit ? `Treffer Rang ${r.rank}` : `kein Treffer (Kandidatenrang ${r.candidateRank ?? '>100'})`
     console.log(`  ${r.id.padEnd(14)} ${status}`)
   }
 
@@ -278,7 +280,7 @@ async function main(): Promise<void> {
       `Bewertung je Fall: **richtig** (Antwort stimmt und ist belegt) · **teilweise** · **falsch** · **falsch grün** (Prüfzeile unauffällig, Aussage falsch) · **falsch rot** (Prüfzeile schlägt an, Aussage richtig)\n`]
     for (const r of results[base.name].runs) {
       if (r.belowFloor) {
-        lines.push(`## ${r.id} — verweigert\n\n**Frage:** ${r.question}\n\nKeine Antwort (bester Score ${r.bestScore?.toFixed(3) ?? '–'} unter Floor ${base.floor}).\n\n**Bewertung:** [ ] richtig verweigert  [ ] hätte antworten sollen\n`)
+        lines.push(`## ${r.id} — verweigert\n\n**Frage:** ${r.question}\n\nKeine Antwort (bester Score ${r.bestScore?.toFixed(3) ?? '–'} unter Floor ${base.floor}).\n\n**Bewertung** (eins ankreuzen):\n- [ ] richtig verweigert\n- [ ] hätte antworten sollen\n`)
         continue
       }
       const rehydrated: VaultHit[] = r.hits.map((h) => {
@@ -292,9 +294,15 @@ async function main(): Promise<void> {
       const s = report.summary
       r.answer = answer
       r.check = `${s.sentences} Sätze · ${s.uncited} ohne Quellenangabe · ${s.low} mit niedriger Wortdeckung · ${s.invalidRefs} ungültige Nummern · ${s.quotesNotFound} Zitate nicht im Original`
-      r.sources = rehydrated.map((h, i) => `[${i + 1}] ${h.fileRel} › ${h.heading || '–'} (Zeile ${h.startLine})`)
+      // Quellen als Wikilinks: das Protokoll wird als Notiz im Vault bewertet (Klick öffnet die Quelle).
+      r.sources = rehydrated.map((h, i) => {
+        const target = h.fileRel.replace(/\.md$/i, '')
+        const name = target.split('/').pop() ?? target
+        return `[${i + 1}] [[${target}|${name}]] › ${h.heading || '–'} (Zeile ${h.startLine})`
+      })
       console.log(`  ${r.id.padEnd(14)} ${Math.round((Date.now() - t1) / 1000)} s · ${r.check}`)
-      lines.push(`## ${r.id}${r.kind === 'positive' ? (r.hit ? ' — erwartete Quelle dabei' : ' — erwartete Quelle FEHLT') : ' — Negativfall, beantwortet'}\n\n**Frage:** ${r.question}\n\n${answer}\n\n**Quellen:**\n${r.sources.map((x) => `- ${x}`).join('\n')}\n\n**Prüfzeile:** ${r.check}\n\n**Bewertung:** [ ] richtig  [ ] teilweise  [ ] falsch  [ ] falsch grün  [ ] falsch rot\n**Anmerkung:** \n`)
+      const verdict = r.kind === 'negative' ? ' — Negativfall, beantwortet' : r.expected.length === 0 ? ' — Themenfrage' : r.hit ? ' — erwartete Quelle dabei' : ' — erwartete Quelle FEHLT'
+      lines.push(`## ${r.id}${verdict}\n\n**Frage:** ${r.question}\n\n${answer}\n\n**Quellen:**\n${r.sources.map((x) => `- ${x}`).join('\n')}\n\n**Prüfzeile:** ${r.check}\n\n**Bewertung** (eins ankreuzen):\n- [ ] richtig\n- [ ] teilweise\n- [ ] falsch\n- [ ] falsch grün (Prüfzeile unauffällig, Aussage falsch)\n- [ ] falsch rot (Prüfzeile schlägt an, Aussage richtig)\n\n**Anmerkung:** \n`)
     }
     const proto = path.join(outDir, `handbewertung-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.md`)
     await fs.writeFile(proto, lines.join('\n'), 'utf-8')
