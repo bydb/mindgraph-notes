@@ -143,6 +143,8 @@ Frage im NotesChat (Modus vault, Filter Ordner/Kategorie/Zeitraum)
 
 ### Phase 3 — Filter, Messung, Feinschliff
 
+**Stand 20.09.2026 — Schritt 1 begonnen:** `npm run vault:eval -- --vault <V> --cases <fragen.json> [--sweep] [--answer]` (`app/scripts/vault-eval.ts`) misst am echten Index Hit@K, MRR, Kandidatenrang der erwarteten Datei (feste Tiefe 100) sowie Verweigerung (Precision/Recall über Negativfälle), sweept Floor/K/Deckel auf einmal eingebetteten Fragen und schreibt mit `--answer` ein Markdown-Protokoll mit Prüfzeile und Bewertungsfeld für die Handbewertung. Fragen und Ergebnisse liegen im Vault unter `.mindgraph/rag-eval/` (nicht im Repo). Erste sechs Fälle (zwei echte Nutzerfragen zur Stellenbewertung, ein Kontrollfall mit Namen, eine Nachschlagefrage, zwei Negativfälle): Hit@8 3/4, die frei formulierte Frage Rang 7, die abgewandelte kein Treffer (Kandidatenrang 26); **beide Negativfälle wurden beantwortet** (beste Scores 0,49 und 0,43 liegen über dem Floor 0,30) — der Floor ist für bge-m3 an diesem Vault deutlich zu niedrig, Kalibrierung folgt mit dem vollen Tuning-Set.
+
 - Tuning- und Holdout-Set, `--scope vault`, Metriken aus Entscheidung 17; Kalibrierung Floor / Support / K / Deckel nur auf dem Tuning-Set, Endzahlen vom Holdout in Rev. 3 und Memory.
 - A/B Deckel und Dedupe; Konkurrenz- und Lebenszyklus-Tests als dauerhafte Testfälle.
 - CHANGELOG-Eintrag in Nutzerfassung mit der ehrlichen Formulierung aus Entscheidung 13.
