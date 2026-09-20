@@ -70,6 +70,10 @@ export interface CitationReport {
 export interface CitationOptions {
   /** Startwert 0,3 — wird in Phase 3 kalibriert. */
   supportThreshold?: number
+  /** Die gestellte Frage: in Anführungszeichen wiederholte Begriffe daraus sind keine Zitate (real: „Computer use“). */
+  question?: string
+  /** Überschrift und Dateiname je Quelle: in Anführungszeichen genannte Notiztitel sind keine Zitate. */
+  sourceTitles?: string[]
 }
 
 const DEFAULT_THRESHOLD = 0.3
@@ -322,6 +326,8 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   const K = sources.length
   const sourceWords = sources.map(contentWords)
   const sourceNorm = sources.map(normalizeWs)
+  const questionNorm = opts.question ? normalizeWs(opts.question) : ''
+  const titleNorm = (opts.sourceTitles ?? []).map(normalizeWs).filter(Boolean)
 
   const refs: CitationRef[] = []
   const sentenceChecks: SentenceCheck[] = []
@@ -358,9 +364,14 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
       }
       const plain = raw.replace(REF_RE, ' ').trim()
       const normalized = normalizeWs(plain).replace(/[.:!…]+$/g, '').trim()
-      const quotes = findQuotes(plain).map((q) => {
+      const quotes = findQuotes(plain).flatMap((q) => {
+        const nq = normalizeWs(q)
+        // Begriffe aus der Frage und Notiztitel in Anführungszeichen sind Nennungen, keine Zitate —
+        // sie werden gar nicht als Zitat geführt (sonst „nicht im Original“ für den eigenen Suchbegriff).
+        if (questionNorm && questionNorm.includes(nq)) return []
+        if (titleNorm.some((t) => t === nq || t.includes(nq))) return []
         const target = localRefs.length > 0 ? localRefs.map((n) => sourceNorm[n - 1]) : sourceNorm
-        return { text: q, found: target.some((s) => s.includes(normalizeWs(q))) }
+        return [{ text: q, found: target.some((s) => s.includes(nq)) }]
       })
 
       let status: SentenceStatus

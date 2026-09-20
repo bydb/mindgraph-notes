@@ -288,7 +288,7 @@ async function main(): Promise<void> {
       })
       const t1 = Date.now()
       const answer = await chat(buildVaultPrompt(rehydrated, 'de', sanitizeUntrustedText), r.question)
-      const report = analyzeCitations(answer, rehydrated.map((h) => h.text))
+      const report = analyzeCitations(answer, rehydrated.map((h) => h.text), { question: r.question, sourceTitles: rehydrated.flatMap((h) => [h.heading, h.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? '']) })
       const s = report.summary
       r.answer = answer
       r.check = `${s.sentences} Sätze · ${s.uncited} ohne Quellenangabe · ${s.low} mit niedriger Wortdeckung · ${s.invalidRefs} ungültige Nummern · ${s.quotesNotFound} Zitate nicht im Original`

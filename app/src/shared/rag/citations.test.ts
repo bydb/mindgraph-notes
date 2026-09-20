@@ -157,3 +157,13 @@ describe('analyzeCitations', () => {
     expect(r.sentences[0].status).toBe('cited-invalid')
   })
 })
+
+describe('Nennungen in Anführungszeichen sind keine Zitate', () => {
+  it('Suchbegriff aus der Frage und Notiztitel werden nicht als „Zitat nicht im Original“ geführt', () => {
+    const r = analyzeCitations('Zum Thema „Computer use“ verweist die Notiz „Lokale Modelle in MindGraph Notes“ auf das Budget von 10.000 Euro. [1] Er sagte „das wird teuer“. [1]', sources,
+      { question: 'Findest du etwas zum Thema Computer use?', sourceTitles: ['Lokale Modelle in MindGraph Notes', 'Budget.md'] })
+    expect(r.sentences[0].quotes).toEqual([])
+    expect(r.sentences[1].quotes).toEqual([{ text: 'das wird teuer', found: false }])
+    expect(r.summary.quotesNotFound).toBe(1)
+  })
+})

@@ -7730,7 +7730,10 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
       // Prüfer, Anzeige und Export arbeiten auf demselben normalisierten Text: LF-Zeilenenden
       // (markdown-it-Zeilenkarten) und keine Private-Use-Zeichen (Marker der Anzeige, F25).
       const answerText = full.replace(/\r\n?/g, '\n').replace(/[\uE000-\uF8FF]/g, '')
-      const report = analyzeCitations(answerText, retrieval.hits.map((h) => h.text))
+      const report = analyzeCitations(answerText, retrieval.hits.map((h) => h.text), {
+        question: query,
+        sourceTitles: retrieval.hits.flatMap((h) => [h.heading, h.fileRel.split('/').pop()?.replace(/\.md$/i, '') ?? ''])
+      })
       sendDone({
         kind: 'answer',
         answer: answerText,
