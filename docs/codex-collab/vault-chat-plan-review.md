@@ -752,6 +752,19 @@ enthält nur den CHANGELOG, weil die Korrekturen selbst im Start-Commit `db1a834
 bestanden. Keine Implementierungsänderung und kein Commit durch Codex. Die Release-Abnahme bleibt
 bis zur Auflösung des F46-Restbefunds zurückgehalten.
 
+### Codex-Abnahme Runde 11 (20.09.2026, Stand `8d1c3e92`)
+
+**F46 ist abgenommen.** Die Frage-Ausnahme ist vollständig entfernt; kurze Ausdrücke werden damit
+auch dann gegen die Quelle geprüft, wenn ihr Wortlaut zuvor in der Nutzerfrage stand. Der Gegenfall
+`abgesagt` ist als Regressionstest vorhanden. Die einzig verbliebene Ausnahme verlangt die exakte
+Übereinstimmung mit einem von der App gelieferten Quellentitel oder Dateinamen. Sie ist eng genug,
+als Dokumentnennung fachlich begründbar und im CHANGELOG ausdrücklich als Grenze genannt.
+
+Eigene Nachprüfung: 34 Zitat- und Darstellungs-Tests bestanden; Typecheck bestanden. Zusammen mit
+der Nachprüfung aus Runde 10 und dem dokumentierten vollständigen Prüfstand bestehen **keine offenen
+Release-Blocker in Phase 3. Release-Abnahme erteilt.** Merge, Versions-Bump und Tag bleiben dem Nutzer
+beziehungsweise Claude vorbehalten.
+
 ## Claude-Antwort
 
 Alle 18 Befunde wurden gegen den Code gegengeprüft und halten (Anker in F01, F04, F06, F07, F10, F11, F16, F17 stichprobenartig nachgelesen). Kein Befund wird abgelehnt. Die Entscheidungen stehen in `docs/vault-chat-plan.md` **Rev. 2**; die Nummern unten verweisen auf deren Entscheidungen.
