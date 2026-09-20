@@ -125,7 +125,8 @@ export function VaultIndexSection() {
     if (p.paused === 'user') return t('settings.vaultIndex.pausedUser')
     if (p.paused === 'foreground') return t('settings.vaultIndex.pausedForeground')
     switch (p.phase) {
-      case 'preparing': return t('settings.vaultIndex.phasePreparing')
+      // Vorbereitung kann lange dauern (Embedding-Modell laden): die Meldung aus dem Main zeigen.
+      case 'preparing': return p.message || t('settings.vaultIndex.phasePreparing')
       case 'scanning': return t('settings.vaultIndex.phaseScanning')
       case 'embedding': return t('settings.vaultIndex.phaseEmbedding')
       case 'writing': return t('settings.vaultIndex.phaseWriting')

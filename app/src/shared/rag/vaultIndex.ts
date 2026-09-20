@@ -209,6 +209,10 @@ export function isIndexable(relPath: string, excludeFolders: string[]): boolean 
   for (const seg of segments.slice(0, -1)) {
     if (ALWAYS_EXCLUDED_SEGMENTS.has(seg.toLowerCase())) return false
   }
+  // Der Agent-Skills-Ordner der App (`Skills/` auf oberster Ebene): Anweisungen und
+  // Beispielmaterial des Notiz-Agenten, keine Notizen — ein Beispielbrief daraus tauchte real als
+  // Quelle auf (Abnahme 19.09.2026). Nur oberste Ebene, ein Unterordner „Skills“ bleibt Notizen.
+  if (segments.length > 1 && segments[0].toLowerCase() === 'skills') return false
   const folded = foldPathForMatch(rel)
   for (const ex of excludeFolders) {
     const prefix = foldedFolderPrefix(ex)

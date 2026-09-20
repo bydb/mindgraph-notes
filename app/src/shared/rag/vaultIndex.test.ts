@@ -218,3 +218,11 @@ describe('embeddingsCompatible', () => {
     expect(embeddingsCompatible(base, { ...base, chunkingVersion: 3 })).toBe(false)
   })
 })
+
+describe('Agent-Skills-Ordner', () => {
+  it('Skills/ auf oberster Ebene ist nie indexierbar, ein Unterordner „Skills“ schon', () => {
+    expect(isIndexable('Skills/briefkopf/beispiele/einladung.md', [])).toBe(false)
+    expect(isIndexable('Skills/arbeitsblatt/SKILL.md', [])).toBe(false)
+    expect(isIndexable('300 - Ressourcen/Skills/Lernen.md', [])).toBe(true)
+  })
+})

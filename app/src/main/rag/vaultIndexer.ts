@@ -376,6 +376,8 @@ export class VaultIndexJob {
       // 1. Modell + Dimension
       this.emit(true, { phase: 'preparing', message: 'Modell prüfen' })
       const model = await resolveLocalModel(embedModel, { fresh: true })
+      // Die Probe-Einbettung lädt das Modell in Ollama — neben einem großen Chatmodell real 42 s.
+      this.emit(true, { phase: 'preparing', message: 'Embedding-Modell laden (beim ersten Mal bis zu einer Minute)' })
       const probe = await this.embedWithRetry('Dimension')
       const dim = probe.length
       const identity: VaultIndexIdentity = {
