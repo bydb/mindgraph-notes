@@ -76,11 +76,21 @@ export function extractTags(content: string): string[] {
  * markierte nur den Linktext, die Notiz öffnete sich nicht (in Vaults, die
  * ausschließlich pfadbasiert verlinken, fällt das sofort auf).
  */
+/**
+ * Typografische Anführungszeichen auf die geraden Formen zurückführen. Der Lesen-Modus
+ * wandelt Wikilinks erst NACH dem Markdown-Rendern um — der Typograph hat aus `You'll` im
+ * Linkziel dann schon `You’ll` gemacht, und die Notiz war nicht mehr zu finden (real,
+ * 20.09.2026, Readwise-Artikel mit Apostroph im Titel).
+ */
+export function straightenQuotes(text: string): string {
+  return text.replace(/[\u2018\u2019\u201A\u2032]/g, "'").replace(/[\u201C\u201D\u201E\u2033]/g, '"').normalize('NFC')
+}
+
 export function findNoteForWikilink(linkText: string, allNotes: Note[]): Note | null {
-  const raw = linkText.trim().replace(/^\/+/, '')
+  const raw = straightenQuotes(linkText.trim().replace(/^\/+/, ''))
   if (!raw) return null
   const wanted = raw.toLowerCase().replace(/\.md$/, '')
-  const byPath = allNotes.find(n => n.path.toLowerCase().replace(/\.md$/, '') === wanted)
+  const byPath = allNotes.find(n => straightenQuotes(n.path).toLowerCase().replace(/\.md$/, '') === wanted)
   if (byPath) return byPath
   return resolveLink(raw, allNotes)
 }

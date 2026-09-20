@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { resolvePluginFileLink } from './linkExtractor'
-import type { FileEntry } from '../../shared/types'
+import { resolvePluginFileLink, findNoteForWikilink, straightenQuotes } from './linkExtractor'
+import type { FileEntry, Note } from '../../shared/types'
 
 const excalidrawClaim = { pluginId: 'mindgraph-excalidraw', editorId: 'excalidraw' }
 
@@ -38,5 +38,13 @@ describe('resolvePluginFileLink', () => {
   it('ignoriert Nicht-Plugin-Dateien und leere Links', () => {
     expect(resolvePluginFileLink('Notiz.md', tree)).toBeNull()
     expect(resolvePluginFileLink('  ', tree)).toBeNull()
+  })
+})
+
+describe('Wikilink mit typografischem Apostroph (Lesen-Modus nach Typograph)', () => {
+  it('findet die Notiz, obwohl der Link „You’ll“ statt „You\'ll“ trägt', () => {
+    const note = { id: 'w', title: 'Want to Remember', path: "500 - Readwise/Articles/Want to Remember Everything You'll Ever Learn.md", content: '' } as unknown as Note
+    expect(findNoteForWikilink("500 - Readwise/Articles/Want to Remember Everything You’ll Ever Learn", [note])?.id).toBe('w')
+    expect(straightenQuotes('„Zitat“ ‚a‘')).toBe('"Zitat" \'a\'')
   })
 })

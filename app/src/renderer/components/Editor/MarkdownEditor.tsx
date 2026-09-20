@@ -24,7 +24,7 @@ import { useTabStore } from '../../stores/tabStore'
 import { useShallow } from 'zustand/react/shallow'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, escapeHtml } from '../../utils/sanitize'
-import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink, findNoteForWikilink } from '../../utils/linkExtractor'
+import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks, resolvePluginFileLink, findNoteForWikilink, straightenQuotes } from '../../utils/linkExtractor'
 import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, parsePluginEmbedSize } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { SlashCommandMenu } from './SlashCommandMenu'
@@ -724,7 +724,7 @@ md.renderer.rules.text = (tokens, idx) => {
     const fragment = hashIndex > -1 ? linkText.substring(hashIndex + 1) : ''
     const isBlock = fragment.startsWith('^')
 
-    return `<div class="wikilink-embed" data-note="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}" data-is-block="${isBlock}">
+    return `<div class="wikilink-embed" data-note="${md.utils.escapeHtml(straightenQuotes(noteName))}" data-fragment="${md.utils.escapeHtml(straightenQuotes(fragment))}" data-is-block="${isBlock}">
       <div class="wikilink-embed-loading">Lade ${md.utils.escapeHtml(linkText)}...</div>
     </div>`
   })
@@ -745,7 +745,10 @@ md.renderer.rules.text = (tokens, idx) => {
     // Display: explizit gesetzt → den nehmen, sonst den vollen Target-Part (mit Fragment)
     const displayText = explicitDisplay !== null ? explicitDisplay : targetPart
 
-    return `<a href="#" class="wikilink" data-link="${md.utils.escapeHtml(noteName)}" data-fragment="${md.utils.escapeHtml(fragment)}">${md.utils.escapeHtml(displayText)}</a>`
+    // Das Ziel gerade schreiben: der Typograph hat im gerenderten Text bereits `'` → `’`
+    // ersetzt; so bleibt das Ziel auflösbar und der WYSIWYG-Roundtrip schreibt keine
+    // veränderten Wikilinks zurück (Anzeige darf typografisch bleiben).
+    return `<a href="#" class="wikilink" data-link="${md.utils.escapeHtml(straightenQuotes(noteName))}" data-fragment="${md.utils.escapeHtml(straightenQuotes(fragment))}">${md.utils.escapeHtml(displayText)}</a>`
   })
 
   return result
