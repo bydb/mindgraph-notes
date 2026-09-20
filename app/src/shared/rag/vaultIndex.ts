@@ -141,6 +141,18 @@ export function identitiesEqual(a: VaultIndexIdentity, b: VaultIndexIdentity): b
   return identityString(a) === identityString(b)
 }
 
+/**
+ * Dürfen Embeddings aus `a` in einem Index mit Identität `b` wiederverwendet werden? Das hängt
+ * nur von Modell, Digest, Dimension und Format-/Chunking-Version ab — NICHT von der
+ * Ausschlussliste: ein geänderter Ausschluss wechselt den Dateinamen des Index, die
+ * Vektoren unveränderter Chunks bleiben gültig (real, 20.09.2026: Archiv-Ausschluss
+ * korrigiert → alle 19 037 Chunks wurden unnötig neu eingebettet).
+ */
+export function embeddingsCompatible(a: VaultIndexIdentity, b: VaultIndexIdentity): boolean {
+  return a.model === b.model && a.digest === b.digest && a.dim === b.dim
+    && a.formatVersion === b.formatVersion && a.chunkingVersion === b.chunkingVersion
+}
+
 /** Lesbarer, nicht eindeutiger Slug für den Dateinamen (Windows: kein `:`/`/`). */
 export function modelSlug(model: string): string {
   return model.replace(/[/\\:]+/g, '-').replace(/\s+/g, '_').replace(/[^\w.\-]/g, '').slice(0, 60) || 'model'

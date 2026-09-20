@@ -22,7 +22,7 @@ import { RAG_INDEX_VERSION } from '../../shared/rag/types'
 import {
   RAG_VAULT_FORMAT_VERSION,
   excludeKeyFor,
-  identitiesEqual,
+  embeddingsCompatible,
   isIndexable,
   normalizeFolderPrefix,
   normalizeRelPath,
@@ -400,9 +400,11 @@ export class VaultIndexJob {
       this.emit(true, { filesTotal: files.length })
 
       let existing: VaultIndexContainer | null = this.opts.existing ?? null
-      if (existing && !identitiesEqual(existing.meta.identity, identity)) existing = null
+      // Wiederverwendung: gleiche Einbettung (Modell, Digest, Dimension, Versionen) genügt —
+      // eine andere Ausschlussliste ändert nur, welche Dateien im Index landen.
+      if (existing && !embeddingsCompatible(existing.meta.identity, identity)) existing = null
       if (!existing) existing = await loadVaultIndexFile(indexFile)
-      if (existing && !identitiesEqual(existing.meta.identity, identity)) existing = null
+      if (existing && !embeddingsCompatible(existing.meta.identity, identity)) existing = null
       const existingRows = new Map<string, number[]>()
       if (existing) {
         existing.meta.chunks.forEach((c, i) => {

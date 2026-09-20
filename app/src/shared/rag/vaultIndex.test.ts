@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { encodeVaultIndex, decodeVaultIndex, VaultIndexFormatError, VAULT_INDEX_HEADER_SIZE, crc32, identityString, identitiesEqual, excludeKeyFor, isIndexable, matchesFilters, modelSlug, cosineRow, vectorNorm, type VaultIndexContainer, type VaultIndexMeta, type VaultFileMeta } from './vaultIndex'
+import { embeddingsCompatible, encodeVaultIndex, decodeVaultIndex, VaultIndexFormatError, VAULT_INDEX_HEADER_SIZE, crc32, identityString, identitiesEqual, excludeKeyFor, isIndexable, matchesFilters, modelSlug, cosineRow, vectorNorm, type VaultIndexContainer, type VaultIndexMeta, type VaultFileMeta } from './vaultIndex'
 
 function sampleMeta(chunkCount = 3, dim = 4): VaultIndexMeta {
   const files: Record<string, VaultFileMeta> = {
@@ -202,5 +202,19 @@ describe('Ordner-Abgleich in Vergleichsform (Variantenselektor, NFC, node_module
     expect(isIndexable('Projekt/node_modules/jsonfile/CHANGELOG.md', [])).toBe(false)
     const file = { sourceHash: 'h', mtime: 0, size: 1, chunkCount: 1 } as unknown as Parameters<typeof matchesFilters>[1]
     expect(matchesFilters('400 - 🏛 Archiv/x.md', file, { folders: ['400 - 🏛\uFE0F Archiv'] })).toBe(true)
+  })
+})
+
+describe('embeddingsCompatible', () => {
+  const base = { model: 'bge-m3', digest: 'sha256:a', dim: 1024, formatVersion: 1, chunkingVersion: 2, excludeKey: '' }
+  it('andere Ausschlussliste: Embeddings bleiben wiederverwendbar, Identität ist trotzdem verschieden', () => {
+    const other = { ...base, excludeKey: '400 - Archiv/' }
+    expect(embeddingsCompatible(base, other)).toBe(true)
+    expect(identitiesEqual(base, other)).toBe(false)
+  })
+  it('anderer Digest, andere Dimension oder Version: nicht wiederverwendbar', () => {
+    expect(embeddingsCompatible(base, { ...base, digest: 'sha256:b' })).toBe(false)
+    expect(embeddingsCompatible(base, { ...base, dim: 768 })).toBe(false)
+    expect(embeddingsCompatible(base, { ...base, chunkingVersion: 3 })).toBe(false)
   })
 })
