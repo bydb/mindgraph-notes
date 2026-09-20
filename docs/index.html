@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.15-beta",
+    "softwareVersion": "0.11.16-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Termine aus Mails: ganzt&#228;gig und mehrt&#228;gig &middot; v0.11.15</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Notizen befragen — mit anklickbaren Quellen &middot; v0.11.16</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,7 +1630,7 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.15 &#183; Termine aus Mails</span></div>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.16 &#183; Notizen befragen</span></div>
           <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Termine aus Mails erkennen ganze und mehrere Tage.</em></h2>
           <p class="st-lead" data-i18n="release.lead">Nennt eine Einladung nur Tage und keine Uhrzeit, schl&#228;gt die Pr&#252;fkarte einen ganzt&#228;gigen Termin vor, bei mehreren Tagen mit Beginn und letztem Tag. Eine Uhrzeit, die nicht in der Mail steht, tr&#228;gt die App nicht mehr ein.</p>
         </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Termine aus Mails: ganztägig und mehrtägig &middot; v{vs}",
+        "hero.release": "Notizen befragen — mit anklickbaren Quellen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Termine aus Mails",
-        "release.heading": "Was ist neu — <em>Termine aus Mails erkennen ganze und mehrere Tage.</em>",
-        "release.lead": "Nennt eine Einladung nur Tage und keine Uhrzeit, schlägt die Prüfkarte einen ganztägigen Termin vor, bei mehreren Tagen mit Beginn und letztem Tag. Eine Uhrzeit, die nicht in der Mail steht, trägt die App nicht mehr ein.",
-        "release.c1h": "Nur, was in der Mail steht",
-        "release.c1": "Uhrzeit, Dauer und Enddatum zählen nur, wenn sie im Text zu finden sind. Sonst sagt die Prüfkarte, was sie angenommen hat.",
-        "release.c2h": "Klare Meldung, wenn der Kalender streikt",
-        "release.c2": "Scheitert das Eintragen in den macOS-Kalender, nennt die App den Grund und den nächsten Schritt. „Als .ics speichern“ funktioniert auf jedem System.",
-        "release.c3h": "Aus 0.11.14: Windows-Version signiert",
-        "release.c3": "Installer und Programm tragen eine gültige Signatur. Windows zeigt einen geprüften Herausgeber.",
+        "release.label": "Release {vs} · Notizen befragen",
+        "release.heading": "Was ist neu — <em>Frag deine Notizen und sieh, woher die Antwort kommt.</em>",
+        "release.lead": "Der Chat durchsucht deinen ganzen Notizspeicher und antwortet mit Quellenangaben, die du anklicken kannst. Ein Klick öffnet die Notiz an der Stelle, aus der die Aussage stammt. Suche und Antwort laufen auf deinem Rechner.",
+        "release.c1h": "Quellen zum Anklicken",
+        "release.c1": "Jede Quellennummer führt in die Notiz, genau an die Stelle. Hat sich die Notiz seitdem geändert, sagt die App das, statt auf eine falsche Zeile zu zeigen.",
+        "release.c2h": "Sichtbar, was geprüft wurde",
+        "release.c2": "Unter jeder Antwort steht, was die App verglichen hat: Sätze ohne Quelle, schwache Übereinstimmung, Zitate, die so nicht im Original stehen. Geprüft wird die Herkunft, nicht ob eine Aussage wahr ist.",
+        "release.c3h": "Sagt auch, wenn nichts passt",
+        "release.c3": "Findet die Suche keinen ausreichend ähnlichen Treffer, sagt die App das, statt zu raten. Der Index entsteht erst auf deinen Klick, nie von selbst.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Events from emails: all-day and multi-day &middot; v{vs}",
+        "hero.release": "Ask your notes — with clickable sources &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Events from emails",
-        "release.heading": "What’s new — <em>Events from emails handle whole days and several days.</em>",
-        "release.lead": "When an invitation names only days and no time, the review card suggests an all-day event, with first and last day if it spans several. The app no longer enters a time that is not in the email.",
-        "release.c1h": "Only what the email says",
-        "release.c1": "Time, duration and end date count only if they can be found in the text. Otherwise the review card tells you what it assumed.",
-        "release.c2h": "A clear message when the calendar fails",
-        "release.c2": "If adding to the macOS calendar fails, the app names the reason and the next step. “Save as .ics” works on every system.",
-        "release.c3h": "From 0.11.14: signed Windows version",
-        "release.c3": "Installer and program carry a valid signature. Windows shows a verified publisher.",
+        "release.label": "Release {vs} · Ask your notes",
+        "release.heading": "What’s new — <em>Ask your notes and see where the answer comes from.</em>",
+        "release.lead": "The chat searches your whole vault and answers with sources you can click. One click opens the note at the passage the statement came from. Search and answer run on your machine.",
+        "release.c1h": "Sources you can click",
+        "release.c1": "Every source number leads into the note, right to the passage. If the note changed since, the app says so instead of pointing at the wrong line.",
+        "release.c2h": "Visible what was checked",
+        "release.c2": "Under every answer you see what the app compared: sentences without a source, weak overlap, quotations that are not in the original. It checks provenance, not whether a statement is true.",
+        "release.c3h": "It also says when nothing fits",
+        "release.c3": "If the search finds no sufficiently similar match, the app says so instead of guessing. The index is built only when you ask for it, never on its own.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",
