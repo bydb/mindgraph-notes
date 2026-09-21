@@ -8,6 +8,7 @@ import { beginOllamaActivity } from '../rag/ollamaActivity'
 import type { WebResearchConfig, WebResearchPhase, WebFetchRecord } from '../../shared/webResearch'
 import type { CollectedTable } from '../../shared/tableCollect'
 import type { ShellState } from './shellExecution'
+import type { ComputerState } from './computerControl'
 
 export type AgentRunStatus = 'running' | 'done' | 'cancelled' | 'error'
 
@@ -96,6 +97,10 @@ export interface AgentRun {
   imageGen?: boolean
   // Nur nach nativer Main-Freigabe gesetzt, nie aus Renderer-Parametern kopieren.
   shell?: ShellState
+  // Rechner-Steuerung (Programme über die Skriptschnittstellen ansprechen). Ebenfalls nur
+  // nach nativer Freigabe für diesen Lauf — und anders als die Shell ohne Sandbox, weil die
+  // Wirkung außerhalb gerade der Zweck ist. Siehe computerControl.ts.
+  computer?: ComputerState
   // Stil-Block(s) aus einer angehängten HTML-Seite, die dieser Lauf gelesen hat.
   // Beim Korrigieren einer Seite lässt das Modell den CSS-Block gern weg — er ist
   // lang und ändert sich nicht. Die Seite rendert dann komplett ohne Layout (real

@@ -37,6 +37,28 @@ Nach Code-Änderungen: **typecheck + test**; bei prozessgrenzen-relevanten Ände
 - **Keine Commits/Pushes ohne ausdrückliche Aufforderung** des Users. Wir arbeiten auf **demselben Branch**;
   koordiniere ausschließlich über das Handoff-Doc, nicht durch stilles Überschreiben.
 
+## Wenn Claude dich startet (Herdr)
+
+Seit 20.09.2026 startet Claude dich für Prüfaufträge selbst — in einer Nachbar-Pane unter
+[Herdr](https://herdr.dev), mit `--sandbox workspace-write --ask-for-approval never`. Du merkst davon
+nichts außer: der Auftrag kommt als Prompt, nicht vom Menschen getippt. Es ändert **nichts** am Protokoll.
+
+Was dabei von dir erwartet wird:
+
+- **Schreib deine Findings in die genannte Aufgabendatei** unter `docs/codex-collab/`, Abschnitt
+  „Codex-Findings" — nicht nur in den Chat. Claude liest die Datei von der Platte; lange Antworten
+  gehen beim Auslesen des Terminals verloren.
+- **Kein Code-Edit, kein Commit, kein Push.** Claude misst das nach: `scripts/pruefgrenze.sh` nimmt vor
+  deinem Lauf Inhalts-Hashes des Arbeitsbaums (auch der von git ignorierten Pfade wie `.claude/`) und
+  vergleicht danach. Außer der Aufgabendatei darf sich nichts geändert haben.
+- Findings im Format aus `docs/codex-collab/README.md` (`### Fxx`, Schwere, `datei:zeile`, `[OFFEN]`),
+  belegt gegen den **echten Code**.
+- Adversarial prüfen. Bestätigung ist wertlos — gegenseitiges Abnicken sieht aus wie Sorgfalt und ist keine.
+  Die Abnahme macht am Ende der Nutzer, nicht wir beide.
+
+Einmalig fragt Codex beim Start nach **Hook-Trust** für `~/.codex/herdr-agent-state.sh` (SessionStart,
+meldet deinen Zustand an Herdr). Claude fragt den Nutzer, bevor er das beantwortet.
+
 ## Aktueller Strang (Kontext)
 Wir planen einen **quellenbelegten Chat über den ganzen Vault**: den bestehenden Projekt-RAG
 (`app/src/main/rag/`, `shared/rag/`) auf alle Notizen ausweiten, Vektoren binär statt als JSON ablegen,

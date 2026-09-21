@@ -22297,10 +22297,13 @@ body.presentation-mode *::after {
 .settings-guard-head {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   margin-bottom: 12px;
 }
+/* Textspalte nimmt den Platz zwischen Kachel und Status-Pille — `justify-content: space-between`
+   reichte, solange es nur zwei Kinder gab; mit der Kachel braucht es eine echte Spalte. */
+.settings-guard-head-body { flex: 1; min-width: 0; }
+.settings-guard-head .sui-tile { flex-shrink: 0; }
 .settings-guard-title {
   margin: 0 0 4px;
   font-size: 15px;
@@ -22353,7 +22356,78 @@ body.presentation-mode *::after {
 }
 .settings-guard-active-value { font-weight: 600; color: var(--text-primary); }
 .settings-guard-card .settings-row select { flex-shrink: 0; min-width: 210px; }
+
+/* Rechner-Steuerung: Zeile mit Steuerung UNTER dem Label (Listen brauchen die volle Breite),
+   und die Freigabeliste der Programme als Chips mit Auswahlknopf. Programme werden
+   ausgewählt statt getippt — `open -a` kennt keine lokalisierten Namen. */
+.settings-guard-card .settings-row.settings-row-stacked {
+  display: block;
+}
+.settings-guard-card .settings-row-stacked .settings-row-info { margin-bottom: 8px; }
+.settings-guard-card .settings-row-stacked textarea {
+  width: 100%;
+  min-height: 62px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+.settings-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.settings-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-color) 14%, transparent);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+}
+.settings-chip-x {
+  padding: 0;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.settings-chip-x:hover { background: var(--danger-color, #d9534f); color: #fff; }
+/* Freigegebener Kurzbefehl, den es auf diesem Rechner nicht (mehr) gibt. Nicht still
+   entfernen — der Nutzer hat ihn vielleicht nur umbenannt. */
+.settings-chip.is-missing {
+  background: color-mix(in srgb, var(--danger-color, #d9534f) 12%, transparent);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.settings-chip-note {
+  font-size: 11px;
+  font-weight: 500;
+  font-style: italic;
+  color: var(--danger-color, #d9534f);
+}
+.settings-hint-warning {
+  display: block;
+  margin-top: 6px;
+  color: var(--danger-color, #d9534f);
+}
 .settings-guard-fixed { margin-top: 6px; font-size: 12px; color: var(--text-secondary); }
+.settings-guard-steps { margin: 0 0 12px; font-size: 12px; color: var(--text-secondary); }
+.settings-guard-steps ol { margin: 4px 0 0; padding-left: 20px; line-height: 1.55; }
+
 .settings-guard-fixed-title {
   display: block;
   margin-bottom: 4px;

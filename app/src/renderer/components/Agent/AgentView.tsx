@@ -7,6 +7,7 @@
 // Zustand und IPC liegen im noteAgentStore (Bereich = Tab-ID), die Lauf-Anzeige ist
 // dieselbe wie in der Macher-Leiste (AgentRunPanel).
 
+import { ComputerArmedHint } from './ComputerArmedHint'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
@@ -17,6 +18,7 @@ import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRo
 import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel } from './AgentRunPanel'
 import { ShellAccessToggle } from './ShellAccessToggle'
+import { ComputerAccessToggle } from './ComputerAccessToggle'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
 import { useIsModuleEnabled } from '../../utils/modules'
@@ -47,6 +49,7 @@ export function AgentView({ tabId }: Props) {
   const ollama = useUIStore(s => s.ollama)
   const webResearchModule = useIsModuleEnabled('web-research')
   const shellModule = useIsModuleEnabled('agent-shell')
+  const computerModule = useIsModuleEnabled('agent-computer')
   const webResearchConfig = useUIStore(s => s.webResearchConfig)
   const setWebResearchConfig = useUIStore(s => s.setWebResearchConfig)
 
@@ -58,8 +61,10 @@ export function AgentView({ tabId }: Props) {
   const [localModel, setLocalModel] = useState('')
   const [webArmed, setWebArmed] = useState(false)
   const [shellArmed, setShellArmed] = useState(false)
+  const [computerArmed, setComputerArmed] = useState(false)
   const [starting, setStarting] = useState(false)
   useEffect(() => { setShellArmed(false) }, [tabId, vaultPath, shellModule])
+  useEffect(() => { setComputerArmed(false) }, [tabId, vaultPath, computerModule])
 
   // Cloud-Routing: hier zählt ausschließlich das 'note-agent'-Opt-in — der Tab kann
   // nichts anderes als Agent-Läufe starten.
@@ -145,7 +150,9 @@ export function AgentView({ tabId }: Props) {
     }
     setStarting(true)
     const shellAccess = shellArmed
+    const computerAccess = computerArmed
     setShellArmed(false)
+    setComputerArmed(false)
     try { await store().startRun(tabId, {
       vaultPath,
       // Der Lauf hat keine Ausgangsnotiz — die Tab-ID ist die Kennung, der Inhalt leer.
@@ -159,6 +166,7 @@ export function AgentView({ tabId }: Props) {
       cloudLabel,
       webResearch: webResearchModule && webArmed && webConfigured,
       shellAccess,
+      computerAccess,
       instructionMs: compose.take(),
       comparisonCaseId: comparisonCaseId ?? undefined
     }) } finally { setStarting(false) }
@@ -280,6 +288,10 @@ export function AgentView({ tabId }: Props) {
                 setShellArmed(enabled)
                 if (enabled) setWebArmed(false)
               }} />}
+              {computerModule && <ComputerAccessToggle enabled={computerArmed} disabled={busy} onChange={enabled => {
+                setComputerArmed(enabled)
+                if (enabled) setWebArmed(false)
+              }} />}
             </>
           }
         />
@@ -288,6 +300,7 @@ export function AgentView({ tabId }: Props) {
             nicht nur eine Empfehlung. */}
         {!scope.targetFolder && <div className="ai-bar-agent-mode-hint">{t('agentTab.needTarget')}</div>}
         {shellArmed && <div className="ai-bar-cloud-hint">{t('aiBar.shell.hint')}</div>}
+        {computerArmed && <ComputerArmedHint />}
         {scope.targetFolder && cloudSelected && <div className="ai-bar-cloud-hint">{t('aiBar.agent.cloudHint')}</div>}
         {webArmed && (
           <div className="ai-bar-cloud-hint">
@@ -298,7 +311,7 @@ export function AgentView({ tabId }: Props) {
         <AgentRunPanel
           run={run}
           onCancel={() => store().cancelRun(tabId)}
-          onAccept={id => void store().acceptResult(tabId, id)}
+          onAccept={(id, openAfter) => void store().acceptResult(tabId, id, openAfter)}
           onDiscard={id => void store().discardResult(tabId, id)}
           onPreview={id => store().previewResult(tabId, id)}
           onDismiss={() => store().dismissRun(tabId)}

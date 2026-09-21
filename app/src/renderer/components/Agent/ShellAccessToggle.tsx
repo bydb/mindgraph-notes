@@ -8,7 +8,7 @@ export function ShellAccessToggle({ enabled, disabled, onChange }: {
   const { t } = useTranslation()
   return (
     <button type="button" className={`ai-bar-context-btn ${enabled ? 'active' : ''}`}
-      disabled={disabled} aria-pressed={enabled} title={t('aiBar.shell.hint')}
+      disabled={disabled} aria-pressed={enabled} title={t('aiBar.shell.tooltip')}
       onClick={() => onChange(!enabled)}>
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
         <rect x="2" y="3" width="20" height="18" rx="2" />

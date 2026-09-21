@@ -62,6 +62,7 @@ export interface AgentRunUiState {
   model: string
   cloudLabel: string | null
   shellAccess?: boolean
+  computerAccess?: boolean
   // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
   // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
   rememberSuggestion?: string
@@ -115,6 +116,7 @@ export interface AgentStartParams {
   cloudLabel: string | null
   webResearch: boolean
   shellAccess?: boolean
+  computerAccess?: boolean
   /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
   instructionMs?: number
   /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
@@ -139,7 +141,10 @@ interface NoteAgentStoreState {
 
   startRun: (scopeId: string, params: AgentStartParams) => Promise<void>
   cancelRun: (scopeId: string) => void
-  acceptResult: (scopeId: string, resultId: string) => Promise<void>
+  /** `openAfter`: nach dem Übernehmen die Datei im Standardprogramm öffnen (DOCX, XLSX …
+   *  Formate, die die App selbst nicht anzeigt). Geöffnet wird die ECHTE Datei im Vault,
+   *  nicht die Wegwerf-Kopie, die `computer_open` während des Laufs benutzt. */
+  acceptResult: (scopeId: string, resultId: string, openAfter?: boolean) => Promise<void>
   discardResult: (scopeId: string, resultId: string) => Promise<void>
   previewResult: (scopeId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; error?: string }>
   dismissRun: (scopeId: string) => void
@@ -329,6 +334,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       cloud: params.cloud,
       webResearch: params.webResearch ? { enabled: true } : null,
       shellAccess: params.shellAccess === true,
+      computerAccess: params.computerAccess === true,
       instructionMs: params.instructionMs,
       comparisonCaseId: params.comparisonCaseId
     })
@@ -349,7 +355,8 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
           startedAt: Date.now(),
           model: params.cloud ? params.cloud.model : params.model,
           cloudLabel: params.cloudLabel,
-          shellAccess: params.shellAccess === true
+          shellAccess: params.shellAccess === true,
+          computerAccess: params.computerAccess === true
         }
       }))
     }))
@@ -360,19 +367,34 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
     if (run.runId && run.phase === 'running') void window.electronAPI.noteAgentCancel(run.runId)
   },
 
-  acceptResult: async (scopeId, resultId) => {
+  acceptResult: async (scopeId, resultId, openAfter) => {
     const run = get().getScope(scopeId).run
     if (!run.runId) return
     const timings = { reviewMs: takeReviewMs(run.runId), waitingMs: takeWaitMs(run.runId) }
     const weitereOffen = hatOffeneKarten(run.results, resultId)
     const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, timings)
     settleTimings(run.runId, timings, !!res.success, weitereOffen)
+    // Ein gescheitertes Öffnen darf die geglückte Übernahme nicht als Fehler erscheinen
+    // lassen — die Datei liegt dann trotzdem im Vault. Deshalb eigener Fehlertext.
+    let openError: string | undefined
+    if (openAfter && res.success) {
+      if (!res.absPath) {
+        // Kommt vor, wenn der Main-Prozess älter ist als der Renderer (Dev-Neustart fehlt).
+        // Still nichts tun sähe aus wie ein kaputter Knopf — die Übernahme selbst hat geklappt.
+        openError = 'Übernommen, aber nicht geöffnet: Die App hat den Dateipfad nicht zurückgegeben. Nach einem Neustart der App geht es wieder.'
+      } else {
+        const opened = await window.electronAPI.openPath(res.absPath)
+        if (!opened.success) openError = opened.error || 'Übernommen, aber das Öffnen im Standardprogramm ist fehlgeschlagen.'
+      }
+    }
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       run: {
         ...sc.run,
         results: sc.run.results.map(r => r.resultId === resultId
-          ? (res.success ? { ...r, state: 'accepted' as const, finalName: res.fileName, error: undefined } : { ...r, error: res.error })
+          ? (res.success
+            ? { ...r, state: 'accepted' as const, finalName: res.fileName, error: openError }
+            : { ...r, error: res.error })
           : r)
       }
     })))

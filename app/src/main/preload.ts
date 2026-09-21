@@ -217,12 +217,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cloud?: { model: string } | null
     webResearch?: { enabled: boolean } | null
     shellAccess?: boolean
+    computerAccess?: boolean
     /** Gemessene aktive Zeit beim Formulieren des Auftrags (Wirkungsbilanz). */
     instructionMs?: number
     /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
     comparisonCaseId?: string
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
+  // Rechner-Steuerung: Programm über den Systemdialog freigeben (liefert Bundle-Kennung).
+  computerControlPickApp: () => ipcRenderer.invoke('computer-control-pick-app'),
 
   // Tätigkeitsprotokoll (Effizienzindex). Anhängen darf der Renderer nur
   // Sprachbefehl-Ereignisse — alles andere schreibt der Main selbst.

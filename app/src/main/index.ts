@@ -198,6 +198,8 @@ import { runNoteAgentLoop } from './noteAgent/loop'
 import { authorizeShell, probeShellEnvironment, stopAgentShellProcesses } from './noteAgent/shellExecution'
 import { sandboxAvailability as shellSandboxAvailability } from './noteAgent/shellSandbox'
 import { normalizeShellGuardrails, describeShellGuardrails } from '../shared/shellGuardrails'
+import { authorizeComputer, computerControlAvailability, usableComputerVerbs } from './noteAgent/computerControl'
+import { normalizeComputerControl, describeComputerControl, activeComputerVerbs, computerVerbLabel } from '../shared/computerControl'
 import { getShellAttachmentPaths } from './noteAgent/contextFiles'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
@@ -1035,6 +1037,115 @@ async function saveSettings(settings: { lastVaultPath?: string }): Promise<void>
   }
 }
 
+// Programm für die Rechner-Steuerung auswählen. Bewusst ein Auswahldialog statt eines
+// Textfeldes: `open -a` kennt keine lokalisierten Namen — im Programme-Ordner steht
+// „Vorschau", aufrufbar ist die App nur als „Preview", und es gibt keinen unterstützten Weg
+// vom Anzeigenamen zur App. Ein getippter Name scheitert deshalb erst mitten im Lauf
+// (real aufgetreten, 20.09.2026). Gespeichert wird die eindeutige Bundle-Kennung.
+ipcMain.handle('computer-control-pick-app', async (event) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  if (process.platform !== 'darwin') return { success: false, error: 'Nur auf macOS verfügbar' }
+  const owner = BrowserWindow.fromWebContents(event.sender)
+  if (!owner || owner.isDestroyed()) return { success: false, error: 'Kein Fenster' }
+  const picked = await dialog.showOpenDialog(owner, {
+    title: 'Programm für die Rechner-Steuerung freigeben',
+    defaultPath: '/Applications',
+    properties: ['openFile'],
+    filters: [{ name: 'Programme', extensions: ['app'] }],
+    buttonLabel: 'Freigeben'
+  })
+  if (picked.canceled || !picked.filePaths[0]) return { success: false }
+  // Kanonisch auflösen und auf ein echtes Bundle-Verzeichnis festnageln (Codex Runde 2,
+  // F15): der Dialog startet zwar in /Applications, lässt aber jeden Ort zu, und ein
+  // präpariertes .app-Verzeichnis darf nicht über einen Symlink oder eine Datei
+  // hereinkommen. Gespeichert wird genau dieser geprüfte Pfad.
+  let appPath: string
+  try {
+    appPath = await fs.realpath(picked.filePaths[0])
+  } catch {
+    return { success: false, error: 'Das Programm konnte nicht aufgelöst werden.' }
+  }
+  if (path.extname(appPath).toLowerCase() !== '.app') {
+    return { success: false, error: 'Das ist kein Programm.' }
+  }
+  const bundleStat = await fs.stat(appPath).catch(() => null)
+  if (!bundleStat?.isDirectory()) {
+    return { success: false, error: 'Das ist kein Programm-Bundle.' }
+  }
+  try {
+    const plistPath = path.join(appPath, 'Contents', 'Info.plist')
+    // Nur eine reguläre, kleine Datei lesen: ein Bundle darf die Info.plist als Symlink
+    // auf etwas anderes legen oder sie beliebig gross machen.
+    const plistHandle = await fs.open(plistPath, 'r')
+    let raw: Buffer
+    try {
+      const st = await plistHandle.stat()
+      if (!st.isFile() || st.size === 0 || st.size > 2 * 1024 * 1024) {
+        return { success: false, error: 'Dieses Programm hat keine lesbare Info.plist.' }
+      }
+      raw = await plistHandle.readFile()
+    } finally {
+      await plistHandle.close()
+    }
+    const id = await readPlistString(raw, 'CFBundleIdentifier')
+    if (!id) return { success: false, error: 'Dieses Programm hat keine Bundle-Kennung.' }
+    // Anzeigename: den LOKALISIERTEN nehmen, den der Nutzer im Finder sieht. Der Ordner
+    // heißt „Preview.app", angezeigt wird „Vorschau" — stünde im Chip und im Auftragstext
+    // „Preview", müsste der Nutzer raten, welches Programm er da freigegeben hat.
+    // Fällt Spotlight aus, bleibt der Ordnername; die Bundle-Kennung trägt ohnehin.
+    const label = await localizedAppName(appPath) || path.basename(appPath, '.app')
+    return { success: true, app: { id, label, path: appPath } }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Programm nicht lesbar' }
+  }
+})
+
+
+/** Lokalisierter Anzeigename eines Programms („Vorschau" statt „Preview"), best effort. */
+async function localizedAppName(appPath: string): Promise<string | null> {
+  try {
+    const { execFile } = await import('child_process')
+    return await new Promise<string | null>(resolve => {
+      execFile('/usr/bin/mdls', ['-name', 'kMDItemDisplayName', '-raw', appPath], { timeout: 5_000 },
+        (error, stdout) => {
+          const name = String(stdout || '').trim()
+          if (error || !name || name === '(null)') return resolve(null)
+          resolve(name.replace(/\.app$/i, '') || null)
+        })
+    })
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Einen String-Wert aus einer Info.plist ziehen — XML wie Binär. macOS liefert beide Formen;
+ * ein eigener Mini-Parser reicht hier, weil nur genau ein bekannter Schlüssel gesucht wird
+ * und ein Fehlschlag sauber als „keine Bundle-Kennung" endet.
+ */
+async function readPlistString(raw: Buffer, key: string): Promise<string | null> {
+  if (raw.subarray(0, 6).toString('latin1') === 'bplist') {
+    // Binärformat: statt einen vollständigen bplist-Parser zu bauen, einmal nach XML wandeln.
+    try {
+      const { execFile } = await import('child_process')
+      return await new Promise<string | null>(resolve => {
+        const child = execFile('/usr/bin/plutil', ['-convert', 'xml1', '-o', '-', '-'],
+          { maxBuffer: 4 * 1024 * 1024, timeout: 10_000 },
+          (error, stdout) => resolve(error ? null : matchPlistKey(String(stdout), key)))
+        child.stdin?.end(raw)
+      })
+    } catch {
+      return null
+    }
+  }
+  return matchPlistKey(raw.toString('utf8'), key)
+}
+
+function matchPlistKey(xml: string, key: string): string | null {
+  const m = new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`).exec(xml)
+  return m ? m[1].trim() || null : null
+}
+
 // UI-Settings laden
 async function loadUISettings(): Promise<Record<string, unknown>> {
   try {
@@ -1623,7 +1734,15 @@ ipcMain.handle('load-ui-settings', async () => {
 })
 
 // UI-Settings speichern
-ipcMain.handle('save-ui-settings', async (_event, settings: Record<string, unknown>) => {
+// Sender-Bindung (Codex F04): Die Datei ist die Main-seitige Quelle für sicherheitsrelevante
+// Schalter — `agentShellEnabled`, `agentComputerEnabled` und deren Freigabelisten werden von
+// dort gelesen, gerade damit sie nicht aus Renderer-Parametern kommen. Ohne diese Prüfung
+// hätte ein beliebiger Frame (eingebettete Vorschau, fremder Inhalt) sie setzen können und
+// die erste Opt-in-Stufe wäre wertlos gewesen. Gegen einen kompromittierten HAUPT-Renderer
+// schützt auch das nicht — dagegen steht allein der native Freigabedialog; genau so steht
+// es auch in docs/rechner-bedienen-plan.md.
+ipcMain.handle('save-ui-settings', async (event, settings: Record<string, unknown>) => {
+  if (!isTrustedSender(event)) return false
   // Modul „Notizen befragen (RAG)" aus → Vault-Index-Job stoppen, Warteschlange leeren (Codex F33).
   if (typeof settings.projectRagEnabled === 'boolean') void getVaultRagManager().setModuleEnabled(settings.projectRagEnabled)
   const before = await loadUISettings()
@@ -4316,6 +4435,9 @@ interface NoteAgentRunParams {
   webResearch?: { enabled: boolean } | null
   // Nur Anfrage. Die tatsächliche Freigabe entsteht unten durch einen nativen Dialog.
   shellAccess?: boolean
+  // Ebenfalls nur Anfrage: Rechner-Steuerung (Programme ansprechen). Die freigegebenen
+  // Vorgänge liest der Main aus ui-settings.json — dieser Parameter trägt sie nicht.
+  computerAccess?: boolean
   // Aktive Zeit, die der Nutzer mit dem Formulieren verbracht hat (Wirkungsbilanz).
   // Renderer-Messung: nur bei Fenster im Vordergrund, gedeckelt.
   instructionMs?: number
@@ -4376,6 +4498,32 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       if (!params.cloud?.model) {
         const reason = shellLockReason(params.model)
         if (reason) return { success: false, error: `Modell "${params.model}" bekommt keine Shell: ${reason}.` }
+      }
+    }
+
+    if (params.computerAccess === true && params.webResearch?.enabled) {
+      // Gleiche Trennung wie bei der Shell, hier aus einem konkreteren Grund: eine
+      // präparierte Webseite, die ein Mail-Ziel oder einen Kurzbefehl vorgibt, hätte
+      // sonst einen Weg nach draußen. Recherche und Wirkung am Rechner bleiben getrennte Läufe.
+      return { success: false, error: 'Rechner-Steuerung und Webrecherche-Modus können nicht im selben Lauf aktiviert werden.' }
+    }
+    if (params.computerAccess === true) {
+      // Zweistufiges Opt-in, HIER durchgesetzt: Stufe 1 ist das Modul in der Main-Kopie der
+      // Einstellungen, Stufe 2 der Schalter pro Lauf plus nativer Dialog weiter unten.
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+      if (ui.agentComputerEnabled !== true) {
+        return { success: false, error: 'Die Rechner-Steuerung ist nicht freigeschaltet (Einstellungen → Module → „Rechner-Steuerung“).' }
+      }
+      const avail = computerControlAvailability()
+      if (!avail.ok) return { success: false, error: avail.reason }
+      if (activeComputerVerbs(normalizeComputerControl(ui.agentComputer)).length === 0) {
+        return { success: false, error: 'Für die Rechner-Steuerung ist kein Vorgang freigegeben (Einstellungen → KI → Rechner-Steuerung).' }
+      }
+      // Dieselbe Modellregel wie bei der Shell, und aus demselben Grund: hier wirkt eine
+      // Modellausgabe außerhalb der App, bevor ein Mensch sie gesehen hat.
+      if (!params.cloud?.model) {
+        const reason = shellLockReason(params.model)
+        if (reason) return { success: false, error: `Modell "${params.model}" bekommt keine Rechner-Steuerung: ${reason}.` }
       }
     }
 
@@ -4567,6 +4715,45 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             runId: run.runId, seq: nextSeq(run), skill: 'shell_access', summary: `Shell-Zugriff für diesen Lauf erlaubt — Sandbox aktiv, Selbsttest bestanden. ${describeShellGuardrails(guardrails)}. Umgebung: ${environment}`
           })
         }
+        if (params.computerAccess === true) {
+          // Freigegebene Vorgänge aus der Main-Kopie der Einstellungen — nie aus den
+          // Renderer-Params. Das Modell kann die Liste damit weder sehen noch erweitern.
+          const settings = normalizeComputerControl((await loadUISettings().catch(() => ({} as Record<string, unknown>))).agentComputer)
+          // Die Systemwerkzeuge VOR dem Dialog prüfen und nur die nutzbaren aufzählen
+          // (Codex F09): vorher stand im Dialog ein Vorgang, der direkt nach der Zustimmung
+          // wegfiel, weil sein Systemwerkzeug fehlte. Der Nutzer hätte etwas freigegeben,
+          // das es im Lauf gar nicht gibt.
+          const probe = await usableComputerVerbs(settings)
+          const usableText = probe.usable.length
+            ? probe.usable.map(v => computerVerbLabel(v)).join(', ')
+            : '(keiner)'
+          const missingText = probe.missing.length
+            ? `\n\nNicht ausführbar auf diesem System und deshalb NICHT dabei: ${probe.missing.map(v => computerVerbLabel(v)).join(', ')}.`
+            : ''
+          const authorized = await authorizeComputer(run, async () => {
+            if (sender.isDestroyed()) return false
+            const owner = BrowserWindow.fromWebContents(sender)
+            if (!owner || owner.isDestroyed()) return false
+            const choice = await dialog.showMessageBox(owner, {
+              type: 'warning',
+              title: 'Rechner-Steuerung für diesen Agent-Lauf',
+              message: 'Darf der Agent für diesen Auftrag Programme auf deinem Rechner ansprechen?',
+              detail: `Modell: ${run.model}\nVault: ${run.vaultPath}\nAuftrag: ${run.instruction}\n\nDas ist eine ERLAUBNIS, kein Ablaufplan: Ob und welchen dieser Vorgänge der Agent nutzt, entscheidet das Modell aus deinem Auftrag. Es kann sein, dass keiner davon stattfindet.\n\nMöglich in diesem Lauf: ${usableText}.${missingText}\n\nDiese Vorgänge wirken sofort und außerhalb der App, ohne weitere Einzelbestätigung — höchstens zehn im ganzen Lauf, abgelehnte Versuche zählen mit. Übergeben werden nur Ergebnisse dieses Laufs und Dateien aus dem Vault; die internen .mindgraph-Daten nie. Ein Ergebnis wird dabei als Kopie geöffnet — Änderungen daran landen nicht in der Datei, die du danach übernimmst.\n\nE-Mails entstehen NUR als sichtbarer Entwurf in Apple Mail und werden nie gesendet. Keiner dieser Vorgänge holt Daten von ausserhalb herein oder gibt welche nach draussen.\n\nBeim ersten Mal fragt macOS zusätzlich, ob MindGraph Notes das jeweilige Programm steuern darf. Die Freigabe gilt nur für diesen Lauf.`,
+              buttons: ['Abbrechen', 'Für diesen Lauf erlauben'],
+              defaultId: 0, cancelId: 0, noLink: true
+            })
+            return choice.response === 1 && !sender.isDestroyed()
+          }, settings)
+          // Weggelassene Vorgänge benennen (Codex F06): ein Vorgang, dessen Systemwerkzeug
+          // fehlt, darf nicht als freigegeben erscheinen — sonst sucht der Nutzer den Fehler
+          // beim Modell, während in Wahrheit `shortcuts` oder `lp` nicht da ist.
+          const dropped = authorized.missing.length
+            ? ` Nicht ausführbar auf diesem System und deshalb weggelassen: ${authorized.missing.map(v => computerVerbLabel(v)).join(', ')}.`
+            : ''
+          if (!sender.isDestroyed()) sender.send('note-agent-progress', {
+            runId: run.runId, seq: nextSeq(run), skill: 'computer_access', summary: `Rechner-Steuerung für diesen Lauf erlaubt — ${describeComputerControl(settings)}.${dropped} Mails werden nur als Entwurf geöffnet, nie gesendet.`
+          })
+        }
         const res = await runNoteAgentLoop({
           run,
           noteContent: params.noteContent || '',
@@ -4728,7 +4915,10 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
       reviewMs: typeof timings?.reviewMs === 'number' && timings.reviewMs >= 0 ? timings.reviewMs : undefined,
       waitingMs: typeof timings?.waitingMs === 'number' && timings.waitingMs >= 0 ? timings.waitingMs : undefined
     })
-    return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/') }
+    // absPath für „Übernehmen und öffnen": der Renderer soll den Pfad nicht selbst
+    // zusammensetzen (Trennzeichen, Umbenennung durch reserveFreeName). open-path
+    // prüft ihn ohnehin erneut mit assertSafePath.
+    return { success: true, fileName: finalName, relPath: path.join(run.targetFolderRel, finalName).replace(/\\/g, '/'), absPath: destPath }
   } catch (error) {
     // Übernahme gescheitert → Konsum zurücknehmen, damit der Nutzer es erneut versuchen kann.
     entry.consumed = false

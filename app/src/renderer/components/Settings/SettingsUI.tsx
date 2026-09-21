@@ -102,7 +102,10 @@ export const TILE_GLYPH = {
   terminal: glyph(<><path d="m4 17 6-6-6-6" /><path d="M12 19h8" /></>),
   book: glyph(<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" /></>),
   pen: glyph(<><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></>),
-  cpu: glyph(<><rect x="4" y="4" width="16" height="16" rx="3" /><circle cx="12" cy="12" r="3" /><path d="M12 4V2M12 22v-2M4 12H2M22 12h-2" /></>)
+  cpu: glyph(<><rect x="4" y="4" width="16" height="16" rx="3" /><circle cx="12" cy="12" r="3" /><path d="M12 4V2M12 22v-2M4 12H2M22 12h-2" /></>),
+  // Bildschirm: dasselbe Zeichen wie der „Rechner"-Schalter an der Auftragsleiste, damit
+  // Einstellung und Bedienelement erkennbar zusammengehören.
+  monitor: glyph(<><rect x="2" y="4" width="20" height="12" rx="2" /><path d="M8 20h8m-4-4v4" /></>)
 } as const
 
 // ── Status-Chip ───────────────────────────────────────────────────────────

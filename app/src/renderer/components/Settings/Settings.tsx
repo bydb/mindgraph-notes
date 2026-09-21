@@ -14,6 +14,7 @@ import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
 import { AgentShellSection } from './AgentShellSection'
+import { ComputerControlSection } from './ComputerControlSection'
 import { ImageGenerationSection } from './ImageGenerationSection'
 import { SkillsSection } from './SkillsSection'
 import { SettingsSearch, type SettingsSearchEntry } from './SettingsSearch'
@@ -249,6 +250,7 @@ const MODULE_CONFIG_TABS: Record<string, { tab: Tab; anchor?: string }> = {
   'smart-connections': { tab: 'ai', anchor: 'ai-smart-connections' },
   'web-research': { tab: 'ai', anchor: 'ai-webresearch' },
   'agent-shell': { tab: 'ai', anchor: 'ai-agentshell' },
+  'agent-computer': { tab: 'ai', anchor: 'ai-agentcomputer' },
   'image-generation': { tab: 'ai', anchor: 'ai-imagegen' },
   zotero: { tab: 'integrations', anchor: 'integration-zotero' },
   'semantic-scholar': { tab: 'integrations', anchor: 'integration-research' },
@@ -1000,6 +1002,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchWebResearchEnabled = useIsModuleEnabled('web-research')
   const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const agentShellModuleOn = useIsModuleEnabled('agent-shell')
+  const agentComputerModuleOn = useIsModuleEnabled('agent-computer')
   const projectRagOn = useIsModuleEnabled('project-rag')
   const searchIndex = React.useMemo<SettingsSearchEntry[]>(() => {
     const g = {
@@ -1762,7 +1765,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                     <>
                       <SectionTitle title={t('settings.vaultIndex.title')} />
                       <Card anchor="ai-vault-index">
-                        <p className="sui-hint">{t('settings.vaultIndex.subtitle')}</p>
+                        <p className="sui-intro">{t('settings.vaultIndex.subtitle')}</p>
                         <VaultIndexSection />
                       </Card>
                     </>
@@ -1774,12 +1777,15 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
 
                   {/* ── Agent-Fähigkeiten (nur bei aktivem Modul) ── */}
-                  {(searchWebResearchEnabled || agentShellModuleOn) && <SectionTitle title={t('settings.aiTab.agent')} />}
+                  {(searchWebResearchEnabled || agentShellModuleOn || agentComputerModuleOn) && <SectionTitle title={t('settings.aiTab.agent')} />}
                   {searchWebResearchEnabled && (
                     <Card anchor="ai-webresearch"><div className="sui-embed"><WebResearchSection /></div></Card>
                   )}
                   {agentShellModuleOn && (
                     <Card anchor="ai-agentshell"><div className="sui-embed"><AgentShellSection /></div></Card>
+                  )}
+                  {agentComputerModuleOn && (
+                    <Card anchor="ai-agentcomputer"><div className="sui-embed"><ComputerControlSection /></div></Card>
                   )}
 
                   {/* ── Smart Connections ── */}

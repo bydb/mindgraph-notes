@@ -833,10 +833,12 @@ export interface ElectronAPI {
     cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null;
     webResearch?: { enabled: boolean } | null;
     shellAccess?: boolean;
+    computerAccess?: boolean;
     instructionMs?: number;
     comparisonCaseId?: string;
   }) => Promise<{ success: boolean; runId?: string; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
+  computerControlPickApp: () => Promise<{ success: boolean; app?: { id: string; label: string; path: string }; error?: string }>;
   noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
   // Agent-Skills Stufe 1
   noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; error?: string }>;
@@ -847,7 +849,7 @@ export interface ElectronAPI {
   noteSkillsCatalog: () => Promise<{ skills: NoteAgentCatalogSkill[]; error?: string }>;
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; includedScripts?: boolean; error?: string }>;
-  noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; error?: string }>;
+  noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; absPath?: string; error?: string }>;
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
   /** Alle Tätigkeits-Ereignisse des Vaults (90 Tage), ohne Inhalte — für die Messgeschichte. */

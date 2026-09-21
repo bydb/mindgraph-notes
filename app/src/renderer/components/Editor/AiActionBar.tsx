@@ -1,3 +1,4 @@
+import { ComputerArmedHint } from '../Agent/ComputerArmedHint'
 import { useEffect, useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
@@ -6,6 +7,7 @@ import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel, type AgentPreviewResponse } from '../Agent/AgentRunPanel'
 import { ShellAccessToggle } from '../Agent/ShellAccessToggle'
+import { ComputerAccessToggle } from '../Agent/ComputerAccessToggle'
 import type { AgentRunUiState } from '../../stores/noteAgentStore'
 import { HumanIcon } from '../Shared/HumanIcon'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
@@ -69,9 +71,9 @@ interface Props {
   onTargetFolderChange: (rel: string | null) => void
   // Lauf-Zustand aus dem noteAgentStore (Protokoll, Ergebnis-Karten, Provenienz).
   agentRun: AgentRunUiState
-  onAgentRun: (instruction: string, opts: { webResearch: boolean; shellAccess?: boolean; instructionMs?: number }) => void | Promise<void>
+  onAgentRun: (instruction: string, opts: { webResearch: boolean; shellAccess?: boolean; computerAccess?: boolean; instructionMs?: number }) => void | Promise<void>
   onAgentCancel: () => void
-  onAgentAccept: (resultId: string) => void
+  onAgentAccept: (resultId: string, openAfter?: boolean) => void
   onAgentDiscard: (resultId: string) => void
   // Vorschau der Staging-Datei vor Übernehmen/Verwerfen (read-only).
   onAgentPreview: (resultId: string) => Promise<AgentPreviewResponse>
@@ -104,10 +106,12 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
   const aiEnabled = useUIStore(s => s.ollama.enabled)
   const webResearchModule = useIsModuleEnabled('web-research')
   const shellModule = useIsModuleEnabled('agent-shell')
+  const computerModule = useIsModuleEnabled('agent-computer')
   const webResearchConfig = useUIStore(s => s.webResearchConfig)
   const setWebResearchConfig = useUIStore(s => s.setWebResearchConfig)
   const [webResearchArmed, setWebResearchArmed] = useState(false)
   const [shellArmed, setShellArmed] = useState(false)
+  const [computerArmed, setComputerArmed] = useState(false)
   const [starting, setStarting] = useState(false)
   const [instruction, setInstruction] = useState('')
   const [preset, setPreset] = useState<string | null>(null)
@@ -128,6 +132,7 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
   const agentMode = !!targetFolder
   const busy = phase === 'generating' || agentPhase === 'running' || starting
   useEffect(() => { setShellArmed(false) }, [scopeId, open, targetFolder, shellModule])
+  useEffect(() => { setComputerArmed(false) }, [scopeId, open, targetFolder, computerModule])
 
   // Config-Spiegel (0d) einmal laden, sobald das Modul aktiv ist — die Leiste braucht Provider
   // + „konfiguriert?" für Tooltip und Warnung (P2-1).
@@ -186,10 +191,12 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
       // webResearch nur, wenn Modul an, scharfgestellt UND konfiguriert — nie „scharf-aber-
       // unkonfiguriert" an den Main geben (der Lauf würde sonst scheitern).
       const shellAccess = shellArmed
+      const computerAccess = computerArmed
       setShellArmed(false)
+      setComputerArmed(false)
       setStarting(true)
       try {
-        await onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured, shellAccess, instructionMs: compose.take() })
+        await onAgentRun(instruction.trim(), { webResearch: webResearchModule && webResearchArmed && webConfigured, shellAccess, computerAccess, instructionMs: compose.take() })
       } finally { setStarting(false) }
       return
     }
@@ -343,6 +350,10 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
               setShellArmed(enabled)
               if (enabled) setWebResearchArmed(false)
             }} />}
+            {computerModule && agentMode && <ComputerAccessToggle enabled={computerArmed} disabled={busy} onChange={enabled => {
+              setComputerArmed(enabled)
+              if (enabled) setWebResearchArmed(false)
+            }} />}
             {/* Webrecherche pro Lauf scharfstellen (Globus). NUR im Agent-Modus sichtbar
                 (Zielordner gesetzt). Nicht konfiguriert → NICHT scharfstellen, sondern in die
                 Einstellungen springen („Jetzt einrichten"); sonst würde der Lauf im Main scheitern. */}
@@ -387,6 +398,7 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
       )}
 
       {shellArmed && <div className="ai-bar-cloud-hint">{t('aiBar.shell.hint')}</div>}
+      {computerArmed && <ComputerArmedHint />}
 
       {/* Modus B + Cloud: ehrlicher Hinweis — auch vom Agenten GELESENE Notizen gehen
           im Verlauf an den Anbieter, nicht nur die Anhänge (Entscheidung 7). */}

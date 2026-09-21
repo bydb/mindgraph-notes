@@ -1,6 +1,6 @@
 {
   "name": "mindgraph-notes",
-  "version": "0.11.17-beta",
+  "version": "0.11.18-beta",
   "description": "Lokaler Workspace, der dir täglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist — mit Wissensgraph und KI.",
   "main": "out/main/index.js",
   "workspaces": [
@@ -77,7 +77,7 @@
         "NSCalendarsUsageDescription": "MindGraph Notes zeigt deine Termine im Dashboard und legt Timeblocks für Aufgaben in deinem Kalender an.",
         "NSCalendarsFullAccessUsageDescription": "MindGraph Notes zeigt deine Termine im Dashboard und legt Timeblocks für Aufgaben in deinem Kalender an.",
         "NSMicrophoneUsageDescription": "MindGraph Notes nutzt das Mikrofon, um Diktate lokal in Text umzuwandeln.",
-        "NSAppleEventsUsageDescription": "MindGraph Notes kann optional mit Kalender und Erinnerungen interagieren.",
+        "NSAppleEventsUsageDescription": "MindGraph Notes kann optional mit Kalender und Erinnerungen interagieren und \u2014 wenn du die Rechner-Steuerung einschaltest \u2014 Dateien \u00f6ffnen, E-Mail-Entw\u00fcrfe aufsetzen, drucken und von dir freigegebene Kurzbefehle starten.",
         "NSRemindersUsageDescription": "MindGraph Notes kann optional Aufgaben mit Apple Reminders synchronisieren."
       },
       "target": [

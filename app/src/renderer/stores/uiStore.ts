@@ -1,4 +1,5 @@
 import { DEFAULT_SHELL_GUARDRAILS, type ShellGuardrails } from '../../shared/shellGuardrails'
+import { DEFAULT_COMPUTER_CONTROL, type ComputerControlSettings } from '../../shared/computerControl'
 import { create } from 'zustand'
 import type { ValuedType, ReferenceMinutes, ReferenceSources, ReferenceSource } from '../../shared/activityLog'
 import type { UpdateInfo } from '../../shared/types'
@@ -553,6 +554,13 @@ export interface ModuleDescriptor {
   iconText?: string
   /** Optional: Markenfarbe (Hintergrund des Icon-Badges). */
   iconColor?: string
+  /**
+   * Nur auf macOS anbieten. Ein Modul, das auf dieser Plattform gar nicht laufen kann,
+   * darf nicht einschaltbar sein: Die Rechner-Steuerung liess sich unter Windows und Linux
+   * aktivieren, der Schalter erschien am Auftrag — und der Lauf brach dann komplett ab,
+   * bevor er begann. Der Auftrag war weg, die Meldung lautete „gibt es nur auf macOS".
+   */
+  macOnly?: boolean
 }
 
 export const MODULE_CATEGORIES: Record<ModuleCategory, string> = {
@@ -580,7 +588,8 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'speech',           label: 'Sprache',          description: 'Vorlesen (TTS) und Diktieren (Whisper, läuft offline in der App) in Editor & Flashcards', category: 'ai' },
   { id: 'project-rag',      label: 'Notizen befragen (RAG)', description: 'Projektordner oder den ganzen Vault semantisch befragen — Index, Embedding & Antwort lokal; der Vault-Index braucht ein eigenes Opt-in pro Vault', category: 'ai' },
   { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' },
-  { id: 'agent-shell',      label: 'Agent-Shell',      description: 'Der Notiz-Agent darf nach Freigabe pro Lauf Befehle und Skripte ausführen — in einer Sandbox mit Schutzgrenzen (nur Anhänge lesen, nur Arbeitsordner schreiben, kein Netz); experimentell, derzeit macOS', category: 'ai' },
+  { id: 'agent-shell',      label: 'Agent-Shell',      macOnly: true,      description: 'Der Notiz-Agent darf nach Freigabe pro Lauf Befehle und Skripte ausführen — in einer Sandbox mit Schutzgrenzen (nur Anhänge lesen, nur Arbeitsordner schreiben, kein Netz); experimentell, derzeit macOS', category: 'ai' },
+  { id: 'agent-computer',   label: 'Rechner-Steuerung', macOnly: true, description: 'Der Notiz-Agent darf ein Ergebnis weiterreichen — Datei öffnen, im Finder zeigen, Mail-Entwurf in Apple Mail, drucken. Drei Stufen: hier einschalten, dann pro Lauf ein Schalter, dann eine Bestätigung beim Start. Kein Skript, keine Kurzbefehle, nichts holt Daten von aussen; Mails nie gesendet. Experimentell, nur macOS', category: 'ai' },
   { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Nano Banana erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und Notiz-Agenten', category: 'ai' }
 ]
 
@@ -711,6 +720,10 @@ interface UIState {
   // Shell-Zugriff des Notiz-Agenten (experimentell): erste Stufe des Opt-ins; die zweite
   // ist der Schalter pro Lauf. Der Main prüft dieses Flag in ui-settings.json selbst.
   agentShellEnabled: boolean
+  /** Modul „Rechner-Steuerung": erlaubt dem Notiz-Agenten, andere Programme anzusprechen. */
+  agentComputerEnabled: boolean
+  /** Welche Vorgänge und Programme dabei freigegeben sind (siehe shared/computerControl.ts). */
+  agentComputer: ComputerControlSettings
   // Schutzgrenzen der Shell (shared/shellGuardrails.ts). Der Main liest sie aus ui-settings.json.
   agentShell: ShellGuardrails
   // Spiegel der Main-seitigen Webrecherche-Config (0d) — nur zum Anzeigen in der KI-Leiste
@@ -874,6 +887,8 @@ interface UIState {
   setWebResearchEnabled: (enabled: boolean) => void
   setAgentShellEnabled: (enabled: boolean) => void
   setAgentShell: (patch: Partial<ShellGuardrails>) => void
+  setAgentComputerEnabled: (enabled: boolean) => void
+  setAgentComputer: (patch: Partial<ComputerControlSettings>) => void
   setImageGenerationEnabled: (enabled: boolean) => void
   setWebResearchConfig: (config: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null) => void
   setSemanticScholarEnabled: (enabled: boolean) => void
@@ -1048,6 +1063,8 @@ const defaultState = {
   webResearchEnabled: false,
   agentShellEnabled: false,
   agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
+  agentComputerEnabled: false,
+  agentComputer: { ...DEFAULT_COMPUTER_CONTROL, verbs: { ...DEFAULT_COMPUTER_CONTROL.verbs }, apps: [] },
   webResearchConfig: null,
   imageGenerationEnabled: false,
   semanticScholarEnabled: true,
@@ -1265,7 +1282,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'agentShellEnabled', 'agentShell', 'imageGenerationEnabled', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1376,6 +1393,11 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setWebResearchEnabled: (enabled) => set({ webResearchEnabled: enabled }),
   setAgentShellEnabled: (enabled) => set({ agentShellEnabled: enabled }),
   setAgentShell: (patch) => set((state) => ({ agentShell: { ...DEFAULT_SHELL_GUARDRAILS, ...state.agentShell, ...patch } })),
+  setAgentComputerEnabled: (enabled) => set({ agentComputerEnabled: enabled }),
+  setAgentComputer: (patch) => set((state) => {
+    const base = { ...DEFAULT_COMPUTER_CONTROL, ...state.agentComputer }
+    return { agentComputer: { ...base, ...patch, verbs: { ...base.verbs, ...(patch.verbs ?? {}) } } }
+  }),
   setImageGenerationEnabled: (enabled) => set({ imageGenerationEnabled: enabled }),
   setWebResearchConfig: (config) => set({ webResearchConfig: config }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),

@@ -1,4 +1,5 @@
 import { useUIStore } from '../../stores/uiStore'
+import { IconTile, TILE_GLYPH } from './SettingsUI'
 import { DEFAULT_SHELL_GUARDRAILS, describeShellGuardrails, type ShellReadScope } from '../../../shared/shellGuardrails'
 
 // Schutzgrenzen der Agent-Shell. Der Renderer wählt nur; erzwungen wird im Main über die
@@ -17,7 +18,8 @@ export function AgentShellSection() {
   return (
     <section className="settings-guard-card" aria-labelledby="agent-shell-guard-title">
       <div className="settings-guard-head">
-        <div>
+        <IconTile bg="#5b6470">{TILE_GLYPH.terminal}</IconTile>
+        <div className="settings-guard-head-body">
           <h4 id="agent-shell-guard-title" className="settings-guard-title">
             {en ? 'Agent shell: protection limits' : 'Agent-Shell: Schutzgrenzen'}
           </h4>

@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.17-beta",
+    "softwareVersion": "0.11.18-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Notizen befragen — mit anklickbaren Quellen &middot; v0.11.16</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Ergebnisse landen dort, wo du weiterarbeitest &middot; v0.11.18</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.16 &#183; Notizen befragen</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Termine aus Mails erkennen ganze und mehrere Tage.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Nennt eine Einladung nur Tage und keine Uhrzeit, schl&#228;gt die Pr&#252;fkarte einen ganzt&#228;gigen Termin vor, bei mehreren Tagen mit Beginn und letztem Tag. Eine Uhrzeit, die nicht in der Mail steht, tr&#228;gt die App nicht mehr ein.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.18 &#183; Ergebnisse weiterreichen</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Der Agent legt das Ergebnis nicht nur ab.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Auf Wunsch &#246;ffnet er die fertige Datei, zeigt sie im Finder, h&#228;ngt sie an einen Mail-Entwurf oder druckt sie. Du gibst das pro Auftrag frei, und beim ersten Mal fragt macOS zus&#228;tzlich selbst nach. Voreingestellt ist alles aus.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Nur, was in der Mail steht</b><p data-i18n="release.c1">Uhrzeit, Dauer und Enddatum z&#228;hlen nur, wenn sie im Text zu finden sind. Sonst sagt die Pr&#252;fkarte, was sie angenommen hat.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Klare Meldung, wenn der Kalender streikt</b><p data-i18n="release.c2">Scheitert das Eintragen in den macOS-Kalender, nennt die App den Grund und den n&#228;chsten Schritt. &#8222;Als .ics speichern&#8220; funktioniert auf jedem System.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Aus 0.11.14: Windows-Version signiert</b><p data-i18n="release.c3">Installer und Programm tragen eine g&#252;ltige Signatur. Windows zeigt einen gepr&#252;ften Herausgeber.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Du gibst frei, nicht das Modell</b><p data-i18n="release.c1">Vor dem Start steht, was in diesem Lauf m&#246;glich ist. Die Freigabe gilt nur f&#252;r diesen einen Auftrag, h&#246;chstens zehn Vorg&#228;nge &#8212; und derselbe Vorgang l&#228;uft nie zweimal.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">E-Mail nur als Entwurf</b><p data-i18n="release.c2">Empf&#228;nger, Betreff, Text und Anhang sind ausgef&#252;llt, das Fenster geht sichtbar auf. Gesendet wird nie durch die App.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Kein Skript, keine Fernsteuerung</b><p data-i18n="release.c3">Es gibt vier benannte Vorg&#228;nge, mehr nicht. Keiner holt Daten von au&#223;en herein oder gibt welche nach drau&#223;en. Derzeit nur macOS.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Notizen befragen — mit anklickbaren Quellen &middot; v{vs}",
+        "hero.release": "Ergebnisse landen dort, wo du weiterarbeitest &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Notizen befragen",
-        "release.heading": "Was ist neu — <em>Frag deine Notizen und sieh, woher die Antwort kommt.</em>",
-        "release.lead": "Der Chat durchsucht deinen ganzen Notizspeicher und antwortet mit Quellenangaben, die du anklicken kannst. Ein Klick öffnet die Notiz an der Stelle, aus der die Aussage stammt. Suche und Antwort laufen auf deinem Rechner.",
-        "release.c1h": "Quellen zum Anklicken",
-        "release.c1": "Jede Quellennummer führt in die Notiz, genau an die Stelle. Hat sich die Notiz seitdem geändert, sagt die App das, statt auf eine falsche Zeile zu zeigen.",
-        "release.c2h": "Sichtbar, was geprüft wurde",
-        "release.c2": "Unter jeder Antwort steht, was die App verglichen hat: Sätze ohne Quelle, schwache Übereinstimmung, Zitate, die so nicht im Original stehen. Geprüft wird die Herkunft, nicht ob eine Aussage wahr ist.",
-        "release.c3h": "Sagt auch, wenn nichts passt",
-        "release.c3": "Findet die Suche keinen ausreichend ähnlichen Treffer, sagt die App das, statt zu raten. Der Index entsteht erst auf deinen Klick, nie von selbst.",
+        "release.label": "Release {vs} · Ergebnisse weiterreichen",
+        "release.heading": "Was ist neu — <em>Der Agent legt das Ergebnis nicht nur ab.</em>",
+        "release.lead": "Auf Wunsch öffnet er die fertige Datei, zeigt sie im Finder, hängt sie an einen Mail-Entwurf oder druckt sie. Du gibst das pro Auftrag frei, und beim ersten Mal fragt macOS zusätzlich selbst nach. Voreingestellt ist alles aus.",
+        "release.c1h": "Du gibst frei, nicht das Modell",
+        "release.c1": "Vor dem Start steht, was in diesem Lauf möglich ist. Die Freigabe gilt nur für diesen einen Auftrag, höchstens zehn Vorgänge — und derselbe Vorgang läuft nie zweimal.",
+        "release.c2h": "E-Mail nur als Entwurf",
+        "release.c2": "Empfänger, Betreff, Text und Anhang sind ausgefüllt, das Fenster geht sichtbar auf. Gesendet wird nie durch die App.",
+        "release.c3h": "Kein Skript, keine Fernsteuerung",
+        "release.c3": "Es gibt vier benannte Vorgänge, mehr nicht. Keiner holt Daten von außen herein oder gibt welche nach draußen. Derzeit nur macOS.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Ask your notes — with clickable sources &middot; v{vs}",
+        "hero.release": "Results land where you keep working &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Ask your notes",
-        "release.heading": "What’s new — <em>Ask your notes and see where the answer comes from.</em>",
-        "release.lead": "The chat searches your whole vault and answers with sources you can click. One click opens the note at the passage the statement came from. Search and answer run on your machine.",
-        "release.c1h": "Sources you can click",
-        "release.c1": "Every source number leads into the note, right to the passage. If the note changed since, the app says so instead of pointing at the wrong line.",
-        "release.c2h": "Visible what was checked",
-        "release.c2": "Under every answer you see what the app compared: sentences without a source, weak overlap, quotations that are not in the original. It checks provenance, not whether a statement is true.",
-        "release.c3h": "It also says when nothing fits",
-        "release.c3": "If the search finds no sufficiently similar match, the app says so instead of guessing. The index is built only when you ask for it, never on its own.",
+        "release.label": "Release {vs} · Handing results on",
+        "release.heading": "What’s new — <em>The agent does more than file the result away.</em>",
+        "release.lead": "If you ask it to, it opens the finished file, reveals it in Finder, attaches it to a mail draft or prints it. You approve that per task, and the first time macOS asks as well. Everything is off by default.",
+        "release.c1h": "You approve, not the model",
+        "release.c1": "Before the run starts you see what is possible in it. The approval covers that one task, at most ten operations — and the same operation never runs twice.",
+        "release.c2h": "Email only as a draft",
+        "release.c2": "Recipients, subject, body and attachment are filled in and the window opens visibly. The app never sends.",
+        "release.c3h": "No script, no remote control",
+        "release.c3": "There are four named operations, nothing more. None of them pulls data in from outside or sends any out. macOS only for now.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

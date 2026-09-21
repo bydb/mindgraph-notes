@@ -2,6 +2,25 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.18-beta] - 2026-09-21
+
+**Der Agent legt ein fertiges Ergebnis nicht nur ab, er reicht es auf Wunsch weiter.** Er öffnet die erzeugte Datei, zeigt sie im Finder, setzt daraus einen Mail-Entwurf mit Anhang auf oder schickt sie an den Drucker. Du gibst das für jeden Auftrag einzeln frei, und beim ersten Mal fragt auch macOS noch einmal nach. Voreingestellt ist alles aus.
+
+### Hintergrund
+
+- Der Anlass war die letzte Handbewegung, die immer übrig blieb: Die App erzeugte die Zusammenfassung, und danach hat man sie selbst gesucht, geöffnet und in eine Mail gezogen. Jetzt schreibt man in den Auftrag, was danach passieren soll.
+- Es gibt genau vier Vorgänge: öffnen, im Finder zeigen, Mail-Entwurf, drucken. Das Modell schreibt kein Skript und führt keines aus — es wählt einen dieser Vorgänge und liefert die Werte, den Aufruf baut die App.
+- Die Freigabe läuft in drei Stufen: die Funktion einschalten, am einzelnen Auftrag einen Schalter setzen, und beim Start einen Systemdialog bestätigen, der aufzählt, was in diesem Lauf möglich ist. Ob davon etwas geschieht, entscheidet das Modell aus deinem Auftragstext.
+- **E-Mail entsteht ausschließlich als sichtbarer Entwurf** in Apple Mail, mit Empfängern, Betreff, Text und Anhang. Einen Vorgang „senden“ gibt es nicht und wird es nicht geben.
+- Geöffnet wird nur, was ein Programm anzeigt, ohne ein eigenes Programm mitzubringen: PDF, Text, Markdown, die neuen Office-Formate und Bilder. HTML-Seiten, ausführbare Dateien und die alten makrofähigen Office-Formate bleiben draußen.
+- Übergeben werden nur Ergebnisse des laufenden Auftrags und Dateien aus deinem Notizspeicher. Ein Ergebnis wird dabei als Kopie geöffnet — wer daran weiterarbeiten will, übernimmt es erst und öffnet dann die übernommene Datei.
+- Ein Vorgang läuft nie zweimal. Bekommt die App keine klare Rückmeldung, gilt der Ausgang als unbekannt und wird nicht wiederholt, weil die Wirkung schon eingetreten sein kann.
+- Zwei unabhängige Prüfdurchgänge haben vorab dreiundzwanzig Schwachstellen gefunden, von denen einundzwanzig behoben wurden. Unter anderem meldete das Öffnen eines Ergebnisses vorher nicht, dass es sich um eine Kopie handelt.
+- **Grenze:** Nur macOS. Auf Windows und Linux erscheint die Funktion gar nicht mehr in der Liste, statt sich einschalten zu lassen und den Auftrag dann scheitern zu lassen. Dasselbe gilt jetzt für die Agent-Shell.
+- **Grenze:** Ob ein Druckauftrag wirklich Papier erzeugt und ob macOS die Steuerung eines Programms erlaubt, zeigt sich erst im Moment selbst. Die App sagt es nicht vorher zu.
+- **Bewusst nicht enthalten:** Kurzbefehle. Sie waren kurzzeitig vorgesehen und wurden wieder entfernt — es war der einzige Weg, über den Daten von außen hereingekommen wären, und die einzige Stelle, an der sich die Zusage „nichts verlässt deinen Rechner“ selbst hätte aushebeln lassen.
+- Nebenbei behoben: Ein zu langer Hinweistext lief als eine einzige Zeile über den Fensterrand hinaus, und die Einleitung der Vault-Index-Karte in den Einstellungen klebte ohne Einrückung am Rahmen.
+
 ## [0.11.17-beta] - 2026-09-20
 
 **Im KI-Chat des Posteingangs ist deine eigene Frage wieder lesbar.** Sie stand bisher als weiße Schrift auf hellem Grund und war damit unsichtbar, ebenso der Senden-Knopf daneben. Dieselbe Ursache traf weitere Stellen: Die aktiven Knöpfe in der Kopfzeile des Posteingangs leuchteten blauviolett statt im Petrol der App, und das Suchfeld in der Notiz zeigte beim Hineinklicken keinen Rahmen.

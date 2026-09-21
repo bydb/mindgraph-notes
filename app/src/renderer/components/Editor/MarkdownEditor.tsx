@@ -2046,7 +2046,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (effectiveNoteId) useNoteAgentStore.getState().setTargetFolder(effectiveNoteId, rel)
   }, [effectiveNoteId])
 
-  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean; shellAccess?: boolean; instructionMs?: number }) => {
+  const agentRunStart = useCallback(async (instruction: string, opts?: { webResearch?: boolean; shellAccess?: boolean; computerAccess?: boolean; instructionMs?: number }) => {
     if (!effectiveNoteId || !vaultPath || !agentTargetFolder) return
     // Cloud-Routing nur mit eigenem 'note-agent'-Opt-in (Entscheidung 7): der
     // Cloud-Eintrag im Picker allein reicht nicht — der gewählte Provider muss
@@ -2082,6 +2082,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       cloudLabel,
       webResearch: !!opts?.webResearch,
       shellAccess: opts?.shellAccess === true,
+      computerAccess: opts?.computerAccess === true,
       instructionMs: opts?.instructionMs
     })
   }, [effectiveNoteId, vaultPath, agentTargetFolder, activeAiCloudRoute, agentRoutes, ollama, aiModel, selectedNote, t])
@@ -2090,8 +2091,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (effectiveNoteId) useNoteAgentStore.getState().cancelRun(effectiveNoteId)
   }, [effectiveNoteId])
 
-  const agentResultAccept = useCallback(async (resultId: string) => {
-    if (effectiveNoteId) await useNoteAgentStore.getState().acceptResult(effectiveNoteId, resultId)
+  const agentResultAccept = useCallback(async (resultId: string, openAfter?: boolean) => {
+    if (effectiveNoteId) await useNoteAgentStore.getState().acceptResult(effectiveNoteId, resultId, openAfter)
   }, [effectiveNoteId])
 
   const agentResultDiscard = useCallback(async (resultId: string) => {

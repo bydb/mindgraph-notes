@@ -30,6 +30,7 @@ import {
 } from '../../shared/webResearch'
 import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
 import { shellExecuteTool, shellStageFileTool } from './shellTools'
+import { computerMailDraftTool, computerOpenTool, computerPrintTool, computerRevealTool } from './computerTools'
 
 export interface NoteAgentContext {
   senderId: number
@@ -261,6 +262,10 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   const registry = new ToolRegistry<NoteAgentContext>()
   registry.register(shellExecuteTool)
   registry.register(shellStageFileTool)
+  registry.register(computerOpenTool)
+  registry.register(computerRevealTool)
+  registry.register(computerMailDraftTool)
+  registry.register(computerPrintTool)
 
   registry.register({
     name: 'read_attachment',

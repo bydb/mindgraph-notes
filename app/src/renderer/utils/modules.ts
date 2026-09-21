@@ -15,8 +15,31 @@ const pluginModules = pluginManifests
     iconColor: manifest.icon?.color,
   }))
 
-/** Kernmodule plus alle manifest-deklarierten Plugin-Module. */
-export const MODULES: readonly ModuleDescriptor[] = [...CORE_MODULES, ...pluginModules]
+/**
+ * Läuft die App auf macOS? Einmal beim Laden bestimmt — die Plattform wechselt nicht.
+ * `userAgentData.platform` wo vorhanden, sonst `platform` (veraltet, aber in Electron da).
+ */
+const IS_MAC = (() => {
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
+  return `${nav.userAgentData?.platform ?? navigator.platform ?? ''}`.toLowerCase().includes('mac')
+})()
+
+/** Module, die auf dieser Plattform überhaupt laufen können. */
+export function isModuleAvailable(module: Pick<ModuleDescriptor, 'macOnly'>): boolean {
+  return !module.macOnly || IS_MAC
+}
+
+/**
+ * Kernmodule plus alle manifest-deklarierten Plugin-Module — ohne die, die auf dieser
+ * Plattform nicht laufen. Sie fallen damit aus Modul-Liste, Suche und Zählern heraus;
+ * `useIsModuleEnabled` liefert für sie zusätzlich immer false, damit ein aus einem anderen
+ * System übernommener oder synchronisierter Schalter sie nicht doch sichtbar macht.
+ */
+export const MODULES: readonly ModuleDescriptor[] = [...CORE_MODULES, ...pluginModules].filter(isModuleAvailable)
+
+const UNAVAILABLE_MODULE_IDS: ReadonlySet<string> = new Set(
+  [...CORE_MODULES, ...pluginModules].filter(m => !isModuleAvailable(m)).map(m => m.id)
+)
 
 /** Modul-Ids, die von einem (manifest-deklarierten) Plugin stammen — für die Trennung
  *  „MindGraph-Module" vs. „Installierte Plugins" in der Settings-UI. */
@@ -49,6 +72,7 @@ function pluginModuleEnabled(state: unknown, id: string): boolean | undefined {
 // Reaktiver Hook: liest Modul-Enable-Status aus dem uiStore und re-rendert bei Änderungen.
 export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
   return useUIStore(state => {
+    if (UNAVAILABLE_MODULE_IDS.has(id)) return false
     const pluginEnabled = pluginModuleEnabled(state, id)
     if (pluginEnabled !== undefined) return pluginEnabled
     switch (id) {
@@ -61,6 +85,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'workflow-canvas':   return state.workflowCanvasEnabled
       case 'web-research':      return state.webResearchEnabled
       case 'agent-shell':       return state.agentShellEnabled
+      case 'agent-computer':    return state.agentComputerEnabled
       case 'image-generation':  return state.imageGenerationEnabled
       case 'semantic-scholar':  return state.semanticScholarEnabled
       case 'zotero':            return state.zoteroEnabled
@@ -76,6 +101,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
 // Mappt eine Modul-ID auf die bestehenden uiStore-Flags.
 // MZ-Suite ist ein Bundle, das mehrere Flags gleichzeitig setzt.
 export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
+  if (UNAVAILABLE_MODULE_IDS.has(id)) return false
   const s = useUIStore.getState()
   const pluginEnabled = pluginModuleEnabled(s, id)
   if (pluginEnabled !== undefined) return pluginEnabled
@@ -89,6 +115,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'workflow-canvas':   return s.workflowCanvasEnabled
     case 'web-research':      return s.webResearchEnabled
     case 'agent-shell':       return s.agentShellEnabled
+    case 'agent-computer':    return s.agentComputerEnabled
     case 'image-generation':  return s.imageGenerationEnabled
     case 'semantic-scholar':  return s.semanticScholarEnabled
     case 'zotero':            return s.zoteroEnabled
@@ -123,6 +150,7 @@ function applyModuleFlags(id: ModuleDescriptor['id'], enabled: boolean): void {
     case 'workflow-canvas':   s.setWorkflowCanvasEnabled(enabled); break
     case 'web-research':      s.setWebResearchEnabled(enabled); break
     case 'agent-shell':       s.setAgentShellEnabled(enabled); break
+    case 'agent-computer':    s.setAgentComputerEnabled(enabled); break
     case 'image-generation':  s.setImageGenerationEnabled(enabled); break
     case 'semantic-scholar':  s.setSemanticScholarEnabled(enabled); break
     case 'zotero':            s.setZoteroEnabled(enabled); break

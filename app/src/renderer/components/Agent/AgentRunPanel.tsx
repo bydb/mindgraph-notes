@@ -5,7 +5,10 @@
 // unter der Notiz und Agent-Tab). Zwei Implementierungen derselben Karten wären
 // zwei Orte für dieselben Fehler.
 
+import { useUIStore } from '../../stores/uiStore'
+import { computerStepLabel } from '../../../shared/computerControl'
 import { useEffect, useRef, useState } from 'react'
+import { needsExternalApp } from '../../utils/resultFormats'
 import { useTranslation } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
 import type { AgentRunUiState } from '../../stores/noteAgentStore'
@@ -22,7 +25,7 @@ export interface AgentPreviewResponse {
 interface Props {
   run: AgentRunUiState
   onCancel: () => void
-  onAccept: (resultId: string) => void
+  onAccept: (resultId: string, openAfter?: boolean) => void
   onDiscard: (resultId: string) => void
   onPreview: (resultId: string) => Promise<AgentPreviewResponse>
   onDismiss: () => void
@@ -65,6 +68,7 @@ function useElapsedLabel(startedAt: number | null, running: boolean): string {
 
 export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, onDismiss, onRemember }: Props) {
   const { t } = useTranslation()
+  const en = useUIStore(st => st.language) === 'en'
   const finalText = useAgentFinalText(run)
   // Ein Lauf mit lokalem 27B-Modell dauert real zehn Minuten. Ohne Uhr sieht das
   // wie ein Hänger aus; mit Uhr sieht man, dass etwas passiert und wie lange schon.
@@ -136,6 +140,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
   return (
     <div className="ai-bar-agent">
       {run.shellAccess && <div className="ai-bar-cloud-hint">{t('aiBar.shell.runHint')}</div>}
+      {run.computerAccess && <div className="ai-bar-cloud-hint">{t('aiBar.computer.runHint')}</div>}
       {/* Provenienz: Modell + Datenweg des Laufs (analog zum Block-Diff-Kopf) */}
       {run.model && (
         <div className="ai-bar-agent-prov" title={run.model}>
@@ -149,7 +154,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
       {run.steps.length > 0 && (
         <div className="ai-bar-agent-steps">
           {run.steps.map(s => (
-            <div key={s.seq} className="ai-bar-agent-step" style={s.skill === 'shell_execute' ? { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflowY: 'auto' } : undefined}>{s.seq}. {s.skill}{s.summary ? ` — ${s.summary}` : ''}</div>
+            <div key={s.seq} className="ai-bar-agent-step" style={s.skill === 'shell_execute' ? { whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 240, overflowY: 'auto' } : undefined}>{s.seq}. {computerStepLabel(s.skill, en ? 'en' : 'de') ?? s.skill}{s.summary ? ` — ${s.summary}` : ''}</div>
           ))}
         </div>
       )}
@@ -218,6 +223,11 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
                     {previews[r.resultId]?.open ? t('aiBar.agent.previewHide') : t('aiBar.agent.preview')}
                   </button>
                   <button type="button" className="ai-bar-cancel" onClick={() => onDiscard(r.resultId)}>{t('aiBar.discard')}</button>
+                  {needsExternalApp(r.suggestedName) && (
+                    <button type="button" className="ai-bar-cancel" onClick={() => onAccept(r.resultId, true)}>
+                      {t('aiBar.agent.acceptAndOpen')}
+                    </button>
+                  )}
                   <button type="button" className="ai-bar-send" onClick={() => onAccept(r.resultId)}>{t('aiBar.agent.accept')}</button>
                 </div>
               ) : (
