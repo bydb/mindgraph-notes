@@ -107,6 +107,9 @@ describe('SyncEngine — die Mailliste wird vereinigt, nicht ersetzt', () => {
   })
 
   afterEach(async () => {
+    // Das Sync-Protokoll schreibt zeitversetzt in den Vault. Ohne Abwarten landet ein
+    // Block NACH dem Aufräumen und legt den Temp-Ordner stillschweigend neu an.
+    await engine?.flushLog()
     await fs.rm(vaultPath, { recursive: true, force: true })
   })
 

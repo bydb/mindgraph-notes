@@ -15,8 +15,9 @@ import {
   type FileManifest
 } from './fileTracker'
 import { moveToSyncTrash } from './trash'
+import { SyncLogBuffer } from './logBuffer'
 import { mergeIncomingEmailStore, EMAIL_STORE_REL_PATH } from '../email/store'
-import type { SyncProgress, SyncResult } from '../../shared/types'
+import type { SyncFailure, SyncProgress, SyncResult } from '../../shared/types'
 
 type SyncStatus = SyncProgress['status']
 
@@ -28,6 +29,55 @@ const PARALLEL_DOWNLOADS = 5
 // Verbindung — die Datei würde endlos retryt und alles dahinter in der Queue nie synced.
 // 64 MB roh → ~85,4 MiB Nachricht: sichere Marge unter dem Limit.
 const MAX_SYNC_FILE_SIZE = 64 * 1024 * 1024
+
+/**
+ * Protokolldatei neben dem Manifest.
+ *
+ * Sie MUSS `.txt` heißen: `isSyncable` lässt unter `.mindgraph` nur `.json` durch,
+ * damit bleibt das Protokoll geräte-lokal. Es gehört auch nicht auf andere Geräte —
+ * es beschreibt, was DIESER Rechner erlebt hat.
+ *
+ * Vorher gab es das Protokoll nur im Arbeitsspeicher des Renderers, gedeckelt auf 200
+ * Einträge. Bei 200 fehlgeschlagenen Downloads hat es sich damit exakt selbst
+ * überschrieben, und ein Neustart löschte den Rest — der einzige Beleg dafür, WELCHE
+ * Dateien fehlten, war weg, bevor jemand nachsehen konnte (real, 09/2026).
+ */
+const SYNC_LOG_REL_PATH = '.mindgraph/sync-log.txt'
+/** Vorheriger Stand nach der Rotation. Muss in der Oberfläche mitgenannt werden. */
+const SYNC_LOG_PREVIOUS_REL_PATH = '.mindgraph/sync-log.1.txt'
+const SYNC_LOG_MAX_BYTES = 2 * 1024 * 1024
+/**
+ * Gesammelt wird im Speicher, geschrieben im Block — asynchron, höchstens EIN Vorgang
+ * gleichzeitig.
+ *
+ * Dritter Entwurf, und die beiden davor sind der Grund für seine Form:
+ *  1. Ein `appendFile` je Zeile, verkettet über ein Promise: Hängt ein Glied (blockierter
+ *     Mount, SMB, schlafende Platte), sammeln sich alle nachfolgenden Zeilen unbegrenzt an.
+ *  2. Synchrones Schreiben auf einem Zeitgeber: kein Rückstau mehr, dafür hält ein
+ *     hängender Systemaufruf die Ereignisschleife des Main-Prozesses an — die ganze App
+ *     friert ein, auch beim Beenden (`before-quit → disconnect`). Ein hängender
+ *     asynchroner Download lässt die Schleife frei, ein `appendFileSync` nicht.
+ *
+ * Jetzt: gedeckelter Puffer (kein Rückstau) UND asynchrones Schreiben (kein Einfrieren).
+ * Solange ein Block unterwegs ist, startet kein zweiter; was inzwischen anfällt, wartet im
+ * Puffer und wird bei vollem Puffer gezählt verworfen.
+ *
+ * Der Preis, ausdrücklich: Nach `disconnect()` kann EIN letzter Block noch landen. Er
+ * enthält nur Zeilen von vor dem Trennen und geht nur in das Protokoll DIESES Vaults.
+ * „Blockiert nie", „verliert den Schluss nicht" und „nach dem Trennen kein Schreibvorgang"
+ * sind zu dritt nicht zu haben, solange `disconnect()` synchron ist — aufgegeben wird das
+ * dritte, weil ein verspäteter Protokollblock harmlos ist und eine eingefrorene App nicht.
+ */
+const SYNC_LOG_FLUSH_DELAY_MS = 250
+/**
+ * Deckel des Puffers (Einzelheiten in logBuffer.ts). `maxBytes` liegt bewusst unter der
+ * Rotationsgrenze: Ein Block passt damit nach einer Rotation immer in die frische Datei.
+ */
+const SYNC_LOG_BUFFER_LIMITS = {
+  maxLines: 2000,
+  maxLineChars: 2000,
+  maxBytes: 1024 * 1024
+}
 
 interface ServerMessage {
   type: string
@@ -91,6 +141,14 @@ export class SyncEngine {
    */
   private beforeOverwrite: ((absPath: string, nextContent: Buffer) => Promise<void>) | null = null
 
+  /** Gesammelte, noch nicht geschriebene Protokollzeilen (gedeckelt, s. logBuffer.ts). */
+  private logBuffer = new SyncLogBuffer(SYNC_LOG_BUFFER_LIMITS)
+  private logFlushTimer: ReturnType<typeof setTimeout> | null = null
+  /** Der eine laufende Schreibvorgang — solange er läuft, startet kein zweiter. */
+  private logWriting: Promise<void> | null = null
+  /** Ab hier nimmt das Protokoll nichts mehr an — gesetzt in disconnect(), vor dem Abschluss. */
+  private logClosed: boolean = false
+
   setBeforeOverwrite(hook: (absPath: string, nextContent: Buffer) => Promise<void>): void {
     this.beforeOverwrite = hook
   }
@@ -137,6 +195,135 @@ export class SyncEngine {
     for (const win of BrowserWindow.getAllWindows()) {
       win.webContents.send('sync-log', entry)
     }
+    this.appendToLogFile(entry)
+  }
+
+  /** Pfad der Protokolldatei; leer, solange kein Vault gesetzt ist. */
+  logFilePath(): string {
+    return this.vaultPath ? path.join(this.vaultPath, SYNC_LOG_REL_PATH) : ''
+  }
+
+  /** Pfad des vorherigen Stands (nach einer Rotation). */
+  previousLogFilePath(): string {
+    return this.vaultPath ? path.join(this.vaultPath, SYNC_LOG_PREVIOUS_REL_PATH) : ''
+  }
+
+  /** Nimmt eine Zeile in den Puffer und sorgt dafür, dass sie bald geschrieben wird. */
+  private appendToLogFile(entry: { type: string; message: string }): void {
+    if (this.logClosed || !this.logFilePath()) return
+    this.logBuffer.push(`${new Date().toISOString()}\t${entry.type}\t${entry.message}`)
+    this.scheduleLogWrite()
+  }
+
+  private scheduleLogWrite(): void {
+    if (this.logFlushTimer || this.logWriting) return
+    this.logFlushTimer = setTimeout(() => {
+      this.logFlushTimer = null
+      void this.writeLogBlock()
+    }, SYNC_LOG_FLUSH_DELAY_MS)
+    // Der Zeitgeber darf den Prozess nicht am Beenden hindern — er ist Diagnose.
+    this.logFlushTimer.unref?.()
+  }
+
+  /**
+   * Schreibt alles Gepufferte als EINEN Block. Läuft schon ein Schreibvorgang, wird der
+   * zurückgegeben statt eines zweiten — der Rest bleibt im (gedeckelten) Puffer.
+   *
+   * Fehler werden nie nach außen gereicht: ein Protokoll darf einen Sync nicht kippen.
+   * Sie werden aber auch nicht mehr verschluckt — die Zeilen eines gescheiterten Blocks
+   * zählen als fehlend und werden beim nächsten geglückten Schreiben ausgewiesen.
+   */
+  private writeLogBlock(): Promise<void> {
+    if (this.logWriting) return this.logWriting
+    const ziel = this.logFilePath()
+    if (!ziel || !this.logBuffer.hasWork) return Promise.resolve()
+
+    const { lines, missing } = this.logBuffer.take()
+    if (missing > 0) {
+      lines.push(
+        `${new Date().toISOString()}\terror\t[${missing} Protokollzeile(n) fehlen hier — ` +
+        'Puffer voll oder Schreibfehler]'
+      )
+    }
+    const block = lines.join('\n') + '\n'
+
+    this.logWriting = (async () => {
+      let geschrieben = false
+      try {
+        await fs.mkdir(path.dirname(ziel), { recursive: true })
+        const rotation = await this.rotateLogFileIfNeeded(ziel, Buffer.byteLength(block))
+        if (rotation.neuBeginnen) {
+          await fs.writeFile(ziel, rotation.hinweis + block, 'utf-8')
+        } else {
+          await fs.appendFile(ziel, block, 'utf-8')
+        }
+        geschrieben = true
+      } catch {
+        // `missing` war schon als Zeile im Block — mitzählen würde doppelt melden.
+        this.logBuffer.noteLost(lines.length - (missing > 0 ? 1 : 0) + missing)
+      } finally {
+        this.logWriting = null
+        // Nur nach einem ERFOLG selbst weitermachen. Nach einem Fehler sofort erneut zu
+        // schreiben wäre bei vollem Datenträger eine Endlosschleife; die nächste
+        // Protokollzeile stößt das Schreiben ohnehin wieder an.
+        if (geschrieben && this.logBuffer.hasWork) {
+          if (this.logClosed) void this.writeLogBlock()
+          else this.scheduleLogWrite()
+        }
+      }
+    })()
+    return this.logWriting
+  }
+
+  /**
+   * Rotiert, BEVOR der Block die Grenze reißt. Weil ein Block höchstens 1 MB groß ist
+   * (s. SYNC_LOG_BUFFER_LIMITS), bleibt die Datei damit unter 2 MB plus einem Block.
+   *
+   * Scheitert das Umbenennen (Verzeichnis nicht beschreibbar, Vorgängerpfad blockiert),
+   * wird NEU BEGONNEN statt angehängt. Der erste Entwurf hängte danach einfach weiter an
+   * die zu große Datei an — sie wuchs dann unbegrenzt. Der ältere Inhalt geht in diesem
+   * Fehlerfall verloren; die Hinweiszeile sagt das, und warum.
+   */
+  private async rotateLogFileIfNeeded(
+    ziel: string,
+    blockBytes: number
+  ): Promise<{ neuBeginnen: boolean; hinweis: string }> {
+    let vorhanden = 0
+    try {
+      vorhanden = (await fs.stat(ziel)).size
+    } catch {
+      return { neuBeginnen: false, hinweis: '' }  // gibt es noch nicht
+    }
+    if (vorhanden + blockBytes < SYNC_LOG_MAX_BYTES) return { neuBeginnen: false, hinweis: '' }
+    try {
+      // Genau EINE Vorgängerdatei: ein Sync-Fehler wird oft erst Tage später gemeldet,
+      // ein einzelner Lauf darf den Beleg aber nicht sprengen.
+      await fs.rename(ziel, this.previousLogFilePath())
+      return { neuBeginnen: false, hinweis: '' }
+    } catch (err) {
+      const grund = err instanceof Error ? err.message : String(err)
+      return {
+        neuBeginnen: true,
+        hinweis:
+          `${new Date().toISOString()}\terror\t[Rotation fehlgeschlagen: ${grund} — ` +
+          'Protokoll neu begonnen, der ältere Inhalt dieser Datei ist verworfen]\n'
+      }
+    }
+  }
+
+  /**
+   * Wartet, bis alles Gepufferte geschrieben ist — auch nach `disconnect()`.
+   *
+   * Das Schreiben hängt an einem Zeitgeber, damit es keinen Download ausbremst; wer den
+   * Inhalt lesen oder den Vault-Ordner entfernen will (Tests), muss es abwarten können.
+   */
+  async flushLog(): Promise<void> {
+    if (this.logFlushTimer) {
+      clearTimeout(this.logFlushTimer)
+      this.logFlushTimer = null
+    }
+    if (this.logWriting) await this.logWriting
+    await this.writeLogBlock()
   }
 
   private sendProgress(progress: Partial<SyncProgress>): void {
@@ -144,6 +331,17 @@ export class SyncEngine {
       status: this.status,
       current: 0,
       total: 0,
+      // JEDER Fehlerabschluss nennt Vault und Protokollpfade, auch der ohne Dateiliste
+      // (Löschbremse, Verbindungsfehler) — der Weg zur Diagnose darf nicht daran hängen,
+      // dass zufällig einzelne Dateien gescheitert sind.
+      ...(progress.status === 'error'
+        ? {
+            vaultPath: this.vaultPath,
+            logFile: this.logFilePath(),
+            previousLogFile: this.previousLogFilePath(),
+            failures: []
+          }
+        : {}),
       ...progress
     }
     for (const win of BrowserWindow.getAllWindows()) {
@@ -675,6 +873,12 @@ export class SyncEngine {
       // und der Auto-Sync wiederholt den Komplett-Abbruch alle 5 Minuten (real passiert mit
       // dem 83-MB-Embeddings-Cache, s. MAX_SYNC_FILE_SIZE).
       const uploadFailures: string[] = []
+      /**
+       * JEDE gescheiterte Datei mit Grund — die Grundlage dafür, dass die Oberfläche
+       * mehr zeigen kann als die erste von zweihundert. Die vier Zähllisten daneben
+       * bleiben, weil die Bilanz am Ende nach Art getrennt gerechnet wird.
+       */
+      const failures: SyncFailure[] = []
       this.status = 'uploading'
       for (let i = 0; i < diff.toUpload.length; i += PARALLEL_UPLOADS) {
         const batch = diff.toUpload.slice(i, i + PARALLEL_UPLOADS)
@@ -686,6 +890,7 @@ export class SyncEngine {
             // syncedAt bleibt unangetastet → Datei wird beim nächsten Sync erneut versucht
             uploadFailures.push(filePath)
             const msg = err instanceof Error ? err.message : String(err)
+            failures.push({ kind: 'upload', path: filePath, reason: msg })
             this.sendLog({ type: 'error', message: `Upload failed: ${filePath} — ${msg}`, fileName: filePath })
             return
           }
@@ -751,6 +956,7 @@ export class SyncEngine {
             const erwarteterHash = remoteManifest.files[filePath]?.hash
             if (erwarteterHash) nichtAngekommeneHashes.add(erwarteterHash)
             const msg = err instanceof Error ? err.message : String(err)
+            failures.push({ kind: 'download', path: filePath, reason: msg })
             this.sendLog({ type: 'error', message: `Download failed: ${filePath} — ${msg}`, fileName: filePath })
             return
           }
@@ -816,6 +1022,7 @@ export class SyncEngine {
           // Datei den Sync aufhält (genau diese Lücke stand seit dem 06.08. offen).
           conflictFailures.push(filePath)
           const msg = err instanceof Error ? err.message : String(err)
+          failures.push({ kind: 'conflict', path: filePath, reason: msg })
           this.sendLog({
             type: 'error',
             message: `Conflict resolution failed: ${filePath} — ${msg}`,
@@ -848,6 +1055,7 @@ export class SyncEngine {
           const previous = this.manifest?.files[filePath]
           if (previous) currentManifest.files[filePath] = previous
           const msg = err instanceof Error ? err.message : String(err)
+          failures.push({ kind: 'delete-remote', path: filePath, reason: msg })
           this.sendLog({
             type: 'error',
             message: `Delete on server failed: ${filePath} — ${msg}`,
@@ -885,6 +1093,11 @@ export class SyncEngine {
         const eigenerHash = currentManifest.files[filePath]?.hash
         if (eigenerHash && nichtAngekommeneHashes.has(eigenerHash)) {
           deferredLocalDeletes.push(filePath)
+          failures.push({
+            kind: 'kept-local',
+            path: filePath,
+            reason: 'The copy on the server could not be transferred; nothing was moved to trash.'
+          })
           this.sendLog({
             type: 'error',
             message:
@@ -982,28 +1195,49 @@ export class SyncEngine {
         // erneut versucht. Entscheidend: das Manifest wurde oben trotzdem gespeichert, der
         // Durchlauf ist also abgeschlossen — der Rest des Vaults bleibt nicht blockiert.
         this.status = 'error'
+        /**
+         * Kurzfassung für die eine Zeile in den Einstellungen: Anzahl plus die ersten
+         * DREI Pfade. Vorher stand hier genau EIN Pfad und dahinter „…" — bei 200
+         * Fehlschlägen sah das aus, als sei es an einer einzigen Datei gescheitert,
+         * und welche die anderen 199 waren, stand nirgends (real, 09/2026).
+         * Die vollständige Liste geht als `failures` an die Oberfläche und steht
+         * Zeile für Zeile in `logFile`.
+         */
+        const benenne = (anzahl: number, was: string, pfade: string[]): string => {
+          const gezeigt = pfade.slice(0, 3).join(', ')
+          const rest = anzahl > 3 ? ` … and ${anzahl - 3} more` : ''
+          return `${anzahl} ${was}: ${gezeigt}${rest}`
+        }
         const parts: string[] = []
-        if (uploadFailures.length > 0) {
-          parts.push(`${uploadFailures.length} upload(s) failed: ${uploadFailures[0]}${uploadFailures.length > 1 ? ', …' : ''}`)
-        }
-        if (downloadFailures.length > 0) {
-          parts.push(`${downloadFailures.length} download(s) failed: ${downloadFailures[0]}${downloadFailures.length > 1 ? ', …' : ''}`)
-        }
-        if (conflictFailures.length > 0) {
-          parts.push(`${conflictFailures.length} conflict(s) unresolved: ${conflictFailures[0]}${conflictFailures.length > 1 ? ', …' : ''}`)
-        }
-        if (deleteFailures.length > 0) {
-          parts.push(`${deleteFailures.length} server delete(s) failed: ${deleteFailures[0]}${deleteFailures.length > 1 ? ', …' : ''}`)
-        }
+        if (uploadFailures.length > 0) parts.push(benenne(uploadFailures.length, 'upload(s) failed', uploadFailures))
+        if (downloadFailures.length > 0) parts.push(benenne(downloadFailures.length, 'download(s) failed', downloadFailures))
+        if (conflictFailures.length > 0) parts.push(benenne(conflictFailures.length, 'conflict(s) unresolved', conflictFailures))
+        if (deleteFailures.length > 0) parts.push(benenne(deleteFailures.length, 'server delete(s) failed', deleteFailures))
         if (deferredLocalDeletes.length > 0) {
-          parts.push(
-            `${deferredLocalDeletes.length} local file(s) kept because their replacement did not arrive: ` +
-            `${deferredLocalDeletes[0]}${deferredLocalDeletes.length > 1 ? ', …' : ''}`
-          )
+          parts.push(benenne(
+            deferredLocalDeletes.length,
+            'local file(s) kept because their replacement did not arrive',
+            deferredLocalDeletes
+          ))
         }
-        const error = `${parts.join(' · ')} (will retry)`
-        this.sendProgress({ status: 'error', error })
-        return { success: false, uploaded: uploadedCount, downloaded: downloadedCount, conflicts: diff.conflicts.length, error }
+        // Beide Dateien nennen: nach einer Rotation liegt der frühere Teil eines langen
+        // Laufs in der Vorgängerdatei, und „full list" wäre sonst eine halbe Wahrheit.
+        const error =
+          `${parts.join(' · ')} (will retry) — full list: ${SYNC_LOG_REL_PATH}` +
+          ` (older part, if rotated: ${path.basename(SYNC_LOG_PREVIOUS_REL_PATH)})`
+        // `failures` MUSS hier mit — dieser Aufruf erreicht die Oberfläche auch dann,
+        // wenn niemand den Rückgabewert liest (Auto-Sync, entprellter Sync).
+        this.sendProgress({ status: 'error', error, failures })
+        return {
+          success: false,
+          uploaded: uploadedCount,
+          downloaded: downloadedCount,
+          conflicts: diff.conflicts.length,
+          error,
+          failures,
+          logFile: this.logFilePath(),
+          previousLogFile: this.previousLogFilePath()
+        }
       }
 
       this.status = 'done'
@@ -1820,6 +2054,18 @@ export class SyncEngine {
     this.status = 'idle'
     this.key = null
     this.reconnectAttempts = 0
+    // Protokoll zumachen und den Rest noch auf den Weg bringen. Der Puffer enthält Zeilen,
+    // die VOR dem Trennen entstanden sind; sie gehören in genau diesen Vault, und
+    // ausgerechnet sie erklären, warum der Lauf endete. Ab hier nimmt das Protokoll nichts
+    // Neues mehr an. EIN letzter Block kann nach dieser Methode noch landen — bewusst
+    // asynchron, denn `before-quit` läuft hier durch, und ein synchrones Schreiben auf
+    // einen toten Mount hielte das Beenden der App an (s. SYNC_LOG_FLUSH_DELAY_MS).
+    this.logClosed = true
+    if (this.logFlushTimer) {
+      clearTimeout(this.logFlushTimer)
+      this.logFlushTimer = null
+    }
+    void this.writeLogBlock()
     console.log('[SyncEngine] Disconnected and destroyed — all file operations blocked')
   }
 

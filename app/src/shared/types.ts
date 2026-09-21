@@ -147,6 +147,27 @@ export interface SyncProgress {
   total: number
   fileName?: string
   error?: string
+  /**
+   * Abschlussdaten eines gescheiterten Laufs — nur bei `status: 'error'` gesetzt.
+   *
+   * Sie reisen über DIESEN Kanal und nicht nur im Rückgabewert von `syncNow`, weil die
+   * meisten Läufe niemand aufruft: Auto-Sync und der entprellte Sync nach Dateiänderungen
+   * starten in der Engine selbst, ihr `SyncResult` verfällt. Ohne das hier erschien die
+   * vollständige Fehlerliste nur nach einem Klick auf „Jetzt synchronisieren" — und eine
+   * alte Liste blieb stehen, wenn danach ein automatischer Lauf glückte.
+   */
+  failures?: SyncFailure[]
+  logFile?: string
+  previousLogFile?: string
+  /** Zu welchem Vault der Lauf gehört — der Store verwirft Abschlussdaten eines fremden. */
+  vaultPath?: string
+}
+
+/** Eine einzelne Datei, die ein Lauf nicht übertragen konnte — mit Grund. */
+export interface SyncFailure {
+  kind: 'upload' | 'download' | 'conflict' | 'delete-remote' | 'kept-local'
+  path: string
+  reason: string
 }
 
 export interface SyncResult {
@@ -155,6 +176,43 @@ export interface SyncResult {
   downloaded: number
   conflicts: number
   error?: string
+  /**
+   * ALLE gescheiterten Dateien, nicht nur die erste. `error` muss kurz bleiben (eine
+   * Zeile in den Einstellungen) und nannte deshalb nur `failures[0]` — von 200
+   * Fehlschlägen blieb genau einer sichtbar, der Rest war nirgends abrufbar
+   * (real beim Erstabgleich eines Zweitgeräts, 09/2026).
+   */
+  failures?: SyncFailure[]
+  /** Pfad des Protokolls auf der Platte, in dem jeder Fehlschlag einzeln steht. */
+  logFile?: string
+  /**
+   * Pfad des vorherigen Protokollstands. Das Protokoll rotiert bei 2 MB; wer nur die
+   * aktuelle Datei nennt, verschweigt bei einem langen Lauf die erste Hälfte.
+   */
+  previousLogFile?: string
+}
+
+/** Warum `electron.safeStorage` die Passphrase nicht ablegen konnte. */
+export type SecretStorageProblem = 'no-encryption' | 'write-failed'
+
+export interface SecretStorageResult {
+  saved: boolean
+  problem?: SecretStorageProblem
+  /**
+   * Nur unter Linux gesetzt: der von Chromium gewählte Passwortspeicher
+   * ('basic_text', 'gnome_libsecret', 'kwallet6', …). Chromium wählt anhand von
+   * `XDG_CURRENT_DESKTOP`; bei einem unbekannten Desktop (Hyprland, Sway …) landet es
+   * auf 'basic_text', und dafür meldet Electron „keine Verschlüsselung verfügbar" —
+   * obwohl ein Schlüsselbund läuft. Die Oberfläche braucht den Namen, um den richtigen
+   * Startschalter nennen zu können (`--password-store=gnome-libsecret`).
+   */
+  backend?: string
+}
+
+export interface SyncRestoreResult {
+  restored: boolean
+  problem?: SecretStorageProblem | 'no-credentials' | 'join-failed'
+  backend?: string
 }
 
 export interface SyncConfig {
@@ -1162,9 +1220,9 @@ export interface ElectronAPI {
     connected: boolean;
     lastSyncTime: number | null;
   }>;
-  syncSavePassphrase: (passphrase: string) => Promise<boolean>;
+  syncSavePassphrase: (passphrase: string) => Promise<SecretStorageResult>;
   syncLoadPassphrase: () => Promise<string | null>;
-  syncRestore: (vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => Promise<boolean>;
+  syncRestore: (vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => Promise<SyncRestoreResult>;
   syncSetExcludeConfig: (config: { folders: string[]; extensions: string[] }) => Promise<boolean>;
   syncGetDeletedFiles: () => Promise<DeletedFileInfo[]>;
   syncRestoreFile: (filePath: string) => Promise<boolean>;

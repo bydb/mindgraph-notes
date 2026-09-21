@@ -720,6 +720,14 @@
 .sui-list-time { color: var(--text-muted); font-family: 'SF Mono', Menlo, Consolas, monospace; font-size: 11.5px; flex-shrink: 0; }
 .sui-list-main { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sui-list-meta { color: var(--text-muted); font-size: 11.5px; }
+/* Zweizeiliger Eintrag: oben die Hauptsache, darunter die Begründung. Nötig, sobald der
+   Nebentext lang werden kann — einzeilig frisst er die ganze Breite und drückt
+   `.sui-list-main` auf null: In der Sync-Fehlerliste verschwand so der DATEINAME genau bei
+   den Einträgen mit der ausführlichsten Fehlermeldung. */
+.sui-list-stack { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sui-list-stack .sui-list-main { flex: none; }
+.sui-list-sub { color: var(--text-muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.sui-list-kind { flex-shrink: 0; min-width: 92px; }
 .sui-list-icon { display: inline-flex; color: var(--text-secondary); flex-shrink: 0; }
 .sui-list-icon.is-error, .sui-list-icon.is-conflict { color: var(--color-danger); }
 .sui-list-icon.is-upload, .sui-list-icon.is-download { color: var(--accent-color); }

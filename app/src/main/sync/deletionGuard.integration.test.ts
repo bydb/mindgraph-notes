@@ -10,11 +10,11 @@
  * nachgebaut. Produktivserver und echter Vault werden nicht berührt.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { WebSocketServer, type WebSocket as WsSocket } from 'ws'
 import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
-import { deriveKey, encryptFile, hashContent, hashPath } from './crypto'
+import { hashContent, hashPath } from './crypto'
+import { FakeRelay, PASSPHRASE, VAULT_ID } from './testRelay'
 import { saveManifest, loadManifest, type FileManifest } from './fileTracker'
 
 vi.mock('electron', () => ({
@@ -23,135 +23,6 @@ vi.mock('electron', () => ({
 }))
 
 const { SyncEngine } = await import('./syncEngine')
-
-const PASSPHRASE = 'test-passphrase-für-den-integrationstest'
-const VAULT_ID = 'mg-1111-2222-3333-4444'
-
-// scrypt (N=2^17) kostet pro Aufruf spürbar Zeit. Die Produktionsparameter bleiben
-// unangetastet — der Test leitet den Schlüssel nur einmal ab statt pro Datei.
-let cachedKey: Buffer | null = null
-function testKey(): Buffer {
-  if (!cachedKey) cachedKey = deriveKey(PASSPHRASE, VAULT_ID)
-  return cachedKey
-}
-
-interface StoredFile {
-  originalPath: string
-  hash: string
-  size: number
-  modifiedAt: number
-  iv: string
-  tag: string
-  data: string
-}
-
-/** Minimaler Relay: register / get-manifest / upload / download / delete. */
-class FakeRelay {
-  private wss: WebSocketServer
-  files = new Map<string, StoredFile>() // key: hashedPath
-  deleted: string[] = []
-  /** Pfade (Klartext), deren Löschung der Server ablehnt — steht für Ack-Timeout/Serverfehler. */
-  failDeletes = new Set<string>()
-
-  private constructor(wss: WebSocketServer) {
-    this.wss = wss
-    this.wss.on('connection', ws => this.wire(ws))
-  }
-
-  static async start(): Promise<FakeRelay> {
-    const wss = new WebSocketServer({ port: 0 })
-    await new Promise<void>(resolve => wss.once('listening', () => resolve()))
-    return new FakeRelay(wss)
-  }
-
-  get url(): string {
-    const addr = this.wss.address()
-    if (typeof addr === 'string' || addr === null) throw new Error('no port')
-    return `ws://127.0.0.1:${addr.port}`
-  }
-
-  /**
-   * Legt eine Datei so ab, als hätte ein anderes Gerät sie hochgeladen.
-   *
-   * `damaged` verfälscht den Auth-Tag: der Blob sieht im Manifest normal aus, AES-GCM
-   * lehnt ihn beim Entschlüsseln aber ab. Genau dieser Zustand liegt real auf dem Server
-   * (einzelne unlesbare Blobs, Ursache seit 06.08.2026 offen) und ist die Sorte Fehler,
-   * die aus einer Konfliktdatei heraus den ganzen Durchlauf abgerissen hat.
-   */
-  seed(relativePath: string, content: string, modifiedAt = 1000, damaged = false): void {
-    const key = testKey()
-    const plaintext = Buffer.from(content, 'utf-8')
-    const { iv, tag, ciphertext } = encryptFile(plaintext, key)
-    if (damaged) tag[0] ^= 0xff
-    this.files.set(hashPath(relativePath), {
-      originalPath: relativePath,
-      hash: hashContent(plaintext),
-      size: plaintext.length,
-      modifiedAt,
-      iv: iv.toString('base64'),
-      tag: tag.toString('base64'),
-      data: ciphertext.toString('base64')
-    })
-  }
-
-  paths(): string[] {
-    return [...this.files.values()].map(f => f.originalPath).sort()
-  }
-
-  private wire(ws: WsSocket): void {
-    ws.on('message', raw => {
-      const msg = JSON.parse(raw.toString())
-      const send = (o: unknown): void => ws.send(JSON.stringify(o))
-
-      switch (msg.type) {
-        case 'register':
-          send({ type: 'registered', vaultId: msg.vaultId })
-          break
-        case 'get-manifest': {
-          const files: Record<string, { hash: string; size: number; modifiedAt: number }> = {}
-          for (const f of this.files.values()) {
-            files[f.originalPath] = { hash: f.hash, size: f.size, modifiedAt: f.modifiedAt }
-          }
-          send({ type: 'manifest', files, deletedFiles: {} })
-          break
-        }
-        case 'upload':
-          this.files.set(msg.path, {
-            originalPath: msg.originalPath,
-            hash: msg.hash,
-            size: msg.size,
-            modifiedAt: msg.modifiedAt,
-            iv: msg.iv,
-            tag: msg.tag,
-            data: msg.data
-          })
-          send({ type: 'ack', path: msg.path })
-          break
-        case 'download': {
-          const f = this.files.get(msg.path)
-          if (!f) return send({ type: 'error', message: 'File not found' })
-          send({ type: 'file-data', path: msg.path, iv: f.iv, tag: f.tag, data: f.data, hash: f.hash, size: f.size })
-          break
-        }
-        case 'delete': {
-          const f = this.files.get(msg.path)
-          if (f && this.failDeletes.has(f.originalPath)) {
-            return send({ type: 'error', message: 'Delete rejected' })
-          }
-          if (f) this.deleted.push(f.originalPath)
-          this.files.delete(msg.path)
-          send({ type: 'ack', path: msg.path })
-          break
-        }
-      }
-    })
-  }
-
-  async stop(): Promise<void> {
-    for (const c of this.wss.clients) c.terminate()
-    await new Promise<void>(resolve => this.wss.close(() => resolve()))
-  }
-}
 
 describe('Löschbremse im echten sync()-Ablauf', () => {
   let relay: FakeRelay
@@ -165,9 +36,15 @@ describe('Löschbremse im echten sync()-Ablauf', () => {
   })
 
   afterEach(async () => {
-    engine.disconnect()
-    await relay.stop()
-    await fs.rm(vault, { recursive: true, force: true })
+    // Gegen halb gescheitertes Setup absichern: scheitert `beforeEach` (z.B. weil das
+    // Binden des Relays verboten ist), sind die Variablen nicht gesetzt — ein blinder
+    // Zugriff hier verdeckte bisher die eigentliche Ursache mit einem Folgefehler.
+    engine?.disconnect()
+    // disconnect() bringt den letzten Protokollblock nur auf den Weg (asynchron, damit
+    // ein toter Mount das Beenden nicht aufhält) — vor dem Löschen des Vaults abwarten.
+    await engine?.flushLog()
+    await relay?.stop()
+    if (vault) await fs.rm(vault, { recursive: true, force: true })
   })
 
   /** Schreibt eine Notiz in den Temp-Vault. */

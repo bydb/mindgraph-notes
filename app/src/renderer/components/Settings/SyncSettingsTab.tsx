@@ -61,10 +61,59 @@ export const SyncSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
     }
   }
 
+  /**
+   * Der Text zum nicht gespeicherten Schlüssel. Er muss den NÄCHSTEN SCHRITT nennen —
+   * ein blankes „ging nicht" hat einen Nutzer einen Abend gekostet, weil der Sync
+   * scheinbar eingerichtet war und nach jedem Neustart tot dastand.
+   */
+  const secretIssue = syncState.secretStorageIssue
+  const secretMessage = (() => {
+    if (!secretIssue) return null
+    const grund =
+      secretIssue.problem === 'no-encryption' ? t('settings.sync.secret.noEncryption')
+        : secretIssue.problem === 'write-failed' ? t('settings.sync.secret.writeFailed')
+          : secretIssue.problem === 'join-failed' ? t('settings.sync.secret.joinFailed')
+            : t('settings.sync.secret.noCredentials')
+    /*
+     * Der Schlüsselbund-Rat gilt NUR, wenn der geschützte Speicher die Ursache ist.
+     * Vorher hing er an jedem Problemtyp, sobald ein Backend-Name vorlag — ein Relay,
+     * das nicht erreichbar ist, empfahl dann `--password-store=gnome-libsecret`. Das
+     * ist genau die Sorte irreführender Hinweis, gegen die diese Änderung antritt.
+     */
+    const nachsatz = secretIssue.problem === 'no-encryption' && secretIssue.backend
+      ? ` ${t('settings.sync.secret.linuxBackend', { backend: secretIssue.backend })}`
+      : ''
+    return { text: `${grund}${nachsatz}`, zeigeSchalter: nachsatz !== '' }
+  })()
+
+  const secretNote = secretMessage && (
+    <Card>
+      <Note
+        tone="warn"
+        action={t('settings.sync.secret.dismiss')}
+        onAction={() => syncState.dismissSecretStorageIssue()}
+      >
+        <b>{t('settings.sync.secret.title')}</b><br />{secretMessage.text}
+        {/* Der Schalter steht als eigene Zeile: im Fließtext brach er hinter „--" um, und
+            wer ihn so abtippt oder kopiert, startet die App mit einem kaputten Argument. */}
+        {secretMessage.zeigeSchalter && <><br /><code className="sui-secret-suffix">--password-store=gnome-libsecret</code><br /></>}
+      </Note>
+    </Card>
+  )
+
+  const FAILURE_LABEL: Record<string, string> = {
+    upload: t('settings.sync.failures.upload'),
+    download: t('settings.sync.failures.download'),
+    conflict: t('settings.sync.failures.conflict'),
+    'delete-remote': t('settings.sync.failures.deleteRemote'),
+    'kept-local': t('settings.sync.failures.keptLocal')
+  }
+
   if (!syncState.syncEnabled) {
     return (
       <div className="settings-section">
         <PageHeader title={t('settings.sync.title')} subtitle={t('settings.sync.subtitle')} />
+        {secretNote}
         <SectionTitle title={t('settings.sync.groupSetup')} />
         <Card>
           <Row label={t('settings.sync.mode')} hint={syncMode === 'new' ? t('settings.sync.newSyncDesc') : t('settings.sync.joinSyncDesc')}>
@@ -144,6 +193,7 @@ export const SyncSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
           {t('settings.sync.progress', { current: syncState.syncProgress.current, total: syncState.syncProgress.total })}
         </p>
       )}
+      {secretNote}
       {syncState.syncError && (
         <Card>
           <Note
@@ -154,6 +204,36 @@ export const SyncSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
             {syncState.syncError}
           </Note>
         </Card>
+      )}
+      {syncState.syncFailures.length > 0 && (
+        <Card>
+          <Details title={`${t('settings.sync.failures.title')} · ${syncState.syncFailures.length}`} wide>
+            <p className="sui-autosave">{t('settings.sync.failures.hint')}</p>
+            <div className="sui-list">
+              {syncState.syncFailures.map((failure, i) => (
+                <div key={`${failure.kind}:${failure.path}:${i}`} className="sui-list-row">
+                  <span className="sui-list-meta sui-list-kind">{FAILURE_LABEL[failure.kind] ?? failure.kind}</span>
+                  {/* Pfad oben, Grund darunter: nebeneinander drückte ein langer Grund den
+                      Pfad auf null Breite — die Zeile sagte dann nicht mehr, WELCHE Datei. */}
+                  <span className="sui-list-stack">
+                    <span className="sui-list-main" title={failure.path}>{failure.path}</span>
+                    <span className="sui-list-sub">{failure.reason}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </Details>
+        </Card>
+      )}
+      {/* Der Weg zum Protokoll hängt am FEHLER, nicht an der Dateiliste: Löschbremse und
+          Verbindungsfehler haben keine Liste, aber genauso einen Eintrag im Protokoll. */}
+      {syncState.syncError && syncState.syncLogFile && (
+        <p className="sui-hero-note">
+          {t('settings.sync.failures.logFile', { path: syncState.syncLogFile })}
+          {syncState.syncPreviousLogFile && (
+            <> {t('settings.sync.failures.logFilePrevious', { path: syncState.syncPreviousLogFile })}</>
+          )}
+        </p>
       )}
 
       <SectionTitle title={t('settings.sync.groupVault')} />

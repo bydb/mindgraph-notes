@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, 
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
-import type { FileEntry } from '../shared/types'
+import type { FileEntry, SecretStorageResult, SyncRestoreResult } from '../shared/types'
 import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
 import { webSearch as webResearchSearch } from './webResearch/providers'
 import { originNeedsPrivateApproval as webResearchNeedsApproval } from './webResearch/egress'
@@ -10166,6 +10166,27 @@ function getSyncCredentialsPath(): string {
 }
 
 /**
+ * Unter Linux: welchen Passwortspeicher Chromium gewählt hat.
+ *
+ * Chromium entscheidet das anhand von `XDG_CURRENT_DESKTOP`. Auf einem unbekannten
+ * Desktop (Hyprland, Sway, …) fällt es auf 'basic_text' zurück, und für den meldet
+ * Electron `isEncryptionAvailable() === false` — auch dann, wenn ein gnome-keyring
+ * läuft und über D-Bus erreichbar wäre. Ohne diese Auskunft sieht der Nutzer nur
+ * „geht nicht" und hat keine Chance zu erraten, dass ein Startschalter genügt
+ * (`--password-store=gnome-libsecret`). Real aufgetreten auf Arch/Hyprland, 09/2026:
+ * die Sync-Passphrase wurde nie abgelegt, der Sync stand nach jedem Neustart.
+ */
+function secretStorageBackend(): string | undefined {
+  // Nur Linux: auf macOS und Windows gibt es genau einen Speicher, der Name sagt nichts.
+  if (process.platform !== 'linux') return undefined
+  try {
+    return safeStorage.getSelectedStorageBackend()
+  } catch {
+    return undefined
+  }
+}
+
+/**
  * Baut die Sync-Engine und hängt ihr das Backup vor jedem Download-Überschreiben an.
  *
  * Ein Download schreibt über eine Datei, die auf DIESEM Gerät gerade bearbeitet worden
@@ -10299,18 +10320,23 @@ ipcMain.handle('sync-status', async () => {
   return syncEngine.getStatus()
 })
 
-ipcMain.handle('sync-save-passphrase', async (_event, passphrase: string) => {
+ipcMain.handle('sync-save-passphrase', async (_event, passphrase: string): Promise<SecretStorageResult> => {
+  // Gibt einen GRUND zurück, nicht nur `false`. Der Aufrufer im Renderer hat den
+  // Rückgabewert früher weggeworfen und den Sync trotzdem als eingerichtet gemeldet —
+  // beim nächsten Start fehlte die Passphrase, der Motor startete nie, und in der
+  // Oberfläche stand nur „Sync not initialized" ohne jeden Hinweis auf die Ursache.
+  const backend = secretStorageBackend()
   try {
     if (!safeStorage.isEncryptionAvailable()) {
-      console.warn('[Sync] safeStorage encryption not available')
-      return false
+      console.warn('[Sync] safeStorage encryption not available, backend:', backend ?? 'unknown')
+      return { saved: false, problem: 'no-encryption', backend }
     }
     const encrypted = safeStorage.encryptString(passphrase)
     await fs.writeFile(getSyncCredentialsPath(), encrypted)
-    return true
+    return { saved: true, backend }
   } catch (error) {
     console.error('[Sync] Failed to save passphrase:', error)
-    return false
+    return { saved: false, problem: 'write-failed', backend }
   }
 })
 
@@ -10357,16 +10383,27 @@ ipcMain.handle('sync-restore-file', async (_event, filePath: string) => {
   }
 })
 
-ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number) => {
+ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string, relayUrl: string, autoSyncInterval?: number): Promise<SyncRestoreResult> => {
+  const backend = secretStorageBackend()
   try {
     assertApprovedVault(vaultPath, 'sync-restore')
     // Load passphrase from safeStorage
     if (!safeStorage.isEncryptionAvailable()) {
-      return false
+      console.warn('[Sync] Restore impossible — safeStorage unavailable, backend:', backend ?? 'unknown')
+      return { restored: false, problem: 'no-encryption', backend }
     }
-    const encrypted = await fs.readFile(getSyncCredentialsPath())
+    let encrypted: Buffer
+    try {
+      encrypted = await fs.readFile(getSyncCredentialsPath())
+    } catch {
+      // Datei fehlt: die Passphrase wurde beim Einrichten nie abgelegt (oder der
+      // Nutzer hat sie entfernt). Das ist ein anderer Fall als „Speicher gesperrt"
+      // und braucht eine andere Ansage — nämlich: einmal neu eingeben.
+      console.warn('[Sync] Restore impossible — no stored passphrase')
+      return { restored: false, problem: 'no-credentials', backend }
+    }
     const passphrase = safeStorage.decryptString(encrypted)
-    if (!passphrase) return false
+    if (!passphrase) return { restored: false, problem: 'no-credentials', backend }
 
     // Re-initialize sync engine — stop the previous one first to avoid a lingering
     // zombie engine with its own reconnect loop.
@@ -10380,10 +10417,10 @@ ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string
     }
 
     console.log('[Sync] Restored sync engine for vault:', vaultId.slice(0, 12) + '...')
-    return true
+    return { restored: true, backend }
   } catch (error) {
     console.error('[Sync] Restore failed:', error)
-    return false
+    return { restored: false, problem: 'join-failed', backend }
   }
 })
 
