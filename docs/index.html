@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.18-beta",
+    "softwareVersion": "0.11.19-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Ergebnisse landen dort, wo du weiterarbeitest &middot; v0.11.18</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: jede fehlende Datei beim Namen &middot; v0.11.19</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.18 &#183; Ergebnisse weiterreichen</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Der Agent legt das Ergebnis nicht nur ab.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Auf Wunsch &#246;ffnet er die fertige Datei, zeigt sie im Finder, h&#228;ngt sie an einen Mail-Entwurf oder druckt sie. Du gibst das pro Auftrag frei, und beim ersten Mal fragt macOS zus&#228;tzlich selbst nach. Voreingestellt ist alles aus.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.19 &#183; Sync auf einem zweiten Ger&#228;t</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Scheitert der Abgleich, siehst du jede Datei und den Grund.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Bisher nannte die Meldung eine einzige Datei, der Rest war weg. Jetzt steht die vollst&#228;ndige Liste in den Einstellungen und in einem Protokoll auf der Platte. Und die Ursache f&#252;r die Fehlschl&#228;ge ist behoben: Die App kappte ihre Verbindung selbst, sobald eine gro&#223;e Datei unterwegs war.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Du gibst frei, nicht das Modell</b><p data-i18n="release.c1">Vor dem Start steht, was in diesem Lauf m&#246;glich ist. Die Freigabe gilt nur f&#252;r diesen einen Auftrag, h&#246;chstens zehn Vorg&#228;nge &#8212; und derselbe Vorgang l&#228;uft nie zweimal.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">E-Mail nur als Entwurf</b><p data-i18n="release.c2">Empf&#228;nger, Betreff, Text und Anhang sind ausgef&#252;llt, das Fenster geht sichtbar auf. Gesendet wird nie durch die App.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Kein Skript, keine Fernsteuerung</b><p data-i18n="release.c3">Es gibt vier benannte Vorg&#228;nge, mehr nicht. Keiner holt Daten von au&#223;en herein oder gibt welche nach drau&#223;en. Derzeit nur macOS.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Gro&#223;e Dateien reissen nichts mehr ab</b><p data-i18n="release.c1">Eine Verbindung gilt als lebendig, solange Daten ankommen. Vorher hielt die App sie nach 30 Sekunden ohne Antwort f&#252;r tot, auch mitten in einem gro&#223;en Upload &#8212; und alle wartenden Downloads scheiterten mit.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Passphrase nicht gespeichert? Die App sagt es</b><p data-i18n="release.c2">Kann das System die Sync-Passphrase nicht sicher ablegen, steht das jetzt mit dem n&#228;chsten Schritt in den Einstellungen &#8212; statt nach dem n&#228;chsten Start still &#8222;nicht eingerichtet&#8220; zu melden.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Karteikarten bleiben erhalten</b><p data-i18n="release.c3">Kam die Serverkopie der Karteikarten nicht an, galt sie als leer, und der lokale Stand &#252;berschrieb sie. Jetzt gilt der Abgleich als gescheitert und wird wiederholt.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Ergebnisse landen dort, wo du weiterarbeitest &middot; v{vs}",
+        "hero.release": "Sync: jede fehlende Datei beim Namen &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Ergebnisse weiterreichen",
-        "release.heading": "Was ist neu — <em>Der Agent legt das Ergebnis nicht nur ab.</em>",
-        "release.lead": "Auf Wunsch öffnet er die fertige Datei, zeigt sie im Finder, hängt sie an einen Mail-Entwurf oder druckt sie. Du gibst das pro Auftrag frei, und beim ersten Mal fragt macOS zusätzlich selbst nach. Voreingestellt ist alles aus.",
-        "release.c1h": "Du gibst frei, nicht das Modell",
-        "release.c1": "Vor dem Start steht, was in diesem Lauf möglich ist. Die Freigabe gilt nur für diesen einen Auftrag, höchstens zehn Vorgänge — und derselbe Vorgang läuft nie zweimal.",
-        "release.c2h": "E-Mail nur als Entwurf",
-        "release.c2": "Empfänger, Betreff, Text und Anhang sind ausgefüllt, das Fenster geht sichtbar auf. Gesendet wird nie durch die App.",
-        "release.c3h": "Kein Skript, keine Fernsteuerung",
-        "release.c3": "Es gibt vier benannte Vorgänge, mehr nicht. Keiner holt Daten von außen herein oder gibt welche nach draußen. Derzeit nur macOS.",
+        "release.label": "Release {vs} · Sync auf einem zweiten Gerät",
+        "release.heading": "Was ist neu — <em>Scheitert der Abgleich, siehst du jede Datei und den Grund.</em>",
+        "release.lead": "Bisher nannte die Meldung eine einzige Datei, der Rest war weg. Jetzt steht die vollständige Liste in den Einstellungen und in einem Protokoll auf der Platte. Und die Ursache für die Fehlschläge ist behoben: Die App kappte ihre Verbindung selbst, sobald eine große Datei unterwegs war.",
+        "release.c1h": "Große Dateien reißen nichts mehr ab",
+        "release.c1": "Eine Verbindung gilt als lebendig, solange Daten ankommen. Vorher hielt die App sie nach 30 Sekunden ohne Antwort für tot, auch mitten in einem großen Upload — und alle wartenden Downloads scheiterten mit.",
+        "release.c2h": "Passphrase nicht gespeichert? Die App sagt es",
+        "release.c2": "Kann das System die Sync-Passphrase nicht sicher ablegen, steht das jetzt mit dem nächsten Schritt in den Einstellungen — statt nach dem nächsten Start still „nicht eingerichtet“ zu melden.",
+        "release.c3h": "Karteikarten bleiben erhalten",
+        "release.c3": "Kam die Serverkopie der Karteikarten nicht an, galt sie als leer, und der lokale Stand überschrieb sie. Jetzt gilt der Abgleich als gescheitert und wird wiederholt.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Results land where you keep working &middot; v{vs}",
+        "hero.release": "Sync: every missing file by name &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Handing results on",
-        "release.heading": "What’s new — <em>The agent does more than file the result away.</em>",
-        "release.lead": "If you ask it to, it opens the finished file, reveals it in Finder, attaches it to a mail draft or prints it. You approve that per task, and the first time macOS asks as well. Everything is off by default.",
-        "release.c1h": "You approve, not the model",
-        "release.c1": "Before the run starts you see what is possible in it. The approval covers that one task, at most ten operations — and the same operation never runs twice.",
-        "release.c2h": "Email only as a draft",
-        "release.c2": "Recipients, subject, body and attachment are filled in and the window opens visibly. The app never sends.",
-        "release.c3h": "No script, no remote control",
-        "release.c3": "There are four named operations, nothing more. None of them pulls data in from outside or sends any out. macOS only for now.",
+        "release.label": "Release {vs} · Sync on a second device",
+        "release.heading": "What’s new — <em>When sync fails, you see every file and the reason.</em>",
+        "release.lead": "The message used to name a single file; the rest was gone. Now the complete list is in the settings and in a log file on disk. And the cause of the failures is fixed: the app cut its own connection whenever a large file was in transit.",
+        "release.c1h": "Large files no longer break the connection",
+        "release.c1": "A connection counts as alive as long as data is arriving. Before, the app declared it dead after 30 seconds without a reply, even in the middle of a large upload — and every waiting download failed with it.",
+        "release.c2h": "Passphrase not stored? The app tells you",
+        "release.c2": "If the system cannot store the sync passphrase securely, the settings now say so and name the next step — instead of silently reporting “not set up” after the next start.",
+        "release.c3h": "Flashcards are kept",
+        "release.c3": "If the server copy of the flashcards did not arrive, it counted as empty and the local set overwrote it. Now the merge counts as failed and is retried.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

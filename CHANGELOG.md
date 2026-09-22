@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.19-beta] - 2026-09-22
+
+**Scheitert der Abgleich, siehst du jetzt jede betroffene Datei mit dem Grund — und die häufigste Ursache dafür ist behoben.** Die App kappte ihre eigene Verbindung, sobald eine große Datei unterwegs war; alle wartenden Downloads scheiterten mit. Das passiert nicht mehr. Kann das System die Sync-Passphrase nicht sicher ablegen, sagt die App das jetzt mit dem nächsten Schritt, statt nach dem nächsten Start still „nicht eingerichtet“ zu melden.
+
+### Hintergrund
+
+- Der Anlass war ein neu eingerichteter Linux-Rechner: Beim ersten Abgleich eines großen Notizspeichers fehlten rund 200 Dateien, die Meldung nannte eine einzige davon, und der Sync stand nach jedem Neustart still. Drei getrennte Fehler, die zusammen so aussahen wie einer.
+- **Die Ursache der Fehlschläge lag in der App.** Sie schickt alle 30 Sekunden ein Lebenszeichen und hielt die Verbindung für tot, wenn keine Antwort kam. Während ein großer Upload läuft, kann keine Antwort kommen — das Lebenszeichen wartet hinter den Daten. Die App trennte dann selbst, und jeder Download in der Warteschlange scheiterte mit „Not connected“. Beim nächsten automatischen Abgleich wiederholte sich das, weil der Upload nie durchkam.
+- Jetzt gilt eine Verbindung als lebendig, solange Daten ankommen oder ein Upload in seiner Frist läuft. Die Frist für einen Upload richtet sich nach seiner Größe; ein Download darf so lange laufen, wie Bytes eintreffen. Ein wirklich toter Anschluss wird weiterhin erkannt: ohne Antwort, ohne ankommende Daten und ohne laufenden Upload trennt die App nach 30 Sekunden — und schreibt das ins Protokoll.
+- **Die Fehlerliste ist vollständig.** In den Einstellungen unter Synchronisation steht ein Aufklapper mit jeder nicht übertragenen Datei, ihrer Art und dem Grund. Vorher nannte die Meldung nur die erste Datei und dahinter „…“.
+- **Es gibt ein Protokoll auf der Platte**, `.mindgraph/sync-log.txt` im Notizspeicher. Es überlebt den Neustart, wird nicht mitsynchronisiert und beginnt bei 2 MB eine neue Datei; der vorherige Stand bleibt daneben liegen. Muss die App beim Schreiben Zeilen auslassen, weil der Datenträger nicht nachkommt, steht die Zahl im Protokoll — nichts verschwindet stillschweigend.
+- **Die Passphrase-Speicherung meldet ihren Grund.** Unter Linux mit einem Desktop, den der Browser-Unterbau nicht kennt (etwa Hyprland oder Sway), gilt der geschützte Speicher als nicht verfügbar, obwohl ein Schlüsselbund läuft. Die App nennt jetzt den gewählten Speicher und den Startschalter, der Abhilfe schafft. Vorher meldete sie „eingerichtet“ und war beim nächsten Start tot.
+- Beim Abgleich der Karteikarten galt eine nicht ankommende Serverkopie als leere Sammlung; der lokale Stand wurde dann als Vereinigung hochgeladen, und Karten, die nur auf dem Server lagen, waren weg. Jetzt gilt der Abgleich als gescheitert und wird wiederholt.
+- Beim Wechsel des Notizspeichers blieben Fehlerliste und Hinweise des vorherigen stehen. Sie werden jetzt zurückgesetzt.
+- Drei unabhängige Prüfdurchgänge haben siebzehn Schwachstellen gefunden, davon sechzehn behoben. Zwei davon steckten in der ersten Reparatur selbst: Sie las den Sendefortschritt aus Werten, die keinen Fortschritt anzeigen, und hätte eine tote Verbindung ewig für lebendig gehalten. Der Umbau stützt sich seitdem nur auf das, was sich messen lässt.
+- **Grenze:** Ob ein großer Upload über eine langsame Leitung jetzt durchläuft, ist auf dem Entwicklungsrechner nicht nachstellbar. Der Beleg kommt aus dem Betrieb; das Protokoll zeigt dann jede gescheiterte Datei.
+- **Bewusst offen:** Die Sync-Passphrase liegt für alle Notizspeicher eines Rechners an derselben Stelle. Wer zwei Speicher mit verschiedenen Passphrasen synchronisiert, überschreibt die erste mit der zweiten. Das ist eine eigene Aufgabe, weil sie einen Umzug der vorhandenen Daten braucht.
+
 ## [0.11.18-beta] - 2026-09-21
 
 **Der Agent legt ein fertiges Ergebnis nicht nur ab, er reicht es auf Wunsch weiter.** Er öffnet die erzeugte Datei, zeigt sie im Finder, setzt daraus einen Mail-Entwurf mit Anhang auf oder schickt sie an den Drucker. Du gibst das für jeden Auftrag einzeln frei, und beim ersten Mal fragt auch macOS noch einmal nach. Voreingestellt ist alles aus.
