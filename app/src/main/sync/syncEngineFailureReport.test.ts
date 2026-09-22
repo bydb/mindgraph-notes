@@ -282,6 +282,27 @@ describe('Fehlerbericht eines Sync-Laufs', () => {
     expect(serverKopie?.modifiedAt).toBe(2000)
   })
 
+  it('kappt die Verbindung NICHT, wenn der Abgleich länger dauert als die Manifest-Frist', async () => {
+    // Seit 0.7.11 feuerte die 15-s-Frist der Dateiliste IMMER — auch wenn die Liste längst
+    // da war — und terminierte die gesunde Verbindung. Jeder Abgleich über 15 s riss ab:
+    // Erstabgleiche (200/194 Fehlschläge) und jeder Upload der 34-MB-Mailliste.
+    // Hier: Frist 300 ms, zehn Downloads à 150 ms in Fünfergruppen = ~300 ms+ Laufzeit.
+    engine.manifestTimeoutMs = 300
+    relay.downloadDelayMs = 150
+    for (let i = 1; i <= 10; i++) relay.seed(`Notizen/langsam-${i}.md`, `Inhalt ${i}`)
+
+    await engine.join(vault, VAULT_ID, PASSPHRASE, relay.url)
+    await engine.connect()
+    const ergebnis = await engine.sync()
+
+    expect(ergebnis.success).toBe(true)
+    expect(ergebnis.downloaded).toBe(10)
+    await engine.flushLog()
+    const protokoll = await fs.readFile(path.join(vault, SYNC_LOG_REL_PATH), 'utf-8')
+    expect(protokoll).not.toContain('Disconnected')
+    expect(protokoll).not.toContain('Manifest request timeout')
+  })
+
   // Der Überlauf des Puffers ist NICHT hier getestet, sondern deterministisch in
   // logBuffer.test.ts. Über den echten Sync hing er an einer Zeitschranke: Leert der
   // 250-ms-Zeitgeber den Puffer mitten im Lauf, läuft er nie über — unter Volllast ist

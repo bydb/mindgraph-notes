@@ -38,6 +38,8 @@ export class FakeRelay {
   failDeletes = new Set<string>()
   /** Pfade (Klartext), deren Download der Server mit Fehler beantwortet — steht für „Kopie nicht lieferbar". */
   failDownloads = new Set<string>()
+  /** Verzögerung je Download in ms — steht für eine langsame Leitung. */
+  downloadDelayMs = 0
 
   private constructor(wss: WebSocketServer) {
     this.wss = wss
@@ -132,7 +134,9 @@ export class FakeRelay {
           const f = this.files.get(msg.path)
           if (!f) return send({ type: 'error', message: 'File not found' })
           if (this.failDownloads.has(f.originalPath)) return send({ type: 'error', message: 'Download rejected' })
-          send({ type: 'file-data', path: msg.path, iv: f.iv, tag: f.tag, data: f.data, hash: f.hash, size: f.size })
+          const antwort = (): void => send({ type: 'file-data', path: msg.path, iv: f.iv, tag: f.tag, data: f.data, hash: f.hash, size: f.size })
+          if (this.downloadDelayMs > 0) setTimeout(antwort, this.downloadDelayMs)
+          else antwort()
           break
         }
         case 'delete': {

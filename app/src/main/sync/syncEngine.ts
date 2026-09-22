@@ -109,6 +109,8 @@ const RECONNECT_MAX_DELAY = 60000
 // beiden Fällen eine kerngesunde Verbindung — und riss damit alle wartenden Downloads mit
 // (real: 200 und 194 Fehlschläge beim Erstabgleich, 22.09.2026).
 const HEARTBEAT_INTERVAL = 30000
+/** Frist für die Dateiliste des Servers. Als Feld überschreibbar, damit ein Test sie unterschreiten kann. */
+const MANIFEST_TIMEOUT_MS = 15000
 
 /** Der Stand, den der Server für einen Pfad bestätigt hat — s. uploadFile/downloadFile. */
 interface UploadedState {
@@ -135,6 +137,8 @@ export class SyncEngine {
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private wsAlive: boolean = true
+  /** Nur für Tests verstellbar (s. MANIFEST_TIMEOUT_MS). */
+  manifestTimeoutMs: number = MANIFEST_TIMEOUT_MS
   /** Empfangene Bytes beim letzten Lebenszeichen — Empfang beweist, dass die Gegenseite lebt. */
   private bytesReadAtLastBeat: number = 0
   /**
@@ -508,10 +512,14 @@ export class SyncEngine {
         }
       })
 
-      this.ws.on('close', () => {
-        console.log('[Sync] Disconnected from relay server')
+      this.ws.on('close', (code: number, reason: Buffer) => {
+        console.log('[Sync] Disconnected from relay server', code)
         this.stopHeartbeat()
-        this.sendLog({ type: 'disconnect', message: 'Disconnected' })
+        // Code und Grund gehören ins Protokoll: 1000 = geordnet, 1005 = kein Status
+        // (typisch: WIR haben terminiert), 1006 = Leitung weg, 1009 = Nachricht zu groß.
+        // Ohne den Code sahen sechs selbst verursachte Abrisse aus wie Netzstörungen.
+        const grund = reason?.length ? ` ${reason.toString()}` : ''
+        this.sendLog({ type: 'disconnect', message: `Disconnected (code ${code}${grund})` })
         this.ws = null
         this.registered = false
         if (this.status !== 'error') {
@@ -1340,11 +1348,27 @@ export class SyncEngine {
         return reject(new Error('Not connected'))
       }
 
+      /*
+       * Die Frist MUSS beim Eintreffen der Antwort gelöscht werden. Seit 0.7.11 (Mai 2026)
+       * feuerte sie IMMER, 15 s nach jeder Anfrage — und weil sie die Verbindung
+       * „vorsichtshalber" kappt, riss sie jeden Abgleich ab, der länger als 15 s lief:
+       * Erstabgleiche mit Tausenden Dateien (200 und 194 Fehlschläge auf einem neuen
+       * Rechner, 22.09.2026), und jeder Upload der 34-MB-Mailliste. Kurze Abgleiche
+       * merkten nichts, weil sie vor der Frist fertig waren. Gefunden über das
+       * Sync-Protokoll auf der Platte: Abriss exakt 18 s nach jedem Start, sechsmal in Folge.
+       */
+      let frist: ReturnType<typeof setTimeout> | null = null
+      const fertig = (): void => {
+        if (frist) clearTimeout(frist)
+        frist = null
+        this.ws?.removeListener('message', handler)
+      }
+
       const handler = (data: WebSocket.Data) => {
         try {
           const msg: ServerMessage = JSON.parse(data.toString())
           if (msg.type === 'manifest') {
-            this.ws?.removeListener('message', handler)
+            fertig()
             const remoteFiles: FileManifest['files'] = {}
             if (msg.files) {
               for (const [filePath, info] of Object.entries(msg.files)) {
@@ -1364,11 +1388,11 @@ export class SyncEngine {
               vaultId: this.vaultId
             })
           } else if (msg.type === 'error') {
-            this.ws?.removeListener('message', handler)
+            fertig()
             reject(new Error(msg.message || msg.error || 'Server error'))
           }
         } catch (err) {
-          this.ws?.removeListener('message', handler)
+          fertig()
           reject(err)
         }
       }
@@ -1376,16 +1400,17 @@ export class SyncEngine {
       this.ws.on('message', handler)
       this.wsSend({ type: 'get-manifest', vaultId: this.vaultId })
 
-      setTimeout(() => {
-        this.ws?.removeListener('message', handler)
+      frist = setTimeout(() => {
+        fertig()
         // A manifest timeout almost always means the socket is silently dead.
         // Tear it down so the close handler schedules a reconnect, instead of
         // leaving a half-open socket that keeps every future sync stuck red.
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          this.sendLog({ type: 'disconnect', message: 'Manifest request timeout — closing socket' })
           this.ws.terminate()
         }
         reject(new Error('Manifest request timeout'))
-      }, 15000)
+      }, this.manifestTimeoutMs)
     })
   }
 

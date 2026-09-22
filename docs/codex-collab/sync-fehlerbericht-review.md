@@ -541,6 +541,23 @@ Tests, `syncEngineFailureReport.test.ts` 13 Tests.
 **Weiterhin nicht belegt:** ob der 34-MB-Upload über eine langsame Leitung jetzt durchläuft.
 Das ist auf Loopback nicht nachstellbar; es zeigt der Build auf dem Linux-Rechner.
 
+### Nachtrag 22.09.2026, mittags — die WAHRE Ursache, gefunden über das neue Protokoll
+
+Das Mac-Protokoll `.mindgraph/sync-log.txt` (neu in 0.11.19) zeigt sechs Läufe in Folge mit
+Abriss **18,0 / 18,5 / 17,9 / 19,9 / 18,6 / 18,0 s** nach „Sync started". Weder Heartbeat
+(≥ 30 s) noch Nachrichtengröße (eine 45-MB-Nachricht geht in 11 s sauber durch — gegen den
+echten Relay gemessen). Ursache: `getRemoteManifest` setzte eine 15-s-Frist, die bei Antwort
+**nie gelöscht** wurde und die Verbindung unbedingt terminierte — seit 0.7.11 (31.05.2026).
+Jeder Abgleich über 15 s riss ab; die 3 s Differenz sind das Einlesen von 7000 Dateien vor der
+Anfrage. Das erklärt die 200/194 Fehlschläge, die „Etappen" beim Erstabgleich UND den ewigen
+Mailliste-Konflikt vollständig. Die Umbauten aus Runde 2/3 waren dafür nicht ursächlich; sie
+bleiben als eigenständige Verbesserungen im Release.
+
+Reparatur: Frist als Handle, `clearTimeout` bei jedem Ausgang; Schließcode und Grund im
+Sync-Protokoll (1005/1006 = selbst terminiert bzw. Leitung weg). Regressionstest mit Frist
+300 ms und zehn Downloads à 150 ms: Verbindung bleibt, kein „Disconnected"; Mutationsprobe rot.
+Codex hat DIESE Änderung nicht gesehen — sie ist zwei Zeilen plus Protokollzeile.
+
 ## Status
 
-Runde 2 abgeschlossen. F01–F05 und F07–F12 adressiert, F06 offen (eigene Aufgabe, vorbestehend). Runde 3 abgeschlossen (F13–F17 adressiert). Offen: F06 (eigene Aufgabe) und die Gegenprobe auf dem Linux-Rechner mit einem Build dieses Stands — danach Release.
+Runde 2 abgeschlossen. F01–F05 und F07–F12 adressiert, F06 offen (eigene Aufgabe, vorbestehend). Released als 0.11.19; wahre Ursache (Manifest-Frist) danach über das Protokoll gefunden und in 0.11.20 behoben. Offen: F06 (eigene Aufgabe).
