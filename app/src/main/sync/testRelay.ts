@@ -36,6 +36,8 @@ export class FakeRelay {
   deleted: string[] = []
   /** Pfade (Klartext), deren Löschung der Server ablehnt — steht für Ack-Timeout/Serverfehler. */
   failDeletes = new Set<string>()
+  /** Pfade (Klartext), deren Download der Server mit Fehler beantwortet — steht für „Kopie nicht lieferbar". */
+  failDownloads = new Set<string>()
 
   private constructor(wss: WebSocketServer) {
     this.wss = wss
@@ -129,6 +131,7 @@ export class FakeRelay {
         case 'download': {
           const f = this.files.get(msg.path)
           if (!f) return send({ type: 'error', message: 'File not found' })
+          if (this.failDownloads.has(f.originalPath)) return send({ type: 'error', message: 'Download rejected' })
           send({ type: 'file-data', path: msg.path, iv: f.iv, tag: f.tag, data: f.data, hash: f.hash, size: f.size })
           break
         }

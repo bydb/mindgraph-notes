@@ -10,32 +10,35 @@
  *  2. lief die feste 30-s-Frist auf die Upload-Bestätigung ab, obwohl die Daten noch
  *     unterwegs waren. Der Konflikt blieb stehen und wiederholte sich alle fünf Minuten.
  *
- * Beide Regeln hatten dieselbe falsche Annahme: „30 Sekunden ohne Antwort = tot". Für eine
- * Verbindung, die gerade 45 MB schiebt, ist das falsch. Maßstab ist deshalb FORTSCHRITT,
- * nicht Antwortzeit.
+ * Was sich messen lässt — und was nicht (mit dem echten `ws` 8.21 nachgemessen):
+ *  - EMPFANG ist messbar: `socket.bytesRead` wächst Schritt für Schritt, während ein
+ *    großer Rahmen ankommt, lange bevor `ws` die Nachricht als Ganzes liefert.
+ *  - SENDEN ist NICHT messbar: `bufferedAmount` steht sofort auf der vollen Rahmengröße
+ *    und fällt erst, wenn der Rahmen komplett ans Betriebssystem übergeben ist;
+ *    `bytesWritten` zählt Bytes, die noch im Puffer liegen — einschließlich der eigenen
+ *    Pings. Beides als „Fortschritt" zu lesen war der Fehler des zweiten Entwurfs: Er ließ
+ *    die 34-MB-Mailliste weiter scheitern UND hielt eine tote Verbindung für ewig lebendig.
+ *
+ * Deshalb: Empfangene Bytes beweisen, dass die Gegenseite lebt. Für das Senden gibt es
+ * keinen Beweis, nur eine ehrliche Frist aus der Größe.
  */
-
-/** Übertragene Bytes eines Sockets, beide Richtungen. */
-export interface TransferCounters {
-  bytesRead: number
-  bytesWritten: number
-}
 
 /**
- * Lebt die Verbindung? Ein Pong beweist es. Ohne Pong beweist es auch, dass seit der
- * letzten Prüfung Bytes geflossen sind — in irgendeine Richtung: Beim Upload hängt der
- * Ping hinter den Daten, beim Download hängt der Pong des Servers hinter seiner großen
- * Nachricht. In beiden Fällen ist die Leitung nicht tot, sondern voll.
- *
- * Tot ist sie erst, wenn weder Pong noch ein einziges Byte angekommen ist.
+ * Lebt die Verbindung? Ein Pong beweist es. Empfangene Bytes beweisen es genauso — sie
+ * kommen von der Gegenseite, nichts anderes kann sie erzeugen. Eigene gesendete Bytes
+ * beweisen NICHTS (s. oben). Läuft ein Upload, dessen Frist noch nicht abgelaufen ist,
+ * wird die Verbindung so lange geschont: Der Ping hängt hinter dem Rahmen, und die
+ * Frist des Uploads ist die Grenze dieser Schonung.
  */
-export function socketLooksAlive(
-  pongSeen: boolean,
-  before: TransferCounters,
-  now: TransferCounters
-): boolean {
-  if (pongSeen) return true
-  return now.bytesRead > before.bytesRead || now.bytesWritten > before.bytesWritten
+export function socketLooksAlive(input: {
+  pongSeen: boolean
+  bytesReadBefore: number
+  bytesReadNow: number
+  uploadInFlightWithinDeadline: boolean
+}): boolean {
+  if (input.pongSeen) return true
+  if (input.bytesReadNow > input.bytesReadBefore) return true
+  return input.uploadInFlightWithinDeadline
 }
 
 /** Feste Frist, wenn nichts mehr unterwegs ist — die Antwort selbst ist klein. */
@@ -43,9 +46,8 @@ export const TRANSFER_IDLE_TIMEOUT_MS = 30_000
 /** Harte Obergrenze je Übertragung, damit ein Waiter nie ewig hängt. */
 export const TRANSFER_HARD_CAP_MS = 15 * 60_000
 /**
- * Angenommene MINDEST-Geschwindigkeit für die Frist beim Empfang. Bewusst niedrig
+ * Angenommene MINDEST-Geschwindigkeit für Fristen aus der Größe. Bewusst niedrig
  * (2 Mbit/s): Die Frist soll nur echte Ausfälle fangen, nicht langsame Leitungen.
- * Beim Senden wird nicht geraten, dort ist der Fortschritt messbar (bufferedAmount).
  */
 export const ASSUMED_MIN_BYTES_PER_SECOND = 256 * 1024
 
@@ -53,9 +55,8 @@ export const ASSUMED_MIN_BYTES_PER_SECOND = 256 * 1024
  * Frist für eine Übertragung bekannter Größe: Grundfrist plus die Zeit, die die Daten
  * bei der angenommenen Mindestgeschwindigkeit brauchen — gedeckelt.
  *
- * Für Downloads gibt es keinen Fortschrittsmesser: `ws` liefert eine Nachricht erst,
- * wenn sie vollständig ist. Also muss die Größe die Frist bestimmen. Sie steht im
- * Server-Manifest, bevor der Download beginnt.
+ * Für UPLOADS ist das die einzige Regel, weil Sendefortschritt nicht messbar ist. Für
+ * DOWNLOADS ist es der Ausgangswert; solange Bytes ankommen, läuft die Frist neu an.
  */
 export function transferTimeoutMs(expectedBytes: number | undefined): number {
   if (!expectedBytes || expectedBytes <= 0 || !Number.isFinite(expectedBytes)) {
@@ -65,4 +66,24 @@ export function transferTimeoutMs(expectedBytes: number | undefined): number {
   const wireBytes = Math.ceil(expectedBytes * 4 / 3)
   const transfer = Math.ceil(wireBytes / ASSUMED_MIN_BYTES_PER_SECOND) * 1000
   return Math.min(TRANSFER_IDLE_TIMEOUT_MS + transfer, TRANSFER_HARD_CAP_MS)
+}
+
+/**
+ * Entscheidung einer Empfangs-Wache: weiter warten, oder abbrechen — und warum.
+ *
+ * Der Deckel wird ZUERST geprüft. Im zweiten Entwurf stand er hinter der
+ * Fortschrittsbehandlung, und jeder Takt mit Fortschritt sprang vorher zurück — der
+ * „harte" Deckel galt nie (Codex, F15).
+ */
+export function receiveWatchVerdict(input: {
+  startedAt: number
+  now: number
+  lastProgressAt: number
+  bytesReadBefore: number
+  bytesReadNow: number
+}): { verdict: 'wait' | 'progress' | 'idle-timeout' | 'hard-cap' } {
+  if (input.now - input.startedAt >= TRANSFER_HARD_CAP_MS) return { verdict: 'hard-cap' }
+  if (input.bytesReadNow > input.bytesReadBefore) return { verdict: 'progress' }
+  if (input.now - input.lastProgressAt >= TRANSFER_IDLE_TIMEOUT_MS) return { verdict: 'idle-timeout' }
+  return { verdict: 'wait' }
 }

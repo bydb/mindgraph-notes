@@ -215,6 +215,54 @@ Vorschlag: Das abgeschlossene Ergebnis jedes Laufs über einen gemeinsamen, mit 
 
 Testlauf Runde 2: `cd app && npx vitest run src/main/sync` ergab **102 bestanden, 20 fehlgeschlagen; 7 Testdateien bestanden, 2 fehlgeschlagen** in 2,83 s; sämtliche 20 Fehler stammen aus `listen EPERM: operation not permitted 127.0.0.1`, sodass das Relay auch mit der neuen Bindung hier nicht läuft, nun aber sofort und ohne die alten Teardown-Folgefehler scheitert. Die Integrationsergebnisse sind daher in diesem Sandkasten weiterhin nicht nachgewiesen. Die oben genannten zusätzlichen Gegenproben liefen ohne Netzwerk und ohne Dateischreibzugriffe mit extrahierten Originalmethoden und simulierten Dateisystemantworten. F06 wurde auftragsgemäß nicht erneut geprüft.
 
+### F13 — Der Heartbeat hält sich durch seine eigenen Pings am Leben
+Schwere: hoch
+Stelle: app/src/main/sync/syncEngine.ts:618
+Status: [OFFEN]
+Die neue Regel akzeptiert jeden Anstieg von `bytesWritten`, auch ohne Pong oder Empfang (`app/src/main/sync/transferTiming.ts:32-38`). Der Heartbeat speichert den Zählerstand aber VOR seinem eigenen `ping()` (`app/src/main/sync/syncEngine.ts:618-621`); dessen Bytes zählen beim nächsten Takt als Fortschritt. Damit kann eine Verbindung ohne jede Antwort dauerhaft als lebendig gelten, solange die lokale Socket-Schicht die kleinen Pings annimmt. `bytesWritten` ist kein Empfangsbeleg der Gegenstelle; der Node-Getter berücksichtigt auch gepufferte Schreibdaten (zusätzlich geprüft im ausgelieferten Node-Quelltext `net`, Getter `bytesWritten`; [Node-Implementierung](https://github.com/nodejs/node/blob/v22.22.3/lib/net.js)). Nach NAT-Verlust/Laptop-Schlaf hängt die Erkennung so vom späteren TCP-Fehler ab, statt von der zugesagten Heartbeat-Frist. Ein TCP-seitig erreichbarer, aber auf WebSocket-Ebene nicht mehr antwortender Peer kann den Fehler unbegrenzt verbergen. Gegenprobe mit den unverändert extrahierten Methoden, virtueller Uhr, keinerlei eingehenden Bytes/Pongs und sechs lokal geschriebenen Bytes je Ping: nach 120 Takten/60 Minuten keine Terminierung, 720 eigene Ping-Bytes. Der Rückfall ohne `_socket` ist anders: Bei konstantem `bufferedAmount=0` bleibt sein Zähler konstant und terminiert nach ausbleibendem Pong; er erzeugt keine dauerhafte Lebendigkeit, erkennt aber Empfangsfortschritt überhaupt nicht (`app/src/main/sync/syncEngine.ts:636-644`) und kann damit große gesunde Downloads wieder kappen.
+Vorschlag: Eigene Pings/Sendewarteschlangen nicht als unbegrenzten Lebensbeweis verwenden; Empfangsaktivität und eine begrenzte Schonfrist für tatsächlich ausstehende Nutzdaten getrennt behandeln und den Rückfall ausdrücklich testen.
+
+### F14 — `bufferedAmount` misst keinen stetigen Upload-Fortschritt; parallele Uploads verfälschen ihn zusätzlich
+Schwere: hoch
+Stelle: app/src/main/sync/syncEngine.ts:1955
+Status: [OFFEN]
+Die Kernreparatur des 34-MB-Falls ist nicht abgesichert: `ws` 8.21.3 berechnet `bufferedAmount` aus der Länge des Node-Schreibpuffers plus Sender-Puffer (`app/node_modules/ws/lib/websocket.js:120-123`) und schreibt einen Frame als große Schreiboperation (`app/node_modules/ws/lib/sender.js:563-570`). Die Länge eines noch nicht abgeschlossenen Schreibauftrags kann konstant bleiben, obwohl dessen Daten nach und nach übertragen werden; Node reduziert sie beim Schreibabschluss, nicht garantiert für jedes TCP-Paket ([Node-Writable-Implementierung](https://github.com/nodejs/node/blob/v22.22.3/lib/internal/streams/writable.js), `onwrite`). Die neue Wache deutet genau diesen Zustand nach 30 Sekunden als Stillstand (`app/src/main/sync/syncEngine.ts:1952-1966`). Netzfreie Gegenprobe mit dem tatsächlich installierten `ws` und einem kontrollierten Duplex: Ein 1-MiB-Frame hält `bufferedAmount` bei 1.048.586 bis zum Schreibcallback und fällt dann auf null; diese Metrik liefert keine Zwischenstände.
+
+Zusätzlich starten fünf Uploads auf demselben Socket (`app/src/main/sync/syncEngine.ts:920-925`), während jeder Waiter seinen eigenen Anfangswert festhält und ihn ausschließlich bei einem neuen Tiefststand aktualisiert (`:1923`, `:1955-1958`). Wächst der gemeinsame Puffer durch einen weiteren Upload, zählt anschließendes Abfließen oberhalb des alten Tiefststands nicht. Gegenprobe mit Original-Wache: Startwert 10, danach 1.000.000 Bytes und jede Sekunde 1000 weniger → Abbruch nach 30 s trotz stetigen Abflusses. Umgekehrt verlängert der Abfluss fremder Uploads das Warten auf ein bereits fehlendes Ack. Die Reparatur kann daher gerade den beschriebenen langsamen großen Upload weiter als gescheitert melden.
+Vorschlag: Sendeabschluss, Warteschlange und Ack-Warten getrennt modellieren; für lange Frames eine belastbare Transportregel oder begrenzte größenabhängige Sendefrist verwenden, statt `bufferedAmount` als paketweisen Fortschrittszähler zu behandeln.
+
+### F15 — Fortschritt überspringt den angeblich harten 15-Minuten-Deckel
+Schwere: mittel
+Stelle: app/src/main/sync/syncEngine.ts:1955
+Status: [OFFEN]
+Bei sinkendem Puffer aktualisiert die Wache den Fortschritt und kehrt sofort zurück (`app/src/main/sync/syncEngine.ts:1955-1958`); erst danach steht die Prüfung von `TRANSFER_HARD_CAP_MS` (`:1961`). Deshalb kann jeder Takt mit neuem Tiefststand die harte Frist überspringen. Gegenprobe mit Originalmethode, Startpuffer 10.000.000 und Abnahme um ein Byte pro Sekunde: Nach 901 Sekunden ist das Promise weiterhin offen und sein Interval aktiv. Reines Schwanken verlängert nicht endlos, weil nur neue Tiefststände zählen, aber der Deckel gilt trotzdem nicht überall; eine große endliche Folge solcher Tiefststände reicht für erhebliche Überschreitungen. Ein später passendes Ack beendet und bereinigt denselben Waiter korrekt (`:1926-1942`).
+Vorschlag: Die absolute Obergrenze vor jeder Fortschrittsbehandlung prüfen, vorzugsweise mit monotoner Zeitmessung; einen Integrationstest der Wache mit virtueller Uhr über 15 Minuten ergänzen.
+
+### F16 — Download-Frist ignoriert Warteschlange und tatsächlichen Empfang; langsame Downloads scheitern wiederholt
+Schwere: hoch
+Stelle: app/src/main/sync/syncEngine.ts:1894
+Status: [OFFEN]
+Die neue Download-Regel bleibt eine feste Frist ab Anfrage: `requestFile()` startet den Timeout sofort und berücksichtigt nur die eigene Größe (`app/src/main/sync/syncEngine.ts:1884-1899`, `app/src/main/sync/transferTiming.ts:60-67`). Gleichzeitig werden fünf Downloads auf derselben WebSocket-Verbindung angefragt (`app/src/main/sync/syncEngine.ts:977-987`); der Server sendet jede Datei als vollständige base64-Nachricht (`mindgraph-sync-server/src/server.ts:187-195`). Eine kleine Notiz hinter der 34-MiB-Mailliste erhält daher nur 31 Sekunden, obwohl der vorausgehende Frame allein bei der angenommenen Geschwindigkeit etwa 182 Sekunden benötigt. Die tatsächliche Reihenfolge kann variieren; die Frist ist aber in keinem Fall an den Beginn der Übertragung dieser Datei gekoppelt.
+
+Auch ohne Warteschlange funktioniert die Annahme nicht für eine dauerhaft langsamere Leitung: Für 34 MiB ergibt die Funktion 212 Sekunden, bei 1 Mbit/s dauert allein der base64-Inhalt etwa 380 Sekunden; laufender Empfang verlängert die Frist nicht. Ein kleiner/veralteter Manifest-Eintrag verschärft das, ein fehlender/ungültiger Eintrag fällt auf 30 Sekunden zurück (`app/src/main/sync/syncEngine.ts:735`, `:1894`; `app/src/main/sync/transferTiming.ts:61-62`). Normale Downloads werden danach zwar als Fehler gesammelt und beim nächsten Auto-Sync erneut versucht (`app/src/main/sync/syncEngine.ts:987-998`, `:2088-2098`), aber ohne Anpassung der Frist kann derselbe große Download auf derselben Leitung immer wieder scheitern. Es gibt keinen Resume-Pfad in `requestFile`; jeder Versuch fordert erneut die vollständige Datei an (`:1884-1889`).
+Vorschlag: Empfangsfortschritt und Wartezeit hinter anderen Frames in einer gemeinsamen Transfersteuerung berücksichtigen; fehlende Größen konservativ behandeln und Wiederholungen nicht mit unverändert unzureichendem Zeitbudget starten.
+
+### F17 — Karteikarten-Timeout wird als leere entfernte Sammlung behandelt und zurückgeschrieben
+Schwere: hoch
+Stelle: app/src/main/sync/syncEngine.ts:1787
+Status: [OFFEN]
+Vorbestand, aber entscheidend für die ausdrücklich angefragten vier `requestFile`-Aufrufer: Beim Karteikarten-Merge bleibt `remoteCards=[]`, wenn die Anfrage wegen der neuen Größenfrist `null` liefert; auch Ausnahmen werden in eine leere Sammlung umgewandelt (`app/src/main/sync/syncEngine.ts:1784-1798`, Timeout `:1895-1898`). Anschließend wird ohne Abbruch aus den lokalen Karten eine Sammlung gebildet, lokal geschrieben, auf den Server hochgeladen und als synchronisiert markiert (`:1800-1838`). Nur auf dem Server vorhandene Karten können damit aus dem aktuellen Serverstand verschwinden. Hier ist die Antwort auf „wird ein zu langsamer Download wiederholt?“ gerade nicht dieselbe wie beim normalen Download: Ein erfolgreicher anschließender Upload kann den Konflikt fälschlich erledigen. Der Mail-Merge macht das korrekt anders und wirft bei fehlender Serverkopie (`:1737-1739`). Diese Änderung hat den Fehler nicht eingeführt, ihre neue Frist bestimmt aber weiterhin, wann er ausgelöst wird.
+Vorschlag: Fehlende oder unlesbare Serverkopie im Karteikarten-Merge als fehlgeschlagenen Konflikt behandeln und keinesfalls die lokale Teilsammlung als Merge-Ergebnis hochladen.
+
+### Runde 3 - geprüft ohne weiteren Befund
+
+- Der Zugriff auf `_socket` passt zur installierten `ws`-Version 8.21.3, die das Feld selbst setzt (`app/node_modules/ws/lib/websocket.js:229`), und die Engine prüft beide Zähler auf numerischen Typ (`app/src/main/sync/syncEngine.ts:637-641`); die semantischen Probleme der Werte stehen in F13/F14.
+- Alle vier `requestFile`-Aufrufer verwenden denselben relativen Pfad als Manifest-Schlüssel (`app/src/main/sync/syncEngine.ts:1456`, `:1663`, `:1737`, `:1787`, `:1894`), dessen Größenwert zuvor aus dem Servermanifest übernommen wird (`:1339-1343`, `:735`), ohne erkennbaren Pfad-/Größen-Mappingfehler.
+- Die Ack-Wache löscht bei passendem Ack, Serverfehler, JSON-Fehler und ausgelöstem Timeout über denselben Abschluss sowohl Interval als auch Listener (`app/src/main/sync/syncEngine.ts:1926-1966`), während Socket-Schließen keinen eigenen sofortigen Abschluss hat und deshalb zunächst der Watchdog weiterläuft.
+- Der größenabhängige Download-Timeout ist rechnerisch auf 15 Minuten begrenzt (`app/src/main/sync/transferTiming.ts:60-67`), unabhängig vom fehlerhaften Upload-Deckel aus F15.
+
+Prüfstand Runde 3: HEAD `478e6f31`; `cd app && npx vitest run src/main/sync/transferTiming` erfolgreich, **9/9 Tests**, 133 ms; zusätzliche netzfreie Gegenproben mit extrahierten Originalmethoden, virtueller Uhr und dem installierten `ws` belegen F13–F15, ersetzen aber keine reale Messung der langsamen Linux-Verbindung. Die neun Tests prüfen nur die reinen Regeln, nicht die Heartbeat-/Waiter-Verdrahtung (`app/src/main/sync/transferTiming.test.ts:10-58`).
+
 ## Claude-Antwort
 
 Alle Befunde am echten Code gegengeprüft. **F01–F05 und F07 umgesetzt, F06 offen** (Entscheidung
@@ -441,6 +489,58 @@ Konflikt bleibt, der nächste Auto-Sync wiederholt alles. Erklärt beide Läufe 
 Offen: Ob es nach der Änderung wirklich durchläuft, zeigt erst ein Build auf dem Linux-Rechner —
 die Bedingung (langsamer Upload, 45-MB-Nachricht) lässt sich auf Loopback nicht nachstellen.
 
+### Runde 3 — Antwort auf F13–F17
+
+Alle fünf am Code und mit dem echten `ws` 8.21.3 nachgemessen. **Alle tragen, alle umgesetzt.**
+Der Nutzer hat den Umbau freigegeben.
+
+Die Messung, die den Umbau bestimmt (Loopback, ws 8.21.3, Node 22):
+- Senden: bei einem 8-MB-Rahmen steht `bufferedAmount` sofort auf 8 388 628 und
+  `bytesWritten` auf 8 388 852 — der Rahmen liegt noch komplett im Puffer. Keine Zwischenwerte.
+  **Sendefortschritt ist nicht messbar.** F13 und F14 bestätigt.
+- Empfang: bei einem 6-MB-Rahmen wächst `_socket.bytesRead` 131 072 → 2 356 877 → 4 519 565,
+  lange vor dem `message`-Ereignis. **Empfang ist messbar.**
+
+### F13 — [ADRESSIERT]
+Gesendete Bytes zählen nicht mehr als Lebensbeweis (`transferTiming.ts:33` `socketLooksAlive`).
+Lebendig ist: Pong, ODER empfangene Bytes (kommen nur von der Gegenseite), ODER ein laufender
+Upload innerhalb seiner Frist (`syncEngine.ts:605`; Fristen in `uploadDeadlines`, gesetzt in
+`:1432`). Die Upload-Frist ist zugleich die Grenze der Schonung — eine tote Leitung wird
+spätestens dann erkannt. Der Rückfall ohne `_socket` erfindet keinen Wert mehr: `socketBytesRead`
+liefert `null` (`:653`), dann entscheiden Pong und laufende Uploads allein.
+
+### F14 — [ADRESSIERT]
+Die `bufferedAmount`-Wache ist weg. `waitForAck` (`:1959`) bekommt eine **feste Frist aus der
+Größe** vom Aufrufer (`transferTimeoutMs(ciphertext.length)`, 2 Mbit/s angenommen, base64
+eingerechnet, Deckel 15 min). Fünf parallele Uploads beeinflussen sich damit nicht mehr. Dein
+Vorschlag „größenabhängige Sendefrist statt Fortschrittszähler" ist übernommen.
+
+### F15 — [ADRESSIERT]
+`receiveWatchVerdict` (`transferTiming.ts:78`) prüft den harten Deckel als ERSTES, vor jedem
+Fortschritt — reine Funktion, Test „prüft den harten Deckel VOR dem Fortschritt". Die Ack-Frist
+ist ein einzelner `setTimeout`, dort gibt es nichts mehr zu überspringen.
+
+### F16 — [ADRESSIERT]
+`requestFile` (`:1881`, Wache `:1930`) wartet nach EMPFANG statt nach Uhr: solange
+`bytesRead` wächst — von welcher der fünf parallelen Antworten auch immer — läuft die Frist
+neu an. Genau dein Beispiel: Die Bytes der Mailliste halten die Frist der kleinen Notiz dahinter
+am Leben. 30 s ohne ein Byte oder der 15-min-Deckel brechen ab. Das Server-Manifest wird dafür
+nicht mehr gebraucht (`lastRemoteManifest` entfernt).
+
+### F17 — [ADRESSIERT]
+Nicht lieferbare oder unlesbare Serverkopie der Karteikarten ist jetzt ein gescheiterter Konflikt
+(`:1814`), wie beim Mail-Abgleich. Test: Datei im Server-Manifest, Download vom Relay verweigert
+(`testRelay.failDownloads`) → Konflikt in `failures`, Serverkopie unverändert. Mutationsprobe:
+alten Fehler wiederhergestellt → Test rot.
+
+### Belege Runde 3
+`npm run typecheck` sauber · `npm run build` durch · `npm run test` 2283 grün / 1 übersprungen
+(der bekannte lastempfindliche Test im Notiz-Agenten, allein grün). `transferTiming.test.ts` 13
+Tests, `syncEngineFailureReport.test.ts` 13 Tests.
+
+**Weiterhin nicht belegt:** ob der 34-MB-Upload über eine langsame Leitung jetzt durchläuft.
+Das ist auf Loopback nicht nachstellbar; es zeigt der Build auf dem Linux-Rechner.
+
 ## Status
 
-Runde 2 abgeschlossen. F01–F05 und F07–F12 adressiert, F06 offen (eigene Aufgabe, vorbestehend). Sichtprüfung in der Dev-App erfolgt (s. Nachtrag). Offen: Gegenprobe auf dem Arch-Rechner, danach Abnahme durch den Nutzer und Release.
+Runde 2 abgeschlossen. F01–F05 und F07–F12 adressiert, F06 offen (eigene Aufgabe, vorbestehend). Runde 3 abgeschlossen (F13–F17 adressiert). Offen: F06 (eigene Aufgabe) und die Gegenprobe auf dem Linux-Rechner mit einem Build dieses Stands — danach Release.

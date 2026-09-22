@@ -235,28 +235,51 @@ describe('Fehlerbericht eines Sync-Laufs', () => {
     expect(aktuell).toContain('Download failed: Notizen/kaputt-001.md')
   })
 
-  it('liest den Byte-Fortschritt des echten Sockets — sonst ist das Lebenszeichen blind', async () => {
-    // Das Lebenszeichen wertet `_socket.bytesRead/bytesWritten` aus, ein ws-Interna. Fällt
-    // der Zugriff still auf den Rückfall zurück, kappt die App bei jedem großen Download
-    // wieder die Verbindung. Dieser Test bricht, sobald ws die Interna umbenennt.
+  it('liest die empfangenen Bytes des echten Sockets — sonst ist das Lebenszeichen blind', async () => {
+    // Lebenszeichen und Empfangs-Wache werten `_socket.bytesRead` aus, ein ws-Interna.
+    // Wird es umbenannt, fällt der Wert still auf null — Pong bleibt dann der einzige
+    // Beweis, und ein großer Download wird wieder gekappt. Dieser Test bricht vorher.
     seedDamaged(1)
     await engine.join(vault, VAULT_ID, PASSPHRASE, relay.url)
     await engine.connect()
     await engine.sync()
 
-    const zaehler = (engine as unknown as { socketCounters: () => { bytesRead: number; bytesWritten: number } }).socketCounters()
-    expect(zaehler.bytesRead).toBeGreaterThan(0)
-    expect(zaehler.bytesWritten).toBeGreaterThan(0)
-    expect(zaehler.bytesWritten).toBeLessThan(Number.MAX_SAFE_INTEGER - 1_000_000) // nicht der Rückfall
+    const gelesen = (engine as unknown as { socketBytesRead: () => number | null }).socketBytesRead()
+    expect(gelesen).not.toBeNull()
+    expect(gelesen!).toBeGreaterThan(0)
   })
 
-  it('bemisst die Download-Frist an der Größe aus dem Server-Manifest', async () => {
+  it('wartet auf einen Download, solange Bytes ankommen — auch länger als 30 s', async () => {
+    // Nachgestellt ohne Uhr: Die Wache entscheidet über receiveWatchVerdict; hier wird
+    // nur belegt, dass ein Download mit sofortiger Antwort die Wache sauber beendet und
+    // kein Timer weitertickt (sonst hielte er den Prozess offen — unref ist gesetzt).
     seedDamaged(1)
     await engine.join(vault, VAULT_ID, PASSPHRASE, relay.url)
     await engine.connect()
-    await engine.sync()
-    const merkt = (engine as unknown as { lastRemoteManifest: { files: Record<string, { size: number }> } | null }).lastRemoteManifest
-    expect(merkt?.files['Notizen/kaputt-001.md']?.size).toBeGreaterThan(0)
+    const ergebnis = await engine.sync()
+    expect(ergebnis.failures).toHaveLength(1)
+    expect(ergebnis.failures![0].reason).toMatch(/Decryption failed/)
+  })
+
+  it('lässt Karteikarten NICHT als leere Serverkopie durchgehen', async () => {
+    // F17: Eine unlesbare Serverkopie wurde zu `[]`, die lokale Sammlung als Vereinigung
+    // hochgeladen und als abgeglichen markiert — Karten nur vom Server waren weg.
+    const pfad = '.mindgraph/flashcards.json'
+    relay.seed(pfad, JSON.stringify([{ id: 'server-only', modified: '2026-01-01' }]), 2000)
+    relay.failDownloads.add(pfad) // steht im Manifest, ist aber nicht lieferbar → requestFile liefert null
+    await fs.mkdir(path.join(vault, '.mindgraph'), { recursive: true })
+    await fs.writeFile(path.join(vault, pfad), JSON.stringify([{ id: 'lokal', modified: '2026-02-01' }]))
+
+    await engine.join(vault, VAULT_ID, PASSPHRASE, relay.url)
+    await engine.connect()
+    const ergebnis = await engine.sync()
+
+    // Der Konflikt gilt als gescheitert, nicht als erledigt …
+    const konflikt = ergebnis.failures?.find(f => f.path === pfad)
+    expect(konflikt?.kind).toBe('conflict')
+    // … und auf dem Server liegt weiterhin die (beschädigte) Originalkopie, nicht die lokale.
+    const serverKopie = relay.files.get((await import('./crypto')).hashPath(pfad))
+    expect(serverKopie?.modifiedAt).toBe(2000)
   })
 
   // Der Überlauf des Puffers ist NICHT hier getestet, sondern deterministisch in
