@@ -40,6 +40,12 @@ export class FakeRelay {
   failDownloads = new Set<string>()
   /** Verzögerung je Download in ms — steht für eine langsame Leitung. */
   downloadDelayMs = 0
+  /** Als unlesbar gemeldete Kopien (Klartextpfad → gemeldete Prüfsumme). */
+  unreadable = new Map<string, string>()
+  /** Mitschnitt aller Meldungen, damit ein Test das Melden selbst prüfen kann. */
+  unreadableReports: string[] = []
+  /** Stellt einen älteren Relay nach, der das Feld `unreadable` nicht kennt. */
+  manifestOhneUnreadable = false
 
   private constructor(wss: WebSocketServer) {
     this.wss = wss
@@ -115,10 +121,32 @@ export class FakeRelay {
           for (const f of this.files.values()) {
             files[f.originalPath] = { hash: f.hash, size: f.size, modifiedAt: f.modifiedAt }
           }
-          send({ type: 'manifest', files, deletedFiles: {} })
+          if (this.manifestOhneUnreadable) {
+            send({ type: 'manifest', files, deletedFiles: {} })
+            break
+          }
+          const unreadable: Record<string, { reportedAt: number; attempts: number }> = {}
+          for (const pfad of this.unreadable.keys()) unreadable[pfad] = { reportedAt: 1, attempts: 0 }
+          send({ type: 'manifest', files, deletedFiles: {}, unreadable })
+          break
+        }
+
+        case 'report-unreadable': {
+          const f = this.files.get(msg.path)
+          // Wie der echte Server: nur annehmen, wenn die gemeldete Prüfsumme die aktuelle ist.
+          if (f && f.hash === msg.hash) {
+            this.unreadable.set(f.originalPath, msg.hash)
+            this.unreadableReports.push(f.originalPath)
+          }
+          send({ type: 'unreadable-noted', path: msg.path, outcome: f ? 'noted' : 'unknown' })
           break
         }
         case 'upload':
+          // Ein Upload heilt die Markierung — wie im echten Server (storeFile).
+          {
+            const vorher = this.files.get(msg.path)
+            if (vorher) this.unreadable.delete(vorher.originalPath)
+          }
           this.files.set(msg.path, {
             originalPath: msg.originalPath,
             hash: msg.hash,

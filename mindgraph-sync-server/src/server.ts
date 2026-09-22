@@ -1,7 +1,9 @@
 import http from 'http'
 import crypto from 'crypto'
 import { WebSocketServer, WebSocket } from 'ws'
-import { initDatabase, registerVault, getManifest, getDeletedManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
+import { initDatabase, registerVault, getManifest,
+  getUnreadable,
+  reportUnreadable, getDeletedManifest, storeFile, getFile, deleteFile, getDeletedFiles, restoreFile, purgeDeletedFiles, closeDatabase, vaultExists, claimActivationKey, addActivationKey, listActivationKeys, deactivateActivationKey, deleteVault, listVaults } from './storage'
 import { checkRateLimit } from './rateLimit'
 
 const PORT = parseInt(process.env.PORT || '8080', 10)
@@ -109,7 +111,27 @@ function handleMessage(ws: WebSocket, ip: string, raw: string): void {
       }
       const files = getManifest(msg.vaultId)
       const deletedFiles = getDeletedManifest(msg.vaultId)
-      sendJson(ws, { type: 'manifest', files, deletedFiles })
+      // `unreadable` ist zugleich die Fähigkeitsanzeige: Ein Client schickt
+      // `report-unreadable` nur, wenn das Manifest dieses Feld trägt.
+      const unreadable = getUnreadable(msg.vaultId)
+      sendJson(ws, { type: 'manifest', files, deletedFiles, unreadable })
+      break
+    }
+
+    case 'report-unreadable': {
+      const registeredForReport = (ws as WebSocket & { vaultId?: string }).vaultId
+      if (!registeredForReport || registeredForReport !== msg.vaultId) {
+        sendJson(ws, { type: 'error', message: 'Not registered' })
+        return
+      }
+      if (!msg.path || !msg.hash) {
+        sendJson(ws, { type: 'error', message: 'Missing report fields' })
+        return
+      }
+      const outcome = reportUnreadable(msg.vaultId, msg.path, msg.hash)
+      // Eigener Antworttyp MIT Pfad — nie `error`: pfadlose Fehler treffen im Client
+      // jeden wartenden Upload/Download (s. waitForAck/requestFile).
+      sendJson(ws, { type: 'unreadable-noted', path: msg.path, outcome })
       break
     }
 

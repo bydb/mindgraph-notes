@@ -85,6 +85,7 @@ interface ServerMessage {
   code?: string
   files?: Record<string, { hash: string; size: number; modifiedAt: number }>
   deletedFiles?: Record<string, { deletedAt: number }>
+  unreadable?: Record<string, { reportedAt: number; attempts: number }>
   path?: string
   iv?: string
   tag?: string
@@ -921,6 +922,34 @@ export class SyncEngine {
         }
       }
 
+      /*
+       * Selbstheilung: Kopien, die ein anderes Gerät als unlesbar gemeldet hat und die
+       * DIESES Gerät nachweislich intakt besitzt (gleiche Prüfsumme wie im Server-Manifest,
+       * also derselbe Inhalt), werden neu hochgeladen — mit unserem Schlüssel.
+       *
+       * Der Prüfsummen-Vergleich ist die ganze Sicherung: Nur wenn Server und Platte
+       * denselben Inhalt melden, ist unsere Kopie der richtige Ersatz. Ohne ihn würde ein
+       * Gerät mit veraltetem Stand den neueren auf dem Server überschreiben.
+       *
+       * Ein Gerät, das die Datei selbst nicht lesen kann, hat sie in `toDownload` und
+       * nicht auf der Platte — es repariert also nie mit seiner eigenen kaputten Kopie.
+       */
+      const reparaturen: string[] = []
+      for (const filePath of Object.keys(this.lastServerUnreadable)) {
+        if (diff.toUpload.includes(filePath)) continue
+        const lokal = currentManifest.files[filePath]
+        const fern = remoteManifest.files[filePath]
+        if (!lokal || !fern || lokal.hash !== fern.hash) continue
+        reparaturen.push(filePath)
+      }
+      if (reparaturen.length > 0) {
+        diff.toUpload.push(...reparaturen)
+        this.sendLog({
+          type: 'upload',
+          message: `Re-uploading ${reparaturen.length} file(s) another device could not decrypt: ${reparaturen.slice(0, 3).join(', ')}${reparaturen.length > 3 ? ` … and ${reparaturen.length - 3} more` : ''}`
+        })
+      }
+
       const total = diff.toUpload.length + diff.toDownload.length + diff.conflicts.length + diff.toDeleteRemote.length
       let current = 0
 
@@ -1338,9 +1367,38 @@ export class SyncEngine {
   }
 
   private lastServerTombstones: Record<string, { deletedAt: number }> = {}
+  /**
+   * Kopien, die IRGENDEIN Gerät nicht entschlüsseln konnte (Selbstheilung, 09/2026).
+   * Leer, solange der Relay das Feld nicht schickt — dann bleibt alles wie bisher.
+   */
+  private lastServerUnreadable: Record<string, { reportedAt: number; attempts: number }> = {}
+  /** Kann dieser Relay Meldungen entgegennehmen? Erkannt am Manifest-Feld. */
+  private relayKanntUnreadable: boolean = false
 
   // Bereits gemeldete Zu-groß-Dateien (Log-Spam-Schutz: Auto-Sync läuft alle 5 min)
   private loggedTooLargePaths = new Set<string>()
+
+  /**
+   * Meldet dem Relay, dass eine Kopie nicht entschlüsselbar war.
+   *
+   * Feuern und vergessen: Die Meldung darf einen Lauf nicht aufhalten, und ob sie ankommt,
+   * ändert für DIESES Gerät nichts — es hat die Datei so oder so nicht. Der Nutzen liegt
+   * beim anderen Gerät, das sie intakt hat und daraufhin neu hochlädt.
+   */
+  private meldeUnlesbar(relativePath: string, erwarteterHash: string | undefined): void {
+    if (!this.relayKanntUnreadable || !erwarteterHash) return
+    this.wsSend({
+      type: 'report-unreadable',
+      vaultId: this.vaultId,
+      path: hashPath(relativePath),
+      hash: erwarteterHash
+    })
+    this.sendLog({
+      type: 'error',
+      message: `Reported unreadable copy to the relay: ${relativePath} — a device with an intact copy will re-upload it`,
+      fileName: relativePath
+    })
+  }
 
   private async getRemoteManifest(): Promise<FileManifest> {
     return new Promise((resolve, reject) => {
@@ -1382,6 +1440,10 @@ export class SyncEngine {
             }
             // Store server tombstones for use in diffManifests
             this.lastServerTombstones = msg.deletedFiles || {}
+            this.lastServerUnreadable = msg.unreadable || {}
+            // Das Feld ist zugleich die Fähigkeitsanzeige: Ein älterer Relay schickt es
+            // nicht, und dann darf der Client auch nichts melden.
+            this.relayKanntUnreadable = msg.unreadable !== undefined
             resolve({
               files: remoteFiles,
               lastSyncTime: 0,
@@ -1520,6 +1582,8 @@ export class SyncEngine {
     try {
       plaintext = decryptFile(ciphertext, this.key, iv, tag)
     } catch {
+      // Dem Relay melden: Ein Gerät mit intakter Kopie gleicher Prüfsumme lädt sie neu hoch.
+      this.meldeUnlesbar(relativePath, fileData.hash)
       throw new Error(
         'Decryption failed — the copy on the server was encrypted with a different passphrase, ' +
         'or its stored data is damaged. Re-upload this file from a device where it is intact.'
@@ -1711,7 +1775,13 @@ export class SyncEngine {
         const ciphertext = Buffer.from(fileData.data, 'base64')
         const iv = Buffer.from(fileData.iv, 'base64')
         const tag = Buffer.from(fileData.tag, 'base64')
-        const remotePlaintext = decryptFile(ciphertext, this.key!, iv, tag)
+        let remotePlaintext: Buffer
+        try {
+          remotePlaintext = decryptFile(ciphertext, this.key!, iv, tag)
+        } catch (err) {
+          this.meldeUnlesbar(relativePath, fileData.hash)
+          throw err
+        }
         const localPlaintext = await fs.readFile(absPath)
 
         if (hashContent(localPlaintext) === hashContent(remotePlaintext)) {
@@ -1784,12 +1854,18 @@ export class SyncEngine {
     if (!fileData) {
       throw new Error('Could not fetch the server copy of the email list')
     }
-    const remotePlaintext = decryptFile(
-      Buffer.from(fileData.data, 'base64'),
-      this.key,
-      Buffer.from(fileData.iv, 'base64'),
-      Buffer.from(fileData.tag, 'base64')
-    )
+    let remotePlaintext: Buffer
+    try {
+      remotePlaintext = decryptFile(
+        Buffer.from(fileData.data, 'base64'),
+        this.key,
+        Buffer.from(fileData.iv, 'base64'),
+        Buffer.from(fileData.tag, 'base64')
+      )
+    } catch (err) {
+      this.meldeUnlesbar(relativePath, fileData.hash)
+      throw err
+    }
 
     const merged = await this.downloadEmailStore(relativePath, remotePlaintext)
     if (!merged) {
@@ -1843,7 +1919,13 @@ export class SyncEngine {
       const ciphertext = Buffer.from(fileData.data, 'base64')
       const iv = Buffer.from(fileData.iv, 'base64')
       const tag = Buffer.from(fileData.tag, 'base64')
-      const plaintext = decryptFile(ciphertext, this.key, iv, tag)
+      let plaintext: Buffer
+      try {
+        plaintext = decryptFile(ciphertext, this.key, iv, tag)
+      } catch (err) {
+        this.meldeUnlesbar(relativePath, fileData.hash)
+        throw err
+      }
       const parsed: unknown = JSON.parse(plaintext.toString('utf-8'))
       if (!Array.isArray(parsed)) {
         throw new Error('Server copy of the flashcards is not a card list')

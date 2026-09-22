@@ -51,6 +51,17 @@ export function initDatabase(): void {
     );
   `)
 
+  // Selbstheilung unlesbarer Kopien (09/2026): Ein Gerät, das einen Blob nicht
+  // entschlüsseln kann, meldet ihn; ein Gerät mit intakter Kopie gleicher Prüfsumme
+  // lädt ihn neu hoch. Spalten nachrüsten, ohne bestehende Datenbanken anzufassen.
+  for (const spalte of ['unreadable_reported_at INTEGER DEFAULT NULL', 'repair_attempts INTEGER DEFAULT 0']) {
+    try {
+      db.exec(`ALTER TABLE files ADD COLUMN ${spalte}`)
+    } catch {
+      // Spalte existiert bereits
+    }
+  }
+
   // Migration: add deleted_at column if missing (for existing databases)
   try {
     db.exec(`ALTER TABLE files ADD COLUMN deleted_at INTEGER DEFAULT NULL`)
@@ -68,6 +79,42 @@ export function registerVault(vaultId: string): void {
   db.prepare(`
     UPDATE vault_meta SET last_activity = unixepoch() WHERE vault_id = ?
   `).run(vaultId)
+}
+
+/** Höchstzahl vergeblicher Reparaturen je Datei — danach bleibt die Markierung stehen. */
+export const MAX_REPAIR_ATTEMPTS = 3
+
+/**
+ * Kopien, die ein Gerät nicht entschlüsseln konnte — Schlüssel ist der Klartextpfad wie
+ * im Manifest. Jedes Gerät mit intakter Kopie gleicher Prüfsumme lädt sie neu hoch.
+ */
+export function getUnreadable(vaultId: string): Record<string, { reportedAt: number; attempts: number }> {
+  const rows = db.prepare(`
+    SELECT file_path, original_path, unreadable_reported_at, repair_attempts
+    FROM files WHERE vault_id = ? AND deleted_at IS NULL AND unreadable_reported_at IS NOT NULL
+  `).all(vaultId) as Array<{ file_path: string; original_path: string; unreadable_reported_at: number; repair_attempts: number }>
+  const out: Record<string, { reportedAt: number; attempts: number }> = {}
+  for (const r of rows) out[r.original_path || r.file_path] = { reportedAt: r.unreadable_reported_at, attempts: r.repair_attempts }
+  return out
+}
+
+/**
+ * Meldung „diese Kopie ist unlesbar". Greift nur, wenn die gemeldete Prüfsumme noch die
+ * gespeicherte ist — eine verspätete Meldung über eine inzwischen ersetzte Kopie wird
+ * ignoriert. Nach MAX_REPAIR_ATTEMPTS vergeblichen Reparaturen wird nicht mehr markiert:
+ * sonst kreisen zwei Geräte mit unbrauchbaren Kopien ewig.
+ */
+export function reportUnreadable(vaultId: string, filePath: string, reportedHash: string): 'noted' | 'stale' | 'given-up' | 'unknown' {
+  const row = db.prepare(
+    'SELECT file_hash, repair_attempts, deleted_at FROM files WHERE vault_id = ? AND file_path = ?'
+  ).get(vaultId, filePath) as { file_hash: string; repair_attempts: number; deleted_at: number | null } | undefined
+  if (!row || row.deleted_at) return 'unknown'
+  if (row.file_hash !== reportedHash) return 'stale'
+  if (row.repair_attempts >= MAX_REPAIR_ATTEMPTS) return 'given-up'
+  db.prepare(
+    'UPDATE files SET unreadable_reported_at = COALESCE(unreadable_reported_at, unixepoch()) WHERE vault_id = ? AND file_path = ?'
+  ).run(vaultId, filePath)
+  return 'noted'
 }
 
 export function getManifest(
@@ -114,9 +161,11 @@ export function storeFile(
 
   // Get old file size for delta calculation (including soft-deleted files)
   const oldFile = db.prepare(
-    'SELECT file_size, deleted_at FROM files WHERE vault_id = ? AND file_path = ?'
-  ).get(vaultId, filePath) as { file_size: number; deleted_at: number | null } | undefined
+    'SELECT file_size, deleted_at, unreadable_reported_at, repair_attempts FROM files WHERE vault_id = ? AND file_path = ?'
+  ).get(vaultId, filePath) as { file_size: number; deleted_at: number | null; unreadable_reported_at: number | null; repair_attempts: number | null } | undefined
   const oldSize = oldFile ? (oldFile.deleted_at ? 0 : oldFile.file_size) : 0
+  // Ein Upload auf eine als unlesbar gemeldete Kopie ist eine Reparatur: zählen, Markierung weg.
+  const attempts = (oldFile?.repair_attempts ?? 0) + (oldFile?.unreadable_reported_at ? 1 : 0)
 
   // Check vault size limit (5 GB) — subtract old size first so updates near the limit don't fail
   const meta = db.prepare('SELECT total_size FROM vault_meta WHERE vault_id = ?').get(vaultId) as
@@ -134,9 +183,9 @@ export function storeFile(
   }
 
   db.prepare(`
-    INSERT OR REPLACE INTO files (vault_id, file_path, iv, auth_tag, encrypted_data, file_hash, file_size, modified_at, original_path, deleted_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-  `).run(vaultId, filePath, iv, authTag, encryptedData, fileHash, fileSize, modifiedAt, originalPath)
+    INSERT OR REPLACE INTO files (vault_id, file_path, iv, auth_tag, encrypted_data, file_hash, file_size, modified_at, original_path, deleted_at, unreadable_reported_at, repair_attempts)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, ?)
+  `).run(vaultId, filePath, iv, authTag, encryptedData, fileHash, fileSize, modifiedAt, originalPath, attempts)
 
   db.prepare(`
     UPDATE vault_meta SET total_size = total_size - ? + ?, last_activity = unixepoch() WHERE vault_id = ?
