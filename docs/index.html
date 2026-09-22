@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.19-beta",
+    "softwareVersion": "0.11.20-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: jede fehlende Datei beim Namen &middot; v0.11.19</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: Abgleich reisst nicht mehr nach 15 Sekunden ab &middot; v0.11.20</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.19 &#183; Sync auf einem zweiten Ger&#228;t</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Scheitert der Abgleich, siehst du jede Datei und den Grund.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Bisher nannte die Meldung eine einzige Datei, der Rest war weg. Jetzt steht die vollst&#228;ndige Liste in den Einstellungen und in einem Protokoll auf der Platte. Und die Ursache f&#252;r die Fehlschl&#228;ge ist behoben: Die App kappte ihre Verbindung selbst, sobald eine gro&#223;e Datei unterwegs war.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.20 &#183; Sync: die eigentliche Ursache</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Ein Abgleich, der l&#228;nger als 15 Sekunden dauert, l&#228;uft jetzt durch.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Seit Mai kappte die App ihre Verbindung 15 Sekunden nach dem Start jedes Abgleichs &#8212; eine Frist, die nie zur&#252;ckgenommen wurde. Kurze Abgleiche merkten nichts. Erstabgleiche gro&#223;er Notizspeicher und gro&#223;e Dateien scheiterten jedes Mal. Gefunden hat es das Protokoll aus 0.11.19.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Gro&#223;e Dateien reissen nichts mehr ab</b><p data-i18n="release.c1">Eine Verbindung gilt als lebendig, solange Daten ankommen. Vorher hielt die App sie nach 30 Sekunden ohne Antwort f&#252;r tot, auch mitten in einem gro&#223;en Upload &#8212; und alle wartenden Downloads scheiterten mit.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Passphrase nicht gespeichert? Die App sagt es</b><p data-i18n="release.c2">Kann das System die Sync-Passphrase nicht sicher ablegen, steht das jetzt mit dem n&#228;chsten Schritt in den Einstellungen &#8212; statt nach dem n&#228;chsten Start still &#8222;nicht eingerichtet&#8220; zu melden.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Karteikarten bleiben erhalten</b><p data-i18n="release.c3">Kam die Serverkopie der Karteikarten nicht an, galt sie als leer, und der lokale Stand &#252;berschrieb sie. Jetzt gilt der Abgleich als gescheitert und wird wiederholt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Erstabgleich in einem St&#252;ck</b><p data-i18n="release.c1">Ein neues Ger&#228;t holt Tausende Dateien jetzt in einem Lauf, statt alle f&#252;nf Minuten 15 Sekunden lang. Was heute noch in Etappen ankam, kommt morgen am St&#252;ck.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gro&#223;e Dateien kommen an</b><p data-i18n="release.c2">Eine 34-MB-Mailliste brauchte l&#228;nger als die Frist und scheiterte bei jedem Versuch &#8212; der Konflikt kam alle f&#252;nf Minuten wieder. Jetzt geht sie durch.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Das Protokoll nennt den Schuldigen</b><p data-i18n="release.c3">Jeder Verbindungsabriss steht mit Code und Grund im Sync-Protokoll. Ob die App selbst getrennt hat oder die Leitung weg war, ist damit unterscheidbar.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Sync: jede fehlende Datei beim Namen &middot; v{vs}",
+        "hero.release": "Sync: Abgleich reißt nicht mehr nach 15 Sekunden ab &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sync auf einem zweiten Gerät",
-        "release.heading": "Was ist neu — <em>Scheitert der Abgleich, siehst du jede Datei und den Grund.</em>",
-        "release.lead": "Bisher nannte die Meldung eine einzige Datei, der Rest war weg. Jetzt steht die vollständige Liste in den Einstellungen und in einem Protokoll auf der Platte. Und die Ursache für die Fehlschläge ist behoben: Die App kappte ihre Verbindung selbst, sobald eine große Datei unterwegs war.",
-        "release.c1h": "Große Dateien reißen nichts mehr ab",
-        "release.c1": "Eine Verbindung gilt als lebendig, solange Daten ankommen. Vorher hielt die App sie nach 30 Sekunden ohne Antwort für tot, auch mitten in einem großen Upload — und alle wartenden Downloads scheiterten mit.",
-        "release.c2h": "Passphrase nicht gespeichert? Die App sagt es",
-        "release.c2": "Kann das System die Sync-Passphrase nicht sicher ablegen, steht das jetzt mit dem nächsten Schritt in den Einstellungen — statt nach dem nächsten Start still „nicht eingerichtet“ zu melden.",
-        "release.c3h": "Karteikarten bleiben erhalten",
-        "release.c3": "Kam die Serverkopie der Karteikarten nicht an, galt sie als leer, und der lokale Stand überschrieb sie. Jetzt gilt der Abgleich als gescheitert und wird wiederholt.",
+        "release.label": "Release {vs} · Sync: die eigentliche Ursache",
+        "release.heading": "Was ist neu — <em>Ein Abgleich, der länger als 15 Sekunden dauert, läuft jetzt durch.</em>",
+        "release.lead": "Seit Mai kappte die App ihre Verbindung 15 Sekunden nach dem Start jedes Abgleichs — eine Frist, die nie zurückgenommen wurde. Kurze Abgleiche merkten nichts. Erstabgleiche großer Notizspeicher und große Dateien scheiterten jedes Mal. Gefunden hat es das Protokoll aus 0.11.19.",
+        "release.c1h": "Erstabgleich in einem Stück",
+        "release.c1": "Ein neues Gerät holt Tausende Dateien jetzt in einem Lauf, statt alle fünf Minuten 15 Sekunden lang. Was heute noch in Etappen ankam, kommt morgen am Stück.",
+        "release.c2h": "Große Dateien kommen an",
+        "release.c2": "Eine 34-MB-Mailliste brauchte länger als die Frist und scheiterte bei jedem Versuch — der Konflikt kam alle fünf Minuten wieder. Jetzt geht sie durch.",
+        "release.c3h": "Das Protokoll nennt den Schuldigen",
+        "release.c3": "Jeder Verbindungsabriss steht mit Code und Grund im Sync-Protokoll. Ob die App selbst getrennt hat oder die Leitung weg war, ist damit unterscheidbar.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Sync: every missing file by name &middot; v{vs}",
+        "hero.release": "Sync: no more cut-off after 15 seconds &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sync on a second device",
-        "release.heading": "What’s new — <em>When sync fails, you see every file and the reason.</em>",
-        "release.lead": "The message used to name a single file; the rest was gone. Now the complete list is in the settings and in a log file on disk. And the cause of the failures is fixed: the app cut its own connection whenever a large file was in transit.",
-        "release.c1h": "Large files no longer break the connection",
-        "release.c1": "A connection counts as alive as long as data is arriving. Before, the app declared it dead after 30 seconds without a reply, even in the middle of a large upload — and every waiting download failed with it.",
-        "release.c2h": "Passphrase not stored? The app tells you",
-        "release.c2": "If the system cannot store the sync passphrase securely, the settings now say so and name the next step — instead of silently reporting “not set up” after the next start.",
-        "release.c3h": "Flashcards are kept",
-        "release.c3": "If the server copy of the flashcards did not arrive, it counted as empty and the local set overwrote it. Now the merge counts as failed and is retried.",
+        "release.label": "Release {vs} · Sync: the real cause",
+        "release.heading": "What’s new — <em>A sync that takes longer than 15 seconds now completes.</em>",
+        "release.lead": "Since May the app cut its connection 15 seconds after every sync started — a timeout that was never cancelled. Short syncs never noticed. First syncs of large vaults and large files failed every time. The log file from 0.11.19 found it.",
+        "release.c1h": "First sync in one go",
+        "release.c1": "A new device now fetches thousands of files in a single run instead of 15 seconds every five minutes. What arrived in instalments today arrives in one piece tomorrow.",
+        "release.c2h": "Large files arrive",
+        "release.c2": "A 34 MB mail store took longer than the timeout and failed on every attempt — the conflict came back every five minutes. Now it goes through.",
+        "release.c3h": "The log names the culprit",
+        "release.c3": "Every dropped connection is in the sync log with code and reason. Whether the app disconnected itself or the line went away is now distinguishable.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

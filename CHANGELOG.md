@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.20-beta] - 2026-09-22
+
+**Ein Abgleich, der länger als 15 Sekunden dauert, läuft jetzt durch.** Seit Mai kappte die App ihre eigene Verbindung 15 Sekunden nach dem Start jedes Abgleichs, weil eine Frist nie zurückgenommen wurde. Kurze Abgleiche merkten davon nichts. Der Erstabgleich eines neuen Geräts kam dadurch nur in 15-Sekunden-Etappen alle fünf Minuten voran, und eine große Datei wie die Mailliste scheiterte bei jedem Versuch.
+
+### Hintergrund
+
+- Gefunden hat es das Protokoll auf der Platte aus 0.11.19: sechs Läufe in Folge, jeder mit Abriss rund 18 Sekunden nach dem Start. Ein Abriss durch das Lebenszeichen käme frühestens nach 30 Sekunden, einer durch eine zu große Nachricht sofort. Beides passte nicht — und eine 45-MB-Nachricht ging in der Gegenprobe in elf Sekunden sauber zum Server.
+- Die Frist gehört zur Anfrage der Dateiliste beim Start. Kommt die Liste nicht binnen 15 Sekunden, gilt die Verbindung als tot und wird getrennt. Nur wurde die Frist beim Eintreffen der Liste nie gelöscht, sie feuerte immer. Die drei Sekunden über 15 sind das Einlesen von 7000 Dateien vor der Anfrage.
+- Die Version 0.11.19 vom selben Tag hatte eine andere Ursache vermutet und das Lebenszeichen umgebaut. Diese Umbauten bleiben, sie sind für sich richtig, aber sie waren nicht der Grund. Drei Prüfrunden hatten an derselben falschen Stelle gesucht.
+- Jeder Verbindungsabriss steht jetzt mit Schließcode und Grund im Sync-Protokoll. Ob die App selbst getrennt hat oder die Leitung weg war, ist damit unterscheidbar.
+- **Grenze:** Wer 0.11.19 auf einem neuen Gerät eingerichtet hat, sieht dort noch die Etappen. Nach dem Update auf diese Version holt der nächste Abgleich den Rest in einem Lauf.
+
 ## [0.11.19-beta] - 2026-09-22
 
 **Scheitert der Abgleich, siehst du jetzt jede betroffene Datei mit dem Grund — und die häufigste Ursache dafür ist behoben.** Die App kappte ihre eigene Verbindung, sobald eine große Datei unterwegs war; alle wartenden Downloads scheiterten mit. Das passiert nicht mehr. Kann das System die Sync-Passphrase nicht sicher ablegen, sagt die App das jetzt mit dem nächsten Schritt, statt nach dem nächsten Start still „nicht eingerichtet“ zu melden.
