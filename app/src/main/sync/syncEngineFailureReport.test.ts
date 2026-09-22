@@ -235,6 +235,30 @@ describe('Fehlerbericht eines Sync-Laufs', () => {
     expect(aktuell).toContain('Download failed: Notizen/kaputt-001.md')
   })
 
+  it('liest den Byte-Fortschritt des echten Sockets — sonst ist das Lebenszeichen blind', async () => {
+    // Das Lebenszeichen wertet `_socket.bytesRead/bytesWritten` aus, ein ws-Interna. Fällt
+    // der Zugriff still auf den Rückfall zurück, kappt die App bei jedem großen Download
+    // wieder die Verbindung. Dieser Test bricht, sobald ws die Interna umbenennt.
+    seedDamaged(1)
+    await engine.join(vault, VAULT_ID, PASSPHRASE, relay.url)
+    await engine.connect()
+    await engine.sync()
+
+    const zaehler = (engine as unknown as { socketCounters: () => { bytesRead: number; bytesWritten: number } }).socketCounters()
+    expect(zaehler.bytesRead).toBeGreaterThan(0)
+    expect(zaehler.bytesWritten).toBeGreaterThan(0)
+    expect(zaehler.bytesWritten).toBeLessThan(Number.MAX_SAFE_INTEGER - 1_000_000) // nicht der Rückfall
+  })
+
+  it('bemisst die Download-Frist an der Größe aus dem Server-Manifest', async () => {
+    seedDamaged(1)
+    await engine.join(vault, VAULT_ID, PASSPHRASE, relay.url)
+    await engine.connect()
+    await engine.sync()
+    const merkt = (engine as unknown as { lastRemoteManifest: { files: Record<string, { size: number }> } | null }).lastRemoteManifest
+    expect(merkt?.files['Notizen/kaputt-001.md']?.size).toBeGreaterThan(0)
+  })
+
   // Der Überlauf des Puffers ist NICHT hier getestet, sondern deterministisch in
   // logBuffer.test.ts. Über den echten Sync hing er an einer Zeitschranke: Leert der
   // 250-ms-Zeitgeber den Puffer mitten im Lauf, läuft er nie über — unter Volllast ist

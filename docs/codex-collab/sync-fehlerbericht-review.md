@@ -408,6 +408,39 @@ nicht der Datenfluss. Vier Korrekturen:
 3. Überschrift des Speicherhinweises lief ohne Trennung in den Text — eigene Zeile.
 4. Deutsches „und N weitere" in der englischen Kurzmeldung — jetzt „and N more", Test angepasst.
 
+### Nachtrag 22.09.2026 — Ursache der Fehlschläge gefunden: die App kappt sich selbst
+
+Gegenprobe mit frischem Vault auf dem Linux-Rechner: wieder 194 gescheiterte Downloads. Das
+Sync-Protokoll (Foto) zeigt die Kette:
+
+```
+10:12:40  Conflict: .mindgraph/email-store.json
+10:12:44  Mailliste vereinigt: 627 lokal + 628 entfernt → 627 Mails
+10:12:49  Disconnected
+10:12:51  Connected
+10:13:15  Mailliste vereinigt, aber nicht hochgeladen: Upload acknowledgment timeout
+```
+
+Die Mailliste ist 34 MB (als base64-Nachricht ~45 MB). Während sie hochgeht, (1) steckt der
+Heartbeat-Ping hinter ihr in der Sendewarteschlange → kein Pong binnen 30 s → die App hält die
+Verbindung für tot und **kappt sie selbst** (`startHeartbeat`); alle wartenden Downloads fallen
+mit „Not connected" um; (2) läuft die feste 30-s-Frist auf die Upload-Bestätigung ab. Der
+Konflikt bleibt, der nächste Auto-Sync wiederholt alles. Erklärt beide Läufe (200 und 194).
+
+**Änderung** (nicht von Codex gesehen — Kandidat für Runde 3):
+- `transferTiming.ts` (rein, 9 Tests): `socketLooksAlive` — Pong ODER Byte-Fortschritt in
+  einer Richtung zählt als lebendig; `transferTimeoutMs` — Frist aus erwarteter Größe bei
+  angenommenen 2 Mbit/s, base64-Aufblähung eingerechnet, Deckel 15 min.
+- Heartbeat liest `_socket.bytesRead/bytesWritten` (ws-Interna, abgesichert, Test bricht bei
+  Umbenennung) und terminiert nur ohne Pong UND ohne Byte. Abriss durch Heartbeat geht ins
+  Sync-Protokoll.
+- `waitForAck`: Frist nach Fortschritt (`bufferedAmount` sinkt → Frist beginnt neu), 30 s
+  Stillstand oder 15 min hart. Fehlertext nennt, ob noch Bytes in der Warteschlange lagen.
+- `requestFile`: Frist aus der Größe im zuletzt geholten Server-Manifest.
+
+Offen: Ob es nach der Änderung wirklich durchläuft, zeigt erst ein Build auf dem Linux-Rechner —
+die Bedingung (langsamer Upload, 45-MB-Nachricht) lässt sich auf Loopback nicht nachstellen.
+
 ## Status
 
 Runde 2 abgeschlossen. F01–F05 und F07–F12 adressiert, F06 offen (eigene Aufgabe, vorbestehend). Sichtprüfung in der Dev-App erfolgt (s. Nachtrag). Offen: Gegenprobe auf dem Arch-Rechner, danach Abnahme durch den Nutzer und Release.

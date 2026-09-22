@@ -16,6 +16,7 @@ import {
 } from './fileTracker'
 import { moveToSyncTrash } from './trash'
 import { SyncLogBuffer } from './logBuffer'
+import { socketLooksAlive, transferTimeoutMs, TRANSFER_IDLE_TIMEOUT_MS, TRANSFER_HARD_CAP_MS, type TransferCounters } from './transferTiming'
 import { mergeIncomingEmailStore, EMAIL_STORE_REL_PATH } from '../email/store'
 import type { SyncFailure, SyncProgress, SyncResult } from '../../shared/types'
 
@@ -97,10 +98,16 @@ interface ServerMessage {
 
 const RECONNECT_BASE_DELAY = 2000
 const RECONNECT_MAX_DELAY = 60000
-// Heartbeat: ping every 30s. If no pong arrives before the next tick, the socket
-// is silently dead (laptop sleep / network change / NAT idle) and gets terminated
-// so the close handler schedules a reconnect — instead of a sync hanging 15s into
-// a "Manifest request timeout" and the status getting stuck red.
+// Heartbeat: ping every 30s. If no pong arrives before the next tick AND no byte has
+// moved in either direction, the socket is silently dead (laptop sleep / network change /
+// NAT idle) and gets terminated so the close handler schedules a reconnect — instead of a
+// sync hanging 15s into a "Manifest request timeout" and the status getting stuck red.
+//
+// „Kein Pong" ALLEIN reicht nicht (s. transferTiming.ts): Während ein 45-MB-Upload läuft,
+// steckt der Ping dahinter in der Sendewarteschlange, und während ein großer Download
+// läuft, steckt der Pong des Servers hinter seiner Nachricht. Die alte Regel kappte in
+// beiden Fällen eine kerngesunde Verbindung — und riss damit alle wartenden Downloads mit
+// (real: 200 und 194 Fehlschläge beim Erstabgleich, 22.09.2026).
 const HEARTBEAT_INTERVAL = 30000
 
 /** Der Stand, den der Server für einen Pfad bestätigt hat — s. uploadFile/downloadFile. */
@@ -128,6 +135,10 @@ export class SyncEngine {
   private syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null
   private wsAlive: boolean = true
+  /** Byte-Zähler des Sockets beim letzten Lebenszeichen — Fortschritt zählt wie ein Pong. */
+  private wsCountersAtLastBeat: TransferCounters = { bytesRead: 0, bytesWritten: 0 }
+  /** Server-Manifest des letzten Abgleichs: liefert die erwartete Größe für Download-Fristen. */
+  private lastRemoteManifest: FileManifest | null = null
   private excludeConfig: { folders: string[]; extensions: string[] } = { folders: [], extensions: [] }
   /** Pfade, deren Upload noch aussteht (Sync lief / Push für denselben Pfad lief / Fehler). */
   private pendingPushes: Set<string> = new Set()
@@ -589,16 +600,22 @@ export class SyncEngine {
   private startHeartbeat(): void {
     this.stopHeartbeat()
     this.wsAlive = true
+    this.wsCountersAtLastBeat = this.socketCounters()
     this.heartbeatTimer = setInterval(() => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return
-      if (!this.wsAlive) {
-        // No pong since the last ping — the connection is silently dead.
+      const jetzt = this.socketCounters()
+      if (!socketLooksAlive(this.wsAlive, this.wsCountersAtLastBeat, jetzt)) {
+        // Kein Pong UND kein Byte seit dem letzten Takt — die Verbindung ist still tot.
         // terminate() fires the 'close' handler → scheduleReconnect (unless intentional).
         console.warn('[Sync] Heartbeat timeout — terminating dead socket')
+        // Ins Protokoll, nicht nur auf die Konsole: Ein Abriss, den die App selbst
+        // ausgelöst hat, muss von einem echten Netzausfall unterscheidbar sein.
+        this.sendLog({ type: 'disconnect', message: 'Heartbeat timeout — no pong and no traffic for 30 s, closing dead socket' })
         this.stopHeartbeat()
         this.ws.terminate()
         return
       }
+      this.wsCountersAtLastBeat = jetzt
       this.wsAlive = false
       try {
         this.ws.ping()
@@ -606,6 +623,25 @@ export class SyncEngine {
         // ignore — a failed ping will be caught on the next tick / by close
       }
     }, HEARTBEAT_INTERVAL)
+  }
+
+  /**
+   * Byte-Zähler des darunterliegenden TCP-Sockets.
+   *
+   * `ws` selbst meldet Empfangsfortschritt nicht — eine Nachricht kommt erst als Ganzes.
+   * Der Net-Socket darunter zählt aber jedes Byte. Der Zugriff über `_socket` ist
+   * ws-intern und deshalb abgesichert: fehlt er, zählt nur `bufferedAmount` (Senderichtung),
+   * und die Regel fällt auf „Pong oder Sendefortschritt" zurück statt auf Blindflug.
+   */
+  private socketCounters(): TransferCounters {
+    const roh = this.ws as unknown as { _socket?: { bytesRead?: number; bytesWritten?: number } } | null
+    const sock = roh?._socket
+    if (sock && typeof sock.bytesRead === 'number' && typeof sock.bytesWritten === 'number') {
+      return { bytesRead: sock.bytesRead, bytesWritten: sock.bytesWritten }
+    }
+    // Rückfall: bufferedAmount sinkt, während gesendet wird — als „geschrieben" verbuchen.
+    const buffered = this.ws?.bufferedAmount ?? 0
+    return { bytesRead: 0, bytesWritten: Number.MAX_SAFE_INTEGER - buffered }
   }
 
   private stopHeartbeat(): void {
@@ -696,6 +732,7 @@ export class SyncEngine {
 
       // Get remote manifest
       const remoteManifest = await this.getRemoteManifest()
+      this.lastRemoteManifest = remoteManifest
 
       // Filter out excluded files from remote manifest and saved manifest
       // so they are completely invisible to the diff algorithm
@@ -1851,10 +1888,15 @@ export class SyncEngine {
         path: hashedPath
       })
 
-      setTimeout(() => {
+      // Frist nach erwarteter Größe (aus dem Server-Manifest), s. transferTiming.ts:
+      // `ws` liefert eine Nachricht erst als Ganzes, Empfangsfortschritt ist nicht
+      // messbar. 30 s fest hätten ein 34-MB-Objekt auf 2 Mbit/s nie ankommen lassen.
+      const erwartet = this.lastRemoteManifest?.files[relativePath]?.size
+      const frist = setTimeout(() => {
         this.ws?.removeListener('message', handler)
         resolve(null)
-      }, 30000)
+      }, transferTimeoutMs(erwartet))
+      frist.unref?.()
     })
   }
 
@@ -1868,35 +1910,65 @@ export class SyncEngine {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         return reject(new Error('Not connected'))
       }
+      const ws = this.ws
 
-      const handler = (data: WebSocket.Data) => {
+      /*
+       * Frist nach FORTSCHRITT, nicht nach Uhr. Die Daten liegen in der Sendewarteschlange
+       * des Sockets (`bufferedAmount`); solange die schrumpft, ist die Übertragung im Gang
+       * und die Frist beginnt neu. Erst wenn 30 s lang nichts abfließt — Leitung tot oder
+       * Server antwortet nicht —, wird abgebrochen. Eine feste 30-s-Frist ließ die 34-MB-
+       * Mailliste auf einem normalen Hausanschluss nie ankommen (real, 22.09.2026).
+       */
+      const start = Date.now()
+      let zuletztGepuffert = ws.bufferedAmount
+      let letzterFortschritt = start
+
+      const ende = (fehler?: Error): void => {
+        clearInterval(wache)
+        ws.removeListener('message', handler)
+        if (fehler) reject(fehler)
+        else resolve()
+      }
+
+      const handler = (data: WebSocket.Data): void => {
         let msg: ServerMessage
         try {
           msg = JSON.parse(data.toString())
         } catch (err) {
-          this.ws?.removeListener('message', handler)
-          reject(err)
+          ende(err instanceof Error ? err : new Error(String(err)))
           return
         }
         if (msg.type === 'ack' && msg.path === expectedPath) {
-          this.ws?.removeListener('message', handler)
-          resolve()
+          ende()
         } else if (msg.type === 'error') {
           // Server-Fehler tragen keinen Pfad (server.ts) → nicht eindeutig einem Upload
           // zuordenbar. Konservativ: diesen Waiter ablehnen → die Batch (Promise.all)
           // schlägt fehl, NICHTS wird fälschlich als synced markiert. Retry beim nächsten Sync.
-          this.ws?.removeListener('message', handler)
-          reject(new Error(msg.message || msg.error || 'Upload failed'))
+          ende(new Error(msg.message || msg.error || 'Upload failed'))
         }
         // Sonst: ack für einen anderen Pfad / notify / unrelated → ignorieren, Listener bleibt.
       }
 
-      this.ws.on('message', handler)
+      const wache = setInterval(() => {
+        const gepuffert = ws.bufferedAmount
+        const jetzt = Date.now()
+        if (gepuffert < zuletztGepuffert) {
+          zuletztGepuffert = gepuffert
+          letzterFortschritt = jetzt
+          return
+        }
+        const stillstand = jetzt - letzterFortschritt
+        if (stillstand >= TRANSFER_IDLE_TIMEOUT_MS || jetzt - start >= TRANSFER_HARD_CAP_MS) {
+          ende(new Error(
+            gepuffert > 0
+              ? `Upload stalled — ${gepuffert} bytes still queued, no progress for ${Math.round(stillstand / 1000)} s`
+              : 'Upload acknowledgment timeout'
+          ))
+        }
+      }, 1000)
+      wache.unref?.()
 
-      setTimeout(() => {
-        this.ws?.removeListener('message', handler)
-        reject(new Error('Upload acknowledgment timeout'))
-      }, 30000)
+      ws.on('message', handler)
     })
   }
 
