@@ -48,7 +48,7 @@
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
-    "softwareVersion": "0.11.20-beta",
+    "softwareVersion": "0.11.21-beta",
     "author": { "@type": "Person", "name": "Jochen Leeder", "url": "https://bydb.io" },
     "license": "https://opensource.org/licenses/AGPL-3.0",
     "featureList": [
@@ -495,7 +495,7 @@
         <span class="hero-dot"></span>
         <span data-i18n="hero.badge">Open Source &middot; Lokal &middot; Kostenlos</span>
       </div>
-      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: Abgleich reisst nicht mehr nach 15 Sekunden ab &middot; v0.11.20</a>
+      <a class="release-badge" href="#changelog" data-i18n="hero.release">Sync: besch&#228;digte Kopien reparieren sich selbst &middot; v0.11.21</a>
     </div>
 
     <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
@@ -1630,16 +1630,16 @@
     <div class="release-inner">
       <div class="release-head">
         <div>
-          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.20 &#183; Sync: die eigentliche Ursache</span></div>
-          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Ein Abgleich, der l&#228;nger als 15 Sekunden dauert, l&#228;uft jetzt durch.</em></h2>
-          <p class="st-lead" data-i18n="release.lead">Seit Mai kappte die App ihre Verbindung 15 Sekunden nach dem Start jedes Abgleichs &#8212; eine Frist, die nie zur&#252;ckgenommen wurde. Kurze Abgleiche merkten nichts. Erstabgleiche gro&#223;er Notizspeicher und gro&#223;e Dateien scheiterten jedes Mal. Gefunden hat es das Protokoll aus 0.11.19.</p>
+          <div class="st-eyebrow"><span class="d"></span><span data-i18n="release.label">Release 0.11.21 &#183; Sync heilt sich selbst</span></div>
+          <h2 class="st-h" style="font-size:clamp(1.8rem,3.8vw,2.6rem)" data-i18n="release.heading">Was ist neu &#8212; <em>Eine besch&#228;digte Kopie auf dem Server repariert sich von selbst.</em></h2>
+          <p class="st-lead" data-i18n="release.lead">Kann ein Ger&#228;t eine Datei nicht entschl&#252;sseln, meldet es das. Ein anderes Ger&#228;t, das denselben Inhalt unversehrt hat, l&#228;dt ihn neu hoch &#8212; ohne dass du etwas tust. Vorher blieben solche Dateien auf dem neuen Ger&#228;t dauerhaft aus.</p>
         </div>
         <div class="release-date">v<span data-app-version>0.10.35-beta</span></div>
       </div>
       <div class="release-grid">
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Erstabgleich in einem St&#252;ck</b><p data-i18n="release.c1">Ein neues Ger&#228;t holt Tausende Dateien jetzt in einem Lauf, statt alle f&#252;nf Minuten 15 Sekunden lang. Was heute noch in Etappen ankam, kommt morgen am St&#252;ck.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Gro&#223;e Dateien kommen an</b><p data-i18n="release.c2">Eine 34-MB-Mailliste brauchte l&#228;nger als die Frist und scheiterte bei jedem Versuch &#8212; der Konflikt kam alle f&#252;nf Minuten wieder. Jetzt geht sie durch.</p></div></div>
-        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Das Protokoll nennt den Schuldigen</b><p data-i18n="release.c3">Jeder Verbindungsabriss steht mit Code und Grund im Sync-Protokoll. Ob die App selbst getrennt hat oder die Leitung weg war, ist damit unterscheidbar.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c1h">Ohne dein Zutun</b><p data-i18n="release.c1">Melden, neu hochladen, ankommen &#8212; das l&#228;uft beim n&#228;chsten Abgleich von selbst. Es gibt nichts anzuklicken und keine Liste abzuarbeiten.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c2h">Ersetzt wird nur bei gleichem Inhalt</b><p data-i18n="release.c2">Hochladen darf nur ein Ger&#228;t, dessen Kopie nachweislich denselben Inhalt tr&#228;gt. Ein veralteter Stand &#252;berschreibt nie einen neueren; das bleibt ein normaler Konflikt.</p></div></div>
+        <div class="release-card"><span>&#10003;</span><div><b data-i18n="release.c3h">Gibt nach drei Versuchen auf</b><p data-i18n="release.c3">Bringt die Reparatur nichts, h&#246;rt sie auf, statt im Kreis zu laufen. Die Datei steht dann als nicht &#252;bertragen in den Einstellungen.</p></div></div>
       </div>
       <a class="release-link" href="https://github.com/bydb/mindgraph-notes/releases" target="_blank" rel="noopener noreferrer" data-i18n="release.link">Vollst&auml;ndige Release Notes auf GitHub &rarr;</a>
     </div>
@@ -1905,7 +1905,7 @@
         "how.p5h": "Das Web, wenn du es brauchst",
         "how.p5": "Schalte die Webrecherche pro Auftrag zu – ganz optional. Der Agent sucht, liest die passenden Seiten und schreibt eine Notiz mit sauberem Quellenverzeichnis; du prüfst sie, bevor sie in deinen Vault kommt. Der Suchanbieter erhält nur die Suchanfragen; die vollständigen Seiten ruft die App lokal ab. Bei einem optionalen Cloud-Modell geht der gelesene Kontext zusätzlich an dessen Anbieter – darauf weist die App vor dem Lauf hin. Den Suchanbieter wählst du selbst: sofort einsatzbereit oder deine eigene, private Suchmaschine.",
         "hero.badge": "Open Source \u00b7 Lokal \u00b7 Kostenlos",
-        "hero.release": "Sync: Abgleich reißt nicht mehr nach 15 Sekunden ab &middot; v{vs}",
+        "hero.release": "Sync: beschädigte Kopien reparieren sich selbst &middot; v{vs}",
         "hero.videoPause": "Anhalten",
         "hero.videoPlay": "Abspielen",
         "hero.videoStart": "Video abspielen",
@@ -1982,15 +1982,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Diktat & Vorlesen",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sync: die eigentliche Ursache",
-        "release.heading": "Was ist neu — <em>Ein Abgleich, der länger als 15 Sekunden dauert, läuft jetzt durch.</em>",
-        "release.lead": "Seit Mai kappte die App ihre Verbindung 15 Sekunden nach dem Start jedes Abgleichs — eine Frist, die nie zurückgenommen wurde. Kurze Abgleiche merkten nichts. Erstabgleiche großer Notizspeicher und große Dateien scheiterten jedes Mal. Gefunden hat es das Protokoll aus 0.11.19.",
-        "release.c1h": "Erstabgleich in einem Stück",
-        "release.c1": "Ein neues Gerät holt Tausende Dateien jetzt in einem Lauf, statt alle fünf Minuten 15 Sekunden lang. Was heute noch in Etappen ankam, kommt morgen am Stück.",
-        "release.c2h": "Große Dateien kommen an",
-        "release.c2": "Eine 34-MB-Mailliste brauchte länger als die Frist und scheiterte bei jedem Versuch — der Konflikt kam alle fünf Minuten wieder. Jetzt geht sie durch.",
-        "release.c3h": "Das Protokoll nennt den Schuldigen",
-        "release.c3": "Jeder Verbindungsabriss steht mit Code und Grund im Sync-Protokoll. Ob die App selbst getrennt hat oder die Leitung weg war, ist damit unterscheidbar.",
+        "release.label": "Release {vs} · Sync heilt sich selbst",
+        "release.heading": "Was ist neu — <em>Eine beschädigte Kopie auf dem Server repariert sich von selbst.</em>",
+        "release.lead": "Kann ein Gerät eine Datei nicht entschlüsseln, meldet es das. Ein anderes Gerät, das denselben Inhalt unversehrt hat, lädt ihn neu hoch — ohne dass du etwas tust. Vorher blieben solche Dateien auf dem neuen Gerät dauerhaft aus.",
+        "release.c1h": "Ohne dein Zutun",
+        "release.c1": "Melden, neu hochladen, ankommen — das läuft beim nächsten Abgleich von selbst. Es gibt nichts anzuklicken und keine Liste abzuarbeiten.",
+        "release.c2h": "Ersetzt wird nur bei gleichem Inhalt",
+        "release.c2": "Hochladen darf nur ein Gerät, dessen Kopie nachweislich denselben Inhalt trägt. Ein veralteter Stand überschreibt nie einen neueren; das bleibt ein normaler Konflikt.",
+        "release.c3h": "Gibt nach drei Versuchen auf",
+        "release.c3": "Bringt die Reparatur nichts, hört sie auf, statt im Kreis zu laufen. Die Datei steht dann als nicht übertragen in den Einstellungen.",
         "release.link": "Vollständige Release Notes auf GitHub →",
         "dl.label": "Download",
         "dl.heading": "Jetzt starten.",
@@ -2173,7 +2173,7 @@
         "how.p5h": "The web, when you need it",
         "how.p5": "Turn on web research per task – entirely optional. The agent searches, reads the relevant pages and writes a note with a clean list of sources; you review it before it enters your vault. The search provider receives only the queries; the app fetches full pages locally. With an optional cloud model, the extracted context is also sent to that model provider – the app warns you before the run. You choose the search provider yourself: ready to use or your own private search engine.",
         "hero.badge": "Open Source \u00b7 Local \u00b7 Free",
-        "hero.release": "Sync: no more cut-off after 15 seconds &middot; v{vs}",
+        "hero.release": "Sync: damaged copies repair themselves &middot; v{vs}",
         "hero.videoPause": "Pause",
         "hero.videoPlay": "Play",
         "hero.videoStart": "Play video",
@@ -2250,15 +2250,15 @@
         "modules.opt.vision": "Vision OCR",
         "modules.opt.speech": "Dictation & TTS",
         "modules.opt.terminal": "Terminal",
-        "release.label": "Release {vs} · Sync: the real cause",
-        "release.heading": "What’s new — <em>A sync that takes longer than 15 seconds now completes.</em>",
-        "release.lead": "Since May the app cut its connection 15 seconds after every sync started — a timeout that was never cancelled. Short syncs never noticed. First syncs of large vaults and large files failed every time. The log file from 0.11.19 found it.",
-        "release.c1h": "First sync in one go",
-        "release.c1": "A new device now fetches thousands of files in a single run instead of 15 seconds every five minutes. What arrived in instalments today arrives in one piece tomorrow.",
-        "release.c2h": "Large files arrive",
-        "release.c2": "A 34 MB mail store took longer than the timeout and failed on every attempt — the conflict came back every five minutes. Now it goes through.",
-        "release.c3h": "The log names the culprit",
-        "release.c3": "Every dropped connection is in the sync log with code and reason. Whether the app disconnected itself or the line went away is now distinguishable.",
+        "release.label": "Release {vs} · Sync heals itself",
+        "release.heading": "What’s new — <em>A damaged copy on the server repairs itself.</em>",
+        "release.lead": "If a device cannot decrypt a file, it reports that. Another device that holds the same content intact re-uploads it — without you doing anything. Before, such files simply never arrived on the new device.",
+        "release.c1h": "Without your help",
+        "release.c1": "Report, re-upload, arrive — that runs by itself on the next sync. There is nothing to click and no list to work through.",
+        "release.c2h": "Replaced only on identical content",
+        "release.c2": "Only a device whose copy provably carries the same content may upload. An outdated version never overwrites a newer one; that stays an ordinary conflict.",
+        "release.c3h": "Gives up after three attempts",
+        "release.c3": "If the repair does not help, it stops instead of going in circles. The file is then listed as not transferred in the settings.",
         "release.link": "Full release notes on GitHub →",
         "dl.label": "Download",
         "dl.heading": "Get started.",

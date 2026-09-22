@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.21-beta] - 2026-09-22
+
+**Eine beschädigte oder mit falschem Schlüssel verschlüsselte Kopie auf dem Server repariert sich jetzt von selbst.** Kann ein Gerät eine Datei nicht entschlüsseln, meldet es das. Ein anderes Gerät, das denselben Inhalt unversehrt besitzt, lädt ihn beim nächsten Abgleich neu hoch. Danach kommt die Datei auch auf dem ersten Gerät an. Du musst dafür nichts anklicken.
+
+### Hintergrund
+
+- Der Anlass: Auf einem neu eingerichteten Rechner scheiterten 194 Dateien, alle mit derselben Meldung „Entschlüsselung fehlgeschlagen". Die Kopien auf dem Server waren mit einem anderen Schlüssel verschlüsselt oder beschädigt — vermutlich von einem Gerät, das sich irgendwann mit falscher Passphrase angemeldet hatte. So ein Gerät kann nichts lesen, aber alles schreiben.
+- Ohne Zutun heilte das nie: Das gesunde Gerät vergleicht Prüfsummen, die stimmten überein, also lud es nie neu hoch. Nur das neue Gerät sah das Problem, und genau das hatte keine brauchbare Kopie.
+- **Ersetzt werden darf nur bei nachweislich gleichem Inhalt.** Stimmt die Prüfsumme der eigenen Datei mit der auf dem Server überein, ist die eigene Kopie der richtige Ersatz. Weicht sie ab, bleibt es ein gewöhnlicher Konflikt, und ein veralteter Stand überschreibt nie einen neueren.
+- Bringt die Reparatur dreimal nichts, hört sie auf. Sonst könnten zwei Geräte mit unbrauchbaren Kopien endlos im Kreis laufen. Die Datei steht dann weiter als nicht übertragen in den Einstellungen.
+- Geprüft wurde der ganze Weg mit zwei Geräten an einem nachgebauten Server: melden, neu hochladen, ankommen. Dazu beide Sicherungen einzeln, indem sie testweise ausgebaut wurden und die Prüfung fehlschlug.
+- Ältere Fassungen des Sync-Servers kennen die Meldung nicht. Die App erkennt das und schweigt dann, statt eine Nachricht zu schicken, die der Server nicht versteht.
+- **Grenze:** Beide Geräte brauchen diese Version, und mindestens eines muss den Inhalt unversehrt besitzen. Liegt eine Datei nur beschädigt auf dem Server und nirgends sonst, kann auch diese Reparatur sie nicht zurückholen.
+- Dieselbe Mechanik behebt nebenbei die einzelnen unlesbaren Dateien, die seit dem 6. August bekannt waren.
+
 ## [0.11.20-beta] - 2026-09-22
 
 **Ein Abgleich, der länger als 15 Sekunden dauert, läuft jetzt durch.** Seit Mai kappte die App ihre eigene Verbindung 15 Sekunden nach dem Start jedes Abgleichs, weil eine Frist nie zurückgenommen wurde. Kurze Abgleiche merkten davon nichts. Der Erstabgleich eines neuen Geräts kam dadurch nur in 15-Sekunden-Etappen alle fünf Minuten voran, und eine große Datei wie die Mailliste scheiterte bei jedem Versuch.
