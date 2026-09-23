@@ -71,3 +71,63 @@ describe('ollamaActivity', () => {
     expect(seen).toEqual([1, 0])
   })
 })
+
+describe('wrapIpcWithOllamaActivity — Cloud-Läufe halten den Indexer nicht an (F19)', () => {
+  beforeEach(() => ollamaActivityInternals.reset())
+
+  const fakeEvent = {} as never
+
+  /** Meldet, wie hoch der Zähler WÄHREND des Laufs stand — darauf kommt es an. */
+  function probe(usesLocal?: (...args: [unknown, boolean]) => boolean) {
+    let during = -1
+    const wrapped = wrapIpcWithOllamaActivity(
+      'probe',
+      async (_event: unknown, _cloud: boolean) => {
+        during = ollamaForegroundCount()
+        return 'fertig'
+      },
+      usesLocal
+    )
+    return { wrapped, seen: () => during }
+  }
+
+  it('ohne Prüfung zählt wie bisher die ganze Laufzeit', async () => {
+    const { wrapped, seen } = probe()
+    await expect(wrapped(fakeEvent, true)).resolves.toBe('fertig')
+    expect(seen()).toBe(1)
+    expect(ollamaForegroundCount()).toBe(0)
+  })
+
+  it('Prüfung false: der Lauf zählt nicht, das Ergebnis kommt trotzdem', async () => {
+    const { wrapped, seen } = probe((_event, cloud) => !cloud)
+    await expect(wrapped(fakeEvent, true)).resolves.toBe('fertig')
+    expect(seen()).toBe(0)
+    expect(ollamaForegroundCount()).toBe(0)
+  })
+
+  it('Prüfung true: der Lauf zählt', async () => {
+    const { wrapped, seen } = probe((_event, cloud) => !cloud)
+    await wrapped(fakeEvent, false)
+    expect(seen()).toBe(1)
+  })
+
+  it('eine werfende Prüfung gilt als lokal — fail-closed', async () => {
+    const { wrapped, seen } = probe(() => {
+      throw new Error('kaputt')
+    })
+    await expect(wrapped(fakeEvent, true)).resolves.toBe('fertig')
+    expect(seen()).toBe(1)
+  })
+
+  it('der Zähler bleibt auch beim nicht gezählten Lauf sauber, wenn der Handler wirft', async () => {
+    const wrapped = wrapIpcWithOllamaActivity(
+      'probe',
+      async (_event: unknown, _cloud: boolean) => {
+        throw new Error('Handler kaputt')
+      },
+      () => false
+    )
+    await expect(wrapped(fakeEvent, true)).rejects.toThrow('Handler kaputt')
+    expect(ollamaForegroundCount()).toBe(0)
+  })
+})

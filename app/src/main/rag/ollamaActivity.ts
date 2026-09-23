@@ -86,12 +86,46 @@ export async function withOllamaActivity<T>(label: string, fn: () => Promise<T>)
   }
 }
 
-/** Hüllt einen IPC-Handler so ein, dass seine gesamte Laufzeit als Vordergrund zählt. */
+/**
+ * Hüllt einen IPC-Handler so ein, dass seine gesamte Laufzeit als Vordergrund zählt.
+ *
+ * `usesLocalOllama` entscheidet anhand der Aufrufargumente, ob dieser Lauf überhaupt
+ * lokales Ollama belegt. Ohne diese Prüfung blockiert ein Lauf, der über einen
+ * Cloud-Anbieter rechnet, den lokalen Vault-Indexer über seine ganze Dauer — er lässt
+ * ihn auf eine Ressource warten, die gar nicht beansprucht wird (Codex F19). Bei einer
+ * Batch-Mailanalyse sind das Minuten, in denen der Index nicht nachzieht.
+ *
+ * Zwei Regeln für diese Prüfung:
+ *
+ *   1. Sie muss die Verzweigung des Handlers SPIEGELN, nicht nur das Vorhandensein eines
+ *      Cloud-Parameters. Der Notiz-Chat zwingt den E-Mail-Modus zurück auf lokal
+ *      (Personendaten dürfen nicht in die Cloud) — ein dort gesetztes Cloud-Modell wird
+ *      also nie benutzt, und der Lauf zählt trotzdem als lokal.
+ *   2. Sie ist fail-closed: wirft sie, gilt der Lauf als lokal. Ein zu früh laufender
+ *      Indexer kostet Rechenzeit im Vordergrund; ein zu lange pausierender kostet nur
+ *      Indexfrische.
+ *
+ * Die ganze Laufzeit statt nur der Modellaufrufe zu zählen bleibt Absicht: dazwischen
+ * liegen Wartezeiten (im Schonmodus 8 s Abkühlung je Mail), in denen der Indexer sonst
+ * eine Einbettung anfinge, die der nächste Modellaufruf sofort wieder abbräche.
+ */
 export function wrapIpcWithOllamaActivity<A extends unknown[], R>(
   label: string,
-  handler: (...args: A) => Promise<R>
+  handler: (...args: A) => Promise<R>,
+  usesLocalOllama?: (...args: A) => boolean
 ): (...args: A) => Promise<R> {
-  return (...args: A) => withOllamaActivity(label, () => handler(...args))
+  return (...args: A) => {
+    let local = true
+    if (usesLocalOllama) {
+      try {
+        local = usesLocalOllama(...args)
+      } catch {
+        local = true
+      }
+    }
+    if (!local) return handler(...args)
+    return withOllamaActivity(label, () => handler(...args))
+  }
 }
 
 /** Nur für Tests. */

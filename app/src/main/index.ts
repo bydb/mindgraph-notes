@@ -6326,7 +6326,12 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'
     }
   }
-}))
+},
+// Wie bei email-analyze: ein Cloud-Lauf darf den lokalen Vault-Indexer nicht anhalten
+// (Codex F19). Die Prüfung spiegelt die Verzweigung im Handler — der E-Mail-Modus wird
+// dort auf lokal zurückgezwungen (Personendaten), ein dort gesetztes Cloud-Modell wird
+// also nie benutzt und der Lauf zählt weiterhin als lokal.
+(_event, _model, _messages, _context, chatMode, cloud) => !(cloud?.model && chatMode !== 'email')))
 
 // Holt verfügbare Embedding-Modelle
 ipcMain.handle('ollama-embedding-models', async () => {
@@ -12336,7 +12341,10 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     console.error('[Email] Analysis error:', error)
     return { success: false, analyzed: 0, failed: 0, total: 0, error: error instanceof Error ? error.message : 'Analyse fehlgeschlagen' }
   }
-}))
+},
+// Cloud-Läufe belegen kein lokales Ollama — sie dürfen den Vault-Indexer nicht anhalten
+// (Codex F19). Fehlt der Schlüssel, bricht der Handler sofort ab, ohne lokal zu rechnen.
+(_event, _vaultPath, _model, _emailIds, _lowPowerMode, cloud) => !cloud?.model))
 
 // Email-Setup: Ordner + Instruktions-Notiz erstellen
 ipcMain.handle('email-setup', async (_event, vaultPath: string, inboxFolderName?: string) => {

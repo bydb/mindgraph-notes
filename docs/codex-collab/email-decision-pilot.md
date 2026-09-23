@@ -954,9 +954,21 @@ blockiert den lokalen Vault-Indexer, obwohl sie kein lokales Ollama braucht. Der
 Einwand des Nutzers stimmt damit nicht ganz: Mails kosten ihn keine Wartezeit, aber
 Indexfrische.
 
-**Das ist ein eigener, kleiner Befund und gehört nicht zu diesem Piloten.** Er steht hier,
-damit er nicht mit ihm verschwindet: die Vordergrund-Hülle müsste den Cloud-Pfad ausnehmen,
-oder feiner greifen als „ganzer Handler".
+**Das ist ein eigener, kleiner Befund und gehört nicht zu diesem Piloten** — er stand hier,
+damit er nicht mit ihm verschwindet.
+
+**Behoben am 23.09.2026.** `wrapIpcWithOllamaActivity` nimmt jetzt eine optionale Prüfung
+`usesLocalOllama(...args)`; liefert sie false, läuft der Handler ohne Vordergrund-Anmeldung.
+Gesetzt an zwei Stellen: `email-analyze` (`!cloud?.model`) und `ollama-chat`/`notes-chat`
+— dort hatte derselbe Fehler gesessen, und die Prüfung muss die Verzweigung des Handlers
+spiegeln statt nur nach einem Cloud-Parameter zu sehen: der E-Mail-Modus wird dort auf lokal
+zurückgezwungen (Personendaten), ein gesetztes Cloud-Modell also nie benutzt. Die Prüfung ist
+fail-closed: wirft sie, gilt der Lauf als lokal. Fünf Tests in `ollamaActivity.test.ts`.
+
+Bewusst NICHT geändert: dass die GANZE Handlerlaufzeit zählt und nicht nur die Modellaufrufe.
+Dazwischen liegen Wartezeiten (im Schonmodus 8 s Abkühlung je Mail), in denen der Indexer
+sonst eine Einbettung anfinge, die der nächste Modellaufruf sofort wieder abbräche. Ob sich
+dieser Tausch lohnt, ist eine Messfrage, keine Meinung.
 
 **F20 — Der Profilvergleich ist kein Qualitätsbeleg.** `[ADRESSIERT]`, zugestimmt. Das
 Profilskript misst Zeit, nicht Güte. Der Qualitätsvergleich der Modellvarianten wurde
@@ -987,8 +999,10 @@ Es entsteht NICHT: lokale NLI-Inferenz (Paket B), Schattenbetrieb (Paket C), ein
 Gate (§6). Wer den Piloten wieder aufnimmt, muss zuerst F18 beantworten — den Wert einer
 Mail als spätere Antwortquelle — und die Lastfrage aus F19 messen, statt sie zu behaupten.
 
-Zwei Fäden laufen getrennt weiter, beide unabhängig von diesem Piloten: die Antwortlatenz
-und -qualität des Vault-Chats (Modellwahl, Kontextlänge), und die Vordergrund-Hülle aus F19.
+Ein Faden läuft getrennt weiter, unabhängig von diesem Piloten: die Antwortlatenz des
+Vault-Chats. Der Modellhebel ist dort zu (Nutzerentscheidung 23.09.2026, qwen3.5 verworfen),
+es bleiben Kontextlänge und ein warm gehaltenes Modell. Die Vordergrund-Hülle aus F19 ist
+behoben.
 
 **Was weiterhin offen ist:** F05 und F08 (Paket C bzw. B). F04 bleibt im Nachweis offen:
 ob die installierte Runtime die drei NLI-Klassen überhaupt herausgibt, entscheidet Paket B.
