@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.22-beta] - 2026-09-23
+
+**Der Agent ist jetzt einen Klick entfernt: Oben in der Leiste steht „Agent“ neben Dashboard und Workflow.** Ein Klick öffnet den Agenten, der Ordner auswertet, Tabellen zusammenführt und Dokumente schreibt. Vorher fand man ihn nur über die Befehlspalette, einen Rechtsklick auf einen Ordner oder die Hilfe. Die Leiste passt jetzt außerdem in kleine Fenster und lässt sich mit Tastatur und Screenreader bedienen.
+
+### Hintergrund
+
+- **Eindeutige Namen:** Das edoobox-Panel hieß im Menü „Veranstaltungsagent“ und war damit neben dem neuen Knopf leicht zu verwechseln. Es heißt jetzt „Veranstaltungen“, wie schon in seiner Kopfzeile. Wer in der Befehlspalette „Agent“ sucht, findet nur noch den Agenten für Notizen und Ordner.
+- **Kleine Fenster:** Mit allen Modulen brauchte die obere Leiste rund 1180 Pixel. In schmaleren Fenstern rutschten Einstellungen, Aufgaben und Posteingang rechts aus dem Bild. Unter 1300 Pixel zeigt die Mitte jetzt nur Symbole, unter 1000 Pixel entfällt die Versionsanzeige. Die Leiste passt bis zur kleinsten Fenstergröße.
+- **Tastatur und Screenreader:** Jeder Knopf der Leiste hat einen festen Namen, den Screenreader vorlesen. Der Hinweistext erscheint auch beim Anspringen mit der Tab-Taste und passt sich sofort an, etwa wenn der Sprachbefehl von „starten“ auf „stoppen“ wechselt oder sich die Zahl offener Aufgaben ändert.
+- **Unterstrich aktiver Knöpfe:** Ein geöffnetes Aufgaben- oder Posteingangs-Panel zeigt seinen farbigen Unterstrich wieder zuverlässig. Er verschwand bisher, sobald man einmal mit der Maus über den Knopf gefahren war.
+- **Vault-Index wartet nicht mehr auf Cloud-Läufe:** Lief die Mail-Analyse oder der Notiz-Chat über einen Cloud-Anbieter, hielt der Aufbau des Vault-Index trotzdem an, als würde lokal gerechnet. Bei einem Stapel Mails waren das Minuten ohne Fortschritt. Jetzt pausiert er nur, wenn wirklich das lokale Modell beschäftigt ist.
+- **Grenze:** Die übrigen Symbolknöpfe außerhalb der oberen Leiste, etwa im Notiz-Chat, haben noch keinen festen Namen für Screenreader.
+
 ## [0.11.21-beta] - 2026-09-22
 
 **Eine beschädigte oder mit falschem Schlüssel verschlüsselte Kopie auf dem Server repariert sich jetzt von selbst.** Kann ein Gerät eine Datei nicht entschlüsseln, meldet es das. Ein anderes Gerät, das denselben Inhalt unversehrt besitzt, lädt ihn beim nächsten Abgleich neu hoch. Danach kommt die Datei auch auf dem ersten Gerät an. Du musst dafür nichts anklicken.
