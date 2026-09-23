@@ -614,7 +614,9 @@ Es gibt keinen Aufrufer im Produktivpfad: `email-analyze` ist unberührt, `src/m
 | `app/scripts/email-decision-instruction.example.md` | — | Beispiel-Instruktionsnotiz für `--instruction` |
 | Tests | 162 | sechs `*.test.ts` neben den Modulen, `scripts/email-decision-fixtures.test.ts` und `scripts/email-decision-eval.test.ts` |
 
-Geändert: `app/package.json` (eine Zeile, Skript `email:decision-eval`).
+Geändert: `app/package.json` (eine Zeile, Skript `email:decision-eval`) — **nach der
+Einfrierung am 23.09.2026 wieder entfernt**, siehe Abschluss. Das Werkzeug bleibt über
+`node scripts/run-ts.mjs scripts/email-decision-eval.ts` lauffähig.
 
 ### Tatsächlicher Vertrag (Abweichungen zum Plan markiert)
 
@@ -684,15 +686,15 @@ ergaben denselben einen Fehlschlag; nach der Korrekturrunde unverändert.
 CLI-Läufe (alle ohne Modell, ohne Netz, ohne Zugriff auf Maildaten):
 
 ```
-npm run email:decision-eval -- --dataset scripts/email-decision-fixtures.jsonl
-npm run email:decision-eval -- --dataset scripts/email-decision-fixtures.jsonl \
+node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset scripts/email-decision-fixtures.jsonl
+node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset scripts/email-decision-fixtures.jsonl \
     --instruction scripts/email-decision-instruction.example.md --experimental-negative-rule
-npm run email:decision-eval -- --dataset scripts/email-decision-fixtures-synthetic-nli.jsonl \
+node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset scripts/email-decision-fixtures-synthetic-nli.jsonl \
     --seed s3 --subset cal --risk-positive 0.6 --risk-negative 0.15 \
     --impersonal-positive 0.6 --sweep
-npm run email:decision-eval -- --dataset <kaputt>.jsonl --validate     # Exit 1
-npm run email:decision-eval -- --dataset … --out /tmp/emails.json      # Exit 1, Schreibsperre
-npm run email:decision-eval                                            # Formatbeschreibung
+node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset <kaputt>.jsonl --validate     # Exit 1
+node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset … --out /tmp/emails.json      # Exit 1, Schreibsperre
+node scripts/run-ts.mjs scripts/email-decision-eval.ts                 # Formatbeschreibung
 ```
 
 Ergebnis des ersten Laufs, ohne Instruktionsnotiz, über alle 23 synthetischen Fälle

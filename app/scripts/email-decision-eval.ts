@@ -1,7 +1,11 @@
 /**
  * E-Mail-Decision-Pilot — Prüf- und Auswertungs-CLI (Paket A).
  *
- *   npm run email:decision-eval -- --dataset <pfad.jsonl> [--instruction <notiz.md>]
+ *   node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset <pfad.jsonl> [--instruction <notiz.md>]
+ *
+ * Bewusst OHNE npm-Skript: der Pilot ist eingefroren (siehe docs/codex-collab/
+ * email-decision-pilot.md). Das Werkzeug bleibt lauffähig, steht aber nicht mehr in der
+ * Befehlsliste des Projekts.
  *
  * Ohne `--dataset` erklärt das Werkzeug das Dateiformat. Mit `--validate` prüft es nur.
  *
@@ -125,7 +129,7 @@ function assertWritableTarget(target: string): void {
 const USAGE = `
 E-Mail-Decision-Pilot — Auswertung (Paket A, ohne Modell lauffähig)
 
-  npm run email:decision-eval -- --dataset <pfad.jsonl> [Optionen]
+  node scripts/run-ts.mjs scripts/email-decision-eval.ts --dataset <pfad.jsonl> [Optionen]
 
 Optionen
   --dataset <pfad>            JSONL mit manuellen Labels (liegt außerhalb des Repos).
