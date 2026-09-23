@@ -21,7 +21,9 @@
     "build:signer": "node scripts/build-signer.mjs",
     "rag:eval": "node scripts/run-ts.mjs scripts/rag-eval.ts",
     "vault:bench": "node scripts/run-ts.mjs scripts/vault-index-bench.ts",
-    "vault:eval": "node scripts/run-ts.mjs scripts/vault-eval.ts"
+    "vault:eval": "node scripts/run-ts.mjs scripts/vault-eval.ts",
+    "vault:profile": "node scripts/run-ts.mjs scripts/vault-answer-profile.ts",
+    "email:decision-eval": "node scripts/run-ts.mjs scripts/email-decision-eval.ts"
   },
   "keywords": [
     "markdown",
