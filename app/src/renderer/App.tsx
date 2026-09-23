@@ -127,7 +127,8 @@ const ViewModeButton: React.FC<{
   <button
     className={`view-mode-btn ${currentMode === mode ? 'active' : ''}`}
     onClick={onClick}
-    title={title}
+    data-tooltip={title}
+    aria-label={title ?? label}
   >
     {children}
     {label && <span className="view-mode-label">{label}</span>}
@@ -326,7 +327,10 @@ const App: React.FC = () => {
     return () => clearTimeout(timer)
   }, [notes, taskExcludedFolders, taskIncludedFolders])
 
-  // title → data-tooltip Konvertierung (verhindert doppelte native Tooltips)
+  // title → data-tooltip Konvertierung (verhindert doppelte native Tooltips).
+  // Die Titelleiste braucht das nicht: ihre Knöpfe setzen data-tooltip und
+  // aria-label direkt, damit dynamische Texte (Sprachbefehl, Aufgaben-Zähler)
+  // und Sprachwechsel sofort im Tooltip ankommen.
   useEffect(() => {
     const convert = (e: MouseEvent) => {
       const el = (e.target as HTMLElement).closest('[title]') as HTMLElement | null
@@ -1246,7 +1250,7 @@ const App: React.FC = () => {
         <div className="titlebar">
           <div className="titlebar-left">
             <div className="view-mode-switcher">
-              <button className="view-mode-btn" onClick={toggleSidebar} title={t('titlebar.sidebar')}>
+              <button className="view-mode-btn" onClick={toggleSidebar} data-tooltip={t('titlebar.sidebar')} aria-label={t('titlebar.sidebar')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   {sidebarVisible ? (
                     <><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></>
@@ -1298,7 +1302,8 @@ const App: React.FC = () => {
                     setViewMode('editor')
                     openDashboardTab()
                   }}
-                  title={t('dashboard.title')}
+                  data-tooltip={t('dashboard.title')}
+                  aria-label={t('dashboard.title')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="7" height="7" rx="1"/>
@@ -1316,7 +1321,8 @@ const App: React.FC = () => {
                     setViewMode('editor')
                     openWorkflowCanvasTab()
                   }}
-                  title="Workflow Canvas"
+                  data-tooltip="Workflow Canvas"
+                  aria-label="Workflow Canvas"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="6" height="6" rx="1"/>
@@ -1326,12 +1332,35 @@ const App: React.FC = () => {
                   <span className="view-mode-label">Workflow</span>
                 </button>
               )}
+              {/* Agent-Tab als fester Einstieg: vorher nur über Befehlspalette,
+                  Ordner-Kontextmenü und Hilfe erreichbar — zu versteckt für eines
+                  der wichtigsten Werkzeuge. Kein Modul-Gate, wie openAgentTab selbst. */}
+              <button
+                className={`view-mode-btn cat-ai ${activeTab?.type === 'agent' ? 'active' : ''}`}
+                onClick={() => {
+                  setViewMode('editor')
+                  openAgentTab()
+                }}
+                data-tooltip={t('commandPalette.openAgent')}
+                aria-label={t('commandPalette.openAgent')}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 8V4H8"/>
+                  <rect x="4" y="12" width="16" height="8" rx="2"/>
+                  <path d="M2 14h2"/>
+                  <path d="M20 14h2"/>
+                  <path d="M15 16h.01"/>
+                  <path d="M9 16h.01"/>
+                </svg>
+                <span className="view-mode-label">Agent</span>
+              </button>
               <span className="view-mode-separator" />
               <button
                 className={`view-mode-btn cat-editor ${textSplitEnabled ? 'active' : ''}`}
                 onClick={() => setTextSplitEnabled(!textSplitEnabled)}
                 disabled={viewMode !== 'editor'}
-                title={t('titlebar.textSplit')}
+                data-tooltip={t('titlebar.textSplit')}
+                aria-label={t('titlebar.textSplit')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="8" height="18" rx="1"/>
@@ -1347,7 +1376,8 @@ const App: React.FC = () => {
                 <button
                   className={`view-mode-btn cat-editor ${voiceCommandKind === 'listening' || voiceCommandKind === 'preparing' ? 'active' : ''}`}
                   onClick={handleVoiceButton}
-                  title={voiceCommandKind === 'listening' ? t('voiceCommand.stopListening') : t('voiceCommand.startListening')}
+                  data-tooltip={voiceCommandKind === 'listening' ? t('voiceCommand.stopListening') : t('voiceCommand.startListening')}
+                  aria-label={voiceCommandKind === 'listening' ? t('voiceCommand.stopListening') : t('voiceCommand.startListening')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
@@ -1360,7 +1390,8 @@ const App: React.FC = () => {
                 <button
                   className="view-mode-btn cat-editor"
                   onClick={() => window.electronAPI.transportShow()}
-                  title={t('titlebar.transport')}
+                  data-tooltip={t('titlebar.transport')}
+                  aria-label={t('titlebar.transport')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 5v14"/>
@@ -1371,7 +1402,8 @@ const App: React.FC = () => {
               <button
                 className="view-mode-btn cat-editor"
                 onClick={() => setSettingsOpen(true)}
-                title={t('titlebar.settings')}
+                data-tooltip={t('titlebar.settings')}
+                aria-label={t('titlebar.settings')}
               >
                 {/* Petrol redesign: Regler/Adjustments-Icon statt Zahnrad (Claude Design). */}
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
@@ -1384,7 +1416,8 @@ const App: React.FC = () => {
               <button
                 className={`view-mode-btn cat-organize overdue-btn ${overduePanelOpen ? 'active' : ''} ${taskStats.overdue > 0 ? 'has-overdue' : ''}`}
                 onClick={() => switchRightPanel('overdue')}
-                title={`${t('tasks.title')} (${taskStats.overdue})`}
+                data-tooltip={`${t('tasks.title')} (${taskStats.overdue})`}
+                aria-label={`${t('tasks.title')} (${taskStats.overdue})`}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>
@@ -1398,7 +1431,8 @@ const App: React.FC = () => {
                 <button
                   className={`view-mode-btn cat-integrate inbox-btn ${inboxPanelOpen ? 'active' : ''} ${unreadRelevantCount > 0 ? 'has-emails' : ''}`}
                   onClick={() => switchRightPanel('inbox')}
-                  title={t('titlebar.inbox')}
+                  data-tooltip={t('titlebar.inbox')}
+                  aria-label={t('titlebar.inbox')}
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect width="20" height="16" x="2" y="4" rx="2" />
@@ -1415,7 +1449,8 @@ const App: React.FC = () => {
                 <button
                   className={`view-mode-btn ${toolsMenuOpen ? 'active' : ''}`}
                   onClick={() => setToolsMenuOpen(o => !o)}
-                  title={t('titlebar.more')}
+                  data-tooltip={t('titlebar.more')}
+                  aria-label={t('titlebar.more')}
                   aria-haspopup="menu"
                   aria-expanded={toolsMenuOpen}
                 >
@@ -1494,7 +1529,8 @@ const App: React.FC = () => {
               <button
                 className="view-mode-btn"
                 onClick={() => setHelpGuideOpen(true)}
-                title={t('titlebar.help')}
+                data-tooltip={t('titlebar.help')}
+                aria-label={t('titlebar.help')}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10"/>

@@ -250,6 +250,13 @@ h2 { letter-spacing: -0.016em; }
   top: calc(100% + 6px);
 }
 
+/* Tastatur: in der Titelleiste sind viele Knöpfe nur Symbole (schmale Fenster) —
+   der Name muss auch beim Anspringen mit Tab erscheinen, nicht nur beim Überfahren. */
+.titlebar [data-tooltip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
 /* Tooltip nach unten für Sidebar-Header-Buttons */
 .sidebar-header-actions [data-tooltip]::after {
   bottom: auto;
@@ -473,6 +480,7 @@ h2 { letter-spacing: -0.016em; }
 }
 
 .app-title {
+  white-space: nowrap;
   font-weight: 600;
   font-size: 13px;
   color: var(--text-secondary);
@@ -482,6 +490,7 @@ h2 { letter-spacing: -0.016em; }
 /* Petrol redesign: Versions-Pill „• 0.9 Petrol" (Accent-Dot + Accent-Text, Claude Design). */
 .beta-badge {
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   gap: 5px;
   font-size: 10px;
@@ -547,6 +556,34 @@ h2 { letter-spacing: -0.016em; }
 
 .titlebar-center .view-mode-btn:has(svg:only-child) {
   min-width: 30px;
+}
+
+/* Schmale Fenster (min. 800 px, main/index.ts): Mit allen Modulen braucht die
+   Leiste beschriftet rund 1180 px und lief rechts aus dem Fenster — Aufgaben,
+   Inbox und Einstellungen waren dann nicht mehr erreichbar. Unterhalb der Schwelle
+   bleiben in der Mitte nur die Symbole (Tooltip über title), unter 1000 px fällt
+   zusätzlich die Versions-Pill weg und rechts die alte Mindestbreite. Schwellen
+   gemessen (Offscreen-Render mit allen Modulen), nicht geschätzt. */
+@media (max-width: 1300px) {
+  .titlebar-center .view-mode-label {
+    display: none;
+  }
+  .titlebar-center .view-mode-btn {
+    min-width: 30px;
+    width: 30px;
+    padding: 0;
+  }
+}
+
+@media (max-width: 1000px) {
+  .titlebar .beta-badge {
+    display: none;
+  }
+  /* Die 340 px stammen aus der Zeit vor dem Werkzeuge-Menü; heute sind es rechts
+     höchstens sieben Symbole (~230 px). */
+  .titlebar-right {
+    min-width: auto;
+  }
 }
 
 .titlebar-right .view-mode-switcher {
@@ -629,10 +666,13 @@ h2 { letter-spacing: -0.016em; }
   stroke: var(--category-color);
 }
 
-.titlebar-right .view-mode-btn.cat-editor.active::after,
-.titlebar-right .view-mode-btn.cat-ai.active::after,
-.titlebar-right .view-mode-btn.cat-organize.active::after,
-.titlebar-right .view-mode-btn.cat-integrate.active::after {
+/* Unterstrich über ::before — ::after gehört dem data-tooltip. Beide auf ::after
+   ließen den Unterstrich unsichtbar werden (opacity 0 aus der Tooltip-Regel) und
+   den Tooltip-Text verschwinden (content ''), sobald ein Knopf data-tooltip trägt. */
+.titlebar-right .view-mode-btn.cat-editor.active::before,
+.titlebar-right .view-mode-btn.cat-ai.active::before,
+.titlebar-right .view-mode-btn.cat-organize.active::before,
+.titlebar-right .view-mode-btn.cat-integrate.active::before {
   content: '';
   position: absolute;
   left: 8px;

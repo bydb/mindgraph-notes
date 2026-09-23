@@ -53,7 +53,7 @@ const RAW_COMMAND_CATALOG = [
   { id: 'panel-vault-chat', labelKey: 'commandPalette.panelVaultChat', categoryKey: 'commandPalette.cat.panels', keywords: 'vault befragen quellen belege zitate fussnoten rag fragen sources citations', requires: 'vaultChat' },
   { id: 'panel-flashcards', labelKey: 'commandPalette.panelFlashcards', categoryKey: 'commandPalette.cat.panels', keywords: 'flashcards karteikarten lernen', requires: 'flashcards' },
   { id: 'panel-inbox', labelKey: 'commandPalette.panelInbox', categoryKey: 'commandPalette.cat.panels', keywords: 'email inbox posteingang mail', requires: 'email' },
-  { id: 'panel-agent', labelKey: 'commandPalette.panelAgent', categoryKey: 'commandPalette.cat.panels', keywords: 'agent edoobox veranstaltungen events', requires: 'edoobox' },
+  { id: 'panel-agent', labelKey: 'commandPalette.panelAgent', categoryKey: 'commandPalette.cat.panels', keywords: 'edoobox veranstaltungen events akkreditierung buchungen', requires: 'edoobox' },
   { id: 'llm-performance', labelKey: 'commandPalette.llmPerformance', categoryKey: 'commandPalette.cat.panels', keywords: 'leistung geschwindigkeit token modell performance speed tokens' },
   { id: 'open-comparison', labelKey: 'commandPalette.openComparison', categoryKey: 'commandPalette.cat.view', keywords: 'vergleich kampagne studie messen konventionell gegenprobe wirklich schneller belegen nachweis controlling' },
   { id: 'panel-scholar', labelKey: 'commandPalette.panelScholar', categoryKey: 'commandPalette.cat.panels', keywords: 'semantic scholar paper research', requires: 'semanticScholar' },

@@ -53,7 +53,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       })
     }
     rows.push({
-      id: 'edoobox', label: 'edoobox API-Key + Secret', category: 'Business', note: 'Veranstaltungs-Agent', settingsTab: 'agents',
+      id: 'edoobox', label: 'edoobox API-Key + Secret', category: 'Business', note: 'Veranstaltungen', settingsTab: 'agents',
       checkSet: async () => { const creds = await edooboxService.loadCredentials(); return !!(creds && creds.apiKey && creds.apiSecret) }
     })
     rows.push({

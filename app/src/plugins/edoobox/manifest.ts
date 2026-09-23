@@ -64,7 +64,7 @@ export const manifest: PluginManifest = {
   id: 'edoobox',
   version: '1.0.0',
   label: 'Edoobox Modul',
-  description: 'Veranstaltungs-Agent: Akkreditierung → edoobox-Push, Dashboard, Buchungen, Teilnehmerlisten.',
+  description: 'Veranstaltungen: Akkreditierung → edoobox-Push, Dashboard, Buchungen, Teilnehmerlisten.',
   category: 'business',
   apiVersion: '^0.2.0',
   minAppVersion: '0.8.14',

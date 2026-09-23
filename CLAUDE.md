@@ -56,7 +56,7 @@ app/
 │       │   ├── DashboardPanel/  # Dashboard-Tab + RadarWidget + ActivityWidget (Brain)
 │       │   ├── Flashcards/ Quiz/ # Lern-Features
 │       │   ├── InboxPanel/  # Smart Email Client (Inbox, Compose-Modal via createPortal, KI-Chat)
-│       │   ├── AgentPanel/  # Veranstaltungs-Agent (edoobox) + Marketing + IQ
+│       │   ├── AgentPanel/  # Panel „Veranstaltungen“ (edoobox) + Marketing + IQ — nicht der Notiz-Agent
 │       │   ├── Terminal/    # Integriertes Terminal (xterm.js + PTY)
 │       │   ├── SemanticScholarPanel/  # Semantic Scholar + OpenAlex + Zotero CSL
 │       │   ├── NotesChat/ SmartConnectionsPanel/ ZoteroSearch/ WorkflowCanvas/ ...
@@ -356,7 +356,7 @@ Click-Handler für Decorations: `view.posAtCoords()` + StateField-Lookup nutzen 
 - **Font-Loads aus CSS (`@font-face`) funktionieren** trotz opaque Origin — empirisch verifiziert mit den KaTeX-woff2 (write_html-Feature). Chromium erzwingt hier kein CORS gegen das Custom-Scheme.
 
 ### Notiz-Agent: Ordner auswerten + Agent-Tab
-- **Zwei Zuhause, ein Zustand**: Macher-Leiste unter der Notiz UND eigener Tab (`TabType 'agent'`, `AgentView`, Befehlspalette + Ordner-Kontextmenü „Ordner mit Agent auswerten"). Lauf-Zustand, Anhänge und Zielordner liegen in `renderer/stores/noteAgentStore.ts`, gekeyt auf einen „Bereich" (Notiz-ID oder Tab-ID). **Die vier `note-agent-*`-Events dürfen nur EINMAL pro Fenster abonniert werden** — preload registriert sie mit `removeAllListeners`, zwei Abonnenten melden sich gegenseitig still ab. Deshalb `initNoteAgentEvents()` genau einmal in `App.tsx`. Anzeige geteilt über `components/Agent/AgentRunPanel.tsx`.
+- **Zwei Zuhause, ein Zustand**: Macher-Leiste unter der Notiz UND eigener Tab (`TabType 'agent'`, `AgentView`; fester Knopf „Agent“ in der Titelleiste, dazu Befehlspalette + Ordner-Kontextmenü „Ordner mit Agent auswerten“). Lauf-Zustand, Anhänge und Zielordner liegen in `renderer/stores/noteAgentStore.ts`, gekeyt auf einen „Bereich" (Notiz-ID oder Tab-ID). **Die vier `note-agent-*`-Events dürfen nur EINMAL pro Fenster abonniert werden** — preload registriert sie mit `removeAllListeners`, zwei Abonnenten melden sich gegenseitig still ab. Deshalb `initNoteAgentEvents()` genau einmal in `App.tsx`. Anzeige geteilt über `components/Agent/AgentRunPanel.tsx`.
 - **Der Agent liest NUR, was angehängt ist.** `note_read` ist `.md`-only, `list_target_folder` liefert nur Namen des ZIELordners. Ohne Ordner-Anhang gibt es keinen Weg zu einer Excel-Datei — das Modell erfand dafür „bitte hochladen" (real passiert). Deshalb: System-Prompt-Absatz „Was du lesen kannst" + Ablehnungstexte, die auf `read_context_file`/Anhängen zeigen, nie auf Upload.
 - **Ordner-Werkzeuge** (nur bei Ordner-Anhang freigeschaltet): `list_context_folder` (Manifest ohne Inhalte) → `read_context_file` (eine Datei, blatt-/zeilenweise) → `collect_table` (App führt alle Excel-/CSV-Dateien zusammen, Modell bekommt nur Kennzahlen + 20 Beispielzeilen + Problemliste) → `write_xlsx({ dataset })`. **Die Zeilen laufen bewusst nie durch den Modellkontext** — sonst greift bei 60 Rückläufen der stille Kontext-Überlauf. Pure Logik in `shared/tableCollect.ts` (Kopfzeilen-Erkennung, unscharfe Spaltenzuordnung, Filter, CSV-Parser) mit Tests. Grenzen: 300 Dateien, 20.000 Zeilen, 40 Dateien mit Blatt-Details — alle sichtbar gemeldet, nie still.
 - **Zwei Ergebnisse pro Lauf erlaubt** (z.B. Tabelle + begleitende Notiz), jedes Format nur einmal. **Web-Läufe bleiben bei „genau EIN Write"** — dort ist das der Quellen-Vertrag.

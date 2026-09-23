@@ -466,7 +466,7 @@ const translations = {
     'commandPalette.panelVaultChat': 'Vault befragen (Antworten mit Quellen)',
     'commandPalette.panelFlashcards': 'Panel: Karteikarten',
     'commandPalette.panelInbox': 'Panel: Posteingang',
-    'commandPalette.panelAgent': 'Panel: Veranstaltungsagent',
+    'commandPalette.panelAgent': 'Panel: Veranstaltungen',
     'commandPalette.panelScholar': 'Panel: Paper-Suche',
     'commandPalette.newNote': 'Neue Notiz',
     'commandPalette.quickSearch': 'Schnellsuche öffnen',
@@ -3043,7 +3043,7 @@ const translations = {
     'agent.iq.download': 'Als .docx herunterladen',
     'agent.iq.generating': 'Erstelle Dokument...',
     'agent.iq.saved': 'Gespeichert',
-    'titlebar.agents': 'Veranstaltungsagent',
+    'titlebar.agents': 'Veranstaltungen',
 
     // WordPress-Plugin (eigener Settings-Tab)
     'settings.wordpress.title': 'WordPress',
@@ -3817,7 +3817,7 @@ const translations = {
     'commandPalette.panelVaultChat': 'Ask the vault (answers with sources)',
     'commandPalette.panelFlashcards': 'Panel: Flashcards',
     'commandPalette.panelInbox': 'Panel: Inbox',
-    'commandPalette.panelAgent': 'Panel: Event agent',
+    'commandPalette.panelAgent': 'Panel: Events',
     'commandPalette.panelScholar': 'Panel: Paper search',
     'commandPalette.newNote': 'New note',
     'commandPalette.quickSearch': 'Open quick search',
@@ -6394,7 +6394,7 @@ const translations = {
     'agent.iq.download': 'Download as .docx',
     'agent.iq.generating': 'Creating document...',
     'agent.iq.saved': 'Saved',
-    'titlebar.agents': 'Event Agent',
+    'titlebar.agents': 'Events',
 
     // WordPress plugin (own settings tab)
     'settings.wordpress.title': 'WordPress',
