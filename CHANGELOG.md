@@ -2,6 +2,15 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.24-beta] - 2026-09-24
+
+**Der Knopf „Zustimmen“ für Cloud-Läufe des Agenten funktioniert jetzt.** In 0.11.23 blieb nach dem Klick der Hinweis „Cloud-Zustimmung fehlt“ stehen, und der Auftrag ließ sich nicht starten. Jetzt verschwindet der Kasten, und du kannst den Auftrag über den gewählten Cloud-Anbieter starten.
+
+### Hintergrund
+
+- Die Zustimmung wurde beim Klick gesetzt, aber erst einen Moment später gespeichert. Die Karte prüfte sofort nach und bekam noch den alten Stand zurück. Jetzt wird zuerst gespeichert, dann geprüft.
+- Dasselbe galt für den Schalter in den Einstellungen unter KI & Modelle. Er speichert ebenfalls sofort.
+
 ## [0.11.23-beta] - 2026-09-24
 
 **Der Agent nimmt dich jetzt an die Hand und durchsucht deinen Vault nach Bedeutung.** Die Agent-Ansicht ist eine Auftragskarte: Beispiele aus Verwaltung, Beschaffung, Wissensrecherche und Schule, darunter Schritt für Schritt Unterlagen, Ablage, Befugnisse und Modell. Hast du einen Vault-Index, findet der Agent passende Notizen auch dann, wenn andere Wörter darin stehen. Die Karte zeigt ehrlich, ob das Modell auf deinem Rechner rechnet oder in der Cloud, und welche Daten wohin gehen.
