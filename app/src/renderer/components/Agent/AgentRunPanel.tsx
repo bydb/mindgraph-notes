@@ -147,7 +147,15 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
           <ModelLogo model={run.model} size={13} />
           <span className="ai-bar-agent-prov-model">{run.model}</span>
           <span className="ai-bar-agent-prov-route">
-            · {run.cloudLabel ? `${t('aiBar.agent.provCloud')} (${run.cloudLabel})` : t('aiBar.agent.provLocal')}
+            {/* Laufbefund aus dem Main (lokal nur nach Prüfung, Ollama-Cloud als Cloud) —
+                vorher galt alles ohne cloudLabel als „lokal“. */}
+            · {run.route
+              ? run.route.kind === 'cloud'
+                ? `${t('aiBar.agent.provCloud')} (${run.route.providerLabel})`
+                : run.route.kind === 'local'
+                  ? t('aiBar.agent.provLocal')
+                  : t('aiBar.agent.provUnverified')
+              : run.cloudLabel ? `${t('aiBar.agent.provCloud')} (${run.cloudLabel})` : t('aiBar.agent.provLocal')}
           </span>
         </div>
       )}

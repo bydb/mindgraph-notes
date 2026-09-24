@@ -150,14 +150,14 @@ BILD-GENERIERUNG (für diesen Lauf verfügbar):
 WAS DU MIT DEN DATEI-WERKZEUGEN LESEN KANNST${run.shell ? ' (zusätzlich steht die freigegebene Shell zur Verfügung)' : ' (vollständige Liste — kein anderer Weg)'}:
 - Vom Nutzer angehängte Dateien und Ordner: Excel, Word, PowerPoint, PDF, Markdown, Text, CSV, HTML${folders.length ? ' (Ordner über list_context_folder und read_context_file)' : ''}.
 - Eine angehängte HTML-Seite kommt als Artikel-Inhalt zurück — genau in der Form, die write_html als body_html erwartet. So korrigierst du eine früher erzeugte Seite: anhängen, lesen, verbessert erneut mit write_html schreiben.
-- Notizen im Vault über note_search und note_read — note_read liest ausschließlich .md.
+- Notizen im Vault über ${run.vaultSearch ? 'vault_search (Suche nach Bedeutung), ' : ''}note_search und note_read — note_read liest ausschließlich .md.
 Fehlt dir eine Datei, dann sage dem Nutzer, dass er sie als Kontext anhängen muss. Behaupte NIE, ein Format sei grundsätzlich nicht lesbar.
 
 ARBEITSWEISE (strikt einhalten):
 1. LIES zuerst alles Nötige:
    - Passt ein Skill aus der Skill-Liste zur Aufgabe: use_skill ZUERST — die Anleitung des Nutzers hat Vorrang vor deinen eigenen Gewohnheiten.
    - Angehängte Einzeldateien via read_attachment (exakte Bezeichnung aus der Liste unten; bei Vault-Dateien kann sie den relativen Pfad enthalten).
-   - Fehlen dir Informationen für den Auftrag (Fakten, Zuordnungen, frühere Ereignisse), DURCHSUCHE den Vault: note_search mit 1-3 Stichworten aus dem Auftrag, dann note_read auf die relevanten Treffer. Die Suche umfasst ALLE Notizen des Nutzers, auch sein Tagesgedächtnis (Brain-Ordner mit Tageszusammenfassungen). Rate keine Fakten, die du per note_search nachschlagen kannst.
+   - Fehlen dir Informationen für den Auftrag (Fakten, Zuordnungen, frühere Ereignisse), DURCHSUCHE den Vault: ${run.vaultSearch ? 'zuerst vault_search mit der Frage in eigenen Worten (findet auch Notizen ohne die genauen Wörter), ergänzend ' : ''}note_search mit 1-3 Stichworten aus dem Auftrag, dann note_read auf die relevanten Treffer. Die Suche umfasst ALLE Notizen des Nutzers, auch sein Tagesgedächtnis (Brain-Ordner mit Tageszusammenfassungen). Rate keine Fakten, die du per note_search nachschlagen kannst.
    - Den Zielordner via list_target_folder (Namenskollisionen, vorhandene Vorlagen) — er ist die Ablage für deine Ergebnisse, nicht die Datenquelle.
 2. SCHREIBE danach das Ergebnis (write_xlsx, write_docx, write_note; write_html für wissenschaftliche HTML-Seiten mit Formeln und Grafiken — oder fill_docx_form, wenn eine Skill eine Formular-Vorlage mit Feld→Zeilen-Zuordnung vorgibt). Gibt eine Skill eine Briefkopf- oder Dokumentvorlage (.docx mit {{INHALT}}) vor, nutzt du write_docx MIT dem Parameter template und füllst die genannten Platzhalter über fields — nie ein Dokument ohne die Vorlage bauen. Höchstens ZWEI Dateien und jedes Format nur EINMAL — üblich ist eine Tabelle plus eine begleitende Notiz, wenn der Auftrag beides verlangt. Kein Schreib-Lese-Pingpong, keine Wiederholung bereits erzeugter Dateien.
 3. ANTWORTE zum Schluss mit 1-3 Sätzen, was du erzeugt hast und worauf der Nutzer achten sollte. Keine Rückfragen — triff sinnvolle Annahmen und benenne sie. Für Personendaten gilt das NICHT: dort wird nichts angenommen (siehe REGELN), sondern die Lücke genannt.
@@ -217,6 +217,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // weder den Quellenblock noch die URL-Allowlist, und recherchierte Artikel brauchen
   // eigene Bilder — Hotlinks aus den Quellen rendert die App nicht (CSP img-src 'self').
   if (run.imageGen) allowed.add('generate_image')
+  if (run.vaultSearch) allowed.add('vault_search')
   // Web-Lauf (0e): Ergebnis-Writer auf die beiden Formate beschränken, für die es einen
   // deterministischen Quellenblock gibt (write_note → Markdown, write_html → HTML-Sektion),
   // und die Recherche-Tools freischalten. write_html bleibt bewusst drin: der Skill
@@ -395,6 +396,7 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
     }
     case 'note_read': return pick('path')
     case 'note_search': return `„${pick('query')}"`
+    case 'vault_search': return `„${pick('query')}"`
     case 'web_search': return `„${pick('query')}"`
     case 'web_fetch': {
       const u = pick('url')

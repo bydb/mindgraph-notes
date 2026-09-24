@@ -9,6 +9,8 @@
 //
 // „Bereich" (scopeId) ist die Notiz-ID (Editor) oder die Tab-ID (Agent-Tab).
 
+import type { AgentRoute } from '../../shared/agentRoute'
+import { dropComposeMeasurement } from '../utils/activeTimeTracker'
 import { create } from 'zustand'
 import { createActiveMeasurement, type ActiveMeasurement } from '../utils/activeTimeTracker'
 import type { NoteAgentAttachment } from '../../shared/types'
@@ -63,6 +65,9 @@ export interface AgentRunUiState {
   cloudLabel: string | null
   shellAccess?: boolean
   computerAccess?: boolean
+  webResearch?: boolean
+  /** Main-seitig beim Start festgestellter Modellweg — die Karte zeigt während des Laufs nur ihn. */
+  route?: AgentRoute
   // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
   // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
   rememberSuggestion?: string
@@ -80,7 +85,28 @@ export interface AgentScopeState {
   targetFolder: string
   attachError: string | null
   run: AgentRunUiState
+  /**
+   * Noch nicht gestarteter Auftrag im Agent-Tab und das Beispiel, aus dem er stammt.
+   * Liegt hier statt im Komponenten-State, damit ein Tab-Wechsel (AgentView wird dabei
+   * ausgehängt) ihn nicht löscht — Anhänge und Zielordner überleben das ja auch.
+   */
+  draft?: string
+  pickedExample?: { text: string; need: AgentExampleNeed } | null
+  /** Modellwahl und Web-Schalter des Agent-Tabs — aus demselben Grund wie `draft` hier. */
+  prefs?: AgentScopePrefs
+  /** Start vom Main abgelehnt, weil Cloud-Freigabe oder Zustimmung fehlt — die Karte zeigt
+   *  dafür eine eigene Zeile statt einer Fehlermeldung unter den Anhängen. */
+  startGate?: { code: 'optin' | 'consent'; message: string } | null
 }
+
+export interface AgentScopePrefs {
+  localModel?: string
+  cloudProvider?: 'openrouter' | 'llmbase' | null
+  webArmed?: boolean
+}
+
+/** Voraussetzung eines Beispielauftrags, solange sein Text unverändert ist. */
+export type AgentExampleNeed = 'none' | 'folder' | 'files2' | 'web'
 
 export const EMPTY_AGENT_RUN: AgentRunUiState = {
   runId: null,
@@ -138,6 +164,9 @@ interface NoteAgentStoreState {
   attachVaultPath: (scopeId: string, vaultPath: string, relPath: string) => Promise<void>
   detach: (scopeId: string, id: string) => Promise<void>
   setTargetFolder: (scopeId: string, rel: string | null) => void
+  setDraft: (scopeId: string, text: string) => void
+  setPickedExample: (scopeId: string, example: { text: string; need: AgentExampleNeed } | null) => void
+  setPrefs: (scopeId: string, patch: AgentScopePrefs) => void
 
   startRun: (scopeId: string, params: AgentStartParams) => Promise<void>
   cancelRun: (scopeId: string) => void
@@ -317,6 +346,15 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
   setTargetFolder: (scopeId, rel) =>
     set(s => withScope(s, scopeId, sc => ({ ...sc, targetFolder: rel || '' }))),
 
+  setDraft: (scopeId, text) =>
+    set(s => withScope(s, scopeId, sc => ({ ...sc, draft: text }))),
+
+  setPickedExample: (scopeId, example) =>
+    set(s => withScope(s, scopeId, sc => ({ ...sc, pickedExample: example }))),
+
+  setPrefs: (scopeId, patch) =>
+    set(s => withScope(s, scopeId, sc => ({ ...sc, prefs: { ...sc.prefs, ...patch } }))),
+
   startRun: async (scopeId, params) => {
     get().setAttachError(scopeId, null)
     const attachmentIds = get().getScope(scopeId).attachments.map(a => a.id)
@@ -339,9 +377,13 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       comparisonCaseId: params.comparisonCaseId
     })
     if (!res.success || !res.runId) {
+      if (res.code === 'optin' || res.code === 'consent') {
+        set(s => withScope(s, scopeId, sc => ({ ...sc, startGate: { code: res.code as 'optin' | 'consent', message: res.error || '' } })))
+      }
       get().setAttachError(scopeId, res.error || 'Start fehlgeschlagen')
       return
     }
+    set(s => withScope(s, scopeId, sc => ({ ...sc, startGate: null })))
     const runId = res.runId
     startWaitTimer(runId)
     set(s => ({
@@ -356,7 +398,9 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
           model: params.cloud ? params.cloud.model : params.model,
           cloudLabel: params.cloudLabel,
           shellAccess: params.shellAccess === true,
-          computerAccess: params.computerAccess === true
+          computerAccess: params.computerAccess === true,
+          webResearch: params.webResearch === true,
+          route: res.route
         }
       }))
     }))
@@ -428,6 +472,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
     set(s => withScope(s, scopeId, sc => ({ ...sc, run: EMPTY_AGENT_RUN }))),
 
   disposeScope: (scopeId) => {
+    dropComposeMeasurement(scopeId)
     const scope = get().scopes[scopeId]
     if (scope?.run.phase === 'running' && scope.run.runId) {
       void window.electronAPI.noteAgentCancel(scope.run.runId)

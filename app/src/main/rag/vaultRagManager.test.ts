@@ -48,7 +48,26 @@ vi.mock('./vaultIndexer', () => {
     }
     run() { return this.done }
   }
-  return { VaultIndexJob, estimateVault: async () => ({ files: 2, bytes: 100, chunksApprox: 1 }) }
+  // Abgleich (Paket 4): echte Dateien des Test-Vaults, nur Markdown, ohne .mindgraph.
+  async function scanVaultFiles(vaultPath: string) {
+    const fsp = await import('fs/promises')
+    const p = await import('path')
+    const out: Array<{ rel: string; abs: string; size: number; mtime: number }> = []
+    async function walk(dir: string) {
+      for (const e of await fsp.readdir(dir, { withFileTypes: true })) {
+        if (e.name.startsWith('.')) continue
+        const abs = p.join(dir, e.name)
+        if (e.isDirectory()) await walk(abs)
+        else if (e.name.endsWith('.md')) {
+          const st = await fsp.stat(abs)
+          out.push({ rel: p.relative(vaultPath, abs).split(p.sep).join('/'), abs, size: st.size, mtime: st.mtimeMs })
+        }
+      }
+    }
+    await walk(vaultPath)
+    return out
+  }
+  return { VaultIndexJob, scanVaultFiles, estimateVault: async () => ({ files: 2, bytes: 100, chunksApprox: 1 }) }
 })
 
 vi.mock('./embed', () => ({
@@ -115,9 +134,9 @@ async function writeNote(rel: string, content: string) {
 }
 
 /** Echter Container auf der Platte: ein Chunk pro Datei, Vektor [1,0,0,0]. */
-async function writeContainer(rels: string[], excludeFolders: string[] = []): Promise<string> {
+async function writeContainer(rels: string[], excludeFolders: string[] = [], digest = 'sha256:aaa'): Promise<string> {
   const identity: VaultIndexIdentity = {
-    model: 'bge-m3:latest', digest: 'sha256:aaa', dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, policyVersion: INDEX_POLICY_VERSION, excludeKey: excludeKeyFor(excludeFolders)
+    model: 'bge-m3:latest', digest, dim: 4, formatVersion: 1, chunkingVersion: RAG_INDEX_VERSION, policyVersion: INDEX_POLICY_VERSION, excludeKey: excludeKeyFor(excludeFolders)
   }
   const meta: VaultIndexMeta = { identity, createdAt: 1, files: {}, chunks: [] }
   for (const rel of rels) {
@@ -571,3 +590,62 @@ describe('Abfrage', () => {
     await expect(m.query(vault, 'alpha', undefined, {})).rejects.toThrow(/Kein Vault-Index/)
   })
 })
+
+describe('Abgleich nach Öffnen/Sync (Paket 4)', () => {
+  it('nichts geändert → „unverändert“, kein Lauf, nichts geschrieben', async () => {
+    const m = manager()
+    await m.setVault(vault)
+    await m.setConfig(vault, { enabled: true, excludeFolders: [] })
+    const file = await writeContainer(['a.md', 'b.md'])
+    const before = (await fs.stat(file)).mtimeMs
+    const r = await m.reconcile(vault, 'open')
+    expect(r.status).toBe('unchanged')
+    expect(r.filesScanned).toBe(2)
+    expect(fake.jobs.length).toBe(0)
+    expect((await fs.stat(file)).mtimeMs).toBe(before)
+    expect((await m.getStatus(vault)).lastReconcile?.status).toBe('unchanged')
+    await m.shutdown()
+  })
+
+  it('geändert, neu und gelöscht → EIN inkrementeller Lauf nur für diese Dateien', async () => {
+    const m = manager()
+    await m.setVault(vault)
+    await m.setConfig(vault, { enabled: true, excludeFolders: [] })
+    await writeContainer(['a.md', 'b.md', 'c.md'])
+    await writeNote('b.md', '# b\n\nneuer Inhalt\n')
+    await writeNote('neu.md', '# neu\n\nhinzugekommen\n')
+    await fs.rm(path.join(vault, 'c.md'))
+    const r = await m.reconcile(vault, 'sync')
+    expect(r.status).toBe('started')
+    expect(r.changed).toBe(3)
+    expect(fake.jobs.length).toBe(1)
+    expect(fake.jobs[0].opts.mode).toBe('incremental')
+    expect([...(fake.jobs[0].opts.changed as Set<string>)].sort()).toEqual(['b.md', 'c.md', 'neu.md'])
+    fake.jobs[0].finish({ status: 'done' })
+    await m.shutdown()
+  })
+
+  it('anderes Embedding-Modell (Digest) → „Neuaufbau erforderlich“, KEIN stiller Vollaufbau (F09)', async () => {
+    const m = manager()
+    await m.setVault(vault)
+    await m.setConfig(vault, { enabled: true, excludeFolders: [] })
+    await writeContainer(['a.md'], [], 'sha256:anders')
+    await writeNote('neu.md', '# neu\n')
+    const r = await m.reconcile(vault, 'open')
+    expect(r.status).toBe('needs-rebuild')
+    expect(fake.jobs.length).toBe(0)
+    await m.shutdown()
+  })
+
+  it('ohne Index oder ohne Opt-in wird nichts gebaut', async () => {
+    const m = manager()
+    await m.setVault(vault)
+    expect((await m.reconcile(vault, 'open')).status).toBe('skipped')
+    await m.setConfig(vault, { enabled: true, excludeFolders: [] })
+    await writeNote('a.md', '# a\n')
+    expect((await m.reconcile(vault, 'open')).status).toBe('no-index')
+    expect(fake.jobs.length).toBe(0)
+    await m.shutdown()
+  })
+})
+

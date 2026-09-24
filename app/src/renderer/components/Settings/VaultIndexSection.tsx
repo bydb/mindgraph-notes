@@ -231,6 +231,15 @@ export function VaultIndexSection() {
           {status.pendingChanges > 0 && !running && (
             <Note tone="muted">{t('settings.vaultIndex.pending', { n: status.pendingChanges })}</Note>
           )}
+          {status.lastReconcile && status.lastReconcile.status !== 'skipped' && (
+            <Note tone={status.lastReconcile.status === 'needs-rebuild' || status.lastReconcile.status === 'error' ? 'warn' : 'muted'}>
+              {t(`settings.vaultIndex.reconcile.${status.lastReconcile.status}` as 'settings.vaultIndex.reconcile.unchanged', {
+                when: new Date(status.lastReconcile.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                n: status.lastReconcile.changed ?? 0,
+                files: status.lastReconcile.filesScanned ?? 0
+              })}
+            </Note>
+          )}
 
           <Details title={t('settings.vaultIndex.excludeTitle')}>
             <p className="sui-hint">{t('settings.vaultIndex.excludeHint')}</p>

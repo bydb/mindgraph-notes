@@ -125,6 +125,9 @@ export class SyncEngine {
   private key: Buffer | null = null
   private manifest: FileManifest | null = null
   private vaultPath: string = ''
+  /** Nach einem erfolgreichen Abgleich (Main-seitig, auch Auto-Sync) — der Vault-Index plant
+   *  darauf seinen Abgleich (Codex F12). Nur Anlass, keine Daten. */
+  onSyncComplete: ((vaultPath: string, downloaded: number) => void) | null = null
   private vaultId: string = ''
   private relayUrl: string = ''
   private activationCode: string = ''
@@ -1338,6 +1341,7 @@ export class SyncEngine {
         message: `${uploadedCount} uploaded, ${downloadedCount} downloaded, ${diff.conflicts.length} conflicts`
       })
       this.sendProgress({ status: 'done', current: total, total })
+      try { this.onSyncComplete?.(this.vaultPath, downloadedCount) } catch { /* Anlass, darf den Sync nicht stören */ }
 
       // Reset status to idle after a moment
       setTimeout(() => {

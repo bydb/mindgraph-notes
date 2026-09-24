@@ -192,6 +192,20 @@ export async function readAgentMemory(vaultPath: string): Promise<string> {
   }
 }
 
+/**
+ * Zustand des Gedächtnisses für die Auftragskarte — dieselbe Schwelle wie
+ * readAgentMemory, damit „wird gekürzt“ genau dann erscheint, wenn der Prompt
+ * tatsächlich gekürzt bekommt. Leer heißt: es gibt keinen Gedächtnisblock im Lauf.
+ */
+export async function agentMemoryStatus(vaultPath: string): Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }> {
+  let trimmed = ''
+  try {
+    trimmed = (await fs.readFile(path.join(vaultPath, AGENT_MEMORY_RELPATH), 'utf-8')).trim()
+  } catch { /* fehlt = leer */ }
+  const state = !trimmed ? 'empty' : trimmed.length > MAX_MEMORY_CHARS ? 'long' : 'filled'
+  return { state, relPath: AGENT_MEMORY_RELPATH }
+}
+
 // Bestätigten Merksatz als datiertes Bullet anhängen; legt die Datei beim ersten
 // Mal mit Kopf an. Rückgabe: vault-relativer Pfad (für „Notiz öffnen" in der UI).
 export async function appendAgentMemory(vaultPath: string, text: string): Promise<string> {

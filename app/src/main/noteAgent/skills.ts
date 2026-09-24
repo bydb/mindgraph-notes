@@ -3,6 +3,7 @@
 // native Freigabe pro Lauf und darf direkte Nebenwirkungen haben.
 // Entscheidung 11: Write-Skills nehmen strukturierte Daten, nie Binärformate vom LLM.
 
+import { clampResults, formatVaultSearchResult, VAULT_SEARCH_MAX_QUERY } from './vaultSearchFormat'
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import { ToolRegistry, type ToolResult } from '../llm/toolRegistry'
@@ -593,6 +594,40 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const res = await noteSearchTool.run(args, telegramCtx(ctx))
       const query = requireString(args, 'query')
       return { ...res, display: query ? `note_search: „${query}"` : undefined }
+    }
+  })
+
+  // Suche nach Bedeutung über den Vault-Index. Nur in der Allowlist, wenn run.vaultSearch
+  // gesetzt ist (Index abfragbar, Embedding lokal) — siehe loop.ts. Auszüge sind GESEHEN,
+  // nicht gelesen; die Quelle heißt deshalb „Suchauszug“ (Codex F04).
+  registry.register({
+    name: 'vault_search',
+    description: 'Sucht im Vault nach BEDEUTUNG (Vault-Index) — findet auch Notizen, die die Suchwörter nicht enthalten. Liefert Pfade mit kurzen Auszügen, nicht die ganzen Notizen; relevante Treffer danach mit note_read lesen. Parameter: query (Frage oder Thema in eigenen Worten), optional max_results (1-8, Standard 5).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Frage oder Thema in eigenen Worten' },
+        max_results: { type: 'integer', description: 'Anzahl Treffer (1-8, Standard 5)' }
+      },
+      required: ['query']
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const search = ctx.run.vaultSearch
+      if (!search) return { ok: false, content: 'Fehler: Der Vault-Index ist in diesem Lauf nicht verfügbar — nutze note_search.' }
+      const query = (requireString(args, 'query') ?? '').trim().slice(0, VAULT_SEARCH_MAX_QUERY)
+      if (!query) return { ok: false, content: 'Fehler: query ist leer.' }
+      try {
+        const result = await search(query, clampResults(args.max_results), ctx.run.abort.signal)
+        const { content, paths } = formatVaultSearchResult(result)
+        for (const p of paths) ctx.run.sources.add(`Suchauszug: ${p}`)
+        return { ok: true, content, display: `vault_search: „${query}" — ${paths.length} Treffer` }
+      } catch (err) {
+        // Abbruch ist Abbruch, nicht „keine Treffer“ (Codex F07).
+        if (ctx.run.abort.signal.aborted) return { ok: false, content: 'Abgebrochen.', display: 'vault_search: abgebrochen' }
+        const msg = err instanceof Error ? err.message : String(err)
+        return { ok: false, content: `Fehler bei der Suche im Vault-Index: ${msg}. Nutze stattdessen note_search mit Stichworten.`, display: `vault_search: Fehler` }
+      }
     }
   })
 

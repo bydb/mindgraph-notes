@@ -33,7 +33,7 @@ const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'notes-chat': { de: 'Notes Chat', en: 'Notes Chat' },
   'note-edit': { de: 'Notiz bearbeiten (KI)', en: 'Note editing (AI)' },
   'quiz': { de: 'Karteikarten & Quiz', en: 'Flashcards & Quiz' },
-  'note-agent': { de: 'Notiz-Agent (Dateien erzeugen)', en: 'Note agent (create files)' }
+  'note-agent': { de: 'Notiz-Agent (Aufträge mit Vault-Zugriff)', en: 'Note agent (tasks with vault access)' }
 }
 
 type ProviderId = 'openrouter' | 'llmbase'

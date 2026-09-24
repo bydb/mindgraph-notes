@@ -9,15 +9,18 @@
  */
 
 import * as fs from 'fs/promises'
-import { INDEX_POLICY_VERSION } from '../../shared/rag/indexPolicy'
+import { INDEX_POLICY_VERSION, isDerivedAiNote } from '../../shared/rag/indexPolicy'
+import { diffIndexAgainstVault, diffSize, type ScannedHash } from '../../shared/rag/reconcile'
+import { RAG_INDEX_VERSION } from '../../shared/rag/types'
 import * as path from 'path'
 import { randomBytes } from 'crypto'
 import type { VaultRagSettings } from '../../shared/types'
-import { excludeKeyFor, isIndexable, normalizeRelPath, type VaultIndexContainer, type VaultQueryFilters } from '../../shared/rag/vaultIndex'
-import { VaultIndexJob, estimateVault, type VaultBuildProgress } from './vaultIndexer'
+import { RAG_VAULT_FORMAT_VERSION, excludeKeyFor, isIndexable, normalizeRelPath, type VaultIndexContainer, type VaultQueryFilters } from '../../shared/rag/vaultIndex'
+import { VaultIndexJob, estimateVault, scanVaultFiles, type VaultBuildProgress } from './vaultIndexer'
 import { queryVaultIndex, type VaultQueryResult } from './vaultRetrieve'
-import { listVaultIndexFiles, loadVaultIndexFile, vaultRagDir, cleanupVaultIndexTemps } from './vaultStore'
-import { describeLocalModelError } from './localModel'
+import { listVaultIndexFiles, loadVaultIndexFile, vaultRagDir, cleanupVaultIndexTemps, readCanonicalFile } from './vaultStore'
+import { ollamaForegroundCount, waitForOllamaIdle } from './ollamaActivity'
+import { describeLocalModelError, resolveLocalModel } from './localModel'
 
 type AssertSafePath = (p: string, op: string) => Promise<string>
 
@@ -41,6 +44,20 @@ export interface VaultRagStatus {
   }
   build: VaultBuildProgress | null
   pendingChanges: number
+  /** Letzter abgeschlossener Abgleich (Öffnen/Sync) — erst nach Ende gesetzt, nie beim Start. */
+  lastReconcile: ReconcileOutcome | null
+}
+
+export type ReconcileReason = 'open' | 'sync'
+export interface ReconcileOutcome {
+  reason: ReconcileReason
+  at: number
+  status: 'unchanged' | 'started' | 'needs-rebuild' | 'no-index' | 'skipped' | 'error'
+  changed?: number
+  filesScanned?: number
+  bytesRead?: number
+  durationMs?: number
+  error?: string
 }
 
 export interface VaultRagManagerDeps {
@@ -91,6 +108,9 @@ export class VaultRagManager {
   /** Generation des Manager-Lebenszyklus: Vault-Wechsel, Abschalten und Shutdown zählen hoch;
    *  ein Start, der über einen Wartepunkt hinweg eine alte Generation trägt, wird verworfen (Codex F30). */
   private generation = 0
+  private reconcileTimer: ReturnType<typeof setTimeout> | null = null
+  private reconcileRunning = false
+  private lastReconcile: ReconcileOutcome | null = null
   /** Identität der laufenden Änderungsmenge: wechselt NUR bei Vault-Wechsel, Opt-out, Modul-Aus
    *  und Shutdown — nicht beim Nutzer-Abbruch, der die Änderungen behalten muss (Codex F32). */
   private changeEpoch = 0
@@ -158,6 +178,10 @@ export class VaultRagManager {
 
   async shutdown(): Promise<void> {
     this.generation++
+    if (this.reconcileTimer) {
+      clearTimeout(this.reconcileTimer)
+      this.reconcileTimer = null
+    }
     this.changeEpoch++
     if (this.queueTimer) {
       clearTimeout(this.queueTimer)
@@ -283,7 +307,8 @@ export class VaultRagManager {
       embedModel,
       index,
       build: this.job && this.sameVault(vaultPath) ? this.job.snapshot : this.lastProgress,
-      pendingChanges: this.pendingChanged.size
+      pendingChanges: this.pendingChanged.size,
+      lastReconcile: this.sameVault(vaultPath) ? this.lastReconcile : null
     }
   }
 
@@ -520,7 +545,130 @@ export class VaultRagManager {
     }
   }
 
+  // ─── Abgleich nach Öffnen und Sync (Paket 4, Codex F09–F12) ──────────────────
+
+  /**
+   * Plant EINEN Abgleich für genau diesen Vault. Mehrere Anlässe (Öffnen, Sync) fassen sich
+   * zusammen; ein Vault-Wechsel verwirft den Plan (Generation). Kein stündlicher Takt: die
+   * Anlässe sind Öffnen und erfolgreicher Sync, der Watcher deckt die laufende Sitzung ab.
+   */
+  scheduleReconcile(vaultPath: string, reason: ReconcileReason, delayMs: number): void {
+    if (!this.vaultPath || !this.sameVault(vaultPath)) return
+    if (this.reconcileTimer) clearTimeout(this.reconcileTimer)
+    const gen = this.generation
+    this.reconcileTimer = setTimeout(() => {
+      this.reconcileTimer = null
+      if (gen !== this.generation) return
+      void this.reconcile(vaultPath, reason).catch((err) => console.warn('[VaultRAG] Abgleich fehlgeschlagen:', err))
+    }, delayMs)
+  }
+
+  /**
+   * Abgleich ohne Modell und ohne Neuschreiben: Prüfsummen aller indexierbaren Dateien gegen
+   * den Bestand. Nur wenn sich etwas geändert hat, startet ein inkrementeller Lauf für GENAU
+   * diese Dateien. Passt der Bestand nicht zum aktuellen Embedding-Modell, wird nichts gebaut
+   * („Neuaufbau erforderlich“) — nie ein stiller Vollaufbau (F09).
+   */
+  async reconcile(vaultPath: string, reason: ReconcileReason): Promise<ReconcileOutcome> {
+    const started = this.now()
+    const done = (o: Omit<ReconcileOutcome, 'reason' | 'at' | 'durationMs'>): ReconcileOutcome => {
+      const outcome: ReconcileOutcome = { reason, at: this.now(), durationMs: this.now() - started, ...o }
+      if (this.sameVault(vaultPath)) this.lastReconcile = outcome
+      console.info(`[VaultRAG] Abgleich (${reason}): ${outcome.status}` +
+        (outcome.filesScanned !== undefined ? `, ${outcome.filesScanned} Dateien, ${Math.round((outcome.bytesRead ?? 0) / 1024)} KB gelesen` : '') +
+        (outcome.changed !== undefined ? `, ${outcome.changed} geändert` : '') +
+        `, ${outcome.durationMs} ms, RSS ${Math.round(process.memoryUsage().rss / 1048576)} MB`)
+      return outcome
+    }
+    if (this.reconcileRunning || this.job || !this.sameVault(vaultPath)) return done({ status: 'skipped' })
+    if (!(await this.moduleEnabled())) return done({ status: 'skipped' })
+    const config = await this.getConfig(vaultPath)
+    if (!config.enabled) return done({ status: 'skipped' })
+    const gen = this.generation
+    this.reconcileRunning = true
+    try {
+      const dir = await this.safeRagDir(vaultPath, 'vault-rag-reconcile')
+      const files = dir ? await listVaultIndexFiles(dir, this.deps.assertSafePath) : []
+      if (files.length === 0) return done({ status: 'no-index' })
+      const newest = files.sort((a, b) => b.mtime - a.mtime)[0]
+      const container = await this.loadContainer(newest.file)
+      if (!container) return done({ status: 'needs-rebuild', error: 'Index unlesbar' })
+      // Passt der Bestand zum aktuellen Embedding-Modell? Nur /api/tags, kein Laden des Modells.
+      let model: { name: string; digest: string }
+      try {
+        model = await resolveLocalModel(await this.deps.getEmbedModel(), { fresh: true })
+      } catch (err) {
+        return done({ status: 'skipped', error: describeLocalModelError(err) })
+      }
+      const id = container.meta.identity
+      if (id.model !== model.name || id.digest !== model.digest || id.formatVersion !== RAG_VAULT_FORMAT_VERSION || id.chunkingVersion !== RAG_INDEX_VERSION) {
+        return done({ status: 'needs-rebuild' })
+      }
+      // Scannen und hashen — gedrosselt: wartet, solange ein Vordergrund-Lauf das lokale Modell
+      // braucht, und gibt nach jeder Datei den Event-Loop frei.
+      const scanned = await scanVaultFiles(vaultPath, config.excludeFolders, this.deps.assertSafePath)
+      const hashes: ScannedHash[] = []
+      let bytesRead = 0
+      for (const f of scanned) {
+        if (gen !== this.generation || !this.sameVault(vaultPath)) return done({ status: 'skipped' })
+        if (ollamaForegroundCount() > 0) await waitForOllamaIdle()
+        try {
+          const file = await readCanonicalFile(f.abs)
+          bytesRead += file.size
+          hashes.push({ rel: f.rel, sourceHash: file.sourceHash, derived: isDerivedAiNote(file.canonical) })
+        } catch {
+          hashes.push({ rel: f.rel, sourceHash: null, derived: false })
+        }
+        await new Promise<void>((r) => setImmediate(r))
+      }
+      const diff = diffIndexAgainstVault(container.meta.files, hashes)
+      const changed = diffSize(diff)
+      if (changed === 0) return done({ status: 'unchanged', changed: 0, filesScanned: scanned.length, bytesRead })
+      const set = new Set<string>([...diff.added, ...diff.modified, ...diff.removed])
+      if (gen !== this.generation) return done({ status: 'skipped' })
+      if (this.job) {
+        // Ein Watcher-Lauf ist schneller gestartet: die Änderungen in dessen Warteschlange
+        // legen, statt sie zu verlieren oder als Fehler zu melden.
+        for (const rel of set) this.pendingChanged.add(rel)
+        if (this.firstPendingAt === null) this.firstPendingAt = this.now()
+        return done({ status: 'started', changed, filesScanned: scanned.length, bytesRead })
+      }
+      const res = await this.startBuild(vaultPath, 'incremental', set)
+      if (!res.ok && this.job) {
+        for (const rel of set) this.pendingChanged.add(rel)
+        if (this.firstPendingAt === null) this.firstPendingAt = this.now()
+        return done({ status: 'started', changed, filesScanned: scanned.length, bytesRead })
+      }
+      return done({ status: res.ok ? 'started' : 'error', error: res.ok ? undefined : res.error, changed, filesScanned: scanned.length, bytesRead })
+    } catch (err) {
+      return done({ status: 'error', error: err instanceof Error ? err.message : String(err) })
+    } finally {
+      this.reconcileRunning = false
+    }
+  }
+
   // ─── Abfrage ────────────────────────────────────────────────────────────────
+
+  /**
+   * Günstige Vorprüfung für den Notiz-Agenten (Werkzeug `vault_search`): Modul an, Opt-in für
+   * diesen Vault, mindestens eine Indexdatei, Embedding-Modell nachweislich lokal. Lädt den
+   * Container NICHT (Speicher/I/O, Codex F03) — Identitätsabweichungen meldet erst die
+   * Abfrage, als klarer Fehler mit Ausweichhinweis.
+   */
+  async isQueryable(vaultPath: string): Promise<boolean> {
+    if (!(await this.moduleEnabled())) return false
+    const config = await this.getConfig(vaultPath)
+    if (!config.enabled) return false
+    const dir = await this.safeRagDir(vaultPath, 'vault-rag-queryable')
+    const files = dir ? await listVaultIndexFiles(dir, this.deps.assertSafePath).catch(() => []) : []
+    if (files.length === 0) return false
+    try {
+      await resolveLocalModel(await this.deps.getEmbedModel())
+      return true
+    } catch {
+      return false
+    }
+  }
 
   async query(
     vaultPath: string,

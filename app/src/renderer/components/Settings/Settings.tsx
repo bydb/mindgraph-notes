@@ -33,6 +33,7 @@ import { SpeechSettingsTab } from './SpeechSettingsTab'
 import { DashboardSettingsTab } from './DashboardSettingsTab'
 import { IntegrationsTab } from './IntegrationsTab'
 import { useIntegrationStatus, type IntegrationStatus, type ConnState } from './useIntegrationStatus'
+import { AgentCloudConsentCard } from './AgentCloudConsentCard'
 import { PageHeader, SectionTitle, Card, ServiceHead, IconTile, TILE_GLYPH, Row, Note, Details, Toggle, Segmented, Select, Button, NumberInput, TextInput, Hero, ModuleOffCard } from './SettingsUI'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
@@ -275,7 +276,9 @@ const ModulesTab: React.FC<{
   t: TabTFn
   onOpenTab: (tab: Tab, anchor?: string) => void
   status: IntegrationStatus
-}> = ({ t, onOpenTab, status }) => {
+  /** Sprungziel von außen (z.B. Agent-Tab „Modul ist aus · Einschalten“). */
+  focusAnchor?: string
+}> = ({ t, onOpenTab, status, focusAnchor }) => {
   // useUIStore als Abhängigkeit einbinden, damit der Tab bei Flag-Änderungen rerendert
   const _tick = useUIStore(s => `${s.notesChatEnabled}${s.projectRagEnabled}${s.smartConnectionsEnabled}${s.flashcardsEnabled}${s.workflowCanvasEnabled}${s.webResearchEnabled}${s.semanticScholarEnabled}${s.zoteroEnabled}${s.languageTool.enabled}${s.email.enabled}${s.readwise.enabled}${s.docling.enabled}${s.visionOcr.enabled}${s.speech.enabled}`)
   void _tick
@@ -524,6 +527,12 @@ const ModulesTab: React.FC<{
   }
 
   const [filter, setFilter] = useState<ModuleFilter>('all')
+  // Ein Sprung zu einer Modulzeile muss die Zeile auch finden: die Filter „aktiv“ und
+  // „Einrichtung nötig“ blenden ausgeschaltete Module aus — gerade die, zu denen ein
+  // „Einschalten“-Link führt.
+  useEffect(() => {
+    if (focusAnchor?.startsWith('module-')) setFilter('all')
+  }, [focusAnchor])
   const needsSetup = (mod: ModuleDescriptor) => {
     if (!isModuleEnabled(mod.id)) return false
     const st = moduleStatus(mod.id)
@@ -543,7 +552,7 @@ const ModulesTab: React.FC<{
       // htmlFor MUSS explizit gesetzt sein: ohne es wäre das Label-Ziel das ERSTE labelbare
       // Element im Baum — und das ist der „Konfigurieren"-<button>, nicht die Checkbox.
       // Ein Klick auf die Zeile/den Toggle öffnete dann den Config-Tab statt umzuschalten.
-      <label key={mod.id} htmlFor={`module-toggle-${mod.id}`} className={`module-row ${enabled ? 'active' : 'is-off'}`}>
+      <label key={mod.id} htmlFor={`module-toggle-${mod.id}`} className={`module-row ${enabled ? 'active' : 'is-off'}`} data-settings-anchor={`module-${mod.id}`}>
         <div
           className="module-row-icon"
           style={{ background: mod.iconText ? (mod.iconColor || 'var(--accent-color, #4a9eff)') : CATEGORY_VISUAL[mod.category].color }}
@@ -1775,6 +1784,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>
                   <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
                   <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>
+                  <div data-settings-anchor="ai-agent-cloud-consent"><AgentCloudConsentCard /></div>
 
                   {/* ── Agent-Fähigkeiten (nur bei aktivem Modul) ── */}
                   {(searchWebResearchEnabled || agentShellModuleOn || agentComputerModuleOn) && <SectionTitle title={t('settings.aiTab.agent')} />}
@@ -1945,7 +1955,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
 
             {/* Modules Tab */}
             {activeTab === 'modules' && (
-              <ModulesTab t={t} onOpenTab={navigateToSetting} status={integrationStatus} />
+              <ModulesTab t={t} onOpenTab={navigateToSetting} status={integrationStatus} focusAnchor={isOpen ? initialAnchor : undefined} />
             )}
 
             {/* Speech Tab */}

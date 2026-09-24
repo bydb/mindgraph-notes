@@ -3,6 +3,8 @@
 // opake Result-Handles (der Renderer sieht nie Staging-Pfade), Results höchstens
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
+import type { AgentRoute } from '../../shared/agentRoute'
+import type { VaultQueryResult } from '../rag/vaultRetrieve'
 import { randomBytes } from 'crypto'
 import { beginOllamaActivity } from '../rag/ollamaActivity'
 import type { WebResearchConfig, WebResearchPhase, WebFetchRecord } from '../../shared/webResearch'
@@ -92,6 +94,12 @@ export interface AgentRun {
   // zusätzlich als Arbeitssitzungen in die Kampagne.
   comparisonCaseId?: string
   web?: WebRunState    // nur bei aktivierter Webrecherche
+  // Main-seitig festgestellter Modellweg (lokal / Cloud / nicht geprüft) — beim Start aus
+  // den echten chatOptions bestimmt, nie aus Renderer-Angaben (Codex F15/F26).
+  route?: AgentRoute
+  // Suche nach Bedeutung über den Vault-Index — nur gesetzt, wenn der Index für diesen Vault
+  // abfragbar ist (Main-seitig beim Start geprüft). Die Einbettung der Anfrage bleibt lokal.
+  vaultSearch?: (query: string, topK: number, signal: AbortSignal) => Promise<VaultQueryResult>
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
   // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
   imageGen?: boolean
@@ -159,6 +167,8 @@ export function startRun(params: {
   skills?: Array<{ name: string; description: string; folderName: string }>
   web?: WebRunState
   imageGen?: boolean
+  route?: AgentRoute
+  vaultSearch?: AgentRun['vaultSearch']
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
@@ -188,13 +198,18 @@ export function startRun(params: {
     instructionMs: params.instructionMs,
     comparisonCaseId: params.comparisonCaseId,
     web: params.web,
-    imageGen: params.imageGen
+    imageGen: params.imageGen,
+    route: params.route,
+    vaultSearch: params.vaultSearch
   }
   activeBySender.set(params.senderId, run)
   runsById.set(run.runId, run)
   enforceRetention(params.senderId)
-  // Der Lauf zählt als Ollama-Vordergrund, bis finishRun ihn abschließt (Vault-Indexer pausiert solange).
-  activityEnds.set(run.runId, beginOllamaActivity('note-agent'))
+  // Der Lauf zählt als Ollama-Vordergrund, bis finishRun ihn abschließt (Vault-Indexer pausiert
+  // solange) — aber nur, wenn er das lokale Ollama überhaupt belegt. Ein Cloud-Lauf rechnet
+  // woanders; ihn mitzuzählen hielt den Indexer minutenlang grundlos an (Codex F08, vgl. F19
+  // der Vault-Chat-Prüfung). Eine lokale Embedding-Abfrage im Cloud-Lauf meldet sich selbst an.
+  if (params.route?.kind !== 'cloud') activityEnds.set(run.runId, beginOllamaActivity('note-agent'))
   return run
 }
 

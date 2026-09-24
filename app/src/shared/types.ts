@@ -84,6 +84,16 @@ export interface VaultRagStatusDto {
   }
   build: VaultBuildProgressDto | null
   pendingChanges: number
+  /** Letzter abgeschlossener Abgleich nach Öffnen/Sync (erst nach Ende gesetzt). */
+  lastReconcile?: {
+    reason: 'open' | 'sync'
+    at: number
+    status: 'unchanged' | 'started' | 'needs-rebuild' | 'no-index' | 'skipped' | 'error'
+    changed?: number
+    filesScanned?: number
+    durationMs?: number
+    error?: string
+  } | null
 }
 
 export interface VaultQueryFiltersDto {
@@ -894,10 +904,18 @@ export interface ElectronAPI {
     computerAccess?: boolean;
     instructionMs?: number;
     comparisonCaseId?: string;
-  }) => Promise<{ success: boolean; runId?: string; error?: string }>;
+  }) => Promise<{ success: boolean; runId?: string; error?: string; code?: 'optin' | 'consent'; route?: import('./agentRoute').AgentRoute }>;
+  noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) => Promise<{
+    success: boolean;
+    route?: import('./agentRoute').AgentRoute;
+    gate?: { ok: true } | { ok: false; code: 'optin' | 'consent'; error: string };
+    error?: string;
+  }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   computerControlPickApp: () => Promise<{ success: boolean; app?: { id: string; label: string; path: string }; error?: string }>;
   noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
+  noteAgentMemoryStatus: (vaultPath: string) => Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }>;
+  imageGenHasKey: () => Promise<boolean>;
   // Agent-Skills Stufe 1
   noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; error?: string }>;
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;

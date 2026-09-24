@@ -21393,7 +21393,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 12px;
 }
 .agent-view-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 4px; }
-.agent-view-title { font-size: 18px; font-weight: 600; color: var(--text-primary); margin: 0; }
+.agent-view-title { font-size: 19px; font-weight: 700; color: var(--text-primary); margin: 0; }
 .agent-view-sub { font-size: 13px; line-height: 1.55; color: var(--text-secondary); margin: 0; }
 .agent-view-input { min-height: 90px; }
 .agent-view-footer { padding-top: 4px; }
@@ -21403,6 +21403,320 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 13px;
   color: var(--text-secondary);
 }
+
+/* ---- Auftragskarte (Redesign 09/2026, Entwurf „Agent Redesign“ Runde 2) ----
+   Jede Vorbedingung eine Zeile mit Zustand. Farben nur aus Tokens: Petrol =
+   --accent-color, „fehlt“ = --color-warning, „verlässt den Rechner“ = warm getönt,
+   „handelt sofort“ = --color-danger. */
+.agent-card {
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: var(--bg-primary);
+  overflow: visible;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+.agent-card > :first-child { border-radius: 14px 14px 0 0; }
+.agent-card > :last-child { border-radius: 0 0 14px 14px; }
+.agent-card-task { display: flex; flex-direction: column; gap: 7px; padding: 13px 16px 10px; }
+/* Leerer Auftrag lädt ein statt zu warnen: weiß; nur der kleine Punkt „Auftrag fehlt“
+   markiert die Lücke. Gelb bleibt echten Lücken weiter unten. */
+.agent-card-task.is-missing { background: var(--bg-primary); }
+
+.agent-card-head { display: flex; align-items: center; gap: 12px; }
+.agent-card-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-subtle);
+  flex-shrink: 0;
+}
+.agent-card-logo img { border-radius: 50%; object-fit: cover; }
+.agent-card-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.agent-card-tagline { margin: 0; font-size: 13px; line-height: 1.45; color: var(--accent-color); }
+.agent-card-task-top { display: flex; gap: 10px; align-items: flex-start; }
+.agent-card-input {
+  flex: 1;
+  min-height: 64px;
+  resize: vertical;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.55;
+  padding: 0;
+}
+.agent-card-input::placeholder { color: var(--text-muted); }
+.agent-card-flag,
+.agent-card-row.is-missing .agent-card-label,
+.agent-card-missing-title {
+  color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary));
+  font-weight: 600;
+}
+.agent-card-flag { font-size: 11.5px; white-space: nowrap; padding-top: 4px; }
+.agent-card-help { color: var(--text-secondary); font-size: 12px; line-height: 1.45; }
+.agent-card-muted { color: var(--text-secondary); }
+.agent-card-eyebrow { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; }
+
+.agent-card-examples {
+  border-top: 1px solid var(--border-subtle);
+  padding: 12px 16px 14px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.agent-card-examples-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .agent-card-examples-grid { grid-template-columns: 1fr; } }
+.agent-card-example {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 11px;
+  cursor: pointer;
+  color: var(--text-primary);
+  font: inherit;
+}
+.agent-card-example:hover,
+.agent-card-example:focus-visible {
+  border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-primary));
+  outline: none;
+}
+.agent-card-example-cat { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; font-weight: 600; color: var(--accent-color); }
+.agent-card-example-text { font-size: 12.5px; line-height: 1.45; }
+.agent-card-example-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
+.agent-card-tag { font-size: 11px; padding: 2px 7px; border-radius: 5px; background: var(--bg-tertiary); color: var(--text-secondary); }
+.agent-card-tag.is-accent { background: var(--accent-subtle); color: var(--accent-color); }
+.agent-card-tag.is-out { background: color-mix(in srgb, var(--color-warning) 12%, var(--bg-primary)); color: color-mix(in srgb, var(--color-warning) 70%, var(--text-primary)); }
+
+.agent-card-row {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0 12px;
+  border-top: 1px solid var(--border-subtle);
+  padding: 10px 16px;
+}
+.agent-card-row.is-two-col { grid-template-columns: 96px minmax(0, 1fr); }
+.agent-card-row.is-center { align-items: center; }
+.agent-card-row.is-missing { background: color-mix(in srgb, var(--color-warning) 7%, var(--bg-primary)); }
+.agent-card-label { color: var(--text-secondary); font-size: 11.5px; padding-top: 3px; }
+.agent-card-row.is-center .agent-card-label { padding-top: 0; }
+.agent-card-value { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.agent-card-value .ai-bar-context { padding: 0; }
+.agent-card-target {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  padding-top: 1px;
+  color: var(--text-secondary);
+}
+.agent-card-target > svg { align-self: center; color: var(--accent-color); }
+.agent-card-target-name { font-weight: 600; color: var(--text-primary); white-space: nowrap; }
+.agent-card-target-parent { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.agent-card-running-model { font-weight: 600; }
+.agent-card-path {
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  padding-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Rechtsbündig am Knopf: die Ablage-Auswahl sitzt am rechten Kartenrand und würde
+   sonst aus dem Fenster laufen. Spezifischer als .ai-bar-context-picker (steht später). */
+.agent-card .ai-bar-context-picker.agent-card-picker { right: 0; left: auto; }
+
+.agent-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.agent-card-btn:hover { border-color: var(--accent-color); }
+.agent-card-link-btn,
+.agent-card-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  color: var(--accent-color);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.agent-card-link-btn.is-strong,
+.agent-card-link { font-weight: 600; }
+.agent-card-link-btn:disabled { opacity: .5; cursor: default; }
+
+.agent-card-perms { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.agent-card-perm {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 7px;
+  border-radius: 9999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.agent-card-switch {
+  position: relative;
+  display: inline-block;
+  width: 22px;
+  height: 13px;
+  border-radius: 9999px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+.agent-card-switch > span {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--bg-primary);
+}
+.agent-card-perm.is-on {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+.agent-card-perm.is-on .agent-card-switch { background: var(--accent-color); }
+.agent-card-perm.is-on .agent-card-switch > span { left: auto; right: 2px; }
+.agent-card-perm.is-locked { color: var(--text-muted); border-color: var(--border-subtle); cursor: not-allowed; }
+.agent-card-perm.is-locked .agent-card-switch { background: var(--border-subtle); }
+.agent-card-perm.is-setup { border-style: dashed; color: var(--text-secondary); padding: 4px 10px; gap: 6px; }
+.agent-card-perm:disabled { opacity: .6; cursor: default; }
+
+.agent-card-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--bg-primary));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--bg-primary));
+  color: color-mix(in srgb, var(--color-danger) 70%, var(--text-primary));
+  font-size: 12px;
+}
+.agent-card-acts-title { color: color-mix(in srgb, var(--color-danger) 80%, var(--text-primary)); font-weight: 600; font-size: 12.5px; }
+
+.agent-card-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.agent-card-route {
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 25%, var(--bg-primary));
+  background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-primary));
+  color: var(--accent-color);
+}
+.agent-card-route.is-out,
+.agent-card-cloud-note {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--bg-primary));
+  background: color-mix(in srgb, var(--color-warning) 9%, var(--bg-primary));
+  color: color-mix(in srgb, var(--color-warning) 65%, var(--text-primary));
+}
+.agent-card-cloud-note {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  line-height: 1.45;
+}
+.agent-card-cloud-note > span { flex: 1; min-width: 220px; }
+.agent-card-route.is-muted {
+  border-color: var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.agent-card-consent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 40%, var(--bg-primary));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--bg-primary));
+  font-size: 12px;
+  line-height: 1.45;
+}
+.agent-card-consent strong { font-size: 12.5px; }
+.agent-card-flows { font-size: 12px; color: var(--text-secondary); }
+.agent-card-flows > summary {
+  cursor: pointer;
+  color: var(--accent-color);
+  font-weight: 600;
+  width: fit-content;
+}
+.agent-card-flows dl { margin: 8px 0 0; display: flex; flex-direction: column; gap: 3px; }
+.agent-card-flows dt { font-weight: 600; color: var(--text-primary); margin-top: 6px; }
+.agent-card-flows dt:first-child { margin-top: 0; }
+.agent-card-flows dd { margin: 0; line-height: 1.45; }
+.agent-card-out-text { color: color-mix(in srgb, var(--color-warning) 65%, var(--text-primary)); font-size: 12px; line-height: 1.45; }
+.agent-card-warn-text { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
+
+.agent-card-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; }
+.agent-card-no-local { flex-basis: 100%; }
+/* Schmaler Agent-Tab (Split-Ansicht, kleines Fenster): Beschriftung über den Inhalt,
+   Aktion darunter, Fußzeile gestapelt — sonst bleiben für den Inhalt wenige Pixel. */
+.agent-view-inner { container-type: inline-size; }
+@container (max-width: 560px) {
+  .agent-card-row,
+  .agent-card-row.is-two-col { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .agent-card-label { padding-top: 0; }
+  .agent-card-row > .ai-bar-context-picker-wrap,
+  .agent-card-row > .agent-card-link-btn { justify-self: start; }
+  /* Knopf steht jetzt links — die Auswahl klappt nach rechts auf und bleibt in der Karte. */
+  .agent-card .ai-bar-context-picker.agent-card-picker { left: 0; right: auto; max-width: calc(100cqw - 32px); }
+  .agent-card-examples-grid { grid-template-columns: 1fr; }
+  .agent-card-footer { flex-direction: column; align-items: stretch; }
+  .agent-card-start { align-self: flex-end; }
+}
+.agent-card-footer-text { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.45; color: var(--text-secondary); max-width: 420px; }
+.agent-card-start {
+  padding: 9px 16px;
+  border-radius: 9px;
+  border: none;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: default;
+}
+.agent-card-start.is-ready { background: var(--accent-color); color: var(--accent-on); cursor: pointer; }
+.agent-card-start.is-ready:hover { background: var(--accent-hover); }
+.agent-card-kbd { opacity: .7; font-weight: 400; }
 
 .ai-bar-expanded {
   flex-shrink: 0;

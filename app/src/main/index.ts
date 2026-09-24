@@ -204,14 +204,16 @@ import { getShellAttachmentPaths } from './noteAgent/contextFiles'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
-import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
+import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, agentMemoryStatus, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls, isNonGenerativeModel } from '../shared/modelCompatibility'
 import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
 import { VaultRagManager } from './rag/vaultRagManager'
 import { locateSource, type SourceRef } from './rag/vaultRetrieve'
 import { wrapIpcWithOllamaActivity, withOllamaActivity } from './rag/ollamaActivity'
-import { resolveLocalModel, describeLocalModelError } from './rag/localModel'
+import type { VaultQueryResult } from './rag/vaultRetrieve'
+import { resolveLocalModel, describeLocalModelError, LocalModelError } from './rag/localModel'
+import { classifyRoute, evaluateCloudGate, type AgentRoute } from '../shared/agentRoute'
 import type { VaultQueryFilters } from '../shared/rag/vaultIndex'
 import { analyzeCitations } from '../shared/rag/citations'
 import { canonicalizeAllowingMissing } from './safePath'
@@ -852,6 +854,10 @@ let fileWatcher: FSWatcher | null = null
 // Prozess, Vault-Wechsel über den Watcher. Lazy, weil app.getPath erst nach der
 // App-Initialisierung sicher ist.
 let vaultRagManagerInstance: VaultRagManager | null = null
+// Abgleich-Verzögerungen: nach dem Öffnen erst, wenn die App angelaufen ist; nach einem Sync
+// kurz entprellt (Watcher-Ereignisse der Downloads fassen sich damit zusammen).
+const VAULT_RECONCILE_OPEN_DELAY_MS = 60_000
+const VAULT_RECONCILE_SYNC_DELAY_MS = 20_000
 function getVaultRagManager(): VaultRagManager {
   if (!vaultRagManagerInstance) {
     vaultRagManagerInstance = new VaultRagManager({
@@ -4445,6 +4451,53 @@ interface NoteAgentRunParams {
   comparisonCaseId?: string
 }
 
+// ── Modellweg des Agenten: Einstufung + Cloud-Freigabe (Codex F15/F26–F28) ──────────
+// EINE Regel für Vorabprüfung (Karte, vor dem Start) und Laufstart. Die Karte zeigt vorher
+// den Preflight, während des Laufs ausschließlich den beim Start gespeicherten Befund.
+
+async function classifyAgentRoute(backend: 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase', model: string): Promise<AgentRoute> {
+  if (backend !== 'ollama') return classifyRoute(backend, model)
+  try {
+    await resolveLocalModel(model)
+    return classifyRoute('ollama', model, { ok: true })
+  } catch (err) {
+    const reason = err instanceof LocalModelError ? err.reason : 'unreachable'
+    return classifyRoute('ollama', model, { ok: false, reason })
+  }
+}
+
+/**
+ * Darf dieser Lauf über einen Cloud-Weg gehen? Main-seitig aus ui-settings.json, nicht aus
+ * Renderer-Parametern: (1) OpenRouter/LLMBase nur mit Feature-Opt-in `note-agent` und genau
+ * dem dort eingestellten Modell, (2) jeder Cloud-Weg — auch Ollama-Cloud — nur mit der
+ * versionierten Zustimmung zu Cloud-Läufen mit Vault-Zugriff. Kein Sperren der Cloud an
+ * sich: der Nutzer entscheidet, aber bewusst (Produktlinie „Transparenz statt Sperre“).
+ */
+async function checkNoteAgentCloudGate(route: AgentRoute, cloudModel: string | undefined): Promise<{ ok: true } | { ok: false; code: 'optin' | 'consent'; error: string }> {
+  if (route.kind !== 'cloud') return { ok: true }
+  const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>)) as Record<string, unknown>
+  const verdict = evaluateCloudGate(route, cloudModel, ui as Parameters<typeof evaluateCloudGate>[2])
+  if (verdict.ok) return { ok: true }
+  if (verdict.code === 'optin') {
+    return { ok: false, code: 'optin', error: `${route.providerLabel} ist für den Notiz-Agenten nicht freigegeben (Einstellungen → KI → Cloud-Anbieter → Notiz-Agent).` }
+  }
+  return { ok: false, code: 'consent', error: `Cloud-Läufe mit Vault-Zugriff brauchen deine ausdrückliche Zustimmung (${route.providerLabel}) — im Agent-Tab auf der Karte oder unter Einstellungen → KI & Modelle → „Notiz-Agent: Cloud-Läufe mit Vault-Zugriff“.` }
+}
+
+// Vorabprüfung für die Karte. Keine Schlüssel, kein Lauf — nur Weg, Freigabe und Zustimmung.
+ipcMain.handle('note-agent-route-preflight', async (event, params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    const backend = params.cloud?.model ? (params.cloud.provider === 'llmbase' ? 'llmbase' : 'openrouter') : (params.localBackend === 'lmstudio' ? 'lmstudio' : 'ollama')
+    const model = params.cloud?.model ?? params.model ?? ''
+    const route = await classifyAgentRoute(backend, model)
+    const gate = await checkNoteAgentCloudGate(route, params.cloud?.model)
+    return { success: true, route, gate }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
+})
+
 // Web-Provenienz fürs done-Event (Renderer zeigt „N Suchen · M Seiten" + Liste). Enthält
 // bewusst NUR das, was tatsächlich passiert ist — inkl. Fehlversuchen.
 function webRunProvenance(run: { web?: WebRunState }): { queries: Array<{ query: string; status: string }>; fetches: Array<{ url: string; title: string; status: string }>; searchCount: number; fetchCount: number } | undefined {
@@ -4578,6 +4631,16 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       chatOptions = { backend: 'ollama', ollamaModel: params.model }
     }
 
+    // Einstufung des Weges VOR jedem Vault-Inhalt (Skills, Gedächtnis, Anhänge, Loop) —
+    // aus den echten chatOptions, erneut geprüft (Metadaten können seit dem Preflight gewechselt
+    // haben). Ergebnis bleibt am Lauf; die Karte zeigt während des Laufs nur diesen Befund.
+    const route = await classifyAgentRoute(
+      chatOptions.backend as 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase',
+      params.cloud?.model ?? params.model
+    )
+    const gate = await checkNoteAgentCloudGate(route, params.cloud?.model)
+    if (!gate.ok) return { success: false, error: gate.error, code: gate.code, route }
+
     // Cloud-Läufe: Ausgabegrenze setzen und OpenRouter pro Request auf Zero Data
     // Retention festlegen. In einem Praxistest endete ein Cloud-Lauf mitten im
     // letzten Abschnitt, weil ohne max_tokens der Anbieter-Default greift.
@@ -4646,6 +4709,20 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     } catch { /* Modul bleibt aus */ }
 
+    // Vault-Index als Suchwerkzeug (vault_search) — für alle Wege, auch Cloud (Nutzerentscheidung
+    // 24.09.2026: Transparenz statt Sperre; die Karte nennt Suchauszüge als Datenweg). Die
+    // Einbettung der Anfrage bleibt lokal und meldet sich als Vordergrund an, damit der
+    // Indexer nicht gleichzeitig einbettet — auch in einem Cloud-Lauf, der selbst nicht zählt.
+    let vaultSearch: ((query: string, topK: number, signal: AbortSignal) => Promise<VaultQueryResult>) | undefined
+    try {
+      const mgr = getVaultRagManager()
+      if (await mgr.isQueryable(params.vaultPath)) {
+        const vp = params.vaultPath
+        vaultSearch = (query, topK, signal) =>
+          withOllamaActivity('vault-query', () => mgr.query(vp, query, undefined, { topK, signal }))
+      }
+    } catch { /* ohne Index kein Werkzeug */ }
+
     const run = startRun({
       senderId: event.sender.id,
       noteId: params.noteId,
@@ -4660,7 +4737,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       comparisonCaseId: typeof params.comparisonCaseId === 'string' ? params.comparisonCaseId : undefined,
       skills,
       web,
-      imageGen
+      imageGen,
+      route,
+      vaultSearch
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
     hookNoteAgentCleanup(event.sender)
@@ -4738,7 +4817,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
               type: 'warning',
               title: 'Rechner-Steuerung für diesen Agent-Lauf',
               message: 'Darf der Agent für diesen Auftrag Programme auf deinem Rechner ansprechen?',
-              detail: `Modell: ${run.model}\nVault: ${run.vaultPath}\nAuftrag: ${run.instruction}\n\nDas ist eine ERLAUBNIS, kein Ablaufplan: Ob und welchen dieser Vorgänge der Agent nutzt, entscheidet das Modell aus deinem Auftrag. Es kann sein, dass keiner davon stattfindet.\n\nMöglich in diesem Lauf: ${usableText}.${missingText}\n\nDiese Vorgänge wirken sofort und außerhalb der App, ohne weitere Einzelbestätigung — höchstens zehn im ganzen Lauf, abgelehnte Versuche zählen mit. Übergeben werden nur Ergebnisse dieses Laufs und Dateien aus dem Vault; die internen .mindgraph-Daten nie. Ein Ergebnis wird dabei als Kopie geöffnet — Änderungen daran landen nicht in der Datei, die du danach übernimmst.\n\nE-Mails entstehen NUR als sichtbarer Entwurf in Apple Mail und werden nie gesendet. Keiner dieser Vorgänge holt Daten von ausserhalb herein oder gibt welche nach draussen.\n\nBeim ersten Mal fragt macOS zusätzlich, ob MindGraph Notes das jeweilige Programm steuern darf. Die Freigabe gilt nur für diesen Lauf.`,
+              detail: `Modell: ${run.model}\nVault: ${run.vaultPath}\nAuftrag: ${run.instruction}\n\nDas ist eine ERLAUBNIS, kein Ablaufplan: Ob und welchen dieser Vorgänge der Agent nutzt, entscheidet das Modell aus deinem Auftrag. Es kann sein, dass keiner davon stattfindet.\n\nMöglich in diesem Lauf: ${usableText}.${missingText}\n\nDiese Vorgänge wirken sofort und außerhalb der App, ohne weitere Einzelbestätigung — höchstens zehn im ganzen Lauf, abgelehnte Versuche zählen mit. Übergeben werden nur Ergebnisse dieses Laufs und Dateien aus dem Vault; die internen .mindgraph-Daten nie. Ein Ergebnis wird dabei als Kopie geöffnet — Änderungen daran landen nicht in der Datei, die du danach übernimmst.\n\nE-Mails entstehen NUR als sichtbarer Entwurf in Apple Mail und werden nie gesendet. Keiner dieser Vorgänge holt Daten von ausserhalb herein. Ein Mail-Entwurf samt Anhängen landet in Apple Mail — ob er von dort mit deinem Mailkonto synchronisiert wird, richtet sich nach dessen Einstellungen.\n\nBeim ersten Mal fragt macOS zusätzlich, ob MindGraph Notes das jeweilige Programm steuern darf. Die Freigabe gilt nur für diesen Lauf.`,
               buttons: ['Abbrechen', 'Für diesen Lauf erlauben'],
               defaultId: 0, cancelId: 0, noLink: true
             })
@@ -4849,7 +4928,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     })()
 
-    return { success: true, runId: run.runId }
+    return { success: true, runId: run.runId, route }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
@@ -4970,6 +5049,17 @@ ipcMain.handle('note-agent-remember', async (event, vaultPath: string, text: str
     return { success: true, relPath }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Auftragskarte im Agent-Tab: Gedächtnis leer / gefüllt / wird gekürzt.
+ipcMain.handle('note-agent-memory-status', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { state: 'empty', relPath: '' }
+  try {
+    assertApprovedVault(vaultPath, 'note-agent-memory-status')
+    return await agentMemoryStatus(vaultPath)
+  } catch {
+    return { state: 'empty', relPath: '' }
   }
 })
 
@@ -6954,7 +7044,12 @@ ipcMain.on('watch-directory', async (_event, dirPath: string) => {
     ignoreInitial: true
   })
   // Vault-RAG folgt dem Watcher: gleicher Vault, gleiche Ereignisquelle (kein zweiter Watcher).
-  void getVaultRagManager().setVault(dirPath)
+  // Nach dem Setzen EIN Abgleich im Hintergrund (Codex F11: erst nach abgeschlossenem setVault,
+  // für genau diesen Vault). Verzögert, damit der App-Start nicht mit einem Datei-Scan
+  // konkurriert; ein Vault-Wechsel verwirft den Plan.
+  void getVaultRagManager().setVault(dirPath).then(() => {
+    getVaultRagManager().scheduleReconcile(dirPath, 'open', VAULT_RECONCILE_OPEN_DELAY_MS)
+  })
 
   fileWatcher.on('all', (eventName, filePath) => {
     if (typeof filePath === 'string') getVaultRagManager().noteFileEvent(dirPath, eventName, filePath)
@@ -7255,6 +7350,14 @@ ipcMain.handle('image-gen-save-key', async (_event, apiKey: string) => {
 ipcMain.handle('image-gen-load-key', async () => {
   const { loadImagenKey } = await import('./imageGen/imagenService')
   return loadImagenKey()
+})
+
+// Nur ja/nein für die Auftragskarte („Bilder möglich über Google“) — der Schlüssel
+// selbst bleibt im Main.
+ipcMain.handle('image-gen-has-key', async (event) => {
+  if (!isTrustedSender(event)) return false
+  const { loadImagenKey } = await import('./imageGen/imagenService')
+  return !!(await loadImagenKey())
 })
 
 ipcMain.handle('image-gen-delete-key', async () => {
@@ -10245,6 +10348,11 @@ async function createSyncEngine(): Promise<import('./sync/syncEngine').SyncEngin
   engine.setBeforeOverwrite(async (absPath, nextContent) => {
     await backupMarkdownBeforeWrite(absPath, nextContent.toString('utf-8'))
   })
+  // Erfolgreicher Sync mit heruntergeladenen Dateien → Vault-Index gleicht ab (entprellt,
+  // mit dem Öffnen-Abgleich zusammengefasst). Ohne Downloads kein Scan (Codex F12).
+  engine.onSyncComplete = (vaultPath, downloaded) => {
+    if (downloaded > 0) getVaultRagManager().scheduleReconcile(vaultPath, 'sync', VAULT_RECONCILE_SYNC_DELAY_MS)
+  }
   return engine
 }
 

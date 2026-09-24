@@ -1856,6 +1856,8 @@ const App: React.FC = () => {
         onClose={() => {
           setSettingsOpen(false)
           setSettingsInitialTab(undefined)
+          // Wer Zustände aus den Einstellungen anzeigt (Agent-Tab: Bildschlüssel), fragt neu.
+          window.dispatchEvent(new CustomEvent('mindgraph:settingsClosed'))
           setSettingsInitialAnchor(undefined)
         }}
         initialTab={settingsInitialTab as never}

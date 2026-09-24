@@ -2,6 +2,14 @@
 // eingestreut (`...settingsPagesI18n.de` / `.en`), damit die 7000-Zeilen-Datei nicht weiter wächst.
 // Schlüssel-Typ entsteht per keyof aus `de`; `en` muss vollständig sein (Typ erzwingt es).
 export const de = {
+  'settings.vaultIndex.reconcile.unchanged': 'Zuletzt abgeglichen um {when}: {files} Dateien geprüft, nichts geändert.',
+  'settings.vaultIndex.reconcile.started': 'Abgleich um {when}: {n} Dateien geändert – werden nachgezogen.',
+  'settings.vaultIndex.reconcile.needs-rebuild': 'Abgleich um {when}: Der Index passt nicht zum aktuellen Embedding-Modell. Bitte neu aufbauen – automatisch geschieht das nicht.',
+  'settings.vaultIndex.reconcile.no-index': 'Abgleich um {when}: Es gibt noch keinen Index.',
+  'settings.vaultIndex.reconcile.error': 'Abgleich um {when} fehlgeschlagen.',
+  'settings.agentCloudConsent.label': 'Notiz-Agent: Cloud-Läufe mit Vault-Zugriff',
+  'settings.agentCloudConsent.hint': 'Läuft der Agent über einen Cloud-Weg (OpenRouter, LLMBase oder ein Ollama-Cloud-Modell), gehen Auftrag, Anhänge und alles, was er im Vault liest oder erstellt, an den Anbieter – auch Mail-Notizen und Personendaten. Ohne diese Zustimmung startet kein solcher Lauf.',
+  'settings.agentCloudConsent.confirm': 'Cloud-Läufe des Notiz-Agenten mit Vault-Zugriff erlauben? Der Agent sendet dann, was er liest und erstellt, an den gewählten Anbieter – auch Mail-Notizen und Personendaten.',
   'settings.ui.add': 'Hinzufügen',
   // Allgemein
   'settings.general.subtitle': 'Erscheinungsbild, Sprache und Start.',
@@ -223,6 +231,14 @@ export const de = {
   'settings.vaultIndex.pauseNote': 'Der Aufbau pausiert vor dem nächsten Embedding-Aufruf, solange Chat, Mail-Analyse, Brain oder Notiz-Agent laufen; ein laufender Aufruf kann noch enden. Telegram, Workflows und Smart Connections sind ausgenommen.',
 }
 export const en: Record<keyof typeof de, string> = {
+  'settings.vaultIndex.reconcile.unchanged': 'Last checked at {when}: {files} files checked, nothing changed.',
+  'settings.vaultIndex.reconcile.started': 'Check at {when}: {n} files changed – being updated.',
+  'settings.vaultIndex.reconcile.needs-rebuild': 'Check at {when}: the index does not match the current embedding model. Please rebuild – this does not happen automatically.',
+  'settings.vaultIndex.reconcile.no-index': 'Check at {when}: there is no index yet.',
+  'settings.vaultIndex.reconcile.error': 'Check at {when} failed.',
+  'settings.agentCloudConsent.label': 'Note agent: cloud runs with vault access',
+  'settings.agentCloudConsent.hint': 'If the agent runs via a cloud route (OpenRouter, LLMBase or an Ollama cloud model), the task, attachments and everything it reads or creates in the vault go to the provider – including mail notes and personal data. Without this consent no such run starts.',
+  'settings.agentCloudConsent.confirm': 'Allow cloud runs of the note agent with vault access? The agent then sends what it reads and creates to the chosen provider – including mail notes and personal data.',
   'settings.ui.add': 'Add',
   'settings.general.subtitle': 'Appearance, language and startup.',
   'settings.general.groupAppearance': 'Appearance',

@@ -7,7 +7,7 @@
 //
 // Die Rechenlogik selbst steht in shared/activeTime.ts und kennt weder Fenster noch Uhr.
 
-import { useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { ActiveTimer } from '../../shared/activeTime'
 
 const live = new Set<ActiveTimer>()
@@ -83,17 +83,35 @@ export function createActiveMeasurement(): ActiveMeasurement {
  * beim ersten Tastendruck und endet beim Abschicken. Vorher zu starten wäre falsch —
  * ein offenes Fenster ist noch keine Arbeit am Auftrag.
  */
-export function useComposeMeasurement(): { noteTyping: () => void; take: () => number } {
+// Bereits gemessene, beim Aushängen gesicherte Zeit je Schlüssel (Agent-Tab: Tab-ID).
+// Der Entwurf überlebt einen Tab-Wechsel — die Zeit daran muss es auch, aber die Zeit
+// auf anderen Tabs zählt nicht mit.
+const carried = new Map<string, number>()
+
+/** Gesicherte Zeit eines geschlossenen Bereichs vergessen. */
+export function dropComposeMeasurement(key: string): void {
+  carried.delete(key)
+}
+
+export function useComposeMeasurement(key?: string): { noteTyping: () => void; take: () => number } {
   const ref = useRef<ActiveMeasurement | null>(null)
+  // Aushängen beendet den Messer immer (sonst bleibt er in `live` hängen und zählt
+  // weiter). Mit Schlüssel wird der Zwischenstand gesichert, ohne verworfen.
+  useEffect(() => () => {
+    if (!ref.current) return
+    const ms = ref.current.end()
+    ref.current = null
+    if (key) carried.set(key, (carried.get(key) ?? 0) + ms)
+  }, [key])
   return {
     noteTyping: () => {
       if (!ref.current) ref.current = createActiveMeasurement()
       ref.current.begin()
     },
     take: () => {
-      if (!ref.current) return 0
-      const ms = ref.current.end()
+      const ms = (ref.current ? ref.current.end() : 0) + (key ? carried.get(key) ?? 0 : 0)
       ref.current = null
+      if (key) carried.delete(key)
       return ms
     }
   }

@@ -1,6 +1,7 @@
 import type { Language } from '../stores/uiStore'
 import * as settingsPagesI18n from './i18n/settingsPages'
 import * as helpGuideI18n from './i18n/helpGuide'
+import * as agentCardI18n from './i18n/agentCard'
 
 type TranslationKey = keyof typeof translations.de
 
@@ -8,6 +9,7 @@ const translations = {
   de: {
     ...settingsPagesI18n.de,
     ...helpGuideI18n.de,
+    ...agentCardI18n.de,
     // ── Einstellungen · Redesign 09/2026: geteilte Bausteine, Integrationen, KI-Tab, Modul-Tab ──
     'settings.ui.saved': 'Gespeichert',
     'settings.ui.remove': 'Entfernen',
@@ -92,7 +94,7 @@ const translations = {
     'settings.cloud.features': 'Cloud für diese Funktionen nutzen',
     'settings.cloud.featuresHint': 'Jede Funktion einzeln freischalten. Alle senden Notiz-Inhalte in die Cloud. Die E-Mail-Analyse stellst du im E-Mail-Tab ein.',
     'settings.cloud.imageGen.name': 'Bild-Generierung · Google Nano Banana',
-    'settings.cloud.imageGen.desc': 'Nur der Bild-Prompt geht an Google – keine Notiz- oder Mail-Inhalte. Genutzt vom Marketing-Tab und Notiz-Agenten.',
+    'settings.cloud.imageGen.desc': 'Der Bild-Prompt geht an Google. Formuliert ihn der Notiz-Agent, kann er Angaben aus Auftrag, Notizen oder Anhängen enthalten. Genutzt vom Marketing-Tab und Notiz-Agenten.',
     'settings.cloud.imageGen.keyLabel': 'Google AI Studio API-Key',
     'settings.aiTab.subtitle': 'Lokal ist Standard. Cloud-Anbieter sind pro Funktion ein bewusstes Opt-in.',
     'settings.aiTab.defaultShort': 'Standard',
@@ -1211,6 +1213,7 @@ const translations = {
     'aiBar.agent.previewBinary': 'Keine Textvorschau für dieses Format möglich — der Inhalt wird erst nach der Übernahme sichtbar.',
     'aiBar.agent.previewTruncated': 'Vorschau gekürzt — die vollständige Datei wird bei der Übernahme geschrieben.',
     'aiBar.agent.provLocal': 'lokal',
+    'aiBar.agent.provUnverified': 'Ausführungsort nicht geprüft',
     'aiBar.agent.provCloud': 'Cloud',
     'aiBar.context.cloudNotEnabledEdit': 'Cloud ist für „Notiz bearbeiten (KI)" nicht freigeschaltet (Einstellungen → Integrationen → OpenRouter) — oder lokales Modell wählen.',
 
@@ -3070,7 +3073,7 @@ const translations = {
     'settings.ai.imageGen.saved': 'Gespeichert',
     'settings.ai.imageGen.keyStored': 'Key hinterlegt',
     'settings.ai.imageGen.saveFailed': 'Speichern fehlgeschlagen',
-    'settings.ai.imageGen.privacyHint': 'Der Key wird verschlüsselt auf diesem Rechner gespeichert (safeStorage). Prompts gehen an Google — keine Notiz- oder Mail-Inhalte, nur der Bild-Prompt.',
+    'settings.ai.imageGen.privacyHint': 'Der Key wird verschlüsselt auf diesem Rechner gespeichert (safeStorage). Der Bild-Prompt geht an Google — formuliert ihn der Notiz-Agent, kann er Angaben aus Auftrag, Notizen oder Anhängen enthalten.',
 
     // Slash Commands
     'slashCommand.header': 'Slash-Befehle',
@@ -3359,6 +3362,7 @@ const translations = {
   en: {
     ...settingsPagesI18n.en,
     ...helpGuideI18n.en,
+    ...agentCardI18n.en,
     // ── Settings · Redesign 09/2026: shared building blocks, integrations, AI tab, modules tab ──
     'settings.ui.saved': 'Saved',
     'settings.ui.remove': 'Remove',
@@ -3443,7 +3447,7 @@ const translations = {
     'settings.cloud.features': 'Use cloud for these features',
     'settings.cloud.featuresHint': 'Enable each feature individually. All of them send note content to the cloud. Email analysis is configured in the Email tab.',
     'settings.cloud.imageGen.name': 'Image generation · Google Nano Banana',
-    'settings.cloud.imageGen.desc': 'Only the image prompt goes to Google – no note or mail content. Used by the marketing tab and the note agent.',
+    'settings.cloud.imageGen.desc': 'The image prompt goes to Google. If the note agent writes it, it can contain details from the task, notes or attachments. Used by the marketing tab and the note agent.',
     'settings.cloud.imageGen.keyLabel': 'Google AI Studio API key',
     'settings.aiTab.subtitle': 'Local is the default. Cloud providers are a deliberate per-feature opt-in.',
     'settings.aiTab.defaultShort': 'Default',
@@ -4563,6 +4567,7 @@ const translations = {
     'aiBar.agent.previewBinary': 'No text preview available for this format — the content becomes visible after accepting.',
     'aiBar.agent.previewTruncated': 'Preview truncated — the full file is written on accept.',
     'aiBar.agent.provLocal': 'local',
+    'aiBar.agent.provUnverified': 'where it runs is not checked',
     'aiBar.agent.provCloud': 'Cloud',
     'aiBar.context.cloudNotEnabledEdit': 'Cloud is not enabled for "Note editing (AI)" (Settings → Integrations → OpenRouter) — or choose a local model.',
 
@@ -6421,7 +6426,7 @@ const translations = {
     'settings.ai.imageGen.saved': 'Saved',
     'settings.ai.imageGen.keyStored': 'Key stored',
     'settings.ai.imageGen.saveFailed': 'Saving failed',
-    'settings.ai.imageGen.privacyHint': 'The key is stored encrypted on this machine (safeStorage). Prompts are sent to Google — no note or mail content, only the image prompt.',
+    'settings.ai.imageGen.privacyHint': 'The key is stored encrypted on this machine (safeStorage). The image prompt goes to Google — if the note agent writes it, it can contain details from the task, notes or attachments.',
 
     // Slash Commands
     'slashCommand.header': 'Slash Commands',
@@ -6714,7 +6719,8 @@ export function t(key: TranslationKey, language: Language, params?: Record<strin
 
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
-      text = text.replace(`{${k}}`, String(v))
+      // Alle Vorkommen — ein Satz wie „geht an {provider} … an {provider}“ blieb sonst halb roh.
+      text = text.split(`{${k}}`).join(String(v))
     })
   }
 

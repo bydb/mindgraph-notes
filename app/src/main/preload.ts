@@ -223,6 +223,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
     comparisonCaseId?: string
   }) => ipcRenderer.invoke('note-agent-run', params),
+  noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) =>
+    ipcRenderer.invoke('note-agent-route-preflight', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
   // Rechner-Steuerung: Programm über den Systemdialog freigeben (liefert Bundle-Kennung).
   computerControlPickApp: () => ipcRenderer.invoke('computer-control-pick-app'),
@@ -263,6 +265,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('activity-changed', handler)
   },
   noteAgentRemember: (vaultPath: string, text: string) => ipcRenderer.invoke('note-agent-remember', vaultPath, text),
+  noteAgentMemoryStatus: (vaultPath: string) => ipcRenderer.invoke('note-agent-memory-status', vaultPath),
+  imageGenHasKey: () => ipcRenderer.invoke('image-gen-has-key'),
   // Agent-Skills Stufe 1: Vault-Skills verwalten
   noteSkillsList: (vaultPath: string) => ipcRenderer.invoke('note-skills-list', vaultPath),
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) =>

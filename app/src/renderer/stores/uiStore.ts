@@ -731,6 +731,10 @@ interface UIState {
   webResearchConfig: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null
   /** Bild-Generierung (Google Nano Banana, Cloud, eigener Key) — opt-in. Key liegt via safeStorage im Main. */
   imageGenerationEnabled: boolean
+  /** Version der ausdrücklichen Zustimmung zu Cloud-Läufen des Agenten mit Vault-Zugriff
+   *  (shared/agentRoute NOTE_AGENT_CLOUD_CONSENT_VERSION). Der Main liest sie selbst. */
+  noteAgentCloudConsentVersion: number
+  setNoteAgentCloudConsentVersion: (version: number) => void
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean
 
@@ -1067,6 +1071,7 @@ const defaultState = {
   agentComputer: { ...DEFAULT_COMPUTER_CONTROL, verbs: { ...DEFAULT_COMPUTER_CONTROL.verbs }, apps: [] },
   webResearchConfig: null,
   imageGenerationEnabled: false,
+  noteAgentCloudConsentVersion: 0,
   semanticScholarEnabled: true,
   zoteroEnabled: true,
 
@@ -1282,7 +1287,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1399,6 +1404,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
     return { agentComputer: { ...base, ...patch, verbs: { ...base.verbs, ...(patch.verbs ?? {}) } } }
   }),
   setImageGenerationEnabled: (enabled) => set({ imageGenerationEnabled: enabled }),
+  setNoteAgentCloudConsentVersion: (version) => set({ noteAgentCloudConsentVersion: version }),
   setWebResearchConfig: (config) => set({ webResearchConfig: config }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
   toggleTaskExcludedFolder: (folderPath) => set((state) => {

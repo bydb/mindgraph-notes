@@ -37,6 +37,9 @@ export const ImageGenerationSection: React.FC = () => {
       if (res.success) {
         setSaved(true)
         setSuffix(key.slice(-4))
+        // Wer „Bilder möglich“ anzeigt (Agent-Tab), fragt erst NACH der Änderung neu —
+        // ein Schließen der Einstellungen kann vor dem Abschluss liegen.
+        window.dispatchEvent(new CustomEvent('mindgraph:imageKeyChanged'))
       } else {
         setError(res.error || t('settings.ai.imageGen.saveFailed'))
       }
@@ -51,6 +54,7 @@ export const ImageGenerationSection: React.FC = () => {
     if (res.success) {
       setSaved(false)
       setSuffix(null)
+      window.dispatchEvent(new CustomEvent('mindgraph:imageKeyChanged'))
     }
   }
 
