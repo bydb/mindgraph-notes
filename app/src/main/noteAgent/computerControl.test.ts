@@ -59,6 +59,8 @@ describe('Freigabe', () => {
   })
 
   it('entsteht nicht, wenn kein einziger Vorgang freigegeben ist', async () => {
+    // Nur macOS: anderswo lehnt authorizeComputer schon vorher ab („gibt es derzeit nur auf macOS“).
+    if (!onMac) return
     const none = normalizeComputerControl({ verbs: { open: false, reveal: false, mail_draft: false, print: false } })
     await expect(authorizeComputer(run, async () => true, none)).rejects.toThrow(/kein Vorgang/)
     expect(run.computer).toBeUndefined()

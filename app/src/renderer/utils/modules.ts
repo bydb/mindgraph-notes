@@ -18,8 +18,11 @@ const pluginModules = pluginManifests
 /**
  * Läuft die App auf macOS? Einmal beim Laden bestimmt — die Plattform wechselt nicht.
  * `userAgentData.platform` wo vorhanden, sonst `platform` (veraltet, aber in Electron da).
+ * Ohne `navigator` (Node 20 in der Linux-CI, wo die Tests diese Datei laden) gilt: kein Mac —
+ * sonst bricht schon der Import ab.
  */
 const IS_MAC = (() => {
+  if (typeof navigator === 'undefined') return false
   const nav = navigator as Navigator & { userAgentData?: { platform?: string } }
   return `${nav.userAgentData?.platform ?? navigator.platform ?? ''}`.toLowerCase().includes('mac')
 })()
