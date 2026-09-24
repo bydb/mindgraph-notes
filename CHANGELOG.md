@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.23-beta] - 2026-09-24
+
+**Der Agent nimmt dich jetzt an die Hand und durchsucht deinen Vault nach Bedeutung.** Die Agent-Ansicht ist eine Auftragskarte: Beispiele aus Verwaltung, Beschaffung, Wissensrecherche und Schule, darunter Schritt für Schritt Unterlagen, Ablage, Befugnisse und Modell. Hast du einen Vault-Index, findet der Agent passende Notizen auch dann, wenn andere Wörter darin stehen. Die Karte zeigt ehrlich, ob das Modell auf deinem Rechner rechnet oder in der Cloud, und welche Daten wohin gehen.
+
+### Hintergrund
+
+- **Auftragskarte:** Wer noch wenig mit Agenten gearbeitet hat, sah bisher ein leeres Eingabefeld. Jetzt steht über jedem Beispiel, was es braucht (Ordner, zwei Dateien, Webrecherche), und der Startknopf nennt den nächsten fehlenden Schritt statt einfach grau zu bleiben. Modellwahl und Webrecherche bleiben beim Wechsel zwischen Tabs erhalten.
+- **Lokal nur, wenn geprüft:** „Auf diesem Rechner“ steht nur noch da, wenn die App das an Ollama nachgeprüft hat. Ein Ollama-Modell, das auswärts rechnet, erscheint als Cloud-Weg, auch wenn sein Name unauffällig ist. LM Studio erscheint als „Ausführungsort nicht geprüft“.
+- **Cloud nur mit Zustimmung:** Ein Cloud-Lauf mit Zugriff auf den Vault braucht einmal deine ausdrückliche Zustimmung. Du gibst sie direkt auf der Karte und nimmst sie in den Einstellungen unter KI & Modelle wieder zurück. Gesperrt wird nichts, auch nicht für Rechner ohne starke Grafikkarte: Du entscheidest mit klarem Hinweis.
+- **Welche Daten wohin gehen:** Ein Aufklapper auf der Karte listet jeden Empfänger auf, vom Modell über Suchdienst und Bild-Generierung bis zu Apple Mail. Zwei Texte der App, die dazu bisher Falsches sagten, sind korrigiert.
+- **Suche nach Bedeutung:** Der Agent nutzt den Vault-Index mit festen Grenzen für Trefferzahl und Textmenge und liest passende Notizen danach vollständig. Findet der Index nichts, sagt er das nicht als „gibt es nicht“, sondern sucht nach Stichworten weiter.
+- **Index gleicht sich selbst ab:** Eine Minute nach dem Öffnen und kurz nach einem Sync mit neuen Dateien prüft die App, ob der Index noch zum Vault passt. Hat sich nichts geändert, lädt sie kein Modell und schreibt nichts; an einem Vault mit rund 3000 Notizen dauerte das anderthalb Sekunden.
+- **Grenze:** Ein echter Lauf über OpenRouter oder LLMBase und der Abgleich nach einem Sync sind noch nicht am echten Gerät erprobt, nur über Tests.
+
 ## [0.11.22-beta] - 2026-09-23
 
 **Der Agent ist jetzt einen Klick entfernt: Oben in der Leiste steht „Agent“ neben Dashboard und Workflow.** Ein Klick öffnet den Agenten, der Ordner auswertet, Tabellen zusammenführt und Dokumente schreibt. Vorher fand man ihn nur über die Befehlspalette, einen Rechtsklick auf einen Ordner oder die Hilfe. Die Leiste passt jetzt außerdem in kleine Fenster und lässt sich mit Tastatur und Screenreader bedienen.
