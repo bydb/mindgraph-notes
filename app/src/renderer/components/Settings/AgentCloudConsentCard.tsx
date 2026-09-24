@@ -1,4 +1,4 @@
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, flushUISettings } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { Card, Row, Toggle } from './SettingsUI'
 import { NOTE_AGENT_CLOUD_CONSENT_VERSION, hasCloudConsent } from '../../../shared/agentRoute'
@@ -25,6 +25,8 @@ export function AgentCloudConsentCard() {
             } else {
               setVersion(0)
             }
+            // Sofort schreiben: der Agent-Tab prüft beim Schließen der Einstellungen neu.
+            void flushUISettings()
           }}
         />
       </Row>

@@ -15,7 +15,7 @@
 // direkt am Schalter.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, flushUISettings } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useComposeMeasurement } from '../../utils/activeTimeTracker'
 import { useComparisonStore } from '../../stores/comparisonStore'
@@ -774,12 +774,15 @@ export function AgentView({ tabId }: Props) {
                         <button
                           type="button"
                           className="agent-card-btn"
-                          onClick={() => {
+                          onClick={async () => {
                             setConsentVersion(NOTE_AGENT_CLOUD_CONSENT_VERSION)
                             useNoteAgentStore.setState(st => {
                               const sc = st.scopes[tabId]
                               return sc ? { scopes: { ...st.scopes, [tabId]: { ...sc, startGate: null } } } : {}
                             })
+                            // Der Main liest die Zustimmung aus ui-settings.json — erst schreiben, dann neu prüfen.
+                            await flushUISettings()
+                            runPreflight()
                           }}
                         >
                           {t('agentCard.consentButton')}

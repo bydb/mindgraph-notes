@@ -1910,23 +1910,36 @@ export async function initializeUISettings(): Promise<void> {
 // Settings speichern - wird bei jeder Änderung aufgerufen
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
+async function writeSettingsNow(): Promise<void> {
+  const state = useUIStore.getState()
+  const toSave: Record<string, unknown> = {}
+  for (const key of persistedKeys) {
+    toSave[key] = state[key as keyof typeof state]
+  }
+  try {
+    await window.electronAPI.saveUISettings(toSave)
+    console.log('[UIStore] Settings saved:', toSave)
+  } catch (error) {
+    console.error('[UIStore] Failed to save settings:', error)
+  }
+}
+
 function saveSettingsDebounced(): void {
   if (saveTimeout) {
     clearTimeout(saveTimeout)
   }
-  saveTimeout = setTimeout(async () => {
-    const state = useUIStore.getState()
-    const toSave: Record<string, unknown> = {}
-    for (const key of persistedKeys) {
-      toSave[key] = state[key as keyof typeof state]
-    }
-    try {
-      await window.electronAPI.saveUISettings(toSave)
-      console.log('[UIStore] Settings saved:', toSave)
-    } catch (error) {
-      console.error('[UIStore] Failed to save settings:', error)
-    }
-  }, 300) // 300ms Debounce
+  saveTimeout = setTimeout(() => { saveTimeout = null; void writeSettingsNow() }, 300) // 300ms Debounce
+}
+
+/**
+ * Sofort auf die Platte schreiben, statt auf den Debounce zu warten. Für Einstellungen,
+ * die der Main direkt danach aus ui-settings.json liest (Cloud-Zustimmung des Agenten):
+ * sonst prüft er noch den alten Stand, und der Klick scheint wirkungslos (real, 24.09.2026).
+ */
+export async function flushUISettings(): Promise<void> {
+  if (!settingsInitialized) return
+  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }
+  await writeSettingsNow()
 }
 
 // Store-Änderungen überwachen und automatisch speichern
