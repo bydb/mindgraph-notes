@@ -37,6 +37,7 @@ import { AgentCloudConsentCard } from './AgentCloudConsentCard'
 import { PageHeader, SectionTitle, Card, ServiceHead, IconTile, TILE_GLYPH, Row, Note, Details, Toggle, Segmented, Select, Button, NumberInput, TextInput, Hero, ModuleOffCard } from './SettingsUI'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
 import { ModelRamWarning } from '../Shared/ModelRamWarning'
+import { ModelMixRamNote } from './ModelMixRamNote'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { VaultIndexSection } from './VaultIndexSection'
 import { ExternalLink } from '../Shared/ExternalLink'
@@ -1668,6 +1669,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                       <ActiveModelStatusBadge model={ollama.selectedModel} />
                       <ModelRamWarning model={ollama.selectedModel} />
                     </Row>
+                    <ModelMixRamNote />
                     {!isLm && connected && projectRagOn && (() => {
                       const patterns = ['embed', 'minilm', 'bge', 'gte', 'e5', 'nomic']
                       const embs = ollamaModels.filter(m => patterns.some(p => m.name.toLowerCase().includes(p)))

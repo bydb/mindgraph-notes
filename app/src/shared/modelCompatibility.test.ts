@@ -15,6 +15,7 @@ import {
   isMlxModel,
   getModelRamGb,
   checkModelRamFit,
+  checkModelMixRamFit,
   canonicalModelKey,
   supportsNativeToolCalls,
   MODULES,
@@ -320,5 +321,48 @@ describe('shellLockReason (Shell-Zugriff des Notiz-Agenten)', () => {
     expect(shellLockReason('qwen3.6:27b-mlx')).toBeNull()
     expect(getModelVerdict('voellig-unbekannt:7b', 'note-agent').verdict).toBe('untested')
     expect(shellLockReason('voellig-unbekannt:7b')).toBeNull()
+  })
+})
+
+describe('checkModelMixRamFit', () => {
+  it('warnt bei zwei 27B-Modellen auf 32 GB, obwohl jedes einzeln passt (Absturz 25.09.2026)', () => {
+    expect(checkModelRamFit('qwen3.8:27b-mlx', 32).fits).toBe(true)
+    expect(checkModelRamFit('qwen3.6:27b-mlx', 32).fits).toBe(true)
+    const fit = checkModelMixRamFit(['qwen3.8:27b-mlx', 'qwen3.6:27b-mlx'], 32)
+    expect(fit.fits).toBe(false)
+    expect(fit.models.map(m => m.model)).toEqual(['qwen3.6:27b-mlx', 'qwen3.8:27b-mlx'])
+  })
+
+  it('zählt jedes Modell nur einmal, auch wenn mehrere Module es nutzen', () => {
+    const fit = checkModelMixRamFit(['qwen3.8:27b-mlx', 'qwen3.8:27b-mlx', ' qwen3.8:27b-mlx ', 'qwen3.5:4b'], 32)
+    expect(fit.models).toHaveLength(2)
+    expect(fit.fits).toBe(true)
+  })
+
+  it('ein einzelnes Modell ist nie eine Kombination — das deckt checkModelRamFit ab', () => {
+    expect(checkModelMixRamFit(['qwen3.6:27b-mlx'], 8).fits).toBe(true)
+  })
+
+  it('ignoriert leere Einträge, Cloud-Modelle, Cloud-Platzhalter und unbekannte Größen', () => {
+    const fit = checkModelMixRamFit(['', null, undefined, 'qwen3.5:cloud', '__openrouter__', 'bge-m3', 'qwen3.8:27b-mlx'], 16)
+    expect(fit.models.map(m => m.model)).toEqual(['qwen3.8:27b-mlx'])
+    expect(fit.fits).toBe(true)
+  })
+
+  it('rechnet höchstens mit den drei größten Modellen (Ollamas Default-Grenze)', () => {
+    const fit = checkModelMixRamFit(['qwen3.5:4b', 'ministral-3:8b', 'gemma4:12b-mlx', 'qwen3.8:27b-mlx'], 64)
+    expect(fit.models.map(m => m.model)).toEqual(['qwen3.8:27b-mlx', 'gemma4:12b-mlx', 'ministral-3:8b'])
+    expect(fit.sumGb).toBe(35)
+    expect(fit.fits).toBe(true)
+  })
+
+  it('lässt dieselbe Reserve wie checkModelRamFit: Summe muss STRIKT unter total − 2 liegen', () => {
+    // ministral 6 + gemma4:12b-mlx 11 = 17 → auf 19 GB genau an der Grenze
+    expect(checkModelMixRamFit(['ministral-3:8b', 'gemma4:12b-mlx'], 19).fits).toBe(false)
+    expect(checkModelMixRamFit(['ministral-3:8b', 'gemma4:12b-mlx'], 20).fits).toBe(true)
+  })
+
+  it('ohne bekannten Gesamtspeicher keine Warnung', () => {
+    expect(checkModelMixRamFit(['qwen3.8:27b-mlx', 'qwen3.6:27b-mlx'], null).fits).toBe(true)
   })
 })

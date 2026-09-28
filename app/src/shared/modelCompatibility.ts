@@ -959,6 +959,45 @@ export function checkModelRamFit(model: string, totalRamGb: number | null | unde
   return { fits: ram < total - 2, modelRamGb: ram, totalRamGb: total }
 }
 
+// Passen die VERSCHIEDENEN lokalen Modelle, die die Module zusammen nutzen, gleichzeitig
+// in den RAM? `checkModelRamFit` prüft je ein Modell — zwei 27B-Modelle passen einzeln in
+// 32 GB, zusammen nicht. Ollama lädt verschiedene Modelle parallel, wenn zwei Funktionen
+// gleichzeitig anfragen (Default bis zu 3 pro GPU), und hat dabei real (25.09.2026) ein
+// zweites 27B-MLX-Modell bei 5,3 GB freiem RAM geladen → Swap, System eingefroren.
+// Gerechnet wird deshalb mit den bis zu drei größten Modellen (Ollamas Default-Grenze),
+// dieselbe Reserve wie oben. Cloud-Modelle, Cloud-Platzhalter (`__openrouter__` …) und
+// Modelle unbekannter Größe zählen nicht. Weiß nichts von OLLAMA_MAX_LOADED_MODELS am
+// Server — der Hinweistext muss diese Ausnahme nennen.
+export const MAX_CONCURRENT_OLLAMA_MODELS = 3
+export interface ModelMixRamFit {
+  fits: boolean
+  /** Die gezählten Modelle (größte zuerst, höchstens MAX_CONCURRENT_OLLAMA_MODELS). */
+  models: Array<{ model: string; ramGb: number }>
+  sumGb: number
+  totalRamGb: number
+}
+export function checkModelMixRamFit(
+  models: Array<string | null | undefined>,
+  totalRamGb: number | null | undefined
+): ModelMixRamFit {
+  const total = typeof totalRamGb === 'number' && totalRamGb > 0 ? totalRamGb : 0
+  const seen = new Set<string>()
+  const sized: Array<{ model: string; ramGb: number }> = []
+  for (const raw of models) {
+    const model = (raw || '').trim()
+    if (!model || model.startsWith('__') || isCloudModel(model) || seen.has(model)) continue
+    seen.add(model)
+    const ramGb = getModelRamGb(model)
+    if (ramGb != null) sized.push({ model, ramGb })
+  }
+  sized.sort((a, b) => b.ramGb - a.ramGb)
+  const counted = sized.slice(0, MAX_CONCURRENT_OLLAMA_MODELS)
+  const sumGb = Math.round(counted.reduce((s, m) => s + m.ramGb, 0) * 10) / 10
+  // Ein einzelnes Modell deckt checkModelRamFit ab — hier geht es nur um die Kombination.
+  const fits = !total || counted.length < 2 || sumGb < total - 2
+  return { fits, models: counted, sumGb, totalRamGb: total }
+}
+
 // MLX-Modelle: Apple-Silicon-optimiert (laufen via Apples MLX-Framework nativ
 // auf M-Chips, deutlich schneller + weniger RAM als GGUF/llama.cpp-Varianten).
 // Erkennung: `-mlx` irgendwo im Tag (z.B. `qwen3.6:27b-mlx`, `qwen3.5:9b-mlx-bf16`)
