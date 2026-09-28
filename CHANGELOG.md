@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.25-beta] - 2026-09-28
+
+**Der Vault-Chat versteht Fragen besser und zeigt zuerst die Quellen, die seine Antwort tragen.** Wörter wie „schau mal“ oder „fasse zusammen“ lenken die Suche nicht mehr ab, und zusammengesetzte Wörter finden auch ihren Wortteil. Außerdem stürzt die App nicht mehr ab, wenn du viele Mails schnell hintereinander abhakst, und die Einstellungen warnen, wenn deine Modelle zusammen zu viel Speicher brauchen.
+
+### Hintergrund
+
+- **Fragen wie gesprochen:** Auftrags- und Füllwörter der Frage zählen beim Wortabgleich nicht mehr. Vorher konnte „schaue“ das stärkste Wort einer Frage sein. Zusammengesetzte Wörter treffen ihren hinteren Wortteil zur Hälfte: „Lizenzverlängerung“ findet „Verlängerung“. In einem Testsatz von 42 Fragen wurde dadurch kein Ergebnis schlechter; dass insgesamt mehr gefunden wird, ist damit nicht belegt.
+- **Tragende Quellen zuerst:** Oben stehen nur die Quellen, auf die sich Sätze stützen, die die Prüfung bestehen. Das Modell nennt gern auch unpassende Treffer in einem Sammelsatz; diese stehen jetzt eingeklappt unter „Weitere gelesene Abschnitte“, ausgeblendet wird nichts.
+- **Abkürzungen:** „bzw.“, „z. B.“ und ähnliche Abkürzungen beenden in der Quellenprüfung keinen Satz mehr. Vorher erschien die erste Satzhälfte fälschlich als „ohne Quellenangabe“.
+- **Kein Absturz beim Abhaken:** Jedes Häkchen im Widget „Zu beantworten“ speicherte die ganze Mailliste. Bei vielen schnellen Klicks und einer großen Liste lief die App aus dem Speicher. Jetzt werden die Klicks zu wenigen Speichervorgängen gebündelt.
+- **Warnung bei Modell-Mix:** Nutzen deine Funktionen verschiedene große lokale Modelle, die gleichzeitig nicht in den Speicher passen, zeigen die Einstellungen unter KI & Modelle einen Hinweis. Ollama lädt solche Modelle sonst parallel, und der ganze Rechner kann einfrieren. Die App warnt nur und sperrt nichts; wer Ollama auf ein Modell gleichzeitig begrenzt, kann den Hinweis ignorieren.
+- **Schnellerer Merksatz-Vorschlag:** Den Vorschlag nach einem Agent-Lauf rechnet das Modell jetzt ohne Nachdenken. Mit einem großen lokalen Modell dauert er dadurch wenige Sekunden statt bis zu einer Minute, in der das Modell für nichts anderes frei war.
+
 ## [0.11.24-beta] - 2026-09-24
 
 **Der Knopf „Zustimmen“ für Cloud-Läufe des Agenten funktioniert jetzt.** In 0.11.23 blieb nach dem Klick der Hinweis „Cloud-Zustimmung fehlt“ stehen, und der Auftrag ließ sich nicht starten. Jetzt verschwindet der Kasten, und du kannst den Auftrag über den gewählten Cloud-Anbieter starten.
