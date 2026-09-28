@@ -8,6 +8,42 @@ import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 import { createActiveMeasurement } from '../utils/activeTimeTracker'
 
+// Speichern bündeln: Jeder Speichervorgang schickt die KOMPLETTE Mailliste an den
+// Main-Prozess (real 38 MB), der sie unter einer Sperre einliest, vereinigt und
+// zurückschreibt. Schnelles Abhaken im „Zu beantworten“-Widget startete früher
+// pro Klick einen eigenen Vorgang: Alle warteten gleichzeitig mit ihrer Kopie an
+// der Sperre, ab dem zweiten stimmte die Basisrevision nicht mehr (der erste
+// hatte die Datei gerade geändert) — also Vereinigung plus komplettes Nachladen.
+// Nach etwa 20 Klicks lief der Main-Prozess mit 3 GB in „heap out of memory“
+// (real, 25.09.2026). Deshalb: höchstens ein Vorgang läuft, höchstens einer
+// wartet. Wer während eines Laufs speichern will, hängt sich an den wartenden an;
+// der liest den Zustand erst beim Start und nimmt damit alle Änderungen mit.
+const saveInFlight = new Map<string, Promise<void>>()
+const saveQueued = new Map<string, Promise<void>>()
+
+function scheduleSave(vaultPath: string, run: () => Promise<void>): Promise<void> {
+  const queued = saveQueued.get(vaultPath)
+  if (queued) return queued
+  const start = (): Promise<void> => {
+    const p: Promise<void> = run().finally(() => {
+      if (saveInFlight.get(vaultPath) === p) saveInFlight.delete(vaultPath)
+    })
+    saveInFlight.set(vaultPath, p)
+    return p
+  }
+  const current = saveInFlight.get(vaultPath)
+  if (!current) return start()
+  // Auch nach einem Fehler des laufenden Vorgangs starten — sonst bliebe der wartende
+  // (und jeder, der sich daran hängt) für immer stehen.
+  const startQueued = (): Promise<void> => {
+    saveQueued.delete(vaultPath)
+    return start()
+  }
+  const next = current.then(startQueued, startQueued)
+  saveQueued.set(vaultPath, next)
+  return next
+}
+
 interface EmailState {
   emails: EmailMessage[]
   lastFetchedAt: Record<string, string>
@@ -352,7 +388,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     }
   },
 
-  saveEmails: async (vaultPath: string) => {
+  saveEmails: (vaultPath: string) => scheduleSave(vaultPath, async () => {
     try {
       const { emails, lastFetchedAt, storeRevision, storeConflict } = get()
       const result = await window.electronAPI.emailSave(vaultPath, { emails, lastFetchedAt }, storeRevision)
@@ -389,7 +425,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     } catch (error) {
       console.error('[EmailStore] Failed to save emails:', error)
     }
-  },
+  }),
 
   reloadAfterStoreConflict: async (vaultPath: string) => {
     set({ storeConflict: null })

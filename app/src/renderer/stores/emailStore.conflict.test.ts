@@ -146,3 +146,55 @@ describe('offener Konflikt sperrt das stille Nachladen', () => {
     expect(useEmailStore.getState().storeConflict).toBeNull()
   })
 })
+
+describe('schnelles Abhaken bündelt das Speichern', () => {
+  // Real 25.09.2026: rund 20 schnelle Klicks im „Zu beantworten“-Widget, je Klick
+  // die ganze Mailliste (38 MB) im Main-Prozess — „heap out of memory“.
+  function analysiert(id: string): Record<string, unknown> {
+    return { ...mail(id), analysis: { relevanceScore: 80, needsReply: true } }
+  }
+
+  it('lässt höchstens einen Vorgang laufen und schreibt die restlichen Klicks in EINEM Folgevorgang', async () => {
+    const ids = ['a', 'b', 'c', 'd', 'e']
+    emailLoad.mockResolvedValue({ ...ladeAntwort([], 'rev-1'), emails: ids.map(analysiert) as never })
+    await useEmailStore.getState().loadEmails(VAULT, true)
+    emailLoad.mockClear()
+
+    let freigeben: () => void = () => {}
+    let n = 0
+    emailSave.mockImplementation(async () => {
+      n++
+      if (n === 1) await new Promise<void>(r => { freigeben = r })
+      return { success: true, merged: false, revision: `rev-${n + 1}` }
+    })
+
+    const klicks = ids.map(id => useEmailStore.getState().markReplyHandled(VAULT, id, true))
+    await Promise.resolve()
+    expect(emailSave).toHaveBeenCalledTimes(1)
+    freigeben()
+    await Promise.all(klicks)
+
+    expect(emailSave).toHaveBeenCalledTimes(2)
+    // Der Folgevorgang baut auf der Revision des ersten auf — kein Scheinkonflikt, kein Nachladen.
+    expect(emailSave.mock.calls[1][2]).toBe('rev-2')
+    expect(emailLoad).not.toHaveBeenCalled()
+    // …und er trägt ALLE Häkchen, auch die, die während des ersten Vorgangs kamen.
+    const geschrieben = (emailSave.mock.calls[1][1] as { emails: Array<{ id: string; analysis?: { replyHandled?: boolean } }> }).emails
+    expect(geschrieben.filter(e => e.analysis?.replyHandled).map(e => e.id)).toEqual(ids)
+  })
+
+  it('speichert nach einem abgeschlossenen Vorgang wieder sofort', async () => {
+    emailSave.mockResolvedValue({ success: true, revision: 'rev-2' })
+    await useEmailStore.getState().saveEmails(VAULT)
+    await useEmailStore.getState().saveEmails(VAULT)
+    expect(emailSave).toHaveBeenCalledTimes(2)
+  })
+
+  it('ein fehlgeschlagener Vorgang blockiert die nächsten nicht', async () => {
+    emailSave.mockRejectedValueOnce(new Error('IPC weg')).mockResolvedValue({ success: true, revision: 'rev-2' })
+    await useEmailStore.getState().saveEmails(VAULT)
+    await useEmailStore.getState().saveEmails(VAULT)
+    expect(emailSave).toHaveBeenCalledTimes(2)
+    expect(useEmailStore.getState().storeRevision).toBe('rev-2')
+  })
+})
