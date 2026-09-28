@@ -36,7 +36,7 @@ import { rankCandidates, selectForQuery, verifyHits, DEFAULT_VAULT_TOP_K, DEFAUL
 import { buildVaultPrompt } from '../src/main/rag/vaultPrompt'
 import { analyzeCitations } from '../src/shared/rag/citations'
 import { keywordOverlapScore } from '../src/shared/rag/similarity'
-import { lexicalIndexFor, lexicalOverlap, chunkLexicalText } from '../src/shared/rag/lexical'
+import { lexicalIndexFor, lexicalOverlap, chunkLexicalText, type LexicalOptions } from '../src/shared/rag/lexical'
 import type { VaultIndexContainer } from '../src/shared/rag/vaultIndex'
 
 const OLLAMA = 'http://localhost:11434'
@@ -61,7 +61,7 @@ const answerMode = flag('answer')
 interface EvalCase { id: string; kind: 'positive' | 'negative'; question: string; expected?: string[]; note?: string }
 /** `lexical` = Gewicht des Wortabgleichs (Anteil der Fragewörter in Titel/Pfad/Text) beim Umsortieren
  *  der Kandidaten; der Floor bleibt auf der reinen Bedeutungsnähe (Verweigerung unverändert). */
-interface Config { name: string; topK: number; floor: number; cap: number; lexical: number; lexicalMode?: 'plain' | 'idf' | 'title'; nearDup?: number }
+interface Config { name: string; topK: number; floor: number; cap: number; lexical: number; lexicalMode?: 'plain' | 'idf' | 'title'; lexicalOptions?: LexicalOptions; nearDup?: number }
 
 let vaultReal = ''
 const assertSafePath = async (p: string): Promise<string> => {
@@ -146,7 +146,7 @@ async function runConfig(container: VaultIndexContainer, cfg: Config, cases: Eva
     // dieselbe Kandidatentiefe (topK × oversample), derselbe Score.
     const picked = selectForQuery(container, qv, c.question, {
       topK: cfg.topK, minScore: cfg.floor, perFileCap: cfg.cap, oversample: DEFAULT_OVERSAMPLE,
-      excludeFolders: excludes, lexicalWeight: cfg.lexical, nearDupCosine: cfg.nearDup ?? DEFAULT_NEAR_DUP_COSINE
+      excludeFolders: excludes, lexicalWeight: cfg.lexical, lexicalOptions: cfg.lexicalOptions, nearDupCosine: cfg.nearDup ?? DEFAULT_NEAR_DUP_COSINE
     })
     const bestScore = picked.bestScore
     const expected = c.expected ?? []
@@ -243,6 +243,13 @@ async function main(): Promise<void> {
   }
   if (flag('sweep-neardup')) {
     for (const nearDup of [0, 0.93, 0.95, 0.97, 0.99]) configs.push({ ...base, name: `neardup ${nearDup || 'aus'}`, nearDup })
+  }
+  // A/B 25.09.2026: Füllwörter der Frage ignorieren, Komposita teilweise treffen — einzeln und zusammen.
+  if (flag('sweep-lexvariants')) {
+    configs.push({ ...base, name: 'ohne Varianten', lexicalOptions: {} })
+    configs.push({ ...base, name: '+ohne Füllwörter', lexicalOptions: { dropRequestWords: true } })
+    configs.push({ ...base, name: '+Komposita', lexicalOptions: { compoundHeads: true } })
+    configs.push({ ...base, name: '+beides', lexicalOptions: { dropRequestWords: true, compoundHeads: true } })
   }
   if (flag('sweep-lexical')) {
     for (const mode of ['plain', 'idf', 'title'] as const) for (const lexical of [0.1, 0.2, 0.3, 0.5]) {

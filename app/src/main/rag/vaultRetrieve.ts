@@ -9,7 +9,7 @@
 import * as path from 'path'
 import { chunkMarkdown } from '../../shared/rag/chunking'
 import { cosineRow, isIndexable, matchesFilters, vectorNorm, type VaultChunkMeta, type VaultIndexContainer, type VaultQueryFilters } from '../../shared/rag/vaultIndex'
-import { chunkLexicalText, lexicalIndexFor, lexicalOverlap } from '../../shared/rag/lexical'
+import { chunkLexicalText, lexicalIndexFor, lexicalOverlap, DEFAULT_LEXICAL_OPTIONS, type LexicalOptions } from '../../shared/rag/lexical'
 import { isDerivedAiNote } from '../../shared/rag/indexPolicy'
 import type { NoteKindId } from '../../shared/noteKind'
 import { embedText } from './embed'
@@ -55,6 +55,8 @@ export interface VaultQueryOptions {
   excludeFolders?: string[]
   /** Umsortierung der Kandidaten: Bedeutungsnähe + Gewicht × Wortabgleich (Floor bleibt auf der Bedeutungsnähe). */
   lexicalWeight?: number
+  /** Varianten des Wortabgleichs (Füllwörter, Komposita) — Standard siehe `DEFAULT_LEXICAL_OPTIONS`. */
+  lexicalOptions?: LexicalOptions
   /** Cosine-Schwelle, ab der ein Kandidat als Near-Duplikat eines gewählten Treffers gilt (0 = aus). */
   nearDupCosine?: number
 }
@@ -127,6 +129,7 @@ export interface SelectForQueryOptions {
   excludeFolders: string[]
   filters?: VaultQueryFilters
   lexicalWeight: number
+  lexicalOptions?: LexicalOptions
   nearDupCosine: number
 }
 
@@ -148,7 +151,7 @@ export function selectForQuery(
   if (bestScore === null || bestScore < opts.minScore) {
     return { selected: [], bestScore, belowFloor: true, candidatesConsidered: ranked.length }
   }
-  const passing = rerankLexical(container, query, ranked.filter((r) => r.score >= opts.minScore), opts.lexicalWeight)
+  const passing = rerankLexical(container, query, ranked.filter((r) => r.score >= opts.minScore), opts.lexicalWeight, opts.lexicalOptions ?? DEFAULT_LEXICAL_OPTIONS)
   const selected = selectHits(container, passing, opts.topK, opts.perFileCap, opts.nearDupCosine)
   return { selected, bestScore, belowFloor: false, candidatesConsidered: ranked.length }
 }
@@ -191,14 +194,15 @@ export function rerankLexical(
   container: VaultIndexContainer,
   query: string,
   ranked: Array<{ row: number; score: number }>,
-  weight: number
+  weight: number,
+  lexicalOptions: LexicalOptions = DEFAULT_LEXICAL_OPTIONS
 ): Array<{ row: number; score: number }> {
   if (weight <= 0 || ranked.length === 0) return ranked
   const index = lexicalIndexFor(container)
   return ranked
     .map((r) => {
       const ch = container.meta.chunks[r.row]
-      return { ...r, combined: r.score + weight * lexicalOverlap(index, query, chunkLexicalText(ch.fileRel, ch.heading, ch.text)) }
+      return { ...r, combined: r.score + weight * lexicalOverlap(index, query, chunkLexicalText(ch.fileRel, ch.heading, ch.text), lexicalOptions) }
     })
     .sort((a, b) => b.combined - a.combined)
     .map(({ row, score }) => ({ row, score }))
@@ -405,6 +409,7 @@ export async function queryVaultIndex(
     excludeFolders: opts.excludeFolders ?? [],
     filters: opts.filters,
     lexicalWeight: opts.lexicalWeight ?? DEFAULT_LEXICAL_WEIGHT,
+    lexicalOptions: opts.lexicalOptions,
     nearDupCosine: opts.nearDupCosine ?? DEFAULT_NEAR_DUP_COSINE
   })
   const { bestScore, selected } = picked

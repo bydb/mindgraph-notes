@@ -22854,6 +22854,10 @@ body.presentation-mode *::after {
 .nc-vault-sources .nc-source-link { cursor: pointer; color: var(--accent-color, #0f766e); }
 .nc-vault-sources .nc-source-link:hover { text-decoration: underline; }
 .nc-vault-sources .nc-source-meta { opacity: 0.6; }
+.nc-vault-unused { margin-top: 4px; }
+.nc-vault-unused > summary { cursor: pointer; opacity: 0.7; padding: 2px 0; }
+.nc-vault-unused > summary:hover { opacity: 1; }
+.nc-vault-unused .nc-vault-sources { opacity: 0.85; }
 .nc-vault-summary { opacity: 0.8; margin: 2px 0 4px; }
 .nc-vault-flags { list-style: none; padding: 0; margin: 0; }
 .nc-vault-flags li { padding: 2px 0; display: flex; gap: 6px; align-items: baseline; }

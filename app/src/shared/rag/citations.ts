@@ -284,6 +284,12 @@ function segments(text: string): Segment[] {
 
 const MONTHS = /^(jan(uar|\.)?|feb(ruar|\.)?|m[äa]rz?|apr(il|\.)?|mai|jun[ie]?|jul[iy]?|aug(ust|\.)?|sep(t|tember|\.)?|okt(ober|\.)?|oct(ober|\.)?|nov(ember|\.)?|dez(ember|\.)?|dec(ember|\.)?)$/i
 
+// Abkürzungen mit Punkt, nach denen KEIN Satz endet („TinkerSchool bzw. TinkerToys“ wurde
+// real am „bzw.“ zerschnitten, die erste Hälfte stand dann als „ohne Quellenangabe“ da,
+// 25.09.2026). Bewusst ohne „usw.“/„etc.“: die schließen oft wirklich einen Satz, und zwei
+// verschmolzene Sätze würden einen unbelegten unter dem Zitat des anderen verstecken (F26).
+const ABBREVIATION_BEFORE_DOT = /(?:^|[^\p{L}])(?:bzw|bzgl|ca|ggf|evtl|vgl|bspw|inkl|zzgl|sog|Nr|Dr|Prof|Hr|Fr|Abs|Kap|[zdousZDOUS]\.\s?[\p{L}]|[zdou])$/u
+
 /** Sätze innerhalb eines Segments: Schluss-Interpunktion + Leerraum + Großbuchstabe/Ziffer/Zitatzeichen/Klammer. */
 function sentences(text: string, seg: [number, number]): Array<[number, number]> {
   const out: Array<[number, number]> = []
@@ -299,6 +305,7 @@ function sentences(text: string, seg: [number, number]): Array<[number, number]>
     const cut = m.index + m[0].length
     const before = s.slice(0, m.index)
     const after = s.slice(cut)
+    if (s[m.index] === '.' && ABBREVIATION_BEFORE_DOT.test(before)) continue
     if (s[m.index] === '.' && /\p{N}$/u.test(before)) {
       const nextWord = (after.match(/^([\p{L}.]+)/u)?.[1] ?? '').replace(/\.$/, '')
       if (nextWord && (MONTHS.test(nextWord) || MONTHS.test(`${nextWord}.`))) continue
@@ -416,6 +423,21 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
     quotesNotFound: sentenceChecks.reduce((n, s) => n + s.quotes.filter((q) => !q.found).length, 0)
   }
   return { refs, sentences: sentenceChecks, usedSources: [...used].sort((a, b) => a - b), summary }
+}
+
+/**
+ * Quellen, die mindestens einen Satz tragen, der die Prüfung besteht (hohe Wortdeckung
+ * oder nicht prüfbar). Für die Anzeige: Das Modell zitiert gern auch unpassende Treffer
+ * in einem Sammelsatz („Weitere Quellen betreffen andere Themen [4][5][6]“) — solche
+ * Sätze haben niedrige Wortdeckung, ihre Quellen gehören nicht nach oben (real, 25.09.2026).
+ * Aufsteigend sortiert.
+ */
+export function supportingSources(report: CitationReport): number[] {
+  const out = new Set<number>()
+  for (const s of report.sentences) {
+    if (s.status === 'cited-high' || s.status === 'cited-unchecked') for (const n of s.refs) out.add(n)
+  }
+  return [...out].sort((a, b) => a - b)
 }
 
 /**

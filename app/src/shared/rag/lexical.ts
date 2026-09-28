@@ -50,9 +50,52 @@ export function lexicalIndexFor(container: VaultIndexContainer): LexicalIndex {
   return idx
 }
 
-/** Anteil (0…1) der seltenheitsgewichteten Fragewörter, die im Text vorkommen. */
-export function lexicalOverlap(index: LexicalIndex, query: string, text: string): number {
+/**
+ * Varianten, gemessen im A/B (25.09.2026, Anlass: Frage „schaue dir bitte … Lizenzverlängerung der
+ * Software Tutory … gebe mir eine Zusammenfassung“ fand die passende Mail nicht):
+ * - `dropRequestWords`: Auftrags- und Füllwörter der FRAGE zählen nicht. „schaue“ war dort das
+ *   seltenste und damit schwerste Wort der ganzen Frage.
+ * - `compoundHeads`: Deutsche Komposita teilweise treffen. „Lizenzverlängerung“ in der Frage trifft
+ *   „Verlängerung“ im Text (und umgekehrt) zur Hälfte — der tragende Wortteil steht hinten.
+ */
+export interface LexicalOptions {
+  dropRequestWords?: boolean
+  compoundHeads?: boolean
+}
+
+// Seit 25.09.2026 Standard (Nutzerentscheidung): Tuning-Set 42 Fragen ohne jede Rangänderung,
+// Tutory-Fälle Platz 6 → 1 bzw. 16 → 9. Mehr Treffer sind damit NICHT belegt — nur „nichts schlechter“.
+export const DEFAULT_LEXICAL_OPTIONS: LexicalOptions = { dropRequestWords: true, compoundHeads: true }
+
+// Nur Wörter, die in einer FRAGE den Auftrag formulieren, nicht den Inhalt. Wirken nur auf die
+// Frage; df und Chunk-Tokens bleiben unverändert.
+const REQUEST_WORDS = new Set([
+  'bitte', 'mal', 'dir', 'mir', 'mich', 'uns', 'euch', 'kannst', 'könntest', 'kann', 'könnte', 'würdest',
+  'schau', 'schaue', 'schauen', 'gib', 'gebe', 'geben', 'zeig', 'zeige', 'zeigen', 'fasse', 'fass', 'fassen',
+  'zusammen', 'zusammenfassung', 'zusammenfassen', 'erkläre', 'erklär', 'erklären', 'sag', 'sage', 'sagen',
+  'nenne', 'nennen', 'liste', 'auflisten', 'finde', 'finden', 'such', 'suche', 'suchen', 'gerne', 'gern',
+  'danke', 'okay', 'kurz', 'kurze', 'kurzen', 'genau', 'eigentlich', 'etwas', 'alles', 'dazu', 'darüber',
+  'please', 'show', 'tell', 'give', 'summarize', 'summary', 'find', 'list', 'explain'
+])
+
+const COMPOUND_MIN_PART = 5
+const COMPOUND_WEIGHT = 0.5
+
+export function lexicalQueryTokens(query: string, opts: LexicalOptions = DEFAULT_LEXICAL_OPTIONS): string[] {
   const q = [...new Set(lexicalTokens(query))]
+  return opts.dropRequestWords ? q.filter((w) => !REQUEST_WORDS.has(w)) : q
+}
+
+/** Ein Wort ist Kopf des anderen (gemeinsames Ende, kürzeres mind. 5 Zeichen, nicht identisch). */
+function sharesCompoundHead(a: string, b: string): boolean {
+  if (a === b) return false
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a]
+  return short.length >= COMPOUND_MIN_PART && long.endsWith(short)
+}
+
+/** Anteil (0…1) der seltenheitsgewichteten Fragewörter, die im Text vorkommen. */
+export function lexicalOverlap(index: LexicalIndex, query: string, text: string, opts: LexicalOptions = DEFAULT_LEXICAL_OPTIONS): number {
+  const q = lexicalQueryTokens(query, opts)
   if (q.length === 0) return 0
   const t = new Set(lexicalTokens(text))
   let sum = 0
@@ -62,6 +105,11 @@ export function lexicalOverlap(index: LexicalIndex, query: string, text: string)
     if (idf <= 0) continue
     sum += idf
     if (t.has(w)) hit += idf
+    else if (opts.compoundHeads) {
+      for (const tw of t) {
+        if (sharesCompoundHead(w, tw)) { hit += idf * COMPOUND_WEIGHT; break }
+      }
+    }
   }
   return sum > 0 ? hit / sum : 0
 }

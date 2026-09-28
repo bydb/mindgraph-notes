@@ -12,7 +12,7 @@ import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId }
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
 import type { NoteAgentAttachment, VaultRagHitDto } from '../../../shared/types'
-import { replaceCitationRefs, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
+import { replaceCitationRefs, supportingSources, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
 import { citationMarkdownPlugin, markCitationRefs, type CitationEnv } from '../../utils/citationMarkdown'
 import { createSourceOpener, findNoteByVaultPath, type SourceJumpDeps } from '../../utils/sourceJump'
 import { chatHistoryForModel } from '../../utils/chatHistory'
@@ -377,27 +377,41 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
     const flagged = flaggedSentences(report)
     const flagClass = (status: string) =>
       status === 'uncited' ? 'is-uncited' : status === 'cited-low' ? 'is-low' : status === 'cited-invalid' ? 'is-invalid' : 'is-quote'
+    // Tragende Quellen zuerst (zitiert in einem Satz, der die Prüfung besteht); der Rest klappt
+    // darunter ein (nicht ausgeblendet — die richtige Notiz ist gelegentlich darunter). Trägt
+    // kein Satz, bleibt die Liste ungeteilt. Nummern bleiben die der Antwort.
+    const used = new Set(supportingSources(report))
+    const numbered = hits.map((h, i) => ({ h, n: i + 1 }))
+    const cited = numbered.filter(x => used.has(x.n))
+    const unused = numbered.filter(x => !used.has(x.n))
+    const renderSource = ({ h, n }: { h: typeof hits[number]; n: number }) => {
+      const base = (h.fileRel.split('/').pop() || h.fileRel).replace(/\.md$/i, '')
+      const id = sameVault ? resolveSourceNoteId(h.fileRel) : null
+      return (
+        <li key={n}>
+          <span className="nc-source-n">[{n}]</span>
+          {id
+            ? <span className="nc-source-link" role="link" tabIndex={0} data-note={id} data-cite={n} title={h.fileRel}>{base}</span>
+            : <span title={sameVault ? h.fileRel : t('notesChat.vaultOtherVault')}>{base}</span>}
+          <span className="nc-source-meta">
+            {h.heading ? ` › ${h.heading}` : ''} · {lang === 'de' ? 'Zeile' : 'line'} {h.startLine}
+            {h.fresh === 'relocated' ? ` · ${t('notesChat.vaultRelocated')}` : ''}
+          </span>
+        </li>
+      )
+    }
     return (
       <div className="nc-vault-footer">
         <h5>{t('notesChat.vaultSources')}</h5>
-        <ol className="nc-vault-sources">
-          {hits.map((h, i) => {
-            const base = (h.fileRel.split('/').pop() || h.fileRel).replace(/\.md$/i, '')
-            const id = sameVault ? resolveSourceNoteId(h.fileRel) : null
-            return (
-              <li key={i}>
-                <span className="nc-source-n">[{i + 1}]</span>
-                {id
-                  ? <span className="nc-source-link" role="link" tabIndex={0} data-note={id} data-cite={i + 1} title={h.fileRel}>{base}</span>
-                  : <span title={sameVault ? h.fileRel : t('notesChat.vaultOtherVault')}>{base}</span>}
-                <span className="nc-source-meta">
-                  {h.heading ? ` › ${h.heading}` : ''} · {lang === 'de' ? 'Zeile' : 'line'} {h.startLine}
-                  {h.fresh === 'relocated' ? ` · ${t('notesChat.vaultRelocated')}` : ''}
-                </span>
-              </li>
-            )
-          })}
-        </ol>
+        {cited.length > 0 && <ol className="nc-vault-sources">{cited.map(renderSource)}</ol>}
+        {unused.length > 0 && (cited.length > 0
+          ? (
+            <details className="nc-vault-unused">
+              <summary>{t('notesChat.vaultSourcesUnused', { n: unused.length })}</summary>
+              <ol className="nc-vault-sources">{unused.map(renderSource)}</ol>
+            </details>
+          )
+          : <ol className="nc-vault-sources">{unused.map(renderSource)}</ol>)}
         <h5>{t('notesChat.vaultCheck')}</h5>
         <div className="nc-vault-summary">
           {t('notesChat.vaultCheckSummary', {

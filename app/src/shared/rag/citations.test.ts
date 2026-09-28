@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analyzeCitations, contentWords, replaceCitationRefs } from './citations'
+import { analyzeCitations, contentWords, replaceCitationRefs, supportingSources } from './citations'
 
 const sources = [
   'Das Budget für die Digitalwoche beträgt 10.000 Euro und wurde am 3. März 2026 vom Schulamt bestätigt.',
@@ -178,5 +178,43 @@ describe('Nennung eines Notiztitels ist kein Zitat — sonst wird geprüft (F46)
     expect(analyzeCitations(`Er schrieb „${lang}“. [1]`, sources).sentences[0].quotes).toEqual([{ text: lang, found: false }])
     const r = analyzeCitations('Die Notiz „Lokale Modelle“ sagt etwas. [1]', sources, { sourceTitles: ['Lokale Modelle in MindGraph Notes'] })
     expect(r.sentences[0].quotes).toEqual([{ text: 'Lokale Modelle', found: false }])
+  })
+})
+
+describe('supportingSources', () => {
+  it('nimmt nur Quellen aus Sätzen, die die Prüfung bestehen — nicht die aus einem Sammelsatz', () => {
+    const three = [...sources, 'Die Lizenz für TinkerSchool verlängert sich automatisch bis August 2027.']
+    const r = analyzeCitations(
+      'Das Budget der Digitalwoche beträgt 10.000 Euro. [1] Weitere Quellen betreffen andere Themen und gehören nicht dazu. [2][3]',
+      three
+    )
+    expect(r.usedSources).toEqual([1, 2, 3])
+    expect(supportingSources(r)).toEqual([1])
+  })
+
+  it('leer, wenn kein Satz trägt', () => {
+    const r = analyzeCitations('Die Veranstaltung wurde abgesagt und verschoben. [1]', sources)
+    expect(supportingSources(r)).toEqual([])
+  })
+})
+
+describe('Abkürzungen beenden keinen Satz', () => {
+  it('„bzw.“ trennt nicht (real: erste Hälfte stand als „ohne Quellenangabe“ da)', () => {
+    const r = analyzeCitations('Das Budget der Digitalwoche bzw. Aktionswoche beträgt 10.000 Euro. [1]', sources)
+    expect(r.sentences).toHaveLength(1)
+    expect(r.sentences[0].status).toBe('cited-high')
+  })
+
+  it('„z. B.“, „d. h.“, „ggf.“ und „Nr.“ trennen nicht', () => {
+    for (const a of ['z. B. Budget', 'd. h. Budget', 'ggf. Budget', 'Nr. Budget']) {
+      const r = analyzeCitations(`Das Budget beträgt 10.000 Euro, ${a} der Digitalwoche. [1]`, sources)
+      expect(r.sentences, a).toHaveLength(1)
+    }
+  })
+
+  it('ein echtes Satzende trennt weiterhin — auch nach „usw.“', () => {
+    const r = analyzeCitations('Budget, Termine usw. Frau Müller moderiert den Workshop. [2]', sources)
+    expect(r.sentences).toHaveLength(2)
+    expect(r.sentences[0].status).toBe('uncited')
   })
 })
