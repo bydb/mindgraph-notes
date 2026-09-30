@@ -22,6 +22,7 @@ import { markdownToDocx, markdownToDocxBuffer } from '../office/officeService'
 import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from '../../shared/docxTemplateFill'
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
 import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
+import { buildEdumap, EdumapInputError, EDUMAP_COLORS, EDUMAP_LIMITS, type EdumapColumnInput } from '../../shared/edumap'
 import { webSearch } from '../webResearch/providers'
 import { fetchAndExtract, FetchExtractError } from '../webResearch/fetchExtract'
 import {
@@ -236,7 +237,7 @@ export function repairImageSrcAttributes(html: string, ctx: NoteAgentContext): s
 async function registerStagedResult(
   ctx: NoteAgentContext,
   fileName: string,
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg',
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg',
   data: Buffer | string,
   summary: string
 ): Promise<ToolResult> {
@@ -981,6 +982,93 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     }
   })
 
+  // Edumap (digitale Pinnwand der hessischen Medienzentren) als importierbares JSON.
+  // Wie bei write_html liefert das Modell nur Inhalt, das Gerüst baut shared/edumap.ts;
+  // Grenzen für Spalten/Boxen/Textlänge halten die Map übersichtlich.
+  registry.register({
+    name: 'write_edumap',
+    description:
+      `Erzeugt eine Edumap (digitale Pinnwand, edumaps.de) als JSON-Datei zum Import in Edumaps („Map erstellen" → „Map importieren" → „Edumaps (json)"). Parameter: file_name (Endung .json), title (Titel der Map), columns (Liste der Spalten, links nach rechts; jede Spalte: title, optional annotation = Leitfrage/Arbeitsauftrag unter dem Spaltentitel, optional color, boxes = Liste mit title, content, optional color). Eine Spalte ohne boxes ist eine Mitmach-Spalte, in die Lernende eigene Boxen legen — sie MUSS eine annotation haben. Optional hint (ein kurzer Hinweiszettel über der Map, z. B. Mitmach-Regel) und lang ("de"/"en"). Box-Text: kurze Zeilen, Listen mit "- ", **fett**, Links als [Text](https://…) oder nackte URL; kein HTML. Farben: ${Object.keys(EDUMAP_COLORS).join(', ')}. Grenzen (sonst Ablehnung): höchstens ${EDUMAP_LIMITS.maxColumns} Spalten, ${EDUMAP_LIMITS.maxBoxesPerColumn} Boxen pro Spalte, ${EDUMAP_LIMITS.maxTotalBoxes} Boxen insgesamt, ${EDUMAP_LIMITS.maxBoxContentChars} Zeichen pro Box.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        file_name: { type: 'string' },
+        title: { type: 'string', description: 'Titel der Map' },
+        columns: {
+          type: 'array',
+          description: 'Spalten der Map von links nach rechts',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string' },
+              annotation: { type: 'string', description: 'Leitfrage oder Arbeitsauftrag (Pflicht bei Spalten ohne Boxen)' },
+              color: { type: 'string' },
+              boxes: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    title: { type: 'string' },
+                    content: { type: 'string' },
+                    color: { type: 'string' }
+                  },
+                  required: ['title']
+                }
+              }
+            },
+            required: ['title']
+          }
+        },
+        hint: { type: 'string', description: 'Optionaler kurzer Hinweiszettel über der Map' },
+        lang: { type: 'string', description: '"de" (Default) oder "en"' }
+      },
+      required: ['file_name', 'title', 'columns']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const rawName = requireString(args, 'file_name')
+      const title = requireString(args, 'title')
+      if (!rawName) return err('Parameter "file_name" fehlt')
+      if (!title) return err('Parameter "title" fehlt')
+      // Manche Modelle liefern verschachtelte Arrays als JSON-String.
+      let columns: unknown = args.columns
+      if (typeof columns === 'string') {
+        try {
+          columns = JSON.parse(columns)
+        } catch {
+          return err('Parameter "columns" ist kein gültiges JSON-Array. Übergib die Spalten als Liste von Objekten mit title, annotation, boxes.')
+        }
+      }
+      if (!Array.isArray(columns)) {
+        console.warn('[note-agent] write_edumap abgelehnt (columns fehlt) — angekommen:', describeArgs(args))
+        return err(`Parameter "columns" fehlt oder ist keine Liste. Angekommen ist: ${describeArgs(args)}.`)
+      }
+      try {
+        const built = buildEdumap({
+          title,
+          columns: columns as EdumapColumnInput[],
+          hint: typeof args.hint === 'string' ? args.hint : undefined,
+          lang: typeof args.lang === 'string' ? args.lang : undefined
+        })
+        const fileName = sanitizeOutputFileName(rawName, '.json')
+        const open = built.openColumnCount > 0 ? `, davon ${built.openColumnCount} zum Mitmachen` : ''
+        const notes = built.notes.length > 0 ? ` (Hinweis: ${built.notes.join('; ')})` : ''
+        return registerStagedResult(
+          ctx,
+          fileName,
+          'json',
+          built.json,
+          `Edumap, ${built.columnCount} Spalten${open}, ${built.boxCount} Boxen — in Edumaps über „Map importieren" → „Edumaps (json)" laden${notes}`
+        )
+      } catch (e) {
+        if (e instanceof EdumapInputError) {
+          return err(`Die Map wurde nicht erzeugt: ${e.issues.join('; ')}. Überarbeite die Spalten und rufe write_edumap erneut mit der VOLLSTÄNDIGEN Map auf.`)
+        }
+        return err(e instanceof Error ? e.message : String(e))
+      }
+    }
+  })
+
   // Bild-Generierung (Opt-in-Modul image-generation, Paket 4 der Modul-Entflechtung).
   // Nur in der Allowlist, wenn run.imageGen (Modul aktiv + Key hinterlegt) — siehe loop.ts.
   // Der Nano-Banana-Aufruf läuft komplett Main-seitig (Key verlässt den Main-Prozess nicht).
@@ -1054,6 +1142,9 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
             ? 'write_note schreibt ausschließlich Markdown. Für eine HTML-Seite das Werkzeug write_html benutzen (Parameter: title, body_html) — nur dann bekommt die Seite die Formel-Darstellung und das Layout.'
             : 'write_note schreibt ausschließlich Markdown, und HTML-Seiten sind in diesem Lauf nicht verfügbar. Gib der Datei die Endung .md und schreibe das Ergebnis als Markdown-Notiz.'
         )
+      }
+      if (/\.json$/i.test(rawName) && isToolAvailable(ctx, 'write_edumap')) {
+        return err('write_note schreibt ausschließlich Markdown. Für eine Edumap das Werkzeug write_edumap benutzen (Parameter: title, columns) — die App baut daraus die importierbare JSON-Datei.')
       }
       const qualityIssues = validateAgentMarkdownResult(markdown, ctx.run.instruction)
       if (qualityIssues.length > 0) {

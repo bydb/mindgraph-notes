@@ -5020,7 +5020,7 @@ ipcMain.handle('note-agent-preview-result', async (event, runId: string, resultI
   if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
   try {
     const real = await assertInsideRunStaging(run, entry.stagingPath)
-    const textKinds = new Set(['md', 'txt', 'csv', 'html'])
+    const textKinds = new Set(['md', 'txt', 'csv', 'html', 'json'])
     if (!textKinds.has(entry.kind)) {
       const stat = await fs.stat(real)
       return { success: true, kind: entry.kind, binary: true, sizeBytes: stat.size }

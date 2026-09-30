@@ -185,7 +185,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const attachments = getContextAttachmentInfos(run.senderId, run.attachmentIds)
 
   // Skill-Angebot nach Kontextlage filtern (Plan Entscheidung 4).
-  const allowed = new Set(['note_read', 'note_search', 'list_target_folder', 'write_xlsx', 'write_docx', 'write_note', 'write_html'])
+  const allowed = new Set(['note_read', 'note_search', 'list_target_folder', 'write_xlsx', 'write_docx', 'write_note', 'write_html', 'write_edumap'])
   if (run.shell && !run.web) {
     allowed.add('shell_execute')
     allowed.add('shell_stage_file')
@@ -222,9 +222,10 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // deterministischen Quellenblock gibt (write_note → Markdown, write_html → HTML-Sektion),
   // und die Recherche-Tools freischalten. write_html bleibt bewusst drin: der Skill
   // „Wissenschaftliche Webseite" verlangt es, und ohne das Tool lief write_note ↔ Fehler
-  // ↔ write_note in eine Schleife (real mit kimi-k3 beobachtet).
+  // ↔ write_note in eine Schleife (real mit kimi-k3 beobachtet). write_edumap fällt weg:
+  // eine Map hat keinen Platz für den Quellenblock.
   if (run.web) {
-    for (const w of ['write_xlsx', 'write_docx', 'fill_docx_form']) allowed.delete(w)
+    for (const w of ['write_xlsx', 'write_docx', 'fill_docx_form', 'write_edumap']) allowed.delete(w)
     allowed.add('web_search')
     allowed.add('web_fetch')
   }
@@ -418,6 +419,7 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
       return tpl ? `${pick('file_name')} (Vorlage ${tpl.split('/').pop()})` : pick('file_name')
     }
     case 'write_html':
+    case 'write_edumap':
     case 'write_note': return pick('file_name')
     case 'fill_docx_form': {
       const fields = Array.isArray(args.entries) ? args.entries.length : 0

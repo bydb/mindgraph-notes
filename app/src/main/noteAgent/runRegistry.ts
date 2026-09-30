@@ -33,7 +33,7 @@ export interface AgentResultEntry {
   resultId: string
   stagingPath: string // absolut, ausschließlich Main-seitig
   suggestedName: string
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'png' | 'jpg' | 'pdf' | 'pptx'
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pdf' | 'pptx'
   summary: string
   sources: string[]
   consumed: boolean
