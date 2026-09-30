@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.26-beta] - 2026-09-30
+
+**Der Agent erstellt jetzt Edumaps, die digitalen Pinnwände der hessischen Medienzentren.** Aus einer Notiz, einem Unterrichts- oder Fortbildungsvorhaben entsteht mit dem neuen Skill „Edumap erstellen“ eine Datei, die du in Edumaps über „Map erstellen“ → „Map importieren“ → „Edumaps (json)“ lädst. Die Map bleibt bewusst übersichtlich und eignet sich zur Ablage von Material oder zum Mitmachen mit Lernenden.
+
+### Hintergrund
+
+- **Drei Zwecke:** Ablage (Material und Informationen geordnet), Mitmachen (leere Spalten mit klarem Arbeitsauftrag, in die Lernende eigene Boxen legen) und Kursbegleitung als Mischform, etwa eine Spalte pro Termin plus Reflexionsspalten.
+- **Nie überladen:** Höchstens 8 Spalten, 10 Boxen pro Spalte, 40 Boxen insgesamt und 800 Zeichen pro Box. Wird es mehr, kürzt der Agent selbst, statt dass die App still abschneidet.
+- **Das Modell schreibt kein JSON:** Es liefert nur Titel, Spalten, Leitfragen und Boxen, die Datei baut die App. Links aus Markdown werden in die Schreibweise von Edumaps übertragen, die Schrift ist Arial.
+- **Datenschutz:** Für Mitmach-Maps verlangt der Skill höchstens Vornamen oder Kürzel von Lernenden und übernimmt keine Namen aus den Quellen.
+- **Nach dem Import einzustellen:** Freigaben, Kommentare und ein Map-Passwort trägt die Datei nicht; das legst du in Edumaps fest. Dateien wie PDFs lädst du ebenfalls dort in die Boxen.
+- **Grenze:** Edumaps veröffentlicht sein Importformat nicht. Der Aufbau folgt einer echten, aus Edumaps exportierten Map. Der Skill ist auch im Skill-Katalog zu finden.
+
 ## [0.11.25-beta] - 2026-09-28
 
 **Der Vault-Chat versteht Fragen besser und zeigt zuerst die Quellen, die seine Antwort tragen.** Wörter wie „schau mal“ oder „fasse zusammen“ lenken die Suche nicht mehr ab, und zusammengesetzte Wörter finden auch ihren Wortteil. Außerdem stürzt die App nicht mehr ab, wenn du viele Mails schnell hintereinander abhakst, und die Einstellungen warnen, wenn deine Modelle zusammen zu viel Speicher brauchen.
