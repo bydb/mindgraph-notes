@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.27-beta] - 2026-10-01
+
+**MindGraph erholt sich jetzt selbst, wenn das Fenster nach dem Ruhezustand des Rechners weiß bleibt oder abstürzt.** Stürzt der Fensterinhalt ab, lädt die App ihn automatisch neu; hängt er, fragt sie, ob du warten oder neu laden möchtest. Außerdem führt der Sync-Knopf in der Statusleiste jetzt direkt zu den Sync-Einstellungen.
+
+### Hintergrund
+
+- **Auslöser:** Auf einem Mac blieb das Fenster nach dem Ruhezustand weiß, bis die App neu gestartet wurde. Die App hatte für diesen Fall bisher keine Gegenmaßnahme.
+- **Automatisch neu laden:** Endet der Fensterinhalt unerwartet, lädt die App ihn neu. Nach drei Abstürzen innerhalb von fünf Minuten fragt sie, statt endlos neu zu laden.
+- **Nach dem Aufwachen:** Beim Aufwachen und Entsperren zeichnet die App das Fenster neu und prüft, ob es antwortet. Antwortet es nicht, entscheidest du: warten oder neu laden. Ein Fenster, das noch arbeitet, wird nie ungefragt neu geladen, weil dabei ungespeicherte Eingaben verloren gingen.
+- **Protokoll zur Fehlersuche:** Ruhezustand, Aufwachen und Fensterereignisse stehen jetzt in einer kleinen Protokolldatei (auf dem Mac unter `~/Library/Logs/MindGraph Notes/window-lifecycle.log`). Tritt ein weißes Fenster noch einmal auf, lässt sich damit erkennen, woran es lag.
+- **Grenze:** Die genaue Ursache des weißen Fensters ist noch nicht nachgewiesen. Ob das Fenster nach dem Neuzeichnen tatsächlich wieder ein Bild zeigt, kann die App nicht selbst messen.
+- **Sync-Knopf:** Ein Klick auf das Sync-Symbol unten öffnete die Einstellungen bisher auf der zuletzt offenen Seite, jetzt immer auf der Sync-Seite.
+
 ## [0.11.26-beta] - 2026-09-30
 
 **Der Agent erstellt jetzt Edumaps, die digitalen Pinnwände der hessischen Medienzentren.** Aus einer Notiz, einem Unterrichts- oder Fortbildungsvorhaben entsteht mit dem neuen Skill „Edumap erstellen“ eine Datei, die du in Edumaps über „Map erstellen“ → „Map importieren“ → „Edumaps (json)“ lädst. Die Map bleibt bewusst übersichtlich und eignet sich zur Ablage von Material oder zum Mitmachen mit Lernenden.
