@@ -402,7 +402,7 @@ export function deriveActivityType(tools: Iterable<string>): ActivityType {
   // Shell-Lauf ohne strukturierte Tabellenverarbeitung: eigene Art, kein Raten der Aufgabe.
   if (used.has('shell_execute') || used.has('shell_stage_file')) return 'shell'
   if (used.has('web_search') || used.has('web_fetch')) return 'web-research'
-  if (used.has('write_docx') || used.has('fill_docx_form') || used.has('write_html') || used.has('write_edumap')) return 'document'
+  if (used.has('write_docx') || used.has('fill_docx_form') || used.has('write_html') || used.has('write_edumap') || used.has('write_pptx')) return 'document'
   if (used.has('write_note')) return 'summary'
   return 'other'
 }

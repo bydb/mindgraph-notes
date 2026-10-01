@@ -86,6 +86,9 @@ export interface AgentRun {
   // Erfolgreich gelaufene Werkzeuge. Nur die NAMEN, nie Argumente — daraus leitet
   // shared/activityLog.ts die Tätigkeitsart ab (inhaltsfrei, siehe deriveActivityType).
   toolsUsed: Set<string>
+  // Name eines geladenen Skills, der eine PowerPoint-Datei verlangt (write_pptx im Text).
+  // Entsteht keine .pptx, hängt loop.ts einen sichtbaren Hinweis an die Abschlussnachricht.
+  expectedPptxSkill?: string
   // Aktive Zeit, die der Nutzer mit dem Formulieren des Auftrags verbracht hat
   // (Renderer-Messung, nur bei Fenster im Vordergrund). Undefiniert, wenn nicht gemessen.
   instructionMs?: number

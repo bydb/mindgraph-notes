@@ -115,12 +115,14 @@ describe('Werkzeug-Allowlist im Web-Lauf', () => {
   const toolNames = (callIndex = 0) =>
     (mockChat.mock.calls[callIndex][1] as Array<{ name: string }>).map(t => t.name)
 
-  it('bietet write_note UND write_html an, aber keine Office-Formate', async () => {
+  it('bietet write_note, write_html und write_pptx an, aber keine Word-/Excel-Formate', async () => {
     mockChat.mockResolvedValue(noToolCalls)
     await run(makeWeb({ wrote: true, phase: 'write' }))
     const names = toolNames()
     expect(names).toContain('write_note')
     expect(names).toContain('write_html')
+    // PowerPoint seit 01.10.2026 auch im Web-Lauf: die App hängt eine Quellenfolie an.
+    expect(names).toContain('write_pptx')
     expect(names).toContain('web_search')
     expect(names).not.toContain('write_xlsx')
     expect(names).not.toContain('write_docx')
@@ -134,5 +136,39 @@ describe('Werkzeug-Allowlist im Web-Lauf', () => {
     expect(names).toContain('write_xlsx')
     expect(names).toContain('write_html')
     expect(names).not.toContain('web_search')
+  })
+})
+
+// Punkt 1 (01.10.2026): Ein PowerPoint-Skill war geladen, am Ende lag nur eine .md vor —
+// ohne Erklärung. Der Hinweis gehört deterministisch in die Abschlussnachricht.
+describe('Hinweis, wenn ein PowerPoint-Skill keine .pptx ergibt', () => {
+  it('nennt den Skill und den Grund, wenn ein anderes Format geschrieben wurde', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun()
+    agentRun.expectedPptxSkill = 'PowerPoint nach Vorlage'
+    agentRun.results.set('r1', { kind: 'md' } as never)
+    const res = await runNoteAgentLoop({ run: agentRun, noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {} })
+    expect(res.text).toContain('fertig')
+    expect(res.text).toContain('„PowerPoint nach Vorlage“ verlangt eine PowerPoint-Datei')
+    expect(res.text).toContain('anderes Format')
+  })
+
+  it('schweigt, wenn eine .pptx entstanden ist oder kein PowerPoint-Skill geladen war', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const withPptx = makeRun()
+    withPptx.expectedPptxSkill = 'PowerPoint nach Vorlage'
+    withPptx.results.set('r1', { kind: 'pptx' } as never)
+    expect((await runNoteAgentLoop({ run: withPptx, noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {} })).text).toBe('fertig')
+    expect((await run()).text).toBe('fertig')
+  })
+})
+
+describe('Hinweis auch bei Abbruch ohne Ergebnis (Codex F32)', () => {
+  it('hängt den PowerPoint-Hinweis an die Fehlermeldung eines Web-Laufs ohne Write', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun(makeWeb())
+    agentRun.expectedPptxSkill = 'PowerPoint nach Vorlage'
+    await expect(runNoteAgentLoop({ run: agentRun, noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {} }))
+      .rejects.toThrow(/ohne Ergebnis beendet.*„PowerPoint nach Vorlage“ verlangt eine PowerPoint-Datei/)
   })
 })

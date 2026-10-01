@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.28-beta] - 2026-10-01
+
+**Der Agent erstellt jetzt PowerPoint-Präsentationen nach einer Vorlage.** Logo, Farben, Schriften und Fußzeile kommen aus deiner Muster-Präsentation, der Agent liefert Gliederung, Folientexte und Sprechernotizen – mit Karten, nummerierten Schritten, Kennzahlen und einem Balken für die Kernaussage statt nur Aufzählungen. Eine fertige Vorlage im MindGraph-Stil liegt bei; den Skill „PowerPoint nach Vorlage“ installierst du unter Einstellungen → Skills → Starter-Skills.
+
+### Hintergrund
+
+- **So funktioniert es:** Der Agent schreibt nie das Dateiformat selbst. Er liefert eine Folienliste, die App legt daraus Folien auf den echten Layouts der Vorlage an. Was in der Vorlage steht (Master, Logo, Hintergründe), bleibt unverändert. Vorlagen dürfen `.pptx` oder `.potx` sein und müssen im Vault liegen.
+- **Eigene Vorlage:** Im Skill steht der Pfad zur mitgelieferten Vorlage „MindGraph Hausstil“. Für deinen eigenen Hausstil trägst du dort deine Muster-Präsentation ein. Layouts wählt der Agent beim Namen; eine kleine Dachzeile über dem Titel und Karten-Plätze erkennt die App an den Namen der Platzhalter („Dachzeile“, „Karte 1“, „Schritt 1“, „Kennzahl 1“, „Kernaussage“).
+- **Ehrlich statt still:** Zu volle Folien werden abgelehnt oder in der Schrift leicht verkleinert. Fehlt einem Layout der Platz für einen Text, bricht die App mit Begründung ab, statt ihn wegzulassen. Liegt ein Logo in einer fremden Vorlage nur auf den Musterfolien statt im Master, sagt die Ergebnis-Karte, dass es auf neuen Folien fehlt.
+- **Webrecherche:** Auch mit eingeschaltetem Globus entsteht eine Präsentation. Die App hängt eine Folie „Quellen“ mit allen tatsächlich gelesenen Seiten als Links an und ersetzt eine selbst geschriebene Quellenfolie des Agenten. Links im Folientext, die nicht gelesen wurden, meldet die Ergebnis-Karte als ungeprüft.
+- **Kein stiller Formatwechsel:** Lädt der Agent den PowerPoint-Skill, liefert am Ende aber keine Präsentation, steht der Grund in seiner Abschlussnachricht. Nach einer Webrecherche erzeugt der Agent außerdem keine weiteren Bilder mehr, damit es bei genau einem Ergebnis bleibt.
+- **Grenzen:** Tabellen, Diagramme und SmartArt kommen in dieser Version nicht auf die Folien. Vorhandene Präsentationen anpassen oder mehrere zusammenführen kann der Agent noch nicht. Kennzahlen setzt er nur mit Zahlen aus der Quelle, nie geschätzt.
+
 ## [0.11.27-beta] - 2026-10-01
 
 **MindGraph erholt sich jetzt selbst, wenn das Fenster nach dem Ruhezustand des Rechners weiß bleibt oder abstürzt.** Stürzt der Fensterinhalt ab, lädt die App ihn automatisch neu; hängt er, fragt sie, ob du warten oder neu laden möchtest. Außerdem führt der Sync-Knopf in der Statusleiste jetzt direkt zu den Sync-Einstellungen.

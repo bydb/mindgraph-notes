@@ -23,10 +23,12 @@ import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from 
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
 import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
 import { buildEdumap, EdumapInputError, EDUMAP_COLORS, EDUMAP_LIMITS, type EdumapColumnInput } from '../../shared/edumap'
+import { buildPptxFromTemplate, inspectPptxTemplate, describePptxTemplate, PptxInputError, PPTX_LIMITS, LAYOUT_KINDS, type PptxSlideInput, type PptxSource } from '../../shared/pptxTemplate'
+import { resolveInVaultSafe } from '../telegram/agent/tools/vaultPaths'
 import { webSearch } from '../webResearch/providers'
 import { fetchAndExtract, FetchExtractError } from '../webResearch/fetchExtract'
 import {
-  normalizeWebUrl, normalizeQuery, isQueryTooLong, isSearchAllowedInPhase, mergeDeterministicSources,
+  normalizeWebUrl, normalizeQuery, isQueryTooLong, isSearchAllowedInPhase, mergeDeterministicSources, sanitizeSourceTitle,
   mergeDeterministicSourcesHtml, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
   type WebSearchHit
 } from '../../shared/webResearch'
@@ -159,6 +161,28 @@ function resolveInVault(vaultRoot: string, relativePath: string): string {
 }
 
 const MAX_FORM_TEMPLATE_BYTES = 10 * 1024 * 1024
+const MAX_PPTX_TEMPLATE_BYTES = 50 * 1024 * 1024
+
+/**
+ * Liest eine Binärdatei aus dem Vault für write_pptx/inspect_pptx_template:
+ * symlink-sicher (realpath gegen den realen Vault-Root, Codex F10), nie aus
+ * .mindgraph, und Größe/Art an der tatsächlich geöffneten Datei geprüft —
+ * O_NOFOLLOW schließt einen zwischen Prüfung und Öffnen untergeschobenen Link aus.
+ */
+async function readVaultBinary(vaultPath: string, relPath: string, maxBytes: number): Promise<Buffer> {
+  const rel = relPath.replace(/\\/g, '/').replace(/^\.\//, '')
+  if (rel.split('/').some(seg => seg === '.mindgraph')) throw new Error('Dateien aus .mindgraph sind nicht lesbar')
+  const abs = await resolveInVaultSafe(vaultPath, rel)
+  const fh = await fs.open(abs, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0))
+  try {
+    const st = await fh.stat()
+    if (!st.isFile()) throw new Error('keine Datei')
+    if (st.size > maxBytes) throw new Error(`zu groß (${Math.round(st.size / 1024 / 1024)} MB, höchstens ${Math.round(maxBytes / 1024 / 1024)} MB)`)
+    return await fh.readFile()
+  } finally {
+    await fh.close()
+  }
+}
 
 // Leitplanke fürs Einzellesen aus einem Ordner (siehe read_context_file).
 const MAX_SINGLE_READS_BEFORE_COLLECT = 3
@@ -237,7 +261,7 @@ export function repairImageSrcAttributes(html: string, ctx: NoteAgentContext): s
 async function registerStagedResult(
   ctx: NoteAgentContext,
   fileName: string,
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg',
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pptx',
   data: Buffer | string,
   summary: string
 ): Promise<ToolResult> {
@@ -519,6 +543,9 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       }
       const body = await readSkillBody(ctx.run.vaultPath, skill.folderName)
       ctx.run.sources.add(`Skill: ${skill.name}`)
+      // Ein Skill, der write_pptx verlangt, erwartet eine PowerPoint-Datei — entsteht am
+      // Ende keine, sagt loop.ts das ausdrücklich (sonst sieht man nur eine .md).
+      if (body.includes('write_pptx')) ctx.run.expectedPptxSkill = skill.name
       // references/assets sichtbar machen (Stufe 3) — gelesen wird per read_skill_file.
       const files = await listSkillFiles(ctx.run.vaultPath, skill.folderName, !!ctx.run.shell)
       const filesNote = files.length
@@ -1069,6 +1096,202 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     }
   })
 
+  // PowerPoint nach Vorlage (Skill „Präsentation nach Vorlage"). Wie write_docx mit
+  // Briefkopf: das Modell liefert nur eine Folienliste, shared/pptxTemplate legt die
+  // Folien auf den echten Layouts der Vorlage an — Master, Logo, Schriften bleiben.
+  registry.register({
+    name: 'inspect_pptx_template',
+    description:
+      'Liest eine PowerPoint-Vorlage (.pptx/.potx) aus dem Vault und nennt ihre Layouts (Name, Art, Platzhalter, ungefähre Zeilenzahl), das Folienformat und die {{FELDER}} der Vorlage. Parameter: template (vault-relativer Pfad, aus der Skill oder dem Anhang). Vor write_pptx aufrufen, wenn du die Layouts der Vorlage nicht kennst.',
+    parameters: {
+      type: 'object',
+      properties: { template: { type: 'string', description: 'Vault-relativer Pfad zur .pptx- oder .potx-Vorlage' } },
+      required: ['template']
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const templateRel = requireString(args, 'template')
+      if (!templateRel) return err('Parameter "template" fehlt')
+      if (!/\.(pptx|potx)$/i.test(templateRel)) return err('Vorlage muss eine .pptx- oder .potx-Datei sein')
+      let bytes: Buffer
+      try {
+        bytes = await readVaultBinary(ctx.run.vaultPath, templateRel, MAX_PPTX_TEMPLATE_BYTES)
+      } catch (e) {
+        return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+      }
+      try {
+        const info = await inspectPptxTemplate(new Uint8Array(bytes))
+        ctx.run.sources.add(templateRel)
+        return { ok: true, content: describePptxTemplate(info), display: `${path.basename(templateRel)} — ${info.layouts.length} Layouts` }
+      } catch (e) {
+        if (e instanceof PptxInputError) return err(e.issues.join('; '))
+        return err(`Vorlage konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+  })
+
+  registry.register({
+    name: 'write_pptx',
+    description:
+      `Erzeugt eine PowerPoint-Präsentation aus einer Vorlage des Nutzers: Master, Logo, Hintergründe, Schriften und Fußzeile kommen aus der Vorlage, du lieferst nur die Folien. Parameter: file_name (Endung .pptx), template (vault-relativer Pfad zur .pptx/.potx), slides (Liste, eine Folie je Eintrag: layout = Layoutname der Vorlage, "#n" (Nummer aus inspect_pptx_template) oder Art ${LAYOUT_KINDS.join('/')}, leer = automatisch; kicker = Dachzeile über dem Titel, 1–4 Wörter, nur wenn das Layout eine Dachzeile hat; title; subtitle; body = Text mit "- " für Aufzählung, zwei Leerzeichen Einzug je Unterebene, "1. " für Nummerierung, **fett**; body2 = zweite Spalte bei Layouts mit zwei Inhalten; image = Dateiname eines in DIESEM Lauf erzeugten Bildes oder vault-relativer Pfad zu PNG/JPEG; notes = Sprechernotizen; items = Karten, Schritte oder Kennzahlen für Layouts mit Plätzen „Karte n"/„Schritt n"/„Kennzahl n" — Liste mit title (bei Kennzahlen die Zahl, z. B. "78 %"), optional label (kleine Rubrik), text (1–2 kurze Sätze), highlight (true = eine Karte hervorheben); takeaway = ein Merksatz für Layouts mit „Kernaussage"). Optional fields ({NAME: "Text"} für {{NAME}} in der Vorlage, z. B. in der Fußzeile). Die Musterfolien der Vorlage werden ersetzt. Eine Kernaussage je Folie, höchstens etwa 6 kurze Punkte — zu volle Folien werden abgelehnt. Grenzen: ${PPTX_LIMITS.maxSlides} Folien, Titel ${PPTX_LIMITS.maxTitleChars} Zeichen, Notizen ${PPTX_LIMITS.maxNotesChars} Zeichen je Folie.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        file_name: { type: 'string' },
+        template: { type: 'string', description: 'Vault-relativer Pfad zur .pptx- oder .potx-Vorlage' },
+        slides: {
+          type: 'array',
+          description: 'Folien in Reihenfolge',
+          items: {
+            type: 'object',
+            properties: {
+              layout: { type: 'string' },
+              kicker: { type: 'string' },
+              title: { type: 'string' },
+              subtitle: { type: 'string' },
+              body: { type: 'string' },
+              body2: { type: 'string' },
+              image: { type: 'string' },
+              notes: { type: 'string' },
+              items: {
+                type: 'array',
+                description: 'Karten/Schritte/Kennzahlen (nur Layouts mit solchen Plätzen)',
+                items: {
+                  type: 'object',
+                  properties: {
+                    label: { type: 'string' },
+                    title: { type: 'string' },
+                    text: { type: 'string' },
+                    highlight: { type: 'boolean' }
+                  },
+                  required: ['title']
+                }
+              },
+              takeaway: { type: 'string', description: 'Merksatz im Kernaussage-Balken (nur Layouts mit Kernaussage)' }
+            }
+          }
+        },
+        fields: { type: 'object', description: 'Werte für {{FELDER}} der Vorlage (optional)', additionalProperties: { type: 'string' } },
+        lang: { type: 'string', description: 'Sprache des Textes, z. B. "de-DE" (Default) oder "en-US"' }
+      },
+      required: ['file_name', 'template', 'slides']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const rawName = requireString(args, 'file_name')
+      const templateRel = requireString(args, 'template')
+      if (!rawName) return err('Parameter "file_name" fehlt')
+      if (!templateRel) return err('Parameter "template" fehlt — nenne den vault-relativen Pfad der Vorlage (steht in der Skill)')
+      if (!/\.(pptx|potx)$/i.test(templateRel)) return err('Vorlage muss eine .pptx- oder .potx-Datei sein')
+      // Manche Modelle liefern verschachtelte Arrays als JSON-String.
+      let slides: unknown = args.slides
+      if (typeof slides === 'string') {
+        try {
+          slides = JSON.parse(slides)
+        } catch {
+          return err('Parameter "slides" ist kein gültiges JSON-Array. Übergib die Folien als Liste von Objekten mit layout, title, body, notes.')
+        }
+      }
+      // Auch verschachtelte items können als JSON-String ankommen.
+      if (Array.isArray(slides)) {
+        for (const sl of slides as Array<Record<string, unknown>>) {
+          if (sl && typeof sl.items === 'string') {
+            try {
+              sl.items = JSON.parse(sl.items)
+            } catch {
+              /* bleibt String → verständliche Ablehnung in validateInput */
+            }
+          }
+        }
+      }
+      if (!Array.isArray(slides) || slides.length === 0) {
+        console.warn('[note-agent] write_pptx abgelehnt (slides fehlt) — angekommen:', describeArgs(args))
+        return err(`Parameter "slides" fehlt oder ist leer. Angekommen ist: ${describeArgs(args)}.`)
+      }
+      let fields: Record<string, string> | undefined
+      if (args.fields !== undefined && args.fields !== null) {
+        if (typeof args.fields !== 'object' || Array.isArray(args.fields)) return err('Parameter "fields" muss ein Objekt {NAME: "Text"} sein')
+        fields = Object.fromEntries(Object.entries(args.fields as Record<string, unknown>).map(([k, v]) => [k, v === null || v === undefined ? '' : String(v)]))
+      }
+
+      // Web-Lauf: genau EIN Ergebnis; die Quellenfolie baut die App aus den Abrufen.
+      if (ctx.run.web?.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
+      let templateBytes: Buffer
+      try {
+        templateBytes = await readVaultBinary(ctx.run.vaultPath, templateRel, MAX_PPTX_TEMPLATE_BYTES)
+      } catch (e) {
+        return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+      }
+
+      // Bilder auflösen: zuerst Ergebnisse dieses Laufs (generate_image), Namensstamm
+      // genügt — das Modell schreibt gern .png, geliefert wird .jpg. Sonst Vault-Pfad.
+      const images: Record<string, Uint8Array> = {}
+      const imageSources: string[] = []
+      let imageBytesTotal = 0
+      for (const sl of slides as PptxSlideInput[]) {
+        const name = sl && typeof sl.image === 'string' ? sl.image.trim() : ''
+        if (!name || images[name]) continue
+        const stem = name.replace(/\.[^./]+$/, '').toLowerCase()
+        const staged = Array.from(ctx.run.results.values()).find(
+          r => (r.kind === 'png' || r.kind === 'jpg') && (r.suggestedName === name || r.suggestedName.replace(/\.[^.]+$/, '').toLowerCase() === stem)
+        )
+        try {
+          if (staged) {
+            // Größe vor dem Einlesen prüfen (Codex F22) — auch Staging-Dateien.
+            const fh = await fs.open(staged.stagingPath, 'r')
+            try {
+              const st = await fh.stat()
+              if (st.size > PPTX_LIMITS.maxImageBytes) return err(`Bild "${name}" ist zu groß (höchstens ${PPTX_LIMITS.maxImageBytes / 1024 / 1024} MB)`)
+              images[name] = new Uint8Array(await fh.readFile())
+            } finally {
+              await fh.close()
+            }
+          } else if (/\.(png|jpe?g)$/i.test(name)) {
+            images[name] = new Uint8Array(await readVaultBinary(ctx.run.vaultPath, name, PPTX_LIMITS.maxImageBytes))
+            imageSources.push(name)
+          } else {
+            return err(`Bild "${name}" gibt es weder als Ergebnis dieses Laufs noch als PNG/JPEG im Vault`)
+          }
+        } catch (e) {
+          return err(`Bild "${name}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+        }
+        imageBytesTotal += images[name].length
+        if (imageBytesTotal > PPTX_LIMITS.maxTotalImageBytes) return err(`Bilder zusammen zu groß (höchstens ${PPTX_LIMITS.maxTotalImageBytes / 1024 / 1024} MB)`)
+      }
+
+      try {
+        const result = await buildPptxFromTemplate(new Uint8Array(templateBytes), {
+          slides: slides as PptxSlideInput[],
+          fields,
+          images,
+          lang: typeof args.lang === 'string' ? args.lang : undefined,
+          sources: ctx.run.web
+            ? ctx.run.web.fetches
+                .filter(f => f.status === 'ok')
+                .map((f): PptxSource => ({ title: sanitizeSourceTitle(f.title) || f.finalUrl, url: f.finalUrl, fetchedAt: f.fetchedAt }))
+            : undefined
+        })
+        ctx.run.sources.add(templateRel)
+        for (const src of imageSources) ctx.run.sources.add(src)
+        const fileName = sanitizeOutputFileName(rawName, '.pptx')
+        const parts = [`${result.slideCount} Folien`, `Vorlage ${path.basename(templateRel)}`]
+        if (result.filled.length) parts.push(`Felder: ${result.filled.join(', ')}`)
+        if (result.notes.length) parts.push(`Hinweise: ${result.notes.join('; ')}`)
+        const res = await registerStagedResult(ctx, fileName, 'pptx', Buffer.from(result.bytes), parts.join(', '))
+        if (res.ok && ctx.run.web) {
+          ctx.run.web.wrote = true
+          ctx.run.web.phase = 'write'
+        }
+        return res
+      } catch (e) {
+        if (e instanceof PptxInputError) {
+          return err(`Die Präsentation wurde nicht erzeugt: ${e.issues.join('; ')}. Überarbeite die Folien und rufe write_pptx erneut mit ALLEN Folien auf.`)
+        }
+        return err(`Präsentation konnte nicht erzeugt werden: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+  })
+
   // Bild-Generierung (Opt-in-Modul image-generation, Paket 4 der Modul-Entflechtung).
   // Nur in der Allowlist, wenn run.imageGen (Modul aktiv + Key hinterlegt) — siehe loop.ts.
   // Der Nano-Banana-Aufruf läuft komplett Main-seitig (Key verlässt den Main-Prozess nicht).
@@ -1091,6 +1314,9 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const prompt = requireString(args, 'prompt')
       if (!rawName) return err('Parameter "file_name" fehlt')
       if (!prompt) return err('Parameter "prompt" fehlt')
+      // Web-Lauf: nach dem einen Ergebnis kein weiteres Artefakt (Codex F33) — Bilder
+      // gehören VOR das Schreiben, sonst entstünde eine zweite Ergebnis-Karte.
+      if (ctx.run.web?.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus entstehen Bilder nur VOR dem Ergebnis.')
       const RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'] as const
       type Ratio = (typeof RATIOS)[number]
       const aspectRatio: Ratio = RATIOS.includes(args.aspect_ratio as Ratio) ? (args.aspect_ratio as Ratio) : '16:9'
