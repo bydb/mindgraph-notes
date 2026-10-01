@@ -1779,7 +1779,7 @@ const App: React.FC = () => {
                   syncStatus === 'error' ? 'error' :
                   'syncing'
                 }`}
-                onClick={() => setSettingsOpen(true)}
+                onClick={() => { setSettingsInitialTab('sync'); setSettingsOpen(true) }}
                 title={t('titlebar.sync')}
               >
                 <svg className={`sync-status-icon ${syncStatus !== 'idle' && syncStatus !== 'done' && syncStatus !== 'error' ? 'syncing' : ''}`} viewBox="0 0 14 14" fill="none">

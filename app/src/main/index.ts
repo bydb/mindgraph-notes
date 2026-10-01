@@ -16,6 +16,7 @@ import {
   isHtmlPreviewable
 } from '../shared/htmlPreview'
 import { exportPreviewPdf, exportPreviewEpub } from './htmlExport'
+import { attachWindowRecovery, initWindowRecovery } from './windowRecovery'
 import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
 import { bundledResourcesDir } from './bundledResources'
 import { trashPath, VAULT_TRASH_DIR, type TrashDestination } from './fileTrash'
@@ -938,7 +939,15 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'ctx.cut': 'Ausschneiden',
     'ctx.copy': 'Kopieren',
     'ctx.paste': 'Einfügen',
-    'ctx.selectAll': 'Alles auswählen'
+    'ctx.selectAll': 'Alles auswählen',
+    'window.crashLoop.message': 'Das Fenster von MindGraph Notes ist mehrfach kurz hintereinander abgestürzt.',
+    'window.crashLoop.detail': 'Automatisches Neuladen ist deshalb angehalten. Du kannst es noch einmal versuchen oder die App beenden und neu starten.',
+    'window.crashLoop.reload': 'Neu laden',
+    'window.crashLoop.quit': 'Beenden',
+    'window.unresponsive.message': 'MindGraph Notes reagiert nicht.',
+    'window.unresponsive.detail': 'Das Fenster antwortet seit {seconds} Sekunden nicht. Du kannst warten oder es neu laden — Eingaben, die noch nicht gespeichert wurden, gehen beim Neuladen verloren.',
+    'window.unresponsive.wait': 'Warten',
+    'window.unresponsive.reload': 'Neu laden'
   },
   en: {
     'btn.cancel': 'Cancel',
@@ -990,7 +999,15 @@ const mainTranslations: Record<'de' | 'en', Record<string, string>> = {
     'ctx.cut': 'Cut',
     'ctx.copy': 'Copy',
     'ctx.paste': 'Paste',
-    'ctx.selectAll': 'Select All'
+    'ctx.selectAll': 'Select All',
+    'window.crashLoop.message': 'The MindGraph Notes window crashed several times in a row.',
+    'window.crashLoop.detail': 'Automatic reloading has been paused. You can try again or quit and restart the app.',
+    'window.crashLoop.reload': 'Reload',
+    'window.crashLoop.quit': 'Quit',
+    'window.unresponsive.message': 'MindGraph Notes is not responding.',
+    'window.unresponsive.detail': 'The window has not responded for {seconds} seconds. You can wait or reload it — input that has not been saved yet will be lost on reload.',
+    'window.unresponsive.wait': 'Wait',
+    'window.unresponsive.reload': 'Reload'
   }
 }
 
@@ -1470,6 +1487,9 @@ function createWindow(): void {
     trafficLightPosition: { x: 15, y: 15 }
   })
 
+  // Weißes Fenster nach Ruhezustand/Absturz: Renderer neu laden, Bild neu anstoßen, protokollieren.
+  attachWindowRecovery(mainWindow)
+
   // In Entwicklung: Vite Dev Server
   if (process.env.NODE_ENV === 'development') {
     mainWindow.loadURL('http://localhost:5173')
@@ -1567,6 +1587,7 @@ app.whenReady().then(async () => {
       syncEngine.sync().catch(err => console.error('[Sync] Resume sync failed:', err))
     }
   })
+  initWindowRecovery({ getMainWindow: () => mainWindow, isQuitting: () => isQuitting, t })
   setupMediaPermissions()
   registerHtmlPreviewProtocol()
 
