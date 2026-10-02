@@ -1720,8 +1720,19 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
               <rect width="20" height="16" x="2" y="4" rx="2" />
               <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
             </svg>
-            <p>{emailSettings.accounts.length === 0 ? t('inbox.empty') : (activeFilter.onlyRelevant ? t('inbox.noRelevant') : t('inbox.empty'))}</p>
-            <span>{emailSettings.accounts.length === 0 ? t('inbox.emptyHint') : (activeFilter.onlyRelevant ? t('inbox.noRelevantHint') : '')}</span>
+            {/* Bei aktiver Suche ist der Relevanz-Filter pausiert — „Keine relevanten
+                E-Mails" wäre dort falsch und sah aus, als hätte die Suche gefiltert. */}
+            {isSearching ? (
+              <>
+                <p>{t('inbox.noSearchResults').replace('{q}', searchQuery.trim())}</p>
+                <span>{t('inbox.noSearchResultsHint')}</span>
+              </>
+            ) : (
+              <>
+                <p>{emailSettings.accounts.length === 0 ? t('inbox.empty') : (activeFilter.onlyRelevant ? t('inbox.noRelevant') : t('inbox.empty'))}</p>
+                <span>{emailSettings.accounts.length === 0 ? t('inbox.emptyHint') : (activeFilter.onlyRelevant ? t('inbox.noRelevantHint') : '')}</span>
+              </>
+            )}
           </div>
         ) : (
           <div className="inbox-list">

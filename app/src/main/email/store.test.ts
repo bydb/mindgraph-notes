@@ -318,6 +318,13 @@ describe('mutateEmailStore — Lesen-Ändern-Schreiben', () => {
     expect(ids((await loadEmailStore(vault)).data)).toEqual(['a', 'b', 'neu'])
   })
 
+  it('schreibt Dubletten aus der gelesenen Datei nicht zurück (Abrufpfad, 02.10.2026)', async () => {
+    await foreignWrite(store(['a', 'dup', 'dup', 'b']))
+    const out = await mutateEmailStore(vault, (data) => ({ data, result: null }))
+    expect(out.written).toBe(true)
+    expect(ids((await loadEmailStore(vault)).data)).toEqual(['a', 'dup', 'b'])
+  })
+
   it('schreibt nicht, wenn der Mutator nichts zu tun hat', async () => {
     await foreignWrite(store(['a']))
     const before = (await fs.stat(emailStorePath(vault))).mtimeMs

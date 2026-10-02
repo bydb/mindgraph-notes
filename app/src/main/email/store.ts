@@ -39,6 +39,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import {
   mergeEmailLists,
+  dedupeEmailsById,
   mergeTombstones,
   mergeDeviceCursors,
   flattenDeviceCursors,
@@ -517,7 +518,11 @@ export async function mutateEmailStore<T>(
     }
     const outcome = await mutator(current.data)
     if (!outcome) return { written: false, revision: current.revision, result: null }
-    const raw = serializeEmailStore({ ...outcome.data, storeVersion: EMAIL_STORE_VERSION })
+    // Doppelte IDs nie zurückschreiben — auch nicht, wenn sie schon in der
+    // gelesenen Datei standen. Sonst hielt der Abruf alte Dubletten am Leben,
+    // und die ließen in der Mailliste Geisterzeilen stehen (02.10.2026).
+    const emails = dedupeEmailsById(outcome.data.emails as Array<{ id: string }>) as EmailStoreData['emails']
+    const raw = serializeEmailStore({ ...outcome.data, emails, storeVersion: EMAIL_STORE_VERSION })
     await writeAtomic(emailStorePath(vaultPath), raw)
     return { written: true, revision: computeRevision(raw), result: outcome.result }
   })

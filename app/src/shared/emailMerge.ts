@@ -296,6 +296,30 @@ export function pruneTombstones(tombstones: EmailTombstones, retentionDays: numb
 // ── Vereinigung ganzer Listen ───────────────────────────────────────────────
 
 /**
+ * Fasst Einträge mit derselben ID zu einem zusammen (Regeln wie zwischen zwei
+ * Geräten), erste Position bleibt. Eine Liste darf keine ID doppelt tragen:
+ * die Mailliste rendert mit der ID als React-Key, und doppelte Keys ließen beim
+ * Filtern alte Zeilen als Geister stehen — unter einer Suche, die nichts fand,
+ * standen zwei fremde Mails (real, 02.10.2026). Entstanden war die Dublette im
+ * Abruf; `mergeEmailLists` reichte sie danach bei jedem Speichern weiter.
+ */
+export function dedupeEmailsById<T extends MergeableEmail>(list: T[]): T[] {
+  const index = new Map<string, number>()
+  const out: T[] = []
+  for (const e of list) {
+    if (!e || typeof e.id !== 'string') { out.push(e); continue }
+    const at = index.get(e.id)
+    if (at === undefined) {
+      index.set(e.id, out.length)
+      out.push(e)
+    } else {
+      out[at] = mergeEmailRecord(out[at], e) as T
+    }
+  }
+  return out.length === list.length ? list : out
+}
+
+/**
  * Vereinigt zwei Mail-Listen.
  *
  * Reihenfolge des Ergebnisses: erst die Datensätze aus `mine` in ihrer
@@ -308,6 +332,11 @@ export function mergeEmailLists(
   options: MergeOptions = {}
 ): MergeableEmail[] {
   const tombstones = options.tombstones || {}
+  // Dubletten innerhalb einer Seite erst zusammenfassen — sonst überlebt eine
+  // doppelte ID in `mine` jede Vereinigung (die Schleife unten prüfte `used`
+  // nur für `theirs`).
+  mine = dedupeEmailsById(mine)
+  theirs = dedupeEmailsById(theirs)
   const theirsById = new Map<string, MergeableEmail>()
   for (const e of theirs) {
     if (e && typeof e.id === 'string') theirsById.set(e.id, e)

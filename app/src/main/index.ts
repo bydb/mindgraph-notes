@@ -152,7 +152,7 @@ import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud, shel
 import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
-import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones } from '../shared/emailMerge'
+import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
@@ -11513,6 +11513,10 @@ ipcMain.handle('email-load', async (_event, vaultPath: string) => {
     // die Kopplung, die den gemeldeten Mailverlust total gemacht hat.
     return {
       ...snapshot.data,
+      // Doppelte IDs aus älteren Abrufen nur für die Anzeige zusammenfassen
+      // (`email-load` schreibt nichts); die Datei heilt beim nächsten Speichern
+      // über `mergeEmailLists`.
+      emails: dedupeEmailsById(snapshot.data.emails as Array<{ id: string }>),
       lastFetchedAt: readDeviceCursor(snapshot.data.lastFetchedAtByDevice, snapshot.data.lastFetchedAt, deviceId),
       revision: snapshot.revision,
       retainDays: await getEmailRetainDays()
@@ -11795,6 +11799,11 @@ ipcMain.handle('email-fetch', async (_event, vaultPath: string, accounts: Array<
               .map((t: { name?: string; address?: string }) => ({ name: t.name || '', address: t.address || '' }))
               .filter((r: { address: string }) => r.address)
 
+            // Sofort als bekannt merken: liefert der Server dieselbe Nachricht im
+            // selben Lauf ein zweites Mal (überlappende Abruffenster), entstand
+            // sonst eine Dublette mit gleicher ID — und die ließ in der Mailliste
+            // Geisterzeilen stehen (real, 02.10.2026).
+            existingIds.add(messageId)
             newEmails.push({
               id: messageId,
               uid: msg.uid,

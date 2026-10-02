@@ -28,4 +28,20 @@ describe('emailMatchesQuery', () => {
   it('fällt ohne bodyText auf den snippet zurück', () => {
     expect(emailMatchesQuery({ from: { address: 'x@y.z' }, snippet: 'Kurzer Auszug' }, 'auszug')).toBe(true)
   })
+  it('faltet ß/ss und Umlaute: „Grüssner" findet „Grüßner" und „gruessner@"', () => {
+    const mail = { from: { name: 'Jürgen Grüßner', address: 'juergen.gruessner@schule.example' }, subject: 'AG Treffen' }
+    for (const q of ['Grüssner', 'grüßner', 'Gruessner', 'gruessner', 'Grussner', 'GRÜSSNER', 'jürgen grüssner']) {
+      expect(emailMatchesQuery(mail, q)).toBe(true)
+    }
+    expect(emailMatchesQuery({ from: { address: 'x@y.z' }, subject: 'Grüße aus Gießen' }, 'giessen gruesse')).toBe(true)
+    expect(emailMatchesQuery({ from: { address: 'x@y.z' }, subject: 'Café José' }, 'cafe jose')).toBe(true)
+  })
+  it('zerlegte Umlaute (NFD) treffen zusammengesetzte (NFC)', () => {
+    expect(emailMatchesQuery({ from: { name: 'Grüßner' } }, 'Gru\u0308ssner')).toBe(true)
+    expect(emailMatchesQuery({ from: { name: 'Gru\u0308ßner' } }, 'Grüssner')).toBe(true)
+  })
+  it('falsche Treffer bleiben aus', () => {
+    expect(emailMatchesQuery(mail, 'grüssner')).toBe(false)
+    expect(emailMatchesQuery({ from: { name: 'Absender B' }, subject: 'Digitale Familie' }, 'Grüssner')).toBe(false)
+  })
 })

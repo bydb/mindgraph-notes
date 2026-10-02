@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   mergeEmailLists,
+  dedupeEmailsById,
   mergeEmailRecord,
   mergeAnalysis,
   mergeWorkflowRuns,
@@ -440,5 +441,29 @@ describe('Rechenregeln der Vereinigung', () => {
     const rechts = mergeEmailLists([a], mergeEmailLists([b], [c]))
     expect(links.map(norm)).toEqual(rechts.map(norm))
     expect(mergeEmailLists(links, links).map(norm)).toEqual(links.map(norm))
+  })
+})
+
+describe('Dubletten mit gleicher ID', () => {
+  it('dedupeEmailsById fasst zusammen, erste Position bleibt, Analyse geht nicht verloren', () => {
+    const a = { id: 'x', fetchedAt: '2026-09-24T08:00:00Z' }
+    const b = { id: 'y', fetchedAt: '2026-09-24T08:00:00Z' }
+    const a2 = { id: 'x', fetchedAt: '2026-09-24T08:00:00Z', analysis: { relevanceScore: 70, analyzedAt: '2026-09-24T09:00:00Z' } }
+    const out = dedupeEmailsById([a, b, a2] as never[]) as Array<{ id: string; analysis?: unknown }>
+    expect(out.map(e => e.id)).toEqual(['x', 'y'])
+    expect(out[0].analysis).toBeTruthy()
+  })
+  it('ohne Dubletten kommt dieselbe Liste zurück', () => {
+    const list = [{ id: 'a' }, { id: 'b' }]
+    expect(dedupeEmailsById(list)).toBe(list)
+  })
+  it('mergeEmailLists trägt eine Dublette aus mine nicht weiter (real 02.10.2026)', () => {
+    const dup = { id: '<dup@example.org>', fetchedAt: '2026-09-17T08:00:00Z' }
+    const out = mergeEmailLists([dup, { ...dup }, { id: 'z' }], [{ ...dup }])
+    expect(out.map(e => e.id)).toEqual(['<dup@example.org>', 'z'])
+  })
+  it('mergeEmailLists fasst auch Dubletten in theirs zusammen', () => {
+    const out = mergeEmailLists([], [{ id: 'q' }, { id: 'q' }])
+    expect(out.map(e => e.id)).toEqual(['q'])
   })
 })
