@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.29-beta] - 2026-10-02
+
+**Die Mailsuche findet jetzt Namen in jeder Schreibweise.** Wer „Weiss“ sucht, findet auch „Weiß“ und die Adresse „weiss@…“ – Umlaute und ß werden in Absender, Empfänger, Betreff und Text gleich behandelt. Unter einer Suche erscheinen außerdem keine fremden Mails mehr.
+
+### Hintergrund
+
+- **Auslöser:** Die Suche nach einer Kollegin mit „ß“ im Namen fand nichts, weil sie Zeichen für Zeichen verglich. Gleichzeitig standen drei unpassende Mails in der Ergebnisliste, darunter der Hinweis „Keine relevanten E-Mails“.
+- **Schreibweisen:** „ü“, „ue“ und „u“ sowie „ß“ und „ss“ finden einander, ebenso Buchstaben mit Akzent. Auch Umlaute, die das System zerlegt liefert, werden erkannt. Mehrere Wörter müssen weiterhin alle vorkommen.
+- **Die falschen Treffer:** Einzelne Mails lagen doppelt in der gespeicherten Mailliste. Die Liste erkennt Zeilen an der Mail-Kennung; bei doppelter Kennung blieben beim Filtern alte Zeilen stehen. Die App fasst solche Dubletten jetzt beim Laden und Speichern zusammen, und der Abruf legt keine neuen mehr an – auch wenn der Server dieselbe Nachricht in einem Durchgang zweimal liefert.
+- **Hinweis bei leerer Suche:** Findet die Suche nichts, steht dort jetzt „Keine Treffer für …“. Der Relevanz-Filter ist beim Suchen ohnehin pausiert.
+- **Grenze:** Liegt dieselbe Mail in zwei verschiedenen Konten, behandelt die App sie weiterhin als eine Mail.
+
 ## [0.11.28-beta] - 2026-10-01
 
 **Der Agent erstellt jetzt PowerPoint-Präsentationen nach einer Vorlage.** Logo, Farben, Schriften und Fußzeile kommen aus deiner Muster-Präsentation, der Agent liefert Gliederung, Folientexte und Sprechernotizen – mit Karten, nummerierten Schritten, Kennzahlen und einem Balken für die Kernaussage statt nur Aufzählungen. Eine fertige Vorlage im MindGraph-Stil liegt bei; den Skill „PowerPoint nach Vorlage“ installierst du unter Einstellungen → Skills → Starter-Skills.
