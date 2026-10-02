@@ -15,10 +15,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
-import { ACTIVITY_TYPE_LABEL_KEY, jobLines } from '../../utils/impactText'
+import { ACTIVITY_TYPE_LABEL_KEY, jobLines, lineLabel, lineKey, skillLabel, ambiguousSkillLine } from '../../utils/impactText'
 import { formatCostCell, formatTps, type LlmRunMetrics } from '../../../shared/llmTelemetry'
 import { formatUsd } from '../../../shared/llmCost'
-import type { ActivityEvent, ValuedType, ReferenceMinutes, ReferenceSources, ActivitySummary } from '../../../shared/activityLog'
+import { seenSkillIds, skillReferencesForVault, type ActivityEvent, type ValuedType, type ReferenceMinutes, type ReferenceSources, type ActivitySummary, type SkillReferences } from '../../../shared/activityLog'
 import {
   rangeBounds, buildBuckets, bucketUsage, bucketCost, bucketPerformance, bucketSavedTime, formatMinutes, MIN_POINT_RUNS,
   type HistoryRange, type Bucket,
@@ -63,6 +63,7 @@ export function HistorySection() {
   const vaultPath = useNotesStore(s => s.vaultPath)
   const referenceMinutes = useUIStore(s => s.impact.referenceMinutes)
   const referenceSources = useUIStore(s => s.impact.referenceSources)
+  const skillReferences = useUIStore(s => s.impact.skillReferences)
   const hourlyRate = useUIStore(s => s.impact.hourlyRate)
   const currency = useUIStore(s => s.impact.currency)
   const [range, setRange] = useState<HistoryRange>('7d')
@@ -123,7 +124,22 @@ export function HistorySection() {
   const usage = useMemo(() => bucketUsage(runs ?? [], buckets), [runs, buckets])
   const cost = useMemo(() => bucketCost(runs ?? [], buckets), [runs, buckets])
   const performance = useMemo(() => bucketPerformance(runs ?? [], buckets), [runs, buckets])
-  const saved = useMemo(() => bucketSavedTime(events ?? [], buckets, referenceMinutes), [events, buckets, referenceMinutes])
+  // Nur Skill-Referenzen, deren Kennung in DIESEM Vault vorkommt: Die Einstellung ist global,
+  // Referenznotiz und Export dürfen keine Skill-Namen anderer Vaults zeigen (Codex F13).
+  // Vault-Kennung aus dem Main (derselbe Hash wie der Ledger) — damit eine Referenz auch vor dem
+  // ersten Lauf und nach der Retention als „zu diesem Vault gehörig" gilt (F19).
+  const [vaultKey, setVaultKey] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    setVaultKey(null)
+    if (!vaultPath) return
+    void window.electronAPI.noteSkillsList(vaultPath)
+      .then(r => { if (!cancelled) setVaultKey(typeof r.vaultKey === 'string' ? r.vaultKey : null) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [vaultPath])
+  const vaultSkillRefs = useMemo(() => skillReferencesForVault(skillReferences, vaultKey, seenSkillIds(events ?? [])), [skillReferences, vaultKey, events])
+  const saved = useMemo(() => bucketSavedTime(events ?? [], buckets, referenceMinutes, MIN_POINT_RUNS, vaultSkillRefs), [events, buckets, referenceMinutes, vaultSkillRefs])
   // Ab wann die beiden Logbücher überhaupt Daten haben. Beide beginnen mit der
   // Installation der Version, die sie schreibt — das Tätigkeitsprotokoll früher als das
   // Telemetrie-Logbuch. Eine 12-Monats-Ansicht über ein zwei Wochen altes Logbuch muss
@@ -152,7 +168,7 @@ export function HistorySection() {
   const copy = async (kind: 'md' | 'csv') => {
     const input = {
       rangeLabel: t(RANGE_KEY[range]), bucketLabel: label, usage, cost, performance, saved,
-      referenceNote: `${referenceNoteText(referenceMinutes, referenceSources, t)} ${t('llmPerf.history.foregroundNote')}${saved.total.correctedRuns > 0 ? ` ${t(saved.total.correctedRuns === 1 ? 'llmPerf.history.correctedOne' : 'llmPerf.history.corrected', { n: saved.total.correctedRuns, minutes: Math.round(saved.total.correctedMs / 60_000) })}` : ''}`,
+      referenceNote: `${referenceNoteText(referenceMinutes, referenceSources, vaultSkillRefs, t)} ${t('llmPerf.history.foregroundNote')}${saved.total.correctedRuns > 0 ? ` ${t(saved.total.correctedRuns === 1 ? 'llmPerf.history.correctedOne' : 'llmPerf.history.corrected', { n: saved.total.correctedRuns, minutes: Math.round(saved.total.correctedMs / 60_000) })}` : ''}`,
     }
     await window.electronAPI.clipboardWriteText(kind === 'md' ? historyToMarkdown(input) : historyToCsv(input))
     setCopied(kind)
@@ -188,7 +204,8 @@ export function HistorySection() {
   for (const c of saved.referenceChanges) {
     const idx = buckets.findIndex(b => c.at >= b.from && c.at < b.to)
     if (idx < 0) continue
-    const line = `${t(ACTIVITY_TYPE_LABEL_KEY[c.activityType])}: ${c.fromMinutes ?? '—'} → ${c.toMinutes ?? '—'} min`
+    const name = c.skill ? skillLabel({ label: c.skillLabel ?? '' }, t) : c.activityType ? t(ACTIVITY_TYPE_LABEL_KEY[c.activityType]) : ''
+    const line = `${name}: ${c.fromMinutes ?? '—'} → ${c.toMinutes ?? '—'} min`
     changeByBucket.set(idx, [...(changeByBucket.get(idx) ?? []), line])
   }
   const savedBuckets = saved.buckets.map((b, i) => ({
@@ -231,14 +248,15 @@ export function HistorySection() {
     wastedTotal > 0 ? t('llmPerf.history.wasted', { n: wastedTotal, minutes: wastedMinutesTotal }) : null,
     saved.total.unmeasuredRuns > 0 ? t('llmPerf.history.unmeasured', { n: saved.total.unmeasuredRuns }) : null,
     saved.total.unpricedTypes.length > 0 ? t('llmPerf.history.noReference', { types: saved.total.unpricedTypes.map(ty => t(ACTIVITY_TYPE_LABEL_KEY[ty])).join(', ') }) : null,
+    saved.total.ambiguousSkillRuns > 0 ? ambiguousSkillLine(saved.total.ambiguousSkillRuns, t) : null,
   ].filter((s): s is string => s !== null)
   const coverage = [
     oldestRunAt !== null && oldestRunAt > bounds.from ? t('llmPerf.history.coverageCalls', { date: new Date(oldestRunAt).toLocaleDateString(loc) }) : null,
     oldestEventAt !== null && oldestEventAt > bounds.from ? t('llmPerf.history.coverageRuns', { date: new Date(oldestEventAt).toLocaleDateString(loc) }) : null,
   ].filter((s): s is string => s !== null)
-  const dotRows = groupByType(saved.byModel).map(([type, rows]) => ({
-    key: type, label: t(ACTIVITY_TYPE_LABEL_KEY[type]),
-    dots: rows.map(r => ({ key: r.model, value: r.medianActiveMinutes, n: r.runs, title: `${t(ACTIVITY_TYPE_LABEL_KEY[type])} · ${r.model}` })),
+  const dotRows = groupByLine(saved.byModel).map(([key, rows]) => ({
+    key, label: lineLabel(rows[0], t),
+    dots: rows.map(r => ({ key: r.model, value: r.medianActiveMinutes, n: r.runs, title: `${lineLabel(r, t)} · ${r.model}` })),
   }))
   const dotModels = [...new Set(saved.byModel.map(r => r.model))]
   const dotLegend: LegendItem[] = dotModels.map(m => ({ key: m, label: m, color: colorOf(m) }))
@@ -369,7 +387,8 @@ export function HistorySection() {
             {valuedAny || saved.referenceChanges.length > 0 ? (
               <>
                 <SignedBars buckets={savedBuckets} color={seriesColor(2)} unit="min" />
-                <p className="llmhist-foot">{referenceNoteText(referenceMinutes, referenceSources, t)}</p>
+                <p className="llmhist-foot">{referenceNoteText(referenceMinutes, referenceSources, vaultSkillRefs, t)}</p>
+                {saved.referenceChanges.some(c => c.skill) && <p className="llmhist-foot">{t('llmPerf.history.skillShift')}</p>}
                 <p className="llmhist-foot">{t('llmPerf.history.foregroundNote')}</p>
               </>
             ) : <p className="viz-empty">{t('llmPerf.history.noSaved')}</p>}
@@ -421,9 +440,10 @@ function sumCompute(cost: ReturnType<typeof bucketCost>, model: string): number 
   return cost.buckets.reduce((n, b) => n + (b.computeMsByModel[model] ?? 0), 0)
 }
 
-function groupByType<R extends { activityType: ValuedType }>(rows: R[]): Array<[ValuedType, R[]]> {
-  const m = new Map<ValuedType, R[]>()
-  for (const r of rows) m.set(r.activityType, [...(m.get(r.activityType) ?? []), r])
+/** Je Bilanzzeile (Art oder Skill) — eine Skill-Zeile darf nicht in der Art-Zeile verschwinden. */
+function groupByLine<R extends { activityType: ValuedType; skill?: { id: string } }>(rows: R[]): Array<[string, R[]]> {
+  const m = new Map<string, R[]>()
+  for (const r of rows) m.set(lineKey(r), [...(m.get(lineKey(r)) ?? []), r])
   return [...m.entries()]
 }
 
@@ -446,12 +466,18 @@ function wastedMinutesOf(saved: { lines: Array<{ wastedMs: number }> }): number 
   return Math.round(saved.lines.reduce((ms, l) => ms + l.wastedMs, 0) / 60_000)
 }
 
-function referenceNoteText(reference: ReferenceMinutes, sources: ReferenceSources | undefined, t: T): string {
+function referenceNoteText(reference: ReferenceMinutes, sources: ReferenceSources | undefined, skills: SkillReferences | undefined, t: T): string {
   const entries = Object.entries(reference).filter(([, v]) => typeof v === 'number' && v > 0) as Array<[ValuedType, number]>
-  if (entries.length === 0) return t('llmPerf.history.noReferenceSet')
+  const skillEntries = Object.values(skills ?? {}).filter(r => r.minutes > 0)
+  if (entries.length === 0 && skillEntries.length === 0) return t('llmPerf.history.noReferenceSet')
   // Die Quelle steht an jeder Zahl: Eine gestoppte Referenz ist eine andere Aussage als eine geschätzte.
-  const quelle = (ty: ValuedType) => t(sources?.[ty] === 'measured' ? 'llmPerf.history.refMeasured' : 'llmPerf.history.refEstimated')
-  return t('llmPerf.history.referenceNote', { list: entries.map(([ty, v]) => `${t(ACTIVITY_TYPE_LABEL_KEY[ty])} ${v} min (${quelle(ty)})`).join(', ') })
+  const quelle = (source: string | undefined) => t(source === 'measured' ? 'llmPerf.history.refMeasured' : 'llmPerf.history.refEstimated')
+  const list = [
+    ...entries.map(([ty, v]) => `${t(ACTIVITY_TYPE_LABEL_KEY[ty])} ${v} min (${quelle(sources?.[ty])})`),
+    // Bereits auf diesen Vault gefiltert (vaultSkillRefs) — siehe oben.
+    ...skillEntries.map(r => `${skillLabel(r, t)} ${r.minutes} min (${quelle(r.source)})`)
+  ]
+  return t('llmPerf.history.referenceNote', { list: list.join(', ') })
 }
 
 /**

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
-import { acceptedLine, emailTasksLine, tasksLine, jobLines, hasRuntimeContext, savedBasisLine, savedContextLine, wastedLine, correctedLine, unmeasuredLine, unpricedLine } from '../../utils/impactText'
+import { acceptedLine, emailTasksLine, tasksLine, jobLines, hasRuntimeContext, savedBasisLine, savedContextLine, wastedLine, correctedLine, unmeasuredLine, unpricedLine, ambiguousSkillLine } from '../../utils/impactText'
 import {
   estimateSavedMinutes,
   impactBadge,
@@ -31,6 +31,7 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
   const vaultPath = useNotesStore(s => s.vaultPath)
   const referenceMinutes = useUIStore(s => s.impact.referenceMinutes)
   const referenceSources = useUIStore(s => s.impact.referenceSources)
+  const skillReferences = useUIStore(s => s.impact.skillReferences)
   const showInStatusBar = useUIStore(s => s.impact.showInStatusBar)
   const [summary, setSummary] = useState<ActivitySummary | null>(null)
 
@@ -77,7 +78,7 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
 
   if (!showInStatusBar || !summary) return null
 
-  const saved = estimateSavedMinutes(summary, referenceMinutes)
+  const saved = estimateSavedMinutes(summary, referenceMinutes, skillReferences)
   const badge = impactBadge(summary, saved)
   if (badge.kind === 'none') return null
 
@@ -105,6 +106,7 @@ export function ImpactIndicator({ onOpenCard }: { onOpenCard: () => void }) {
     // auch in die Kurzfassung, sonst wirkt die Statusleiste wie ein Urteil.
     saved.unpricedTypes.length > 0 ? unpricedLine(saved.unpricedTypes, t) : null,
     saved.unmeasuredRuns > 0 ? unmeasuredLine(saved.unmeasuredRuns, t) : null,
+    saved.ambiguousSkillRuns > 0 ? ambiguousSkillLine(saved.ambiguousSkillRuns, t) : null,
     t('statusbar.impact.openCard')
   ].filter(Boolean)
 

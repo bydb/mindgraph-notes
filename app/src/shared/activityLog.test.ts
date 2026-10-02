@@ -14,6 +14,10 @@ import {
   pruneActivityEvents,
   stableJobId,
   summarizeActivity,
+  normalizeSkillReferences,
+  normalizeSkillIdList,
+  resolveRunSkill,
+  MAX_SKILL_REFERENCE_MINUTES,
   type ActivityEvent,
   type ActivityEventKind
 } from './activityLog'
@@ -108,6 +112,7 @@ describe('isActivityEvent', () => {
     'email-tasks-extracted': { at: NOW, kind: 'email-tasks-extracted', id: 'm', emails: 1, tasks: 1, durationMs: 1 },
     'task-created': { at: NOW, kind: 'task-created', count: 1 },
     'reference-changed': { at: NOW, kind: 'reference-changed', activityType: 'document', fromMinutes: 20, toMinutes: 30 },
+    'skill-reference-changed': { at: NOW, kind: 'skill-reference-changed', skill: 'sk-0123456789abcdef', fromMinutes: null, toMinutes: 240 },
     'job-started': { at: NOW, kind: 'job-started', jobId: 'mk-1', jobKind: 'marketing', pluginId: 'edoobox' },
     'job-outcome': { at: NOW, kind: 'job-outcome', jobId: 'mk-1', jobType: 'wp-post', outcome: 'draft', pluginId: 'wordpress', activeMs: 1000 },
     'job-abandoned': { at: NOW, kind: 'job-abandoned', jobId: 'mk-1', pluginId: 'edoobox', activeMs: 1000 },
@@ -838,5 +843,123 @@ describe('Manuelle Zeitkorrektur (Paket 3)', () => {
     expect(isCorrectionTargetKnown(events, 'a')).toBe(true)
     expect(isCorrectionTargetKnown(events, 'tl-1')).toBe(true)
     expect(isCorrectionTargetKnown(events, 'erfunden')).toBe(false)
+  })
+})
+
+describe('Bewertung je Skill', () => {
+  const PPTX = 'sk-00000000000000a1'
+  const BRIEF = 'sk-00000000000000b2'
+  const REF = { document: 10 }
+  const SKILLS = { [PPTX]: { minutes: 240, label: 'Präsentation nach Vorlage' } }
+  const today = localDayRange(NOW)
+
+  function docRun(runId: string, skills?: string[], over: Partial<Extract<ActivityEvent, { kind: 'agent-run-finished' }>> = {}): ActivityEvent {
+    return runFinished({ runId, activityType: 'document', instructionMs: 2 * 60_000, ...(skills ? { skills } : {}), ...over })
+  }
+
+  it('bewertet einen Skill-Lauf mit der Skill-Referenz in einer eigenen Zeile', () => {
+    const events = [docRun('a', [PPTX]), accepted({ runId: 'a', reviewMs: 60_000 }), docRun('b'), accepted({ runId: 'b', reviewMs: 60_000 })]
+    const saved = estimateSavedMinutes(summarizeActivity(events, today), REF, SKILLS)
+    const skillLine = saved.lines.find(l => l.skill?.id === PPTX)!
+    const docLine = saved.lines.find(l => !l.skill && l.activityType === 'document')!
+    // Die Kartenrechnung muss je Zeile aufgehen: runs × Referenz − aktiv.
+    expect(skillLine).toMatchObject({ runs: 1, referenceMinutes: 240, savedMinutes: 237, skill: { label: 'Präsentation nach Vorlage' } })
+    expect(docLine).toMatchObject({ runs: 1, referenceMinutes: 10, savedMinutes: 7 })
+    expect(saved.totalMinutes).toBe(244)
+  })
+
+  it('ohne Skill-Referenz bleibt alles wie vorher — Skill-Lauf läuft über die Art', () => {
+    const events = [docRun('a', [PPTX]), accepted({ runId: 'a', reviewMs: 60_000 })]
+    const ohne = estimateSavedMinutes(summarizeActivity(events, today), REF)
+    expect(ohne.lines).toHaveLength(1)
+    expect(ohne.lines[0]).toMatchObject({ activityType: 'document', referenceMinutes: 10, savedMinutes: 7 })
+    expect(ohne.lines[0].skill).toBeUndefined()
+  })
+
+  it('zieht einen Fehlversuch auf DERSELBEN Skill-Zeile ab', () => {
+    const events = [
+      docRun('a', [PPTX]), accepted({ runId: 'a', reviewMs: 60_000 }),
+      docRun('b', [PPTX], { status: 'failed', instructionMs: 4 * 60_000 })
+    ]
+    const saved = estimateSavedMinutes(summarizeActivity(events, today), REF, SKILLS)
+    expect(saved.lines).toHaveLength(1)
+    expect(saved.lines[0]).toMatchObject({ skill: { id: PPTX }, runs: 1, wastedRuns: 1, savedMinutes: 237 - 4 })
+  })
+
+  it('Shell-Läufe bleiben unbewertet, auch mit bepreistem Skill (F01)', () => {
+    const events = [runFinished({ runId: 's', activityType: 'shell', skills: [PPTX] }), accepted({ runId: 's' })]
+    const saved = estimateSavedMinutes(summarizeActivity(events, today), REF, SKILLS)
+    expect(saved.lines).toHaveLength(0)
+    expect(saved.unpricedTypes).toContain('shell')
+  })
+
+  it('zwei bepreiste Skills: keine Wahl des teureren, sondern Art + ausgewiesen (F04)', () => {
+    const refs = { ...SKILLS, [BRIEF]: { minutes: 30, label: 'Brief' } }
+    const events = [docRun('a', [BRIEF, PPTX]), accepted({ runId: 'a', reviewMs: 60_000 })]
+    const saved = estimateSavedMinutes(summarizeActivity(events, today), REF, refs)
+    expect(saved.lines).toHaveLength(1)
+    expect(saved.lines[0]).toMatchObject({ activityType: 'document', referenceMinutes: 10 })
+    expect(saved.ambiguousSkillRuns).toBe(1)
+    // Ein bepreister und ein unbepreister Skill sind eindeutig.
+    expect(resolveRunSkill({ activityType: 'document', skills: [BRIEF, PPTX] }, SKILLS)).toEqual({ skill: PPTX, ambiguous: false })
+  })
+
+  it('abgeschnittene Skill-Liste wird nicht über einen Skill bewertet (F03)', () => {
+    expect(resolveRunSkill({ activityType: 'document', skills: [PPTX], skillsTruncated: true }, SKILLS).skill).toBeNull()
+  })
+
+  it('Tag 1 + Tag 2 = Gesamtzeitraum, auch mit Skill-Zeilen', () => {
+    const tag1 = NOW - DAY
+    const events = [
+      docRun('a', [PPTX], { at: tag1 }), accepted({ runId: 'a', at: tag1, reviewMs: 60_000 }),
+      docRun('b', [PPTX]), accepted({ runId: 'b', reviewMs: 2 * 60_000 })
+    ]
+    const r1 = localDayRange(tag1), r2 = today
+    const s1 = estimateSavedMinutes(summarizeActivity(events, r1), REF, SKILLS).totalMinutes
+    const s2 = estimateSavedMinutes(summarizeActivity(events, r2), REF, SKILLS).totalMinutes
+    const gesamt = estimateSavedMinutes(summarizeActivity(events, { from: r1.from, to: r2.to }), REF, SKILLS).totalMinutes
+    expect(s1 + s2).toBe(gesamt)
+  })
+
+  it('Modellvergleich trennt Skill-Zeilen von Art-Zeilen', () => {
+    const events = [docRun('a', [PPTX], { model: 'm1' }), accepted({ runId: 'a' }), docRun('b', undefined, { model: 'm1' }), accepted({ runId: 'b' })]
+    const saved = estimateSavedMinutes(summarizeActivity(events, today), REF, SKILLS)
+    expect(saved.byModel).toHaveLength(2)
+    expect(saved.byModel.filter(r => r.skill?.id === PPTX)).toHaveLength(1)
+  })
+
+  it('bereinigt manipulierte Einstellungen, statt die Rechnung zu verbiegen (F06)', () => {
+    const roh = JSON.parse(JSON.stringify({
+      [PPTX]: { minutes: 240.4, label: '  Präsentation  ', source: 'measured' },
+      [BRIEF]: { minutes: Number.NaN, label: 'x' },
+      'sk-zzzz': { minutes: 10, label: 'falsche Kennung' },
+      'sk-00000000000000c3': { minutes: MAX_SKILL_REFERENCE_MINUTES + 1, label: 'zu groß' },
+      'sk-00000000000000d4': { minutes: -5, label: 'negativ' },
+      __proto__: { minutes: 10, label: 'proto' }
+    }))
+    expect(normalizeSkillReferences(roh)).toEqual({ [PPTX]: { minutes: 240, label: 'Präsentation', source: 'measured' } })
+    expect(normalizeSkillReferences(null)).toEqual({})
+    expect(normalizeSkillIdList([PPTX, PPTX, 'quatsch', 3])).toEqual([PPTX])
+  })
+
+  it('lehnt Läufe mit kaputter Skill-Liste beim Lesen ab', () => {
+    expect(isActivityEvent(docRun('a', [PPTX]))).toBe(true)
+    expect(isActivityEvent(docRun('a', ['Kunde Müller']))).toBe(false)
+    expect(isActivityEvent({ ...docRun('a', [PPTX]), skillsTruncated: false })).toBe(false)
+    expect(isActivityEvent({ at: NOW, kind: 'skill-reference-changed', skill: PPTX, fromMinutes: 0, toMinutes: 5 })).toBe(false)
+  })
+})
+
+describe('skillReferencesForVault', () => {
+  it('nennt nur Referenzen dieses Vaults — per gespeicherter Vault-Kennung oder Protokoll (F13/F14)', async () => {
+    const { skillReferencesForVault, seenSkillIds } = await import('./activityLog')
+    const refs = {
+      'sk-00000000000000a1': { minutes: 10, label: 'hier, alt', vault: undefined },
+      'sk-00000000000000b2': { minutes: 20, label: 'hier, gebunden', vault: '0123456789abcdef' },
+      'sk-00000000000000c3': { minutes: 30, label: 'anderer Vault', vault: 'fedcba9876543210' }
+    }
+    const seen = seenSkillIds([runFinished({ skills: ['sk-00000000000000a1'] })])
+    expect(Object.keys(skillReferencesForVault(refs, '0123456789abcdef', seen)).sort()).toEqual(['sk-00000000000000a1', 'sk-00000000000000b2'])
+    expect(Object.keys(skillReferencesForVault(refs, null, new Set()))).toEqual([])
   })
 })

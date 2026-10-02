@@ -185,7 +185,7 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState } from './noteAgent/runRegistry'
+import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState, type AgentRun } from './noteAgent/runRegistry'
 import { randomBytes } from 'crypto'
 import { loadComparisons, updateComparisons, mainRandom } from './comparisonStore'
 import { createCampaign, createCase, startWork, markResultReady, addSession, correctSession, setAccepted, closeCase, abortCase, markNotMeasurable, endCampaign } from '../shared/comparison/model'
@@ -193,7 +193,8 @@ import { campaignReport } from '../shared/comparison/metrics'
 import { toCsv, toMarkdown, type ExportLabels } from '../shared/comparison/export'
 import type { ComparisonCase, Quality, WorkSession } from '../shared/comparison/types'
 import { readActivityEvents, recordActivity, appendActivityEvent, readActivitySummary, onActivityChanged, setEmailForegroundMs, raiseJobActiveMs, appendTimeCorrection } from './activityLedger'
-import { VALUED_TYPES, deriveActivityType, isActivityEvent, type ActivityEvent } from '../shared/activityLog'
+import { VALUED_TYPES, MAX_RUN_SKILLS, deriveActivityType, isActivityEvent, normalizeSkillReferences, normalizeSkillIdList, type ActivityEvent } from '../shared/activityLog'
+import { skillActivityId, vaultActivityKey } from './skillActivityId'
 import { acquireStayAwake } from './powerGuard'
 import { runNoteAgentLoop } from './noteAgent/loop'
 import { authorizeShell, probeShellEnvironment, stopAgentShellProcesses } from './noteAgent/shellExecution'
@@ -1179,8 +1180,10 @@ async function loadUISettings(): Promise<Record<string, unknown>> {
   }
 }
 
-// UI-Settings speichern (merge mit bestehenden Daten um Datenverlust zu vermeiden)
-async function saveUISettings(settings: Record<string, unknown>): Promise<void> {
+// UI-Settings speichern (merge mit bestehenden Daten um Datenverlust zu vermeiden).
+// Liefert, ob die Datei wirklich geschrieben wurde — ein Referenz-Ereignis im
+// Tätigkeitsprotokoll darf nur nach geglücktem Schreiben entstehen (Codex F11).
+async function saveUISettings(settings: Record<string, unknown>): Promise<boolean> {
   try {
     // Bestehende Settings laden und mergen, damit nicht-übermittelte Felder erhalten bleiben
     let existing: Record<string, unknown> = {}
@@ -1192,8 +1195,10 @@ async function saveUISettings(settings: Record<string, unknown>): Promise<void> 
     }
     const merged = { ...existing, ...settings }
     await fs.writeFile(getUISettingsPath(), JSON.stringify(merged, null, 2), 'utf-8')
+    return true
   } catch (error) {
     console.error('Fehler beim Speichern der UI-Settings:', error)
+    return false
   }
 }
 
@@ -1768,15 +1773,40 @@ ipcMain.handle('load-ui-settings', async () => {
 // die erste Opt-in-Stufe wäre wertlos gewesen. Gegen einen kompromittierten HAUPT-Renderer
 // schützt auch das nicht — dagegen steht allein der native Freigabedialog; genau so steht
 // es auch in docs/rechner-bedienen-plan.md.
-ipcMain.handle('save-ui-settings', async (event, settings: Record<string, unknown>) => {
+// Schreibvorgänge der UI-Einstellungen nacheinander: jeder liest, mischt und schreibt die Datei.
+// Zwei verschränkte Aufrufe (zwei Fenster, Sofort-Speichern neben Autosave) überschrieben sich
+// sonst gegenseitig, und die Referenz-Ereignisse verglichen mit einem veralteten Vorstand (F18).
+let uiSettingsWriteChain: Promise<unknown> = Promise.resolve()
+
+ipcMain.handle('save-ui-settings', (event, settings: Record<string, unknown>) => {
   if (!isTrustedSender(event)) return false
+  const run = uiSettingsWriteChain.then(() => saveUISettingsSerial(settings))
+  uiSettingsWriteChain = run.catch(() => undefined)
+  return run
+})
+
+async function saveUISettingsSerial(settings: Record<string, unknown>): Promise<boolean> {
   // Modul „Notizen befragen (RAG)" aus → Vault-Index-Job stoppen, Warteschlange leeren (Codex F33).
   if (typeof settings.projectRagEnabled === 'boolean') void getVaultRagManager().setModuleEnabled(settings.projectRagEnabled)
   const before = await loadUISettings()
-  await saveUISettings(settings)
-  recordReferenceChanges(before, settings)
-  return true
-})
+  // Skill-Referenzen der Zeitbilanz bereinigen, BEVOR sie auf die Platte gehen (Codex F06):
+  // Der Renderer könnte NaN, negative Minuten oder `__proto__`-Schlüssel schicken.
+  const impact = settings.impact
+  if (impact && typeof impact === 'object' && !Array.isArray(impact)) {
+    const roh = impact as Record<string, unknown>
+    settings = {
+      ...settings,
+      impact: {
+        ...roh,
+        ...('skillReferences' in roh ? { skillReferences: normalizeSkillReferences(roh.skillReferences) } : {}),
+        ...('skillReferenceDismissed' in roh ? { skillReferenceDismissed: normalizeSkillIdList(roh.skillReferenceDismissed) } : {})
+      }
+    }
+  }
+  const saved = await saveUISettings(settings)
+  if (saved) recordReferenceChanges(before, settings)
+  return saved
+}
 
 /**
  * Geänderte Referenzzeiten der Zeitbilanz ins Tätigkeitsprotokoll schreiben.
@@ -1798,6 +1828,24 @@ function recordReferenceChanges(before: Record<string, unknown>, after: Record<s
     if (von === nach) continue
     recordActivity(lastKnownVaultPath, { at: Date.now(), kind: 'reference-changed', activityType: type, fromMinutes: von, toMinutes: nach })
   }
+  // Skill-Referenzen: dieselbe Regel, eigene Ereignisart. Die Einstellung ist global, die
+  // Kennungen sind vault-gebunden — ins Protokoll DIESES Vaults gehören nur Kennungen, die
+  // hier schon in einem Lauf vorkamen; sonst landete die Referenz eines anderen Vaults als
+  // Marker in dieser Historie.
+  const skillsAlt = normalizeSkillReferences((before.impact as { skillReferences?: unknown } | undefined)?.skillReferences)
+  const skillsNeu = normalizeSkillReferences((after.impact as { skillReferences?: unknown } | undefined)?.skillReferences)
+  const geaendert = [...new Set([...Object.keys(skillsAlt), ...Object.keys(skillsNeu)])]
+    .filter(id => (skillsAlt[id]?.minutes ?? null) !== (skillsNeu[id]?.minutes ?? null))
+  if (geaendert.length === 0) return
+  const vault = lastKnownVaultPath
+  void readActivityEvents(vault).then(events => {
+    const bekannt = new Set<string>()
+    for (const e of events) if (e.kind === 'agent-run-finished') for (const id of e.skills ?? []) bekannt.add(id)
+    for (const id of geaendert) {
+      if (!bekannt.has(id)) continue
+      recordActivity(vault, { at: Date.now(), kind: 'skill-reference-changed', skill: id, fromMinutes: skillsAlt[id]?.minutes ?? null, toMinutes: skillsNeu[id]?.minutes ?? null })
+    }
+  }).catch(() => undefined)
 }
 
 // Sprache für Main-Process-Dialoge setzen (vom Renderer bei Sprachwechsel aufgerufen)
@@ -4881,7 +4929,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
           status: 'ok',
-          llm
+          llm,
+          ...runSkillFields(run)
         })
         if (!sender.isDestroyed()) {
           sender.send('note-agent-done', {
@@ -4890,7 +4939,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             text: res.text,
             hitMaxIterations: res.hitMaxIterations,
             results: publicResults(run),
-            web: webRunProvenance(run)
+            web: webRunProvenance(run),
+            ...promptSkillFields(run)
           })
         }
         // Mitlernen (Stufe 3): Merksatz-Vorschlag asynchron NACH dem Done-Event —
@@ -4920,7 +4970,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           activityType: deriveActivityType(run.toolsUsed),
           resultCount: run.results.size,
           status: cancelled ? 'aborted' : 'failed',
-          llm
+          llm,
+          ...runSkillFields(run)
         })
         let message = e instanceof Error ? e.message : String(e)
         if (/aborted due to timeout|TimeoutError/i.test(message)) {
@@ -4940,7 +4991,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             cancelled,
             error: message,
             results: publicResults(run),
-            web: webRunProvenance(run)
+            web: webRunProvenance(run),
+            ...promptSkillFields(run)
           })
         }
       } finally {
@@ -4954,6 +5006,29 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
 })
+
+/**
+ * Skills eines Laufs fürs Tätigkeitsprotokoll: nur opake Kennungen, höchstens
+ * MAX_RUN_SKILLS. Bei mehr wird der Lauf als abgeschnitten markiert und nicht über einen
+ * Skill bewertet — sonst entschiede die Grenze, welcher Skill zählt (Codex F03).
+ */
+/**
+ * Skills für die Rückfrage auf der Ergebniskarte — nur, wenn der Lauf über einen Skill
+ * bewertbar ist. Shell-Läufe und abgeschnittene Listen verwirft `resolveRunSkill`; die
+ * Karte dürfte dort keine Referenz erfragen und „gespeichert" melden, die für genau diesen
+ * Lauf nie zählt (Codex F12). `vaultKey` bindet eine dort gespeicherte Referenz an den Vault.
+ */
+function promptSkillFields(run: AgentRun): { skills: Array<{ id: string; label: string }>; vaultKey: string } {
+  const bewertbar = deriveActivityType(run.toolsUsed) !== 'shell' && run.skillsUsed.length <= MAX_RUN_SKILLS
+  return { skills: bewertbar ? run.skillsUsed.map(s => ({ ...s })) : [], vaultKey: vaultActivityKey(run.vaultPath) }
+}
+
+function runSkillFields(run: AgentRun): { skills?: string[]; skillsTruncated?: true } {
+  const ids = run.skillsUsed.map(s => s.id)
+  if (ids.length === 0) return {}
+  if (ids.length > MAX_RUN_SKILLS) return { skills: ids.slice(0, MAX_RUN_SKILLS), skillsTruncated: true }
+  return { skills: ids }
+}
 
 ipcMain.handle('note-agent-cancel', async (event, runId: string) => {
   const run = getRunForSender(event.sender.id, runId)
@@ -5374,7 +5449,10 @@ ipcMain.handle('note-skills-list', async (event, vaultPath: string) => {
   if (!isTrustedSender(event)) return { skills: [], error: 'Nicht autorisierter Aufrufer' }
   try {
     assertApprovedVault(vaultPath, 'note-skills-list')
-    return { skills: await listVaultSkills(vaultPath) }
+    // activityId: dieselbe opake Kennung, die use_skill ins Protokoll schreibt — die
+    // Zeitbilanz-Einstellung schlüsselt Skill-Referenzen danach (vault-gebunden).
+    const skills = await listVaultSkills(vaultPath)
+    return { skills: skills.map(s => ({ ...s, activityId: skillActivityId(vaultPath, s.folderName) })), vaultKey: vaultActivityKey(vaultPath) }
   } catch (error) {
     return { skills: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }

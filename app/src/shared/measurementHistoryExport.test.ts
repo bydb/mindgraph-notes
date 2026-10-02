@@ -77,3 +77,60 @@ describe('historyToCsv', () => {
     expect(historyToMarkdown(input)).toContain('selbst gestoppt')
   })
 })
+
+describe('Export mit Skill-Zeilen', () => {
+  const SKILL = 'sk-00000000000000a1'
+  const events: ActivityEvent[] = [
+    { at: NOW, kind: 'agent-run-finished', runId: 's', durationMs: 60_000, instructionMs: 5 * 60_000, activityType: 'document', resultCount: 1, status: 'ok', skills: [SKILL] },
+    { at: NOW + 1, kind: 'agent-result-accepted', runId: 's', format: 'pptx', reviewMs: 0 },
+    { at: NOW + 2, kind: 'skill-reference-changed', skill: SKILL, fromMinutes: null, toMinutes: 240 },
+  ]
+  function buildSkill(label: string) {
+    const { from, to, grain } = rangeBounds('7d', NOW)
+    const buckets = buildBuckets(from, to, grain)
+    return {
+      rangeLabel: '7 Tage', bucketLabel: (b: { from: number }) => new Date(b.from).getDate() + '.',
+      usage: bucketUsage([], buckets), cost: bucketCost([], buckets), performance: bucketPerformance([], buckets),
+      saved: bucketSavedTime(events, buckets, {}, 3, { [SKILL]: { minutes: 240, label } }), referenceNote: 'Referenz.',
+    }
+  }
+
+  it('nennt die Skill-Zeile mit Referenz, aktiver Zeit und Netto — in Markdown und CSV', () => {
+    const input = buildSkill('Präsentation')
+    const md = historyToMarkdown(input)
+    expect(md).toContain('| Skill „Präsentation" | 1 | 240 | geschätzt | 5 |  | 235 |')
+    expect(md).toContain('Referenz geändert')
+    const csv = historyToCsv(input)
+    expect(csv).toContain('Zeile Skill „Präsentation"')
+    expect(csv).toContain('Referenz geändert Skill „Präsentation"')
+  })
+
+  it('ein Pipe oder Umbruch im Skill-Namen zerlegt die Tabelle nicht (F17)', () => {
+    const md = historyToMarkdown(buildSkill('A | B\n| neu | Zeile |'))
+    const zeile = md.split('\n').find(l => l.startsWith('| Skill'))!
+    expect(zeile).toContain('A \\| B \\| neu \\| Zeile \\|')
+    expect(md.split('\n').some(l => l.startsWith('| neu'))).toBe(false)
+  })
+})
+
+describe('mdCell mit vorhandenem Backslash (F20)', () => {
+  it('ein „\\|" im Namen bleibt eine Zelle', async () => {
+    const { rangeBounds: rb, buildBuckets: bb, bucketUsage: bu, bucketCost: bc, bucketPerformance: bp, bucketSavedTime: bs } = await import('./measurementHistory')
+    const SKILL = 'sk-00000000000000a1'
+    const events: ActivityEvent[] = [
+      { at: NOW, kind: 'agent-run-finished', runId: 's', durationMs: 60_000, instructionMs: 60_000, activityType: 'document', resultCount: 1, status: 'ok', skills: [SKILL] },
+      { at: NOW + 1, kind: 'agent-result-accepted', runId: 's', format: 'pptx', reviewMs: 0 },
+    ]
+    const { from, to, grain } = rb('7d', NOW)
+    const buckets = bb(from, to, grain)
+    const md = historyToMarkdown({
+      rangeLabel: '7 Tage', bucketLabel: (b: { from: number }) => String(b.from),
+      usage: bu([], buckets), cost: bc([], buckets), performance: bp([], buckets),
+      saved: bs(events, buckets, {}, 3, { [SKILL]: { minutes: 30, label: 'A \\| B \\\\| C' } }), referenceNote: '',
+    })
+    const zeile = md.split('\n').find(l => l.startsWith('| Skill'))!
+    // Erst Backslashes verdoppeln, dann Pipes maskieren: Jede Pipe aus dem Namen hat danach
+    // eine UNGERADE Zahl Backslashes davor und trennt keine Spalte.
+    expect(zeile).toContain('A \\\\\\| B \\\\\\\\\\| C')
+  })
+})

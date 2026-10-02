@@ -2,10 +2,10 @@
 // Zeitbilanz, Ordner. Liest und schreibt direkt im uiStore — vorher hingen 40 destrukturierte
 // Werte in Settings.tsx an dieser einen Seite.
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, UI_LANGUAGES, BACKGROUND_COLORS, type Language, type FontFamily, type BackgroundColor } from '../../stores/uiStore'
 import { useNotesStore } from '../../stores/notesStore'
-import { VALUED_TYPES, isReferenceable, type ValuedType } from '../../../shared/activityLog'
+import { VALUED_TYPES, MAX_SKILL_REFERENCE_MINUTES, isReferenceable, isSkillId, seenSkillIds, skillReferencesForVault, type ValuedType } from '../../../shared/activityLog'
 import type { TabTFn } from './settingsTypes'
 import { PresentationSection } from './PresentationSection'
 import { PageHeader, SectionTitle, Card, Row, Details, Toggle, Segmented, Select, Button, TextInput } from './SettingsUI'
@@ -282,6 +282,7 @@ const ImpactCard: React.FC<{ t: TabTFn }> = ({ t }) => {
           </Row>
         )
       })}
+      <SkillReferenceRows t={t} />
       <Row label={t('settings.impact.hourlyRate')} hint={t('settings.impact.hourlyRateHint')}>
         <input
           type="number"
@@ -309,7 +310,112 @@ const ImpactCard: React.FC<{ t: TabTFn }> = ({ t }) => {
         <p>{t('settings.impact.hint')}</p>
         <p>{t('settings.impact.basis')}</p>
         <p>{t('settings.impact.sourceHint')}</p>
+        <p>{t('settings.impact.skillsRule')}</p>
       </Details>
     </Card>
+  )
+}
+
+/**
+ * Referenzzeit je Skill dieses Vaults. Die Kennungen sind vault-gebunden (Main:
+ * skillActivityId) — gezeigt werden nur die Skills des offenen Vaults und gespeicherte
+ * Referenzen, deren Kennung in DIESEM Vault schon in einem Lauf vorkam (Skill inzwischen
+ * gelöscht oder umbenannt). Referenzen anderer Vaults bleiben unsichtbar und unberührt.
+ */
+const SkillReferenceRows: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const vaultPath = useNotesStore(state => state.vaultPath)
+  const skillReferences = useUIStore(state => state.impact.skillReferences)
+  const setSkillReference = useUIStore(state => state.setSkillReference)
+  const setSkillReferenceSource = useUIStore(state => state.setSkillReferenceSource)
+  const [skills, setSkills] = useState<Array<{ id: string; name: string }> | null>(null)
+  const [seenIds, setSeenIds] = useState<Set<string>>(new Set())
+  const [vaultKey, setVaultKey] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!vaultPath) { setSkills([]); return }
+    void Promise.all([
+      window.electronAPI.noteSkillsList(vaultPath).catch(() => ({ skills: [] })),
+      window.electronAPI.activityEvents(vaultPath).catch(() => ({ success: false as const, events: undefined }))
+    ]).then(([list, log]) => {
+      if (cancelled) return
+      setSkills((list.skills ?? []).filter(s => isSkillId(s.activityId)).map(s => ({ id: s.activityId, name: s.name })))
+      setVaultKey('vaultKey' in list && typeof list.vaultKey === 'string' ? list.vaultKey : null)
+      setSeenIds(seenSkillIds(log.events ?? []))
+    })
+    return () => { cancelled = true }
+  }, [vaultPath])
+
+  if (skills === null) return null
+  const known = new Set(skills.map(s => s.id))
+  // Verwaist = gespeichert, aber nicht mehr im Vault. Zugehörigkeit über die gespeicherte
+  // Vault-Kennung ODER das Protokoll — die Kennung trägt auch nach der Retention (F14).
+  const orphaned = Object.entries(skillReferencesForVault(skillReferences, vaultKey, seenIds))
+    .filter(([id]) => !known.has(id))
+    .map(([id, ref]) => ({ id, name: ref.label }))
+
+  return (
+    <>
+      <Row label={t('settings.impact.skillsTitle')} hint={t('settings.impact.skillsHint')} />
+      {skills.length === 0 && orphaned.length === 0 && <Row label={t('settings.impact.skillsEmpty')} />}
+      {[...skills, ...orphaned].map(skill => {
+        const ref = skillReferences?.[skill.id]
+        const missing = !known.has(skill.id)
+        return (
+          <Row key={skill.id} label={skill.name || t('impact.skill.unknown')} hint={missing ? t('settings.impact.skillNotInVault') : undefined}>
+            <SkillMinutesInput
+              value={ref?.minutes ?? null}
+              placeholder={t('settings.impact.placeholder')}
+              onCommit={v => setSkillReference(skill.id, v, skill.name, vaultKey ?? undefined)}
+            />
+            <span className="sui-unit">{t('settings.impact.column')}</span>
+            <Select
+              value={ref?.source ?? 'estimated'}
+              onChange={e => setSkillReferenceSource(skill.id, e.target.value === 'measured' ? 'measured' : 'estimated')}
+              aria-label={t('settings.impact.source')}
+              disabled={!ref}
+            >
+              <option value="estimated">{t('settings.impact.sourceEstimated')}</option>
+              <option value="measured">{t('settings.impact.sourceMeasured')}</option>
+            </Select>
+            {missing && ref && (
+              <Button variant="link" onClick={() => setSkillReference(skill.id, null)}>{t('settings.impact.skillRemove')}</Button>
+            )}
+          </Row>
+        )
+      })}
+    </>
+  )
+}
+
+/**
+ * Minuten-Feld, das LEER sein darf (keine Referenz) und erst bei Verlassen/Enter übernimmt —
+ * eine Skill-Referenz verbucht rückwirkend, ein halb getipptes „2" für „240" soll nicht
+ * zwischendurch als Referenz ins Protokoll (Auto-Save-Konvention der Einstellungen).
+ */
+const SkillMinutesInput: React.FC<{ value: number | null; placeholder: string; onCommit: (next: number | null) => void }> = ({ value, placeholder, onCommit }) => {
+  const [draft, setDraft] = useState(value === null ? '' : String(value))
+  useEffect(() => { setDraft(value === null ? '' : String(value)) }, [value])
+  const commit = () => {
+    if (draft.trim() === '') { if (value !== null) onCommit(null); return }
+    const n = Math.round(Number(draft))
+    if (!Number.isFinite(n) || n <= 0) { setDraft(value === null ? '' : String(value)); return }
+    const clamped = Math.min(MAX_SKILL_REFERENCE_MINUTES, n)
+    setDraft(String(clamped))
+    if (clamped !== value) onCommit(clamped)
+  }
+  return (
+    <input
+      type="number"
+      className="sui-input is-number"
+      min={1}
+      max={MAX_SKILL_REFERENCE_MINUTES}
+      step={15}
+      value={draft}
+      placeholder={placeholder}
+      onChange={e => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+    />
   )
 }

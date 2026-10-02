@@ -1,7 +1,7 @@
 import { DEFAULT_SHELL_GUARDRAILS, type ShellGuardrails } from '../../shared/shellGuardrails'
 import { DEFAULT_COMPUTER_CONTROL, type ComputerControlSettings } from '../../shared/computerControl'
 import { create } from 'zustand'
-import type { ValuedType, ReferenceMinutes, ReferenceSources, ReferenceSource } from '../../shared/activityLog'
+import { MAX_SKILL_REFERENCE_MINUTES, isSkillId, type ValuedType, type ReferenceMinutes, type ReferenceSources, type ReferenceSource, type SkillReferences } from '../../shared/activityLog'
 import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
 import { DEFAULT_OPENROUTER_SETTINGS, DEFAULT_LLMBASE_SETTINGS, type CloudProviderSettings } from '../../shared/llmBackend'
@@ -645,6 +645,14 @@ export interface ImpactSettings {
   currency?: string
   /** Woher jede Referenzzeit stammt: geschätzt (Default) oder selbst gestoppt. */
   referenceSources?: ReferenceSources
+  /**
+   * Referenzzeit je Skill (Schlüssel = opake, vault-gebundene Kennung aus `noteSkillsList`
+   * → `activityId`). Feiner als die Art: „Dokument" deckt ein Anschreiben wie einen
+   * Foliensatz ab. Nur Nutzerangaben; der Main bereinigt vor dem Speichern.
+   */
+  skillReferences?: SkillReferences
+  /** Skills, für die die Ergebniskarte nicht mehr nach der Referenzzeit fragt. */
+  skillReferenceDismissed?: string[]
 }
 
 interface UIState {
@@ -946,6 +954,10 @@ interface UIState {
   impact: ImpactSettings
   setReferenceMinutes: (type: ValuedType, minutes: number | null) => void
   setReferenceSource: (type: ValuedType, source: ReferenceSource) => void
+  /** null oder 0 löscht die Referenz; `label` = Anzeigename des Skills zum Zeitpunkt der Eingabe. */
+  setSkillReference: (id: string, minutes: number | null, label?: string, vault?: string) => void
+  setSkillReferenceSource: (id: string, source: ReferenceSource) => void
+  dismissSkillReferencePrompt: (id: string) => void
   setImpact: (settings: Partial<ImpactSettings>) => void
 
   // Telegram Bot
@@ -1505,6 +1517,28 @@ export const useUIStore = create<UIState>()((set, get) => ({
     else next[type] = Math.round(minutes)
     return { impact: { ...state.impact, referenceMinutes: next } }
   }),
+  setSkillReference: (id, minutes, label, vault) => set((state) => {
+    if (!isSkillId(id)) return {}
+    const next = { ...(state.impact.skillReferences ?? {}) }
+    if (minutes === null || !Number.isFinite(minutes) || minutes <= 0) delete next[id]
+    else next[id] = {
+      ...next[id],
+      minutes: Math.min(MAX_SKILL_REFERENCE_MINUTES, Math.max(1, Math.round(minutes))),
+      label: (label ?? next[id]?.label ?? '').trim().slice(0, 120),
+      ...(vault ?? next[id]?.vault ? { vault: vault ?? next[id]?.vault } : {})
+    }
+    return { impact: { ...state.impact, skillReferences: next } }
+  }),
+  setSkillReferenceSource: (id, source) => set((state) => {
+    const cur = state.impact.skillReferences?.[id]
+    if (!cur) return {}
+    return { impact: { ...state.impact, skillReferences: { ...state.impact.skillReferences, [id]: { ...cur, source } } } }
+  }),
+  dismissSkillReferencePrompt: (id) => set((state) => {
+    if (!isSkillId(id)) return {}
+    const cur = state.impact.skillReferenceDismissed ?? []
+    return cur.includes(id) ? {} : { impact: { ...state.impact, skillReferenceDismissed: [...cur, id] } }
+  }),
   setReferenceSource: (type, source) => set((state) => ({
     impact: { ...state.impact, referenceSources: { ...(state.impact.referenceSources ?? {}), [type]: source } }
   })),
@@ -1910,18 +1944,44 @@ export async function initializeUISettings(): Promise<void> {
 // Settings speichern - wird bei jeder Änderung aufgerufen
 let saveTimeout: ReturnType<typeof setTimeout> | null = null
 
-async function writeSettingsNow(): Promise<void> {
-  const state = useUIStore.getState()
-  const toSave: Record<string, unknown> = {}
-  for (const key of persistedKeys) {
-    toSave[key] = state[key as keyof typeof state]
-  }
-  try {
-    await window.electronAPI.saveUISettings(toSave)
-    console.log('[UIStore] Settings saved:', toSave)
-  } catch (error) {
-    console.error('[UIStore] Failed to save settings:', error)
-  }
+// Alle Schreibvorgänge laufen nacheinander, und jeder nimmt seinen Schnappschuss erst, wenn
+// er dran ist. Sonst konnte ein älterer, schon laufender Autosave nach einem Sofort-Speichern
+// ankommen und den neueren Stand überschreiben (Codex F18).
+let saveChain: Promise<unknown> = Promise.resolve()
+
+function writeSettingsNow(): Promise<boolean> {
+  const next = saveChain.then(async () => {
+    const state = useUIStore.getState()
+    const toSave: Record<string, unknown> = {}
+    for (const key of persistedKeys) {
+      toSave[key] = state[key as keyof typeof state]
+    }
+    try {
+      const ok = (await window.electronAPI.saveUISettings(toSave)) === true
+      if (ok) console.log('[UIStore] Settings saved:', toSave)
+      else console.error('[UIStore] Settings NOT saved (Main meldet Schreibfehler)')
+      return ok
+    } catch (error) {
+      console.error('[UIStore] Failed to save settings:', error)
+      return false
+    }
+  })
+  saveChain = next.catch(() => undefined)
+  return next
+}
+
+/**
+ * Zeitbilanz sofort schreiben und das Ergebnis melden — für Knöpfe, die „gespeichert"
+ * bestätigen. Der debouncte Autosave hat keinen Rückkanal; ohne diesen Weg sah der Nutzer
+ * bei einem Schreibfehler eine Bestätigung für eine Referenz, die nach dem Neustart fehlt
+ * (Codex F16).
+ */
+export async function saveImpactNow(): Promise<boolean> {
+  if (!settingsInitialized) return false
+  // Ausstehenden Autosave vorziehen statt parallel zu schreiben: EIN Schreibvorgang mit dem
+  // aktuellen Stand, eingereiht hinter jeden schon laufenden (F18).
+  if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }
+  return writeSettingsNow()
 }
 
 function saveSettingsDebounced(): void {
@@ -1936,10 +1996,15 @@ function saveSettingsDebounced(): void {
  * die der Main direkt danach aus ui-settings.json liest (Cloud-Zustimmung des Agenten):
  * sonst prüft er noch den alten Stand, und der Klick scheint wirkungslos (real, 24.09.2026).
  */
-export async function flushUISettings(): Promise<void> {
-  if (!settingsInitialized) return
+/**
+ * Ausstehende Einstellungen sofort schreiben. Liefert, ob der Main die Datei wirklich
+ * geschrieben hat — wer danach etwas tut, das der Main aus ui-settings.json liest (Cloud-
+ * Zustimmung des Notiz-Agenten), muss bei `false` zurückrollen statt weiterzumachen (Codex F21).
+ */
+export async function flushUISettings(): Promise<boolean> {
+  if (!settingsInitialized) return false
   if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }
-  await writeSettingsNow()
+  return writeSettingsNow()
 }
 
 // Store-Änderungen überwachen und automatisch speichern

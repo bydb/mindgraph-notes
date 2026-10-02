@@ -65,6 +65,10 @@ export interface AgentRun {
   // Aktivierte Vault-Skills (Agent-Skills Stufe 1) — Discovery-Metadaten für den
   // System-Prompt; den Body holt use_skill bei Bedarf.
   skills: Array<{ name: string; description: string; folderName: string }>
+  // Im Lauf erfolgreich per use_skill geladene Skills (opake Kennung + Anzeigename), in der
+  // Reihenfolge des ersten Ladens. Die Kennung geht ins Tätigkeitsprotokoll, der Name nur
+  // an die Ergebniskarte (Rückfrage nach der Referenzzeit) — nie ins Protokoll.
+  skillsUsed: Array<{ id: string; label: string }>
   status: AgentRunStatus
   abort: AbortController
   seq: number
@@ -198,6 +202,7 @@ export function startRun(params: {
     sources: new Set(),
     startedAt: Date.now(),
     toolsUsed: new Set(),
+    skillsUsed: [],
     instructionMs: params.instructionMs,
     comparisonCaseId: params.comparisonCaseId,
     web: params.web,

@@ -81,6 +81,27 @@ export function stableJobId(parts: string[]): string {
   return fnv(2166136261) + fnv(0x9e3779b9)
 }
 
+/**
+ * Skill-Kennung im Protokoll: opak und an den Vault gebunden (Main: `skillActivityId`,
+ * Hash aus Vault-Pfad und Skill-Ordner). Der Ordnername selbst gehört NICHT hierher — er
+ * ist frei gewählt und kann einen Kunden oder ein Projekt nennen (Codex F05). Und weil
+ * der Vault in den Hash eingeht, teilen sich gleichnamige Skills zweier Vaults keine
+ * Referenz (F02). Den Anzeigenamen hält nur die löschbare Einstellung.
+ */
+export const SKILL_ID_PATTERN = /^sk-[0-9a-f]{16}$/
+export function isSkillId(value: unknown): value is string {
+  return typeof value === 'string' && SKILL_ID_PATTERN.test(value)
+}
+/**
+ * Höchstens so viele Skills je Lauf im Protokoll. Mehr lädt kein sinnvoller Auftrag; wer
+ * darüber kommt, wird als `skillsTruncated` markiert und NICHT über einen Skill bewertet —
+ * sonst entschiede das Abschneiden, welcher Skill zählt (F03).
+ */
+export const MAX_RUN_SKILLS = 20
+/** Obergrenze einer Skill-Referenz: eine Arbeitswoche. Schutz gegen „2400" statt „240". */
+export const MAX_SKILL_REFERENCE_MINUTES = 2400
+const MAX_SKILL_LABEL_CHARS = 120
+
 /** Formate, die der Agent als Ergebnis anbieten kann (Spiegel von AgentResultEntry['kind']). */
 export type ResultFormat = 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pdf' | 'pptx'
 
@@ -104,6 +125,14 @@ export type ActivityEvent =
        * Läufen vor dieser Messung und bei Läufen ohne einen einzigen Modellaufruf.
        */
       llm?: RunCallTotals
+      /**
+       * Im Lauf erfolgreich geladene Skills (opake Kennungen, Reihenfolge des ersten
+       * Ladens). Grundlage der Bewertung je Skill. Fehlt bei Läufen ohne Skill und vor
+       * dieser Messung.
+       */
+      skills?: string[]
+      /** Mehr als MAX_RUN_SKILLS geladen — dann wird der Lauf nicht über einen Skill bewertet. */
+      skillsTruncated?: true
     }
   | {
       at: number
@@ -158,6 +187,18 @@ export type ActivityEvent =
       at: number
       kind: 'reference-changed'
       activityType: ValuedType
+      fromMinutes: number | null
+      toMinutes: number | null
+    }
+  | {
+      /**
+       * Wie `reference-changed`, aber für die Referenz eines Skills. Eine Skill-Referenz
+       * ändert nicht nur die Höhe, sondern auch die ZUORDNUNG früherer Läufe (von der Art
+       * zum Skill und zurück) — die Historie muss den Sprung deshalb markieren (F07).
+       */
+      at: number
+      kind: 'skill-reference-changed'
+      skill: string
       fromMinutes: number | null
       toMinutes: number | null
     }
@@ -253,6 +294,7 @@ const KNOWN_KINDS: ActivityEventKind[] = [
   'task-created',
   'email-tasks-extracted',
   'reference-changed',
+  'skill-reference-changed',
   'job-started',
   'job-outcome',
   'job-abandoned',
@@ -275,7 +317,13 @@ export function isActivityEvent(value: unknown): value is ActivityEvent {
   if (typeof e.kind !== 'string' || !KNOWN_KINDS.includes(e.kind as ActivityEventKind)) return false
   if (e.kind === 'agent-run-finished') {
     if (e.llm !== undefined && !isRunCallTotals(e.llm)) return false
+    if (e.skills !== undefined && !(Array.isArray(e.skills) && e.skills.length <= MAX_RUN_SKILLS && e.skills.every(isSkillId))) return false
+    if (e.skillsTruncated !== undefined && e.skillsTruncated !== true) return false
     return typeof e.runId === 'string' && typeof e.durationMs === 'number' && typeof e.activityType === 'string'
+  }
+  if (e.kind === 'skill-reference-changed') {
+    const minuten = (v: unknown): boolean => v === null || (typeof v === 'number' && Number.isFinite(v) && v > 0 && v <= MAX_SKILL_REFERENCE_MINUTES)
+    return isSkillId(e.skill) && minuten(e.fromMinutes) && minuten(e.toMinutes)
   }
   if (e.kind === 'agent-result-accepted' || e.kind === 'agent-result-discarded') {
     return typeof e.runId === 'string' && typeof e.format === 'string'
@@ -428,6 +476,9 @@ export interface AcceptedRun {
   accepted: number
   /** Manuell nachgetragene Zeit (in activeMs bereits enthalten). */
   correctedMs?: number
+  /** Geladene Skills des Laufs (opake Kennungen) — Grundlage der Bewertung je Skill. */
+  skills?: string[]
+  skillsTruncated?: true
 }
 
 /**
@@ -447,6 +498,8 @@ export interface DiscardedRun {
   /** `discarded` heißt auch: Lauf beendet, kein Ergebnis je übernommen. */
   reason: 'discarded' | 'failed' | 'aborted'
   correctedMs?: number
+  skills?: string[]
+  skillsTruncated?: true
 }
 
 export interface ActivitySummary {
@@ -633,7 +686,8 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
               waitingMs: foregroundMsByRun.get(e.runId)
             }), corrected(e.runId)),
             reason: e.status === 'ok' ? 'discarded' : e.status,
-            ...(corrected(e.runId) > 0 ? { correctedMs: corrected(e.runId) } : {})
+            ...(corrected(e.runId) > 0 ? { correctedMs: corrected(e.runId) } : {}),
+            ...skillFieldsOf(e)
           })
         }
         break
@@ -685,12 +739,20 @@ export function summarizeActivity(events: ActivityEvent[], range: ActivityRange)
       }), corrected(runId)),
       elapsedMs: Math.max(0, first - startedAt),
       accepted,
-      ...(corrected(runId) > 0 ? { correctedMs: corrected(runId) } : {})
+      ...(corrected(runId) > 0 ? { correctedMs: corrected(runId) } : {}),
+      ...skillFieldsOf(run)
     })
   }
 
   summarizeJobs(events, range, summary, corrected)
   return summary
+}
+
+function skillFieldsOf(run: Extract<ActivityEvent, { kind: 'agent-run-finished' }>): { skills?: string[]; skillsTruncated?: true } {
+  return {
+    ...(run.skills && run.skills.length > 0 ? { skills: [...run.skills] } : {}),
+    ...(run.skillsTruncated ? { skillsTruncated: true as const } : {})
+  }
 }
 
 /**
@@ -783,8 +845,120 @@ export type ReferenceMinutes = Partial<Record<ValuedType, number>>
 export type ReferenceSource = 'estimated' | 'measured'
 export type ReferenceSources = Partial<Record<ValuedType, ReferenceSource>>
 
+/**
+ * Referenzzeit eines Skills — eine Angabe des Nutzers wie die Referenz je Art, nur feiner:
+ * „Dokument" deckt ein Dreizeilen-Anschreiben genauso ab wie einen Foliensatz, der Skill
+ * sagt, welche Arbeit es war. Bewusst NICHT im SKILL.md: ein importierter fremder Skill
+ * dürfte sonst die eigene Bilanz bestimmen (Regel „Minuten nur gegen eigene Referenz").
+ * `label` ist der Anzeigename beim Eintragen — die Einstellung ist die einzige Stelle, an
+ * der Name und Kennung zusammenstehen, und sie ist löschbar.
+ */
+export interface SkillReference {
+  minutes: number
+  label: string
+  source?: ReferenceSource
+  /**
+   * Opake Vault-Kennung (Main: `vaultActivityKey`, derselbe Hash wie der Ledger-Dateiname).
+   * Hält die Zugehörigkeit unabhängig von der befristeten Laufhistorie fest — sonst ließe
+   * sich die Referenz eines gelöschten Skills nach der Retention nicht mehr finden und
+   * nicht mehr entfernen (Codex F14), und Anzeigen anderer Vaults könnten sie nicht
+   * ausfiltern (F13).
+   */
+  vault?: string
+}
+/** Schlüssel = opake Skill-Kennung (SKILL_ID_PATTERN). */
+export type SkillReferences = Record<string, SkillReference>
+
+/**
+ * Bereinigt eine Skill-Referenzliste aus der Einstellungsdatei oder vom Renderer. Läuft im
+ * Main vor dem Speichern UND in der Rechnung (F06): Ein manipulierter Eintrag (NaN,
+ * negativ, `__proto__`, Riesen-Label) darf weder die Zahl noch die Anzeige verbiegen.
+ * Ungültiges fällt still heraus — eine kaputte Zeile, nicht die ganze Liste.
+ */
+export function normalizeSkillReferences(value: unknown): SkillReferences {
+  const out: SkillReferences = {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out
+  for (const [id, raw] of Object.entries(value as Record<string, unknown>)) {
+    if (!isSkillId(id) || !raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    const minutes = typeof r.minutes === 'number' && Number.isFinite(r.minutes) ? Math.round(r.minutes) : NaN
+    if (!(minutes >= 1 && minutes <= MAX_SKILL_REFERENCE_MINUTES)) continue
+    const label = typeof r.label === 'string' ? r.label.trim().slice(0, MAX_SKILL_LABEL_CHARS) : ''
+    out[id] = {
+      minutes,
+      label,
+      ...(r.source === 'measured' || r.source === 'estimated' ? { source: r.source } : {}),
+      ...(isVaultKey(r.vault) ? { vault: r.vault } : {})
+    }
+  }
+  return out
+}
+
+export function isVaultKey(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{16}$/.test(value)
+}
+
+/**
+ * Gehört eine Skill-Referenz zum Vault? Ja, wenn sie mit dessen Kennung gespeichert wurde
+ * oder ihre Skill-Kennung im Protokoll dieses Vaults vorkommt (ältere Einträge ohne `vault`).
+ * Anzeigen, Referenznotiz und Export dürfen nur solche Referenzen nennen — sonst stünden
+ * Namen und Minuten vertraulicher Skills anderer Vaults darin (Codex F13).
+ */
+export function skillReferencesForVault(refs: SkillReferences | undefined, vaultKey: string | null, seenSkillIds: Set<string>): SkillReferences {
+  const out: SkillReferences = {}
+  for (const [id, ref] of Object.entries(normalizeSkillReferences(refs))) {
+    if ((vaultKey && ref.vault === vaultKey) || seenSkillIds.has(id)) out[id] = ref
+  }
+  return out
+}
+
+/** Skill-Kennungen, die im Protokoll vorkommen. */
+export function seenSkillIds(events: ActivityEvent[]): Set<string> {
+  const ids = new Set<string>()
+  for (const e of events) if (e.kind === 'agent-run-finished') for (const id of e.skills ?? []) ids.add(id)
+  return ids
+}
+
+/** Liste von Skill-Kennungen (z.B. „nicht mehr fragen") — nur gültige, ohne Dubletten. */
+export function normalizeSkillIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.filter(isSkillId))].slice(0, 500)
+}
+
+/**
+ * Über welchen Skill wird ein Lauf bewertet? `null` = über die Tätigkeitsart.
+ *
+ * - Shell-Läufe nie: `shell` ist gezählt, nie bewertet — ein Skill-Name beweist nicht,
+ *   welche der sehr verschiedenen Shell-Arbeiten lief (F01).
+ * - Abgeschnittene Skill-Liste nie: sonst entschiede die Grenze, welcher Skill zählt (F03).
+ * - Nur bei GENAU EINEM bepreisten Skill. `use_skill` belegt, dass eine Anleitung gelesen
+ *   wurde, nicht welche Arbeit erledigt wurde; bei zwei bepreisten Skills den teureren zu
+ *   nehmen, schöbe den Lauf automatisch zur größten Ersparnis (F04). Mehrdeutige Läufe
+ *   fallen auf die Art zurück und werden als `ambiguousSkillRuns` ausgewiesen.
+ */
+export function resolveRunSkill(
+  run: { activityType: ValuedType; skills?: string[]; skillsTruncated?: true },
+  skillRefs: SkillReferences
+): { skill: string | null; ambiguous: boolean } {
+  if (run.activityType === 'shell' || run.skillsTruncated || !run.skills?.length) return { skill: null, ambiguous: false }
+  const priced = [...new Set(run.skills)].filter(id => (skillRefs[id]?.minutes ?? 0) > 0)
+  if (priced.length === 1) return { skill: priced[0], ambiguous: false }
+  return { skill: null, ambiguous: priced.length > 1 }
+}
+
+/** Was eine Skill-Zeile über ihren Skill weiß — die Karte beschriftet damit, statt mit der Art. */
+export interface SkillLineInfo {
+  id: string
+  /** Leer, wenn die Einstellung keinen Namen (mehr) kennt — Anzeige dann „früherer Skill". */
+  label: string
+  source?: ReferenceSource
+}
+
 export interface SavedTimeLine {
+  /** Bei Skill-Zeilen die abgeleitete Art des (ersten) Laufs — nur Kontext, Beschriftung kommt aus `skill`. */
   activityType: ValuedType
+  /** Gesetzt bei Zeilen, die über eine Skill-Referenz bewertet sind. */
+  skill?: SkillLineInfo
   /** Bewertete Läufe dieser Art (übernommen UND mit gemessener Arbeitszeit). */
   runs: number
   /** Referenzzeit des Nutzers: aktive Arbeitszeit von Hand, in Minuten. */
@@ -814,6 +988,7 @@ export interface SavedTimeLine {
 
 export interface ModelComparisonRow {
   activityType: ValuedType
+  skill?: SkillLineInfo
   model: string
   runs: number
   /** Median der aktiven Zeit je Vorgang — robuster als der Mittelwert bei wenigen Läufen. */
@@ -849,6 +1024,11 @@ export interface SavedTime {
   correctedRuns: number
   correctedMs: number
   /**
+   * Läufe mit mehr als einem bepreisten Skill — sie wurden über die Art bewertet, nicht
+   * über einen der Skills (resolveRunSkill). Gezählt, damit die Karte es sagen kann.
+   */
+  ambiguousSkillRuns: number
+  /**
    * Je Tätigkeitsart und Modell, absteigend nach Anzahl. Nur damit lassen sich zwei
    * Modelle wirklich gegeneinander lesen — eine zusammengefasste Zeile mit beiden
    * Namen sagt über keines von beiden etwas aus.
@@ -873,22 +1053,40 @@ export interface SavedTime {
  * gutgeschrieben, seine aktive Zeit wird aber abgezogen. Ohne diesen Abzug kann die
  * Kennzahl nur gewinnen — wer dreimal scheitert und einmal trifft, sähe nur den Treffer.
  */
-export function estimateSavedMinutes(summary: ActivitySummary, reference: ReferenceMinutes): SavedTime {
-  const byType = new Map<ValuedType, {
+export function estimateSavedMinutes(summary: ActivitySummary, reference: ReferenceMinutes, skillReferences: SkillReferences = {}): SavedTime {
+  // Auch hier bereinigen: Die Rechnung darf sich nicht darauf verlassen, dass der Aufrufer
+  // die Einstellung schon geprüft hat (F06).
+  const skillRefs = normalizeSkillReferences(skillReferences)
+  // Schlüssel je Zeile: die Art (`document`) oder `skill:<kennung>`. Ein Skill-Lauf bekommt
+  // eine EIGENE Zeile — sonst stünde in der Dokument-Zeile „1 × 10 min", gutgeschrieben
+  // wären aber 240, und die Kartenrechnung ginge nicht mehr auf.
+  const byType = new Map<string, {
     runs: number; activeMs: number; runtimeMs: number; elapsedMs: number; saved: number
     wastedRuns: number; wastedMs: number; correctedMs: number; correctedRuns: number
     models: Map<string, number>
+    /** Art des ersten Laufs, bei Art-Zeilen = Schlüssel. */
+    activityType: ValuedType | undefined
   }>()
   const leer = () => ({
     runs: 0, activeMs: 0, runtimeMs: 0, elapsedMs: 0, saved: 0, wastedRuns: 0, wastedMs: 0, correctedMs: 0, correctedRuns: 0,
-    models: new Map<string, number>()
+    models: new Map<string, number>(),
+    activityType: undefined as ValuedType | undefined
   })
   const merkeNachtrag = (bucket: ReturnType<typeof leer>, ms: number | undefined): void => {
     if (ms && ms > 0) { bucket.correctedMs += ms; bucket.correctedRuns += 1 }
   }
   let unmeasuredRuns = 0
   const unpricedJobTypes: ValuedType[] = []
-  const perModel = new Map<string, { activityType: ValuedType; model: string; active: number[]; runtime: number[] }>()
+  const perModel = new Map<string, { activityType: ValuedType; skill?: string; model: string; active: number[]; runtime: number[] }>()
+  let ambiguousSkillRuns = 0
+  /** Zeile und Referenz eines Agent-Laufs — für Erfolg UND Fehlversuch dieselbe (Regel 6). */
+  const valuationOf = (run: { activityType: ValuedType; skills?: string[]; skillsTruncated?: true }): { key: string; ref: number | undefined; skill?: string } => {
+    const { skill, ambiguous } = resolveRunSkill(run, skillRefs)
+    if (ambiguous) ambiguousSkillRuns += 1
+    if (skill) return { key: `skill:${skill}`, ref: skillRefs[skill].minutes, skill }
+    return { key: run.activityType, ref: isReferenceable(run.activityType) ? reference[run.activityType] : undefined }
+  }
+  const skillOfKey = (key: string): string | undefined => key.startsWith('skill:') ? key.slice(6) : undefined
 
   for (const run of summary.acceptedRuns) {
     // Ohne gemessene Arbeitszeit keine Bewertung. Eine 0 anzunehmen hieße, die volle
@@ -897,8 +1095,9 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
       unmeasuredRuns += 1
       continue
     }
-    const ref = reference[run.activityType]
-    const bucket = byType.get(run.activityType) ?? leer()
+    const { key, ref, skill } = valuationOf(run)
+    const bucket = byType.get(key) ?? leer()
+    bucket.activityType ??= run.activityType
     bucket.runs += 1
     bucket.activeMs += run.activeMs
     merkeNachtrag(bucket, run.correctedMs)
@@ -906,11 +1105,11 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     bucket.elapsedMs += run.elapsedMs
     if (run.model) {
       bucket.models.set(run.model, (bucket.models.get(run.model) ?? 0) + 1)
-      const key = `${run.activityType}\u0000${run.model}`
-      const roh = perModel.get(key) ?? { activityType: run.activityType, model: run.model, active: [], runtime: [] }
+      const modelKey = `${key}\u0000${run.model}`
+      const roh = perModel.get(modelKey) ?? { activityType: run.activityType, ...(skill ? { skill } : {}), model: run.model, active: [], runtime: [] }
       roh.active.push(run.activeMs)
       roh.runtime.push(run.durationMs)
-      perModel.set(key, roh)
+      perModel.set(modelKey, roh)
     }
     if (typeof ref === 'number' && ref > 0) {
       // Abgezogen wird die AKTIVE Zeit, nicht die Laufzeit: Wer während des Laufs etwas
@@ -922,7 +1121,7 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
       // nur gewinnen und nie verlieren kann.
       bucket.saved += ref - run.activeMs / 60_000
     }
-    byType.set(run.activityType, bucket)
+    byType.set(key, bucket)
   }
 
   for (const run of summary.discardedRuns) {
@@ -931,7 +1130,9 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
       unmeasuredRuns += 1
       continue
     }
-    const bucket = byType.get(run.activityType) ?? leer()
+    const { key, ref } = valuationOf(run)
+    const bucket = byType.get(key) ?? leer()
+    bucket.activityType ??= run.activityType
     bucket.wastedRuns += 1
     bucket.wastedMs += run.activeMs
     merkeNachtrag(bucket, run.correctedMs)
@@ -939,9 +1140,8 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     // Abzug nur, wo auch eine Gutschrift möglich wäre (Referenz vorhanden). Ohne
     // Referenz würde die Art nur Verluste zeigen und nie Gewinne — sie bleibt
     // „nicht bewertbar", mitsamt ihren Fehlversuchen.
-    const ref = reference[run.activityType]
     if (typeof ref === 'number' && ref > 0) bucket.saved -= run.activeMs / 60_000
-    byType.set(run.activityType, bucket)
+    byType.set(key, bucket)
   }
 
   // Vorgänge: gespart = Σ Referenz(bepreiste Kanäle) − aktive Zeit, je Vorgang EINMAL.
@@ -998,16 +1198,21 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
 
   const lines: SavedTimeLine[] = []
   const unpriced: ValuedType[] = [...unpricedJobTypes]
-  for (const type of VALUED_TYPES) {
-    const bucket = byType.get(type)
+  const skillKeys = [...byType.keys()].filter(key => skillOfKey(key) !== undefined)
+    .sort((a, b) => (skillRefs[skillOfKey(a)!]?.label ?? '').localeCompare(skillRefs[skillOfKey(b)!]?.label ?? '') || a.localeCompare(b))
+  for (const key of [...VALUED_TYPES, ...skillKeys]) {
+    const bucket = byType.get(key)
     if (!bucket) continue
-    const ref = isReferenceable(type) ? reference[type] : undefined
+    const skill = skillOfKey(key)
+    const type = (skill ? bucket.activityType : key) as ValuedType
+    const ref = skill ? skillRefs[skill]?.minutes : isReferenceable(type) ? reference[type] : undefined
     if (typeof ref !== 'number' || ref <= 0) {
       if (!unpriced.includes(type)) unpriced.push(type)
       continue
     }
     lines.push({
       activityType: type,
+      ...(skill ? { skill: skillInfo(skill, skillRefs) } : {}),
       runs: bucket.runs,
       referenceMinutes: ref,
       activeMinutes: Math.round(bucket.activeMs / 60_000),
@@ -1029,6 +1234,7 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
   const byModel: ModelComparisonRow[] = [...perModel.values()]
     .map(roh => ({
       activityType: roh.activityType,
+      ...(roh.skill ? { skill: skillInfo(roh.skill, skillRefs) } : {}),
       model: roh.model,
       runs: roh.active.length,
       medianActiveMinutes: Math.round(median(roh.active) / 60_000),
@@ -1047,8 +1253,14 @@ export function estimateSavedMinutes(summary: ActivitySummary, reference: Refere
     wastedRuns: lines.reduce((sum, line) => sum + line.wastedRuns, 0),
     correctedRuns: lines.reduce((sum, line) => sum + line.correctedRuns, 0),
     correctedMs: lines.reduce((sum, line) => sum + line.correctedMs, 0),
+    ambiguousSkillRuns,
     byModel
   }
+}
+
+function skillInfo(id: string, skillRefs: SkillReferences): SkillLineInfo {
+  const ref = skillRefs[id]
+  return { id, label: ref?.label ?? '', ...(ref?.source ? { source: ref.source } : {}) }
 }
 
 /**

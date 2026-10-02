@@ -21,7 +21,7 @@ import {
 } from './llmTelemetry'
 import {
   estimateSavedMinutes, summarizeActivity,
-  type ActivityEvent, type ActivitySummary, type ValuedType, type ReferenceMinutes, type SavedTime, type ModelComparisonRow,
+  type ActivityEvent, type ActivitySummary, type ValuedType, type ReferenceMinutes, type SkillReferences, type SavedTime, type ModelComparisonRow,
 } from './activityLog'
 
 export type HistoryRange = 'today' | '7d' | '30d' | '12m'
@@ -287,7 +287,11 @@ export interface SavedTimeBucket {
 
 export interface ReferenceChange {
   at: number
-  activityType: ValuedType
+  /** Genau eines von beiden: Referenz einer Art oder eines Skills (opake Kennung). */
+  activityType?: ValuedType
+  skill?: string
+  /** Anzeigename des Skills aus der Einstellung; leer = nicht (mehr) bekannt. */
+  skillLabel?: string
   fromMinutes: number | null
   toMinutes: number | null
 }
@@ -308,24 +312,28 @@ export function bucketSavedTime(
   events: ActivityEvent[],
   buckets: Bucket[],
   reference: ReferenceMinutes,
-  minRuns: number = MIN_POINT_RUNS
+  minRuns: number = MIN_POINT_RUNS,
+  skillReferences: SkillReferences = {}
 ): SavedTimeHistory {
   // Immer mit ALLEN Ereignissen rechnen — die Übernahme kann in einem anderen Eimer
   // liegen als das Lauf-Ende (siehe summarizeActivity).
   const out: SavedTimeBucket[] = buckets.map(b => {
     const summary = summarizeActivity(events, { from: b.from, to: b.to })
-    const saved = estimateSavedMinutes(summary, reference)
+    const saved = estimateSavedMinutes(summary, reference, skillReferences)
     return { bucket: b, summary, saved, valuedRuns: saved.lines.reduce((n, l) => n + l.runs, 0) }
   })
   const from = buckets[0]?.from ?? 0
   const to = buckets[buckets.length - 1]?.to ?? 0
   const totalSummary = summarizeActivity(events, { from, to })
-  const total = estimateSavedMinutes(totalSummary, reference)
+  const total = estimateSavedMinutes(totalSummary, reference, skillReferences)
   const byModel = total.byModel.filter(r => r.runs >= minRuns)
-  const referenceChanges: ReferenceChange[] = events
-    .filter((e): e is Extract<ActivityEvent, { kind: 'reference-changed' }> => e.kind === 'reference-changed' && e.at >= from && e.at < to)
-    .map(e => ({ at: e.at, activityType: e.activityType, fromMinutes: e.fromMinutes, toMinutes: e.toMinutes }))
-    .sort((a, b) => a.at - b.at)
+  const referenceChanges: ReferenceChange[] = []
+  for (const e of events) {
+    if (e.at < from || e.at >= to) continue
+    if (e.kind === 'reference-changed') referenceChanges.push({ at: e.at, activityType: e.activityType, fromMinutes: e.fromMinutes, toMinutes: e.toMinutes })
+    if (e.kind === 'skill-reference-changed') referenceChanges.push({ at: e.at, skill: e.skill, skillLabel: skillReferences[e.skill]?.label ?? '', fromMinutes: e.fromMinutes, toMinutes: e.toMinutes })
+  }
+  referenceChanges.sort((a, b) => a.at - b.at)
   return { buckets: out, total, totalSummary, byModel, byModelHidden: total.byModel.length - byModel.length, referenceChanges }
 }
 

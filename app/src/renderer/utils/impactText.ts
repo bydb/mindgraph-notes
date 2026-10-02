@@ -6,7 +6,7 @@
 // übernommen"). Zwei Formulierungen derselben Zahl laufen immer auseinander.
 
 import type { TranslationKey } from './translations'
-import { JOB_TYPES, JOB_OUTCOMES, isJobType, type ValuedType, type ActivitySummary, type ModelComparisonRow, type SavedTimeLine, type JobType, type JobOutcome, type ReferenceSources } from '../../shared/activityLog'
+import { JOB_TYPES, JOB_OUTCOMES, isJobType, type ValuedType, type ActivitySummary, type ModelComparisonRow, type SavedTimeLine, type JobType, type JobOutcome, type ReferenceSources, type SkillLineInfo } from '../../shared/activityLog'
 
 export type ImpactTFn = (key: TranslationKey, params?: Record<string, string | number>) => string
 
@@ -21,6 +21,25 @@ export const ACTIVITY_TYPE_LABEL_KEY: Record<ValuedType, TranslationKey> = {
   'attendance-list': 'voiceCommand.activityType.attendanceList',
   'wp-post': 'voiceCommand.activityType.wpPost',
   'ig-caption': 'voiceCommand.activityType.igCaption'
+}
+
+/** Name eines Skills für Karte, Tooltip und Historie — nie die opake Kennung. */
+export function skillLabel(skill: Pick<SkillLineInfo, 'label'>, t: ImpactTFn): string {
+  return skill.label ? t('impact.skill.label', { name: skill.label }) : t('impact.skill.unknown')
+}
+
+/**
+ * Beschriftung einer Bilanzzeile: der Skill, wenn die Zeile über eine Skill-Referenz
+ * bewertet ist, sonst die Tätigkeitsart. EINE Stelle, damit Karte, Tooltip, Sprachkarte
+ * und Historie dieselbe Zeile gleich benennen (Codex F09).
+ */
+export function lineLabel(line: { activityType: ValuedType; skill?: SkillLineInfo }, t: ImpactTFn): string {
+  return line.skill ? skillLabel(line.skill, t) : t(ACTIVITY_TYPE_LABEL_KEY[line.activityType])
+}
+
+/** Schlüssel einer Bilanzzeile — für Stichproben und Gruppierungen, die zur Zeile passen müssen. */
+export function lineKey(line: { activityType: ValuedType; skill?: { id: string } }): string {
+  return line.skill ? `skill:${line.skill.id}` : line.activityType
 }
 
 /**
@@ -103,13 +122,14 @@ export function grossMinutes(line: SavedTimeLine): number {
 }
 
 /** „deine Schätzung" oder „selbst gestoppt" — die Karte sagt, welche Art Zahl sie verrechnet. */
-export function basisLabel(type: ValuedType, sources: ReferenceSources | undefined, t: ImpactTFn): string {
-  return t(sources?.[type] === 'measured' ? 'voiceCommand.card.basisMeasured' : 'voiceCommand.card.basisEstimated')
+export function basisLabel(line: { activityType: ValuedType; skill?: SkillLineInfo }, sources: ReferenceSources | undefined, t: ImpactTFn): string {
+  const source = line.skill ? line.skill.source : sources?.[line.activityType]
+  return t(source === 'measured' ? 'voiceCommand.card.basisMeasured' : 'voiceCommand.card.basisEstimated')
 }
 
 /** Die Rechnung allein („30 min von Hand − 6 min aktiv = 24 min") — für die Karte mit Beschriftung links. */
 export function savedBasisFormula(line: SavedTimeLine, t: ImpactTFn, sources?: ReferenceSources): string {
-  const basis = basisLabel(line.activityType, sources, t)
+  const basis = basisLabel(line, sources, t)
   // Die Referenzzeit gilt je Vorgang, aktive Zeit und Gewinn sind Summen. Bei mehreren
   // Vorgängen muss der Faktor sichtbar sein, sonst steht dort „30 − 1 = 59" und die
   // ganze Rechnung wirkt kaputt (real so aufgetreten).
@@ -136,7 +156,7 @@ export function savedBasisFormula(line: SavedTimeLine, t: ImpactTFn, sources?: R
 }
 
 export function savedBasisLine(line: SavedTimeLine, t: ImpactTFn, sources?: ReferenceSources): string {
-  return `${t(ACTIVITY_TYPE_LABEL_KEY[line.activityType])}: ${savedBasisFormula(line, t, sources)}`
+  return `${lineLabel(line, t)}: ${savedBasisFormula(line, t, sources)}`
 }
 
 /** Durchlaufzeit und Fertigstellung — Kontext, damit die Zahl einordenbar bleibt. */
@@ -173,7 +193,7 @@ export function wastedFormula(line: SavedTimeLine, t: ImpactTFn): string {
 }
 
 export function wastedLine(line: SavedTimeLine, t: ImpactTFn): string {
-  return `${t(ACTIVITY_TYPE_LABEL_KEY[line.activityType])}: ${wastedFormula(line, t)}`
+  return `${lineLabel(line, t)}: ${wastedFormula(line, t)}`
 }
 
 /**
@@ -193,7 +213,7 @@ export function correctedFormula(line: SavedTimeLine, t: ImpactTFn): string {
 }
 
 export function correctedLine(line: SavedTimeLine, t: ImpactTFn): string {
-  return `${t(ACTIVITY_TYPE_LABEL_KEY[line.activityType])}: ${correctedFormula(line, t)}`
+  return `${lineLabel(line, t)}: ${correctedFormula(line, t)}`
 }
 
 /** Läufe ohne gemessene Arbeitszeit: nicht bewertet, aber auch nicht verschwiegen. */
@@ -217,6 +237,11 @@ export function modelComparisonLine(row: ModelComparisonRow, t: ImpactTFn): stri
   // Median nicht schon sagt — weicht er dagegen deutlich ab, ist genau das die Auskunft.
   if (row.runs < 3) return basis
   return `${basis} · ${t('voiceCommand.card.modelMean', { mean: row.meanActiveMinutes })}`
+}
+
+/** Läufe mit mehreren bepreisten Skills: über die Art bewertet — gesagt, nicht verschwiegen (F04). */
+export function ambiguousSkillLine(count: number, t: ImpactTFn): string {
+  return t(count === 1 ? 'voiceCommand.card.savedAmbiguousOne' : 'voiceCommand.card.savedAmbiguous', { count })
 }
 
 export function unpricedLine(types: ValuedType[], t: ImpactTFn): string {

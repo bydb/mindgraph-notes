@@ -22059,6 +22059,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-bar-agent-remember { display: flex; align-items: center; gap: 8px; }
 .ai-bar-agent-remember .ai-bar-context-search { flex: 1; }
 .ai-bar-agent-remember-saved { font-size: 11px; color: var(--accent-color); }
+/* Zeitbilanz: Rückfrage nach der Referenzzeit eines Skills (SkillReferencePrompt) */
+.ai-bar-agent-skillref { display: flex; flex-direction: column; gap: 4px; }
+.ai-bar-agent-skillref-question { font-size: 12px; color: var(--text-primary); }
+.ai-bar-agent-skillref .ai-bar-agent-skillref-minutes { flex: 0 0 80px; }
+.ai-bar-agent-skillref .ai-bar-agent-skillref-pick { flex: 1 1 auto; }
+.ai-bar-agent-skillref-unit { font-size: 11px; color: var(--text-secondary); margin-right: auto; }
+.ai-bar-agent-skillref-hint { font-size: 11px; color: var(--text-secondary); }
 .ai-bar-cloud-hint {
   padding: 6px 9px;
   border: 1px solid color-mix(in srgb, var(--color-warning) 35%, transparent);

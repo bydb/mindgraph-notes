@@ -605,6 +605,8 @@ export interface NoteAgentSkill {
   folderName: string;
   relPath: string;
   enabled: boolean;
+  /** Opake, vault-gebundene Kennung für die Zeitbilanz (Skill-Referenzen, Tätigkeitsprotokoll). */
+  activityId: string;
 }
 
 // Agent-Skills Stufe 2: Eintrag des kuratierten Katalogs (docs/skills/index.json).
@@ -640,6 +642,10 @@ export interface NoteAgentDoneEvent {
     searchCount: number;
     fetchCount: number;
   };
+  /** Im Lauf geladene Skills — für die Rückfrage nach der Referenzzeit auf der Ergebniskarte. */
+  skills?: Array<{ id: string; label: string }>;
+  /** Opake Vault-Kennung, an die eine dort erfragte Skill-Referenz gebunden wird. */
+  vaultKey?: string;
 }
 
 // IPC Kommunikation
@@ -917,7 +923,7 @@ export interface ElectronAPI {
   noteAgentMemoryStatus: (vaultPath: string) => Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }>;
   imageGenHasKey: () => Promise<boolean>;
   // Agent-Skills Stufe 1
-  noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; error?: string }>;
+  noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; vaultKey?: string; error?: string }>;
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   noteSkillsCreate: (vaultPath: string, name: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsInstallStarter: (vaultPath: string) => Promise<{ success: boolean; installed: string[]; error?: string }>;

@@ -159,6 +159,7 @@ export function AgentView({ tabId }: Props) {
   const [shellArmed, setShellArmed] = useState(false)
   const [computerArmed, setComputerArmed] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [consentSaveFailed, setConsentSaveFailed] = useState(false)
   useOnChange([vaultPath, shellModule], () => setShellArmed(false))
   useOnChange([vaultPath, computerModule], () => setComputerArmed(false))
   useOnChange([vaultPath, webResearchModule], () => setWebArmed(false))
@@ -775,18 +776,27 @@ export function AgentView({ tabId }: Props) {
                           type="button"
                           className="agent-card-btn"
                           onClick={async () => {
+                            const vorher = useUIStore.getState().noteAgentCloudConsentVersion
                             setConsentVersion(NOTE_AGENT_CLOUD_CONSENT_VERSION)
+                            setConsentSaveFailed(false)
+                            // Der Main liest die Zustimmung aus ui-settings.json — erst schreiben, dann neu prüfen.
+                            // Scheitert das Schreiben, Store zurück und Sperre stehen lassen (Codex F21).
+                            const ok = await flushUISettings()
+                            if (!ok) {
+                              setConsentVersion(vorher)
+                              setConsentSaveFailed(true)
+                              return
+                            }
                             useNoteAgentStore.setState(st => {
                               const sc = st.scopes[tabId]
                               return sc ? { scopes: { ...st.scopes, [tabId]: { ...sc, startGate: null } } } : {}
                             })
-                            // Der Main liest die Zustimmung aus ui-settings.json — erst schreiben, dann neu prüfen.
-                            await flushUISettings()
                             runPreflight()
                           }}
                         >
                           {t('agentCard.consentButton')}
                         </button>
+                        {consentSaveFailed && <span className="agent-card-no-local">{t('agentCard.consentSaveFailed')}</span>}
                       </div>
                     )}
                     {!running && gateBlock === 'optin' && (

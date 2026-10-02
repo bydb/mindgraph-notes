@@ -21,7 +21,13 @@ export interface HistoryExportInput {
 /** Aus den Rohwerten gerundet, nicht als Summe gerundeter Zeilen. */
 const wastedMinutes = (saved: { lines: Array<{ wastedMs: number }> }) => Math.round(saved.lines.reduce((ms, l) => ms + l.wastedMs, 0) / 60_000)
 
-const csvEsc = (v: string) => /[";\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+const csvEsc = (v: string) => /[";\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+/**
+ * Tabellenzelle im Markdown: Pipe maskieren, Zeilenumbrüche glätten. Skill-Namen kommen aus
+ * frei editierbarem Frontmatter — ein `|` oder Umbruch verschob sonst Spalten oder setzte
+ * eine scheinbar eigene Exportzeile (Codex F17).
+ */
+const mdCell = (v: string) => v.replace(/[\r\n]+/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|')
 const csvNum = (v: number | null | undefined) => v === null || v === undefined || !Number.isFinite(v) ? '' : String(Math.round(v * 100) / 100).replace('.', ',')
 
 export function historyToMarkdown(input: HistoryExportInput): string {
@@ -62,13 +68,22 @@ export function historyToMarkdown(input: HistoryExportInput): string {
       Object.entries(byOutcome ?? {}).map(([outcome, n]) => `${type} ${outcome}: ${n}`))
     out.push('', `Vorgänge aus Plugins: ${teile.join(', ') || 'keine'}${jobs.prepared ? `; ${jobs.prepared} vorbereitet ohne Abschluss (gezählt, nicht bewertet)` : ''}. Etiketten reichen nur so weit wie der Nachweis: gespeichert ist nicht gedruckt, verwendet ist nicht veröffentlicht.`)
   }
-  out.push('', `Gesamt: ${Math.round(gesamt.totalMinutes)} Minuten aus ${gesamt.lines.reduce((n, l) => n + l.runs, 0)} bewerteten Läufen${gesamt.wastedRuns ? `, abzüglich ${wastedMinutes(gesamt)} Minuten aus ${gesamt.wastedRuns} Fehlversuchen ohne übernommenes Ergebnis` : ''}; ${gesamt.unmeasuredRuns} Läufe nicht gemessen${gesamt.correctedRuns ? `; ${Math.round(gesamt.correctedMs / 60_000)} Minuten bei ${gesamt.correctedRuns} Vorgängen manuell nachgetragen (Nutzerangabe, keine Messung)` : ''}. ${input.referenceNote}`)
+  out.push('', `Gesamt: ${Math.round(gesamt.totalMinutes)} Minuten aus ${gesamt.lines.reduce((n, l) => n + l.runs, 0)} bewerteten Läufen${gesamt.wastedRuns ? `, abzüglich ${wastedMinutes(gesamt)} Minuten aus ${gesamt.wastedRuns} Fehlversuchen ohne übernommenes Ergebnis` : ''}; ${gesamt.unmeasuredRuns} Läufe nicht gemessen${gesamt.ambiguousSkillRuns ? `; ${gesamt.ambiguousSkillRuns} Läufe mit mehreren bepreisten Skills über die Tätigkeitsart bewertet` : ''}${gesamt.correctedRuns ? `; ${Math.round(gesamt.correctedMs / 60_000)} Minuten bei ${gesamt.correctedRuns} Vorgängen manuell nachgetragen (Nutzerangabe, keine Messung)` : ''}. ${input.referenceNote}`)
+  // Je Bewertungszeile die ganze Rechnung — erst damit lässt sich ein exportierter Zeitgewinn
+  // auf seine Referenz (Art oder Skill) und die Fehlversuche derselben Zeile zurückführen (F15).
+  if (gesamt.lines.length) {
+    out.push('', '| Zeile | bewertete Läufe | Referenz je Lauf (min) | Quelle | aktiv (min) | Fehlversuche | netto (min) |', '|---|---|---|---|---|---|---|')
+    for (const l of gesamt.lines) {
+      out.push(`| ${mdCell(lineName(l))} | ${l.runs} | ${l.referenceMinutes} | ${l.skill ? (l.skill.source === 'measured' ? 'gestoppt' : 'geschätzt') : '—'} | ${Math.round(l.activeMs / 60_000)} | ${l.wastedRuns || ''} | ${l.savedMinutes} |`)
+    }
+  }
   if (input.saved.referenceChanges.length) {
-    out.push('', 'Referenz geändert: ' + input.saved.referenceChanges.map(c => `${new Date(c.at).toLocaleDateString()} ${c.activityType} ${c.fromMinutes ?? '—'} → ${c.toMinutes ?? '—'} min`).join('; '))
+    out.push('', 'Referenz geändert: ' + input.saved.referenceChanges.map(c => `${new Date(c.at).toLocaleDateString()} ${c.skill ? skillName(c.skillLabel) : c.activityType} ${c.fromMinutes ?? '—'} → ${c.toMinutes ?? '—'} min`).join('; ')
+      + (input.saved.referenceChanges.some(c => c.skill) ? '. Eine Skill-Referenz verschiebt frühere Läufe dieses Skills zwischen Art- und Skill-Zeile — die Abschnitte sind mit den heutigen Referenzen gerechnet.' : ''))
   }
   if (input.saved.byModel.length) {
     out.push('', '| Tätigkeit | Modell | Läufe | Median aktive Minuten | Mittel |', '|---|---|---|---|---|')
-    for (const r of input.saved.byModel) out.push(`| ${r.activityType} | ${r.model} | ${r.runs} | ${Math.round(r.medianActiveMinutes)} | ${Math.round(r.meanActiveMinutes)} |`)
+    for (const r of input.saved.byModel) out.push(`| ${mdCell(lineName(r))} | ${mdCell(r.model)} | ${r.runs} | ${Math.round(r.medianActiveMinutes)} | ${Math.round(r.meanActiveMinutes)} |`)
   }
   if (input.saved.byModelHidden) out.push('', `${input.saved.byModelHidden} Modellzeile(n) mit weniger als 3 Läufen nicht gezeigt.`)
   out.push('')
@@ -83,6 +98,16 @@ export function historyToMarkdown(input: HistoryExportInput): string {
   }
   out.push('', 'Kein Wert unter drei warmen Läufen je Eimer; „(N)" = Läufe vorhanden, aber zu wenige. Kaltstarts sind herausgerechnet. Sternchen: verstecktes Reasoning, Wert zu niedrig. Cloud-Modelle melden keine Serverzeiten.')
   return out.join('\n')
+}
+
+/** Skill-Name im Export; ohne bekannte Einstellung neutral, nie die opake Kennung. Einzeilig. */
+function skillName(label: string | undefined): string {
+  return label ? `Skill „${label.replace(/[\r\n]+/g, ' ')}"` : 'früherer Skill'
+}
+
+/** Beschriftung einer Bilanzzeile im Export — dieselbe Unterscheidung wie lineLabel im Renderer. */
+function lineName(line: { activityType: string; skill?: { label: string } }): string {
+  return line.skill ? skillName(line.skill.label) : line.activityType
 }
 
 export function historyToCsv(input: HistoryExportInput): string {
@@ -109,6 +134,20 @@ export function historyToCsv(input: HistoryExportInput): string {
   }
   // Referenzen samt Quelle gehören in JEDEN Export — eine Zahl ohne ihre Grundlage ist keine Aussage.
   out.push(['Zeitgewinn', 'gesamt', 'Referenzen', '', '', input.referenceNote].map(csvEsc).join(';'))
+  for (const l of input.saved.total.lines) {
+    const hinweis = [
+      `${l.runs} × ${l.referenceMinutes} min Referenz${l.skill ? (l.skill.source === 'measured' ? ' (gestoppt)' : ' (geschätzt)') : ''}`,
+      `${Math.round(l.activeMs / 60_000)} min aktiv`,
+      l.wastedRuns ? `${l.wastedRuns} Fehlversuche` : ''
+    ].filter(Boolean).join('; ')
+    out.push(['Zeitgewinn', 'gesamt', `Zeile ${lineName(l)}`, csvNum(l.savedMinutes), String(l.runs), hinweis].map(csvEsc).join(';'))
+  }
+  if (input.saved.total.ambiguousSkillRuns) {
+    out.push(['Zeitgewinn', 'gesamt', 'mehrdeutige Skill-Läufe', String(input.saved.total.ambiguousSkillRuns), '', 'über die Tätigkeitsart bewertet'].map(csvEsc).join(';'))
+  }
+  for (const c of input.saved.referenceChanges) {
+    out.push(['Zeitgewinn', new Date(c.at).toLocaleDateString(), `Referenz geändert ${c.skill ? skillName(c.skillLabel) : c.activityType ?? ''}`, c.toMinutes === null ? '' : String(c.toMinutes), '', `vorher ${c.fromMinutes ?? '—'} min${c.skill ? '; frühere Läufe dieses Skills neu bewertet' : ''}`].map(csvEsc).join(';'))
+  }
   for (const s of input.performance) {
     s.points.forEach((p, i) => {
       if (p.outputTps === null) return

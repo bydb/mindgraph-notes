@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react'
 import { needsExternalApp } from '../../utils/resultFormats'
 import { useTranslation } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
+import { SkillReferencePrompt } from './SkillReferencePrompt'
 import type { AgentRunUiState } from '../../stores/noteAgentStore'
 
 export interface AgentPreviewResponse {
@@ -246,6 +247,8 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
               {r.error && <div className="ai-bar-context-error">{r.error}</div>}
             </div>
           ))}
+          {/* Zeitbilanz: Referenzzeit des Skills erfragen, sobald alle Karten entschieden sind */}
+          <SkillReferencePrompt run={run} />
           {/* Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz */}
           <div className="ai-bar-agent-remember">
             <input

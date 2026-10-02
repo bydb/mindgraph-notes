@@ -71,6 +71,9 @@ export interface AgentRunUiState {
   // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
   // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
   rememberSuggestion?: string
+  /** Im Lauf geladene Skills (opake Kennung + Name) — Grundlage der Rückfrage nach der Referenzzeit. */
+  skills?: Array<{ id: string; label: string }>
+  vaultKey?: string
 }
 
 export interface AgentScopeState {
@@ -513,6 +516,8 @@ export function initNoteAgentEvents(): void {
       phase: 'review',
       results: p.results.map(r => ({ ...r, state: 'pending' as const })),
       web: p.web,
+      skills: p.skills ?? [],
+      vaultKey: p.vaultKey,
       outcome: p.ok ? 'ok' : p.cancelled ? 'cancelled' : 'error',
       text: p.text || '',
       errorText: p.error || '',

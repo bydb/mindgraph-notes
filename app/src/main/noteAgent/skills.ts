@@ -35,6 +35,7 @@ import {
 import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
 import { shellExecuteTool, shellStageFileTool } from './shellTools'
 import { computerMailDraftTool, computerOpenTool, computerPrintTool, computerRevealTool } from './computerTools'
+import { skillActivityId } from '../skillActivityId'
 
 export interface NoteAgentContext {
   senderId: number
@@ -543,6 +544,10 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       }
       const body = await readSkillBody(ctx.run.vaultPath, skill.folderName)
       ctx.run.sources.add(`Skill: ${skill.name}`)
+      // Zeitbilanz: welcher Skill den Lauf geprägt hat (Bewertung je Skill). Nur die opake
+      // Kennung geht ins Protokoll; der Name bleibt am Lauf für die Ergebniskarte.
+      const skillId = skillActivityId(ctx.run.vaultPath, skill.folderName)
+      if (!ctx.run.skillsUsed.some(s => s.id === skillId)) ctx.run.skillsUsed.push({ id: skillId, label: skill.name })
       // Ein Skill, der write_pptx verlangt, erwartet eine PowerPoint-Datei — entsteht am
       // Ende keine, sagt loop.ts das ausdrücklich (sonst sieht man nur eine .md).
       if (body.includes('write_pptx')) ctx.run.expectedPptxSkill = skill.name

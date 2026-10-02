@@ -298,6 +298,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       searchCount: number
       fetchCount: number
     }
+    skills?: Array<{ id: string; label: string }>
+    vaultKey?: string
   }) => void) => {
     ipcRenderer.removeAllListeners('note-agent-done')
     ipcRenderer.on('note-agent-done', (_event, p) => callback(p))

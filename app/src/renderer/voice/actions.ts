@@ -16,12 +16,14 @@ import { collectFocusTasks } from '../utils/dashboardData'
 import { useEmailStore } from '../stores/emailStore'
 import {
   estimateSavedMinutes,
+  normalizeSkillReferences,
+  resolveRunSkill,
   localDayRange,
   type ActivityType,
   isJobType,
   type ActivitySummary
 } from '../../shared/activityLog'
-import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, jobRows, hasRuntimeContext, savedBasisFormula, savedContextLine, wastedFormula, correctedFormula, sampleLine, unmeasuredLine, unpricedLine, modelComparisonLine } from '../utils/impactText'
+import { ACTIVITY_TYPE_LABEL_KEY, acceptedLine, emailTasksLine, tasksLine, jobRows, hasRuntimeContext, savedBasisFormula, savedContextLine, wastedFormula, correctedFormula, sampleLine, unmeasuredLine, unpricedLine, modelComparisonLine, lineLabel, lineKey, ambiguousSkillLine } from '../utils/impactText'
 
 export type TFn = (key: any, params?: Record<string, string | number>) => string
 
@@ -434,11 +436,18 @@ const activityToday: ActionSpec<'activity.today'> = {
       throw new Error(res.error || t('voiceCommand.card.activityUnavailable'))
     }
     const summary: ActivitySummary = res.summary
+    const skillReferences = useUIStore.getState().impact.skillReferences ?? {}
+    // Stichprobe je ZEILE, nicht je grober Art: Eine Skill-Zeile darf nicht die Zahl aller
+    // Dokument-Läufe als „vergleichbare Vorgänge" nennen (Codex F09). Dieselbe Zuordnung
+    // wie in der Rechnung (resolveRunSkill).
     const sampleByType = new Map<string, number>()
+    const skillRefsClean = normalizeSkillReferences(skillReferences)
     for (const run of history.summary?.acceptedRuns ?? []) {
-      sampleByType.set(run.activityType, (sampleByType.get(run.activityType) ?? 0) + 1)
+      const { skill } = resolveRunSkill(run, skillRefsClean)
+      const key = skill ? `skill:${skill}` : run.activityType
+      sampleByType.set(key, (sampleByType.get(key) ?? 0) + 1)
     }
-    const saved = estimateSavedMinutes(summary, useUIStore.getState().impact.referenceMinutes)
+    const saved = estimateSavedMinutes(summary, useUIStore.getState().impact.referenceMinutes, skillReferences)
     const referenceSources = useUIStore.getState().impact.referenceSources
 
     const doneGroup = t('voiceCommand.card.groupDone')
@@ -484,14 +493,14 @@ const activityToday: ActionSpec<'activity.today'> = {
       // eine Ableitung aus einer Angabe des Nutzers, keine Messung. Je Art eine Zeile mit
       // Beschriftung links und Rechnung rechts, darunter Kontext gedämpft, Vorbehalte farbig.
       for (const line of saved.lines) {
-        const label = t(ACTIVITY_TYPE_LABEL_KEY[line.activityType])
+        const label = lineLabel(line, t)
         // Eine Art mit ausschließlich Fehlversuchen hat keine Rechnung „N × Referenz",
         // nur den Abzug — die Grundlage-Zeile wäre dort „0 × 30 min".
         if (line.runs > 0) {
           lines.push({ group: savedGroup, kind: 'row', label, text: savedBasisFormula(line, t, referenceSources) })
           const kontext = [
             hasRuntimeContext(line) ? savedContextLine(line, t) : null,
-            sampleLine(sampleByType.get(line.activityType) ?? line.runs, t)
+            sampleLine(sampleByType.get(lineKey(line)) ?? line.runs, t)
           ].filter((x): x is string => x !== null).join(' · ')
           lines.push({ group: savedGroup, kind: 'muted', text: kontext })
         } else {
@@ -508,12 +517,12 @@ const activityToday: ActionSpec<'activity.today'> = {
     // Modellvergleich nur, wenn es etwas zu vergleichen gibt: Bei einem einzigen Modell
     // sagt die Zeile nichts, was nicht schon oben steht.
     const vergleich = saved.byModel.filter(row =>
-      saved.byModel.filter(other => other.activityType === row.activityType).length > 1
+      saved.byModel.filter(other => lineKey(other) === lineKey(row)).length > 1
     )
     if (vergleich.length > 0) {
       const modelGroup = t('voiceCommand.card.groupModels')
       for (const row of vergleich) {
-        lines.push({ group: modelGroup, text: `${t(ACTIVITY_TYPE_LABEL_KEY[row.activityType])} — ${modelComparisonLine(row, t)}` })
+        lines.push({ group: modelGroup, text: `${lineLabel(row, t)} — ${modelComparisonLine(row, t)}` })
       }
     }
 
@@ -522,7 +531,8 @@ const activityToday: ActionSpec<'activity.today'> = {
     // „nichts gespart" und „nicht bewertbar".
     const footnotes = [
       saved.unpricedTypes.length > 0 ? unpricedLine(saved.unpricedTypes, t) : null,
-      saved.unmeasuredRuns > 0 ? unmeasuredLine(saved.unmeasuredRuns, t) : null
+      saved.unmeasuredRuns > 0 ? unmeasuredLine(saved.unmeasuredRuns, t) : null,
+      saved.ambiguousSkillRuns > 0 ? ambiguousSkillLine(saved.ambiguousSkillRuns, t) : null
     ].filter(Boolean) as string[]
     const footnote = footnotes.length > 0 ? footnotes.join(' ') : undefined
 
