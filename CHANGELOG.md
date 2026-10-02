@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.30-beta] - 2026-10-02
+
+**Die Zeitbilanz rechnet Agent-Aufträge jetzt mit deiner eigenen Zeitschätzung je Skill.** Bisher zählte ein Foliensatz genauso viel wie ein kurzes Anschreiben, weil beides nur „Dokument“ war. Jetzt trägst du für jeden Skill ein, wie lange dich so ein Auftrag von Hand kosten würde – unter Einstellungen → Allgemein → Zeitbilanz oder direkt auf der Ergebniskarte, die nach der Übernahme einmal danach fragt.
+
+### Hintergrund
+
+- **Auslöser:** Nach einem Vormittag mit Präsentation, Antrag und Anschreiben zeigte die Bilanz 13 Minuten – gerechnet war mit der Referenzzeit für „Dokument“, die ein Foliensatz und ein Dreizeiler gleichermaßen bekamen.
+- **So wird gerechnet:** Nutzt ein Lauf genau einen Skill mit eingetragener Zeit, gilt diese Zeit; abgezogen wird wie bisher deine aktive Zeit. Skill-Läufe stehen als eigene Zeile in Statusleiste, Tagesbilanz, Historie und Export. Ohne Skill-Zeit bleibt alles wie vorher.
+- **Ehrlich statt großzügig:** Lädt ein Lauf mehrere Skills mit eingetragener Zeit, zählt keiner davon – der Lauf wird über die Tätigkeit bewertet, und die Bilanz sagt das dazu. Shell-Läufe bleiben auch mit Skill unbewertet. Fehlversuche ziehen auf derselben Zeile ab. Eine neue Skill-Zeit bewertet frühere Läufe dieses Skills mit; die Historie markiert die Änderung.
+- **Datenschutz:** Ins Tätigkeitsprotokoll kommt nicht der Skill-Name, sondern eine Kennung, die an den Vault gebunden ist. Gleichnamige Skills in zwei Vaults teilen sich keine Zeit, und Namen aus einem anderen Vault erscheinen nicht in Historie oder Export.
+- **Zuverlässiger speichern:** Die Rückfrage und die Cloud-Zustimmung des Notiz-Agenten melden „gespeichert“ erst, wenn die Einstellung wirklich auf der Platte steht; scheitert das Schreiben, springt der Schalter zurück.
+- **Grenze:** Läufe, die vor diesem Update liefen, kennen ihren Skill nicht und bleiben bei der Tätigkeitszeit.
+
 ## [0.11.29-beta] - 2026-10-02
 
 **Die Mailsuche findet jetzt Namen in jeder Schreibweise.** Wer „Weiss“ sucht, findet auch „Weiß“ und die Adresse „weiss@…“ – Umlaute und ß werden in Absender, Empfänger, Betreff und Text gleich behandelt. Unter einer Suche erscheinen außerdem keine fremden Mails mehr.
