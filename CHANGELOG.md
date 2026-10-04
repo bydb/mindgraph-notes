@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.32-beta] - 2026-10-04
+
+**Der Agent heißt jetzt Petrol Agent und ist deutlich aufgeräumter.** Die Beispiele sind kompakte Karten mit Symbol, Kurztitel und „Unterlagen → Ergebnis“; ein Klick füllt den Auftrag. Auf breiten Bildschirmen steht der Auftrag links und Unterlagen, Ablage, Befugnisse und Modell rechts daneben. Der Knopf heißt „Auftrag losschicken“.
+
+### Hintergrund
+
+- **Weniger Text:** Die langen Beispieltexte erscheinen erst im Eingabefeld, wo du sie anpassen kannst. Zeilen ohne Aussage – „Noch nichts angehängt“, „Web, Shell und Rechner sind aus“, ein leeres Gedächtnis – sind weg.
+- **Nur die nächste Lücke ist markiert:** Fehlen mehrere Dinge, ist nur die erste Zeile farbig hinterlegt; weitere tragen einen kleinen Punkt am Namen. Vorher sah die Karte nach dem Klick auf ein Beispiel aus wie ein Formular voller Fehler.
+- **Anderes Beispiel:** Hast du ein Beispiel gewählt und noch nichts daran geändert, wechselst du über „Anderes Beispiel“ direkt zu einem anderen. Einen eigenen Text überschreibt das nie.
+- **Was gleich bleibt:** Ob das Modell auf deinem Rechner, in der Cloud oder ungeprüft läuft, welche Daten wohin gehen und dass Shell und Rechner sofort handeln, steht weiter sichtbar in der Karte. Ergebnisse kommen wie bisher erst nach deinem OK in den Vault – dieser Satz steht jetzt direkt am Knopf.
+- **Schmale Fenster:** Unter etwa 1000 Pixel Breite und in der geteilten Ansicht bleibt die Karte einspaltig.
+
 ## [0.11.31-beta] - 2026-10-04
 
 **Die App kann jetzt direkt im Agent-Tab starten.** Unter Einstellungen → Allgemein → Schwerpunkt wählst du „Agent“: Beim nächsten Öffnen landest du sofort bei der Auftragskarte, und der Agent-Knopf steht hervorgehoben in der Titelleiste. Ausgeschaltet wird nichts – Notizen, Dashboard und alle Module bleiben einen Klick entfernt.
