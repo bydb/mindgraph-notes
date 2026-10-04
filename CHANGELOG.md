@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.31-beta] - 2026-10-04
+
+**Die App kann jetzt direkt im Agent-Tab starten.** Unter Einstellungen → Allgemein → Schwerpunkt wählst du „Agent“: Beim nächsten Öffnen landest du sofort bei der Auftragskarte, und der Agent-Knopf steht hervorgehoben in der Titelleiste. Ausgeschaltet wird nichts – Notizen, Dashboard und alle Module bleiben einen Klick entfernt.
+
+### Hintergrund
+
+- **Schon beim Einrichten:** Der Einrichtungsassistent fragt jetzt zuerst „Womit möchtest du hauptsächlich arbeiten?“ – auch wenn du direkt einen vorhandenen Notiz-Ordner öffnest. Bei „Agent“ sagt er ehrlich, wie es auf deinem Rechner aussieht: ob das gewählte Modell in der Cloud rechnet, ob Aufträge mit einem lokalen Modell mehrere Minuten dauern, oder ob noch gar kein Modell gewählt ist.
+- **Nur beim Start:** Die App springt einmal beim Öffnen in den Agent-Tab, nicht bei einem späteren Vault-Wechsel. Eine geänderte Einstellung gilt ab dem nächsten Start.
+- **Kein Modell, kein Start:** Ist für den Agenten noch kein Modell gewählt, zeigt die Auftragskarte das jetzt als eigene Zeile mit „KI einrichten“, statt startklar auszusehen.
+- **Neue Beispiele ohne Unterlagen:** „Projekte zusammenfassen“ und „Überblick über meine Notizen“ funktionieren auch mit dem mitgelieferten Starter-Vault – das bisherige Beispiel zum Datenschutz fand dort nichts.
+- **Seitenleiste:** War die Seitenleiste beim Beenden ausgeblendet, startete die App ohne geladene Notizen. Das ist behoben. Der Dialog „Neue Notiz“ erscheint jetzt auch bei ausgeblendeter Seitenleiste – mittig, ohne sie aufzuklappen – und gibt beim Abbrechen den Fokus an den Editor zurück. Während der Einrichtungsassistent offen ist, öffnen ⌘N und ⌘O nichts mehr im Hintergrund.
+
 ## [0.11.30-beta] - 2026-10-02
 
 **Die Zeitbilanz rechnet Agent-Aufträge jetzt mit deiner eigenen Zeitschätzung je Skill.** Bisher zählte ein Foliensatz genauso viel wie ein kurzes Anschreiben, weil beides nur „Dokument“ war. Jetzt trägst du für jeden Skill ein, wie lange dich so ein Auftrag von Hand kosten würde – unter Einstellungen → Allgemein → Zeitbilanz oder direkt auf der Ergebniskarte, die nach der Übernahme einmal danach fragt.
