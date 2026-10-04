@@ -26,6 +26,7 @@ import { checkTtsLength } from '../shared/ttsLimits'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../shared/emailFetchWindow'
 import { diffKnownMessages, type KnownLocalMessage, type KnownMessageUpdate } from '../shared/emailSync'
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
+import { passwordStoreOverride } from '../shared/linuxPasswordStore'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -40,6 +41,15 @@ if (!app.isPackaged) {
   } catch (err) {
     console.error('[dev] userData-Isolation fehlgeschlagen:', err)
   }
+}
+
+// Linux auf unbekanntem Desktop (Hyprland, Sway …): Chromium wählt sonst den Klartext-Speicher,
+// und safeStorage verweigert JEDES Geheimnis (Sync, Mail, Cloud-Schlüssel). Muss vor app.ready
+// laufen — danach ist der Passwortspeicher festgelegt. Begründung in shared/linuxPasswordStore.ts.
+const passwordStore = passwordStoreOverride(process.platform, process.env, process.argv)
+if (passwordStore) {
+  app.commandLine.appendSwitch('password-store', passwordStore)
+  console.log(`[secrets] unbekannter Desktop (${process.env.XDG_CURRENT_DESKTOP || 'leer'}) → --password-store=${passwordStore}`)
 }
 
 // Lazy-loaded native/heavy Module — beim Start nicht eager geladen (8-GB-Startup-Optimierung).
@@ -10807,7 +10817,14 @@ function registerCloudProviderIpc(provider: CloudChatBackend): void {
   ipcMain.handle(`${provider}-save-key`, async (_event, apiKey: string) => {
     try {
       if (!safeStorage.isEncryptionAvailable()) {
-        return { success: false, error: 'safeStorage nicht verfügbar' }
+        // Vorher nur „safeStorage nicht verfügbar" — damit konnte niemand etwas anfangen.
+        const backend = secretStorageBackend()
+        return {
+          success: false,
+          error: backend
+            ? `Schlüssel nicht gespeichert: kein Passwortspeicher verfügbar (Linux-Speicher: ${backend}). Läuft ein Schlüsselbund (gnome-keyring/KWallet)? Sonst die App mit --password-store=gnome-libsecret starten.`
+            : 'Schlüssel nicht gespeichert: die Verschlüsselung des Betriebssystems ist nicht verfügbar.'
+        }
       }
       const trimmed = (apiKey || '').trim()
       if (!trimmed) {
