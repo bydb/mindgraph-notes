@@ -383,6 +383,21 @@ export function AgentView({ tabId }: Props) {
   // Aktive Zeit am Auftrag: läuft ab dem ersten Tastendruck, pausiert, sobald das
   // Fenster in den Hintergrund geht. Grundlage der Wirkungsbilanz.
   const compose = useComposeMeasurement(tabId)
+  const [exampleMenuOpen, setExampleMenuOpen] = useState(false)
+  const exampleMenuRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!exampleMenuOpen) return
+    const onDown = (e: MouseEvent) => { if (!exampleMenuRef.current?.contains(e.target as Node)) setExampleMenuOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [exampleMenuOpen])
+  const pickExample = (ex: typeof EXAMPLES[number]) => {
+    compose.noteTyping()
+    setInstruction(t(ex.text))
+    useNoteAgentStore.getState().setPickedExample(tabId, { text: t(ex.text), need: ex.need })
+    setExampleMenuOpen(false)
+    inputRef.current?.focus()
+  }
   // Läuft eine Vergleichskampagne und ist ein Fall zugerechnet, wandern die gemessenen
   // Zeiten dieses Laufs zusätzlich als Arbeitssitzungen in den Fall.
   const comparisonCaseId = useComparisonStore(s => s.activeCaseId)
@@ -417,7 +432,6 @@ export function AgentView({ tabId }: Props) {
   const shownShellState: PermState = running ? (runShell ? 'on' : 'off') : shellState
   const shownComputerState: PermState = running ? (runComputer ? 'on' : 'off') : computerState
   const actsNow = running ? runShell || runComputer : shellOn || computerOn
-  const allOff = running ? !runWeb && !runShell && !runComputer : !webOn && !shellOn && !computerOn
   const lockedReason = webState === 'locked'
     ? t('agentCard.permLocked', { a: webLockedBy, b: t('aiBar.web.label') })
     : (shellState === 'locked' || computerState === 'locked')
@@ -443,6 +457,18 @@ export function AgentView({ tabId }: Props) {
   // startklar aus, und der Lauf scheiterte erst im Main (Codex F29).
   const modelMissing = !activeCloudRoute && !effectiveModel.trim()
   const canRun = !!vaultPath && !modelMissing && hasTarget && hasTask && !docsMissing && !webMissing && !resultsPending && !gateBlock && !busy
+
+  // Erste Lücke in derselben Reihenfolge wie der Knopftext. Nur sie wird als Fläche
+  // hervorgehoben; weitere Lücken tragen nur den Punkt am Label — zwei orange Flächen
+  // untereinander lasen sich wie ein Formular voller Fehler (Design-Runde F02).
+  type Gap = 'vault' | 'model' | 'pending' | 'consent' | 'optin' | 'task' | 'docs' | 'web' | 'target' | null
+  const firstGap: Gap = busy ? null : !vaultPath ? 'vault' : modelMissing ? 'model' : resultsPending ? 'pending'
+    : gateBlock === 'consent' ? 'consent' : gateBlock === 'optin' ? 'optin'
+    : !hasTask ? 'task' : docsMissing ? 'docs' : webMissing ? 'web' : !hasTarget ? 'target' : null
+  // Steht die Lücke sichtbar in der Karte (markierte Zeile mit eigener Handlung), heißt
+  // der Knopf schlicht „Starten“ — ein zweiter Knopf „Unterlagen anhängen“ neben „+ Kontext“
+  // war doppelt (Nutzer, 04.10.2026). Lücken ohne eigene Zeile nennt weiter der Knopf.
+  const gapShownInCard = firstGap === 'docs' || firstGap === 'target' || firstGap === 'web' || firstGap === 'model'
 
   const submit = async () => {
     if (!canRun || !vaultPath) return
@@ -533,7 +559,7 @@ export function AgentView({ tabId }: Props) {
 
   return (
     <div className="agent-view">
-      <div className="agent-view-inner">
+      <div className={`agent-view-inner ${run.phase === 'idle' && !starting ? 'is-idle' : ''}`}>
         <div className="agent-card-head">
           <span className="agent-card-logo" aria-hidden="true">
             {customLogo
@@ -547,6 +573,9 @@ export function AgentView({ tabId }: Props) {
         </div>
 
         <div className="agent-card">
+          {/* Zwei Spalten auf breiten Fenstern: links Auftrag + Beispiele, rechts die
+              Bedingungen des Laufs. Schmal liegen beide untereinander. */}
+          <div className="agent-card-main">
           {/* Auftrag */}
           <div className={`agent-card-task ${hasTask ? '' : 'is-missing'}`}>
             <div className="agent-card-task-top">
@@ -565,7 +594,33 @@ export function AgentView({ tabId }: Props) {
               />
               {!hasTask && <span className="agent-card-flag">&#9679; {t('agentCard.taskMissing')}</span>}
             </div>
-            <span className="agent-card-help">{t('agentCard.inputHelp')}</span>
+            <div className="agent-card-task-foot">
+              <span className="agent-card-help">{t('agentCard.inputHelp')}</span>
+              {/* Rückweg zu den Beispielen — nur solange der Text ein unverändertes Beispiel
+                  ist; einen eigenen Entwurf ersetzt ein Klick nicht (Design-Runde F04). */}
+              {hasTask && !busy && pickedExample?.text === instruction && (
+                <div className="agent-card-example-switch" ref={exampleMenuRef}>
+                  <button
+                    type="button"
+                    className="agent-card-link-btn"
+                    aria-expanded={exampleMenuOpen}
+                    onClick={() => setExampleMenuOpen(v => !v)}
+                  >
+                    {t('agentCard.otherExample')}
+                  </button>
+                  {exampleMenuOpen && (
+                    <div className="agent-card-example-menu" role="menu" onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setExampleMenuOpen(false) } }}>
+                      {EXAMPLES.map(ex => (
+                        <button key={ex.text} type="button" role="menuitem" className="agent-card-example-menu-item" onClick={() => pickExample(ex)}>
+                          <span className="agent-card-example-icon is-small" aria-hidden="true"><ExampleGlyph icon={ex.icon} /></span>
+                          {t(ex.title)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Beispiele nur im leeren Zustand: ein Klick füllt den Text, Unterlagen hängt
@@ -579,12 +634,7 @@ export function AgentView({ tabId }: Props) {
                     key={ex.text}
                     type="button"
                     className="agent-card-example"
-                    onClick={() => {
-                      compose.noteTyping()
-                      setInstruction(t(ex.text))
-                      useNoteAgentStore.getState().setPickedExample(tabId, { text: t(ex.text), need: ex.need })
-                      inputRef.current?.focus()
-                    }}
+                    onClick={() => pickExample(ex)}
                   >
                     <span className="agent-card-example-icon" aria-hidden="true"><ExampleGlyph icon={ex.icon} /></span>
                     <span className="agent-card-example-body">
@@ -599,8 +649,11 @@ export function AgentView({ tabId }: Props) {
             </div>
           )}
 
+          </div>
+
+          <div className="agent-card-side">
           {/* Unterlagen */}
-          <div className={`agent-card-row ${docsMissing ? 'is-missing' : ''}`}>
+          <div className={`agent-card-row ${firstGap === 'docs' ? 'is-missing' : docsMissing ? 'is-gap' : ''}`}>
             <span className="agent-card-label">{t('agentCard.rowDocs')}{docsMissing && <> &#9679;</>}</span>
             <div className="agent-card-value">
               <ContextAttachmentRow
@@ -613,15 +666,14 @@ export function AgentView({ tabId }: Props) {
                 attachError={scope.attachError}
                 cloudSelected={false}
               />
-              {docsMissing && <span className="agent-card-missing-title">{t(docsHint)}</span>}
-              {!docsMissing && scope.attachments.length === 0 && <span className="agent-card-muted">{t('agentCard.docsEmpty')}</span>}
-              <span className="agent-card-help">{t('agentCard.docsHelp')}</span>
+              {docsMissing && <span className={firstGap === 'docs' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(docsHint)}</span>}
+              {!docsMissing && scope.attachments.length === 0 && <span className="agent-card-help">{t('agentCard.docsHelp')}</span>}
             </div>
           </div>
 
           {/* Ablage — kein automatischer Vorschlag: der Zielordner ist die Ablage, nicht
               die Datenquelle (Codex F11). */}
-          <div className={`agent-card-row ${hasTarget ? '' : 'is-missing'}`}>
+          <div className={`agent-card-row ${firstGap === 'target' ? 'is-missing' : hasTarget ? '' : 'is-gap'}`}>
             <span className="agent-card-label">
               {t('agentCard.rowTarget')}{!hasTarget && <> &#9679;</>}
             </span>
@@ -639,7 +691,7 @@ export function AgentView({ tabId }: Props) {
                 })()
               ) : (
                 <>
-                  <span className="agent-card-missing-title">{t('agentCard.targetMissing')}</span>
+                  <span className={firstGap === 'target' ? 'agent-card-missing-title' : 'agent-card-muted'}>{t('agentCard.targetMissing')}</span>
                   <span className="agent-card-help">{t('agentCard.targetHelp')}</span>
                 </>
               )}
@@ -690,7 +742,7 @@ export function AgentView({ tabId }: Props) {
           </div>
 
           {/* Befugnisse */}
-          <div className={`agent-card-row is-two-col ${webMissing ? 'is-missing' : ''}`}>
+          <div className={`agent-card-row is-two-col ${firstGap === 'web' ? 'is-missing' : webMissing ? 'is-gap' : ''}`}>
             <span className="agent-card-label">{t('agentCard.rowPerms')}{webMissing && <> &#9679;</>}</span>
             <div className="agent-card-value">
               <div className="agent-card-perms">
@@ -726,13 +778,8 @@ export function AgentView({ tabId }: Props) {
                   </>
                 )}
               </div>
-              {webMissing && <span className="agent-card-missing-title">{t(webHint)}</span>}
+              {webMissing && <span className={firstGap === 'web' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(webHint)}</span>}
               {lockedReason && <span id={lockedReasonId} className="agent-card-muted">{lockedReason}</span>}
-              {allOff && (
-                <span className="agent-card-muted">
-                  {HAS_MAC_TOOLS ? t('agentCard.allOff') : t('agentCard.allOffNoMac')}
-                </span>
-              )}
               {actsNow && (
                 <div className="agent-card-acts">
                   <span className="agent-card-acts-title">{t('agentCard.actsNow')}</span>
@@ -900,15 +947,15 @@ export function AgentView({ tabId }: Props) {
           )}
 
           {/* Gedächtnis: nur „wird berücksichtigt“, wenn es Inhalt gibt — eine leere Notiz
-              erzeugt keinen Gedächtnisblock im Lauf. */}
+              erzeugt keinen Gedächtnisblock im Lauf. Leer (und während der Prüfung) entfällt
+              die Zeile: sie hätte nichts zu tun (Design-Runde F08). „Unbekannt“ bleibt sichtbar. */}
+          {memoryState !== 'empty' && memoryState !== 'checking' && (
           <div className="agent-card-row is-center">
             <span className="agent-card-label">{t('agentCard.rowMemory')}</span>
             <span className={`agent-card-value ${memoryState === 'long' ? 'agent-card-warn-text' : memoryState === 'filled' ? '' : 'agent-card-muted'}`}>
               {t(
-                memoryState === 'empty' ? 'agentCard.memEmpty'
-                : memoryState === 'long' ? 'agentCard.memLong'
+                memoryState === 'long' ? 'agentCard.memLong'
                 : memoryState === 'filled' ? 'agentCard.memFilled'
-                : memoryState === 'checking' ? 'agentCard.memChecking'
                 : 'agentCard.memUnknown'
               )}
             </span>
@@ -916,17 +963,26 @@ export function AgentView({ tabId }: Props) {
               ? <button type="button" className="agent-card-link-btn" onClick={() => void openMemoryNote()}>{t('agentCard.memView')}</button>
               : <span />}
           </div>
+          )}
+          </div>
         </div>
 
         <div className="agent-card-footer">
           <div className="agent-card-footer-text">
-            <span>{t('agentCard.footer')}</span>
+            <span className="agent-card-promise">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/>
+              </svg>
+              {t('agentCard.footer')}
+            </span>
             {actsNow && <span className="agent-card-acts-title">{t('agentCard.footerActsNow')}</span>}
             {!cloudSelected && <span>{t('agentCard.duration')}</span>}
           </div>
-          <button type="button" className={`agent-card-start ${canRun ? 'is-ready' : ''}`} onClick={() => void submit()} disabled={!canRun}>
-            {buttonLabel}{canRun && <span className="agent-card-kbd"> {SUBMIT_KEYS}</span>}
-          </button>
+          <div className="agent-card-actions">
+            <button type="button" className={`agent-card-start ${canRun ? 'is-ready' : ''}`} onClick={() => void submit()} disabled={!canRun}>
+              {gapShownInCard ? t('agentCard.btnStart') : buttonLabel}{canRun && <span className="agent-card-kbd"> {SUBMIT_KEYS}</span>}
+            </button>
+          </div>
         </div>
 
         <AgentRunPanel

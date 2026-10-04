@@ -21404,7 +21404,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   background: var(--bg-primary);
 }
 .agent-view-inner {
-  max-width: 780px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 32px 24px 48px;
   display: flex;
@@ -21435,8 +21435,29 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 13px;
   color: var(--text-primary);
 }
-.agent-card > :first-child { border-radius: 14px 14px 0 0; }
-.agent-card > :last-child { border-radius: 0 0 14px 14px; }
+/* Lesebreite 780 px, solange die Karte einspaltig ist; breit wird sie zweispaltig. */
+.agent-view-inner > * { width: 100%; max-width: 780px; margin-inline: auto; }
+.agent-card-main > :first-child { border-top-left-radius: 14px; border-top-right-radius: 14px; }
+.agent-card-side > :last-child { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+@container (min-width: 1000px) {
+  .agent-view-inner > * { max-width: none; }
+  .agent-card { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); }
+  .agent-card-main { display: flex; flex-direction: column; border-right: 1px solid var(--border-subtle); min-width: 0; }
+  .agent-card-main > .agent-card-task { flex: 1; }
+  .agent-card-main .agent-card-task-top { flex: 1; align-items: stretch; }
+  .agent-card-main .agent-card-flag { align-self: flex-start; }
+  .agent-card-main .agent-card-input { min-height: 120px; resize: none; }
+  .agent-card-main > :first-child { border-top-right-radius: 0; }
+  .agent-card-main > :last-child { border-bottom-left-radius: 14px; }
+  .agent-card-side { min-width: 0; }
+  .agent-card-side > .agent-card-row:first-child { border-top: none; border-top-right-radius: 14px; }
+  .agent-card-side > :last-child { border-bottom-left-radius: 0; }
+  /* Linke Spalte: zwei Beispiele je Reihe, ein einzelnes letztes mittig. */
+  .agent-card-main .agent-card-examples-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .agent-card-main .agent-card-examples-grid > * { grid-column: span 2; }
+  .agent-card-main .agent-card-examples-grid > :nth-child(4):nth-last-child(2) { grid-column: span 2; }
+  .agent-card-main .agent-card-examples-grid > :last-child:nth-child(odd) { grid-column: 2 / span 2; }
+}
 .agent-card-task { display: flex; flex-direction: column; gap: 7px; padding: 13px 16px 10px; }
 /* Leerer Auftrag lädt ein statt zu warnen: weiß; nur der kleine Punkt „Auftrag fehlt“
    markiert die Lücke. Gelb bleibt echten Lücken weiter unten. */
@@ -21490,7 +21511,15 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   flex-direction: column;
   gap: 9px;
 }
-.agent-card-examples-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.agent-card-examples-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.agent-card-examples-grid > * { grid-column: span 2; }
+/* Fünf Beispiele: die zweite Reihe mittig statt Loch rechts unten (Design-Runde F06). */
+.agent-card-examples-grid > :nth-child(4):nth-last-child(2) { grid-column: 2 / span 2; }
+@container (max-width: 700px) {
+  .agent-card-examples-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-card-examples-grid > *,
+  .agent-card-examples-grid > :nth-child(4):nth-last-child(2) { grid-column: auto; }
+}
 /* Kompakte Karte: Symbol, Kurztitel, „Unterlagen → Ergebnis“. Der volle Auftrag landet
    beim Klick im Eingabefeld — dort kann man ihn anpassen. */
 .agent-card-example {
@@ -21529,6 +21558,40 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-card-example-title { font-size: 12.5px; font-weight: 600; line-height: 1.3; }
 .agent-card-example-meta { font-size: 11px; line-height: 1.35; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .agent-card-example-meta .is-accent { color: var(--accent-color); font-weight: 500; }
+.agent-card-example-icon.is-small { width: 22px; height: 22px; border-radius: 6px; }
+.agent-card-example-icon.is-small svg { width: 13px; height: 13px; }
+.agent-card-task-foot { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.agent-card-example-switch { position: relative; flex-shrink: 0; }
+.agent-card-example-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+.agent-card-example-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.agent-card-example-menu-item:hover,
+.agent-card-example-menu-item:focus-visible { background: var(--accent-subtle); outline: none; }
 
 .agent-card-row {
   display: grid;
@@ -21541,6 +21604,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-card-row.is-two-col { grid-template-columns: 96px minmax(0, 1fr); }
 .agent-card-row.is-center { align-items: center; }
 .agent-card-row.is-missing { background: color-mix(in srgb, var(--color-warning) 7%, var(--bg-primary)); }
+.agent-card-row.is-gap .agent-card-label { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
 .agent-card-label { color: var(--text-secondary); font-size: 11.5px; padding-top: 3px; }
 .agent-card-row.is-center .agent-card-label { padding-top: 0; }
 .agent-card-value { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
@@ -21717,7 +21781,18 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-card-out-text { color: color-mix(in srgb, var(--color-warning) 65%, var(--text-primary)); font-size: 12px; line-height: 1.45; }
 .agent-card-warn-text { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
 
-.agent-card-footer { display: flex; justify-content: space-between; align-items: flex-end; gap: 18px; }
+.agent-card-footer { display: flex; justify-content: space-between; align-items: center; gap: 18px; padding: 0 2px; }
+.agent-card-promise { display: inline-flex; align-items: center; gap: 6px; color: var(--text-primary); font-weight: 500; }
+.agent-card-promise svg { color: var(--accent-color); flex-shrink: 0; }
+.agent-card-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+/* Leerlauf bei hohem, breitem Fenster: etwas tiefer beginnen statt oben zu kleben.
+   Im Lauf und im schmalen Split bleibt die Ansicht oben (Design-Runde F01/F07). */
+.agent-card-head { transition: margin-top .25s ease; }
+@media (min-height: 760px) {
+  @container (min-width: 561px) {
+    .agent-view-inner.is-idle > .agent-card-head { margin-top: clamp(0px, calc(8vh - 40px), 56px); }
+  }
+}
 .agent-card-no-local { flex-basis: 100%; }
 /* Schmaler Agent-Tab (Split-Ansicht, kleines Fenster): Beschriftung über den Inhalt,
    Aktion darunter, Fußzeile gestapelt — sonst bleiben für den Inhalt wenige Pixel. */
@@ -21732,9 +21807,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   .agent-card .ai-bar-context-picker.agent-card-picker { left: 0; right: auto; max-width: calc(100cqw - 32px); }
   .agent-card-examples-grid { grid-template-columns: 1fr; }
   .agent-card-footer { flex-direction: column; align-items: stretch; }
-  .agent-card-start { align-self: flex-end; }
+  .agent-card-actions { align-self: flex-end; }
+  .agent-card-examples-grid > *,
+  .agent-card-examples-grid > :nth-child(4):nth-last-child(2) { grid-column: auto; }
 }
-.agent-card-footer-text { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.45; color: var(--text-secondary); max-width: 420px; }
+.agent-card-footer-text { display: flex; flex-direction: column; gap: 5px; font-size: 12px; line-height: 1.45; color: var(--text-secondary); max-width: 520px; }
 .agent-card-start {
   padding: 9px 16px;
   border-radius: 9px;
