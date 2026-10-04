@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="XuIkFK3V33YXi92ZBbb1AsgrCejIxVlfMPM_Zj0Ny3o">
-  <title>MindGraph Notes &ndash; Zeigt dir, was heute wichtig ist</title>
-  <meta name="description" content="Lokaler Workspace, der dir t&auml;glich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist. Markdown, Wissensgraph und lokale KI &ndash; Open Source, E2E-verschl&uuml;sselt, ohne Cloud-Zwang.">
+  <title>MindGraph Notes &ndash; KI-Arbeit, die du nachpr&uuml;fen kannst</title>
+  <meta name="description" content="Lokaler Wissens- und Arbeitsraum, in dem KI-Arbeit nachvollziehbar bleibt: Der Agent erledigt Auftr&auml;ge mit deinen Unterlagen, der Vault-Chat antwortet mit Quellen, das Dashboard zeigt, was heute z&auml;hlt. Open Source, lokal als Standard.">
   <link rel="icon" type="image/svg+xml" href="mindgraph-logo.svg">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
@@ -20,8 +20,8 @@
 
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mindgraph-notes.de/">
-  <meta property="og:title" content="MindGraph Notes &ndash; Zeigt dir, was heute wichtig ist">
-  <meta property="og:description" content="Lokaler Workspace, der deine Notizen, Aufgaben, E-Mails und Dokumente verbindet und nach Relevanz sortiert. Dashboard, Wissensgraph und lokale KI in einer Desktop-App.">
+  <meta property="og:title" content="MindGraph Notes &ndash; KI-Arbeit, die du nachpr&uuml;fen kannst">
+  <meta property="og:description" content="Der Agent erledigt Auftr&auml;ge mit deinen Unterlagen, der Vault-Chat antwortet mit Quellen, gespeichert wird erst nach deiner Zustimmung. Lokaler Wissens- und Arbeitsraum, Open Source.">
   <meta property="og:image" content="https://mindgraph-notes.de/screenshot.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -31,7 +31,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="MindGraph Notes &ndash; Zeigt dir, was heute wichtig ist">
-  <meta name="twitter:description" content="Lokaler Workspace, der Notizen, Aufgaben, E-Mails und Dokumente nach Relevanz sortiert. Open Source, lokal mit KI, E2E-verschl&uuml;sselt.">
+  <meta name="twitter:description" content="Lokaler Wissens- und Arbeitsraum, in dem KI-Arbeit nachvollziehbar bleibt. Agent, Vault-Chat mit Quellen, Dashboard. Open Source, E2E-verschl&uuml;sselt.">
   <meta name="twitter:image" content="https://mindgraph-notes.de/screenshot.png">
 
   <!-- Einzige Stelle, an der die Release-Version steht. Alle sichtbaren Versionsangaben
@@ -44,7 +44,7 @@
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "macOS, Windows, Linux",
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" },
-    "description": "Lokaler Workspace, der dir taeglich zeigt, was in deinen Notizen, Aufgaben und E-Mails wichtig ist. Verbindet Markdown, Wissensgraph, Email, Karteikarten und Dokumente mit lokaler KI und E2E-verschluesseltem Sync.",
+    "description": "Lokaler Wissens- und Arbeitsraum, in dem KI-Arbeit nachvollziehbar bleibt: Agent fuer Auftraege mit eigenen Unterlagen, Vault-Chat mit Quellenangaben, Dashboard, Markdown und Wissensgraph. Lokale KI als Standard, E2E-verschluesselter Sync.",
     "url": "https://mindgraph-notes.de/",
     "downloadUrl": "https://github.com/bydb/mindgraph-notes/releases",
     "screenshot": "https://mindgraph-notes.de/screenshot.png",
@@ -462,6 +462,11 @@
     .agent-accept, .agent-reject { font-size: 11px; padding: 2.5px 8px; border-radius: 6px; }
     .agent-accept { background: #10696b; color: #fff; }
     .agent-reject { background: #fff; border: 1px solid #e4dfd6; color: #91897d; }
+    /* --- Vault-Chat-Kapitel: Antwort mit Fußnoten --- */
+    .vc-answer { font-size: 13.5px; line-height: 1.6; color: #1a1a1a; margin: 12px 2px; }
+    .vc-fn { font-size: 10px; font-weight: 700; color: #10696b; margin: 0 2px 0 1px; }
+    .mock-row .vc-fn { flex: none; width: 14px; text-align: center; }
+    .vc-more { font-size: 11.5px; color: #91897d; margin-top: 8px; padding-left: 2px; }
   </style>
 </head>
 <body>
@@ -498,11 +503,9 @@
       <a class="release-badge" href="#changelog" data-i18n="hero.release">Start im Agent-Tab &middot; v0.11.31</a>
     </div>
 
-    <h1 data-i18n="hero.title">Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em></h1>
+    <h1 data-i18n="hero.title">KI-Arbeit,<br><em>die du nachpr&uuml;fen kannst.</em></h1>
 
-    <p class="hero-sub" data-i18n="hero.sub">
-      MindGraph zeigt dir jeden Morgen, was heute z&auml;hlt &mdash; Aufgaben, Mails, Termine, vergessene F&auml;den. Du gehst aufs Bike, ins Wochenende, liegst mal f&uuml;nf Tage flach. Und nichts f&auml;llt durch. Lokal, ohne Cloud-Zwang.
-    </p>
+    <p class="hero-sub" data-i18n="hero.sub">MindGraph ist dein lokaler Wissens- und Arbeitsraum. Der Agent erledigt Auftr&auml;ge mit deinen Unterlagen, der Vault-Chat antwortet mit Quellen aus deinen Notizen, das Dashboard zeigt jeden Morgen, was z&auml;hlt. Gespeichert wird erst, wenn du zugestimmt hast. Lokal ist der Standard &ndash; Cloud nur, wenn du sie einschaltest.</p>
 
     <div class="hero-cta">
       <a href="#download" class="btn btn-primary">
@@ -635,37 +638,16 @@
 
   <!-- 3 · Der Wechsel -->
   <section class="story shift">
-    <p class="big" data-i18n="st.shift">Was, wenn dein Arbeitsraum <em>mitdenkt</em> &mdash; und dir jeden Morgen zeigt, was heute z&auml;hlt, ohne dich zu ersetzen?</p>
+    <p class="big" data-i18n="st.shift">Was, wenn KI dir Arbeit abnimmt &mdash; <em>und du bei jedem Ergebnis siehst, woher es kommt?</em></p>
   </section>
-
-  <!-- 4a · Klarheit -->
-  <section class="story beat">
-    <div class="beat-text">
-      <div class="num" data-i18n="st.b1.num">WARUM 01 &middot; KLARHEIT</div>
-      <h2 class="st-h" data-i18n="st.b1.h">Das Wichtige von heute &mdash; <em>von selbst.</em></h2>
-      <p class="st-lead" data-i18n="st.b1.lead">Du &ouml;ffnest morgens einen Tab, nicht zehn. MindGraph zeigt &uuml;berf&auml;llige Aufgaben, Mails die Antwort erwarten, heutige Termine &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Warst du f&uuml;nf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.</p>
-      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b1.f"><b>Dashboard &amp; Relevanz-Radar:</b> eine lokale KI bewertet laufend, welche offenen Probleme gerade Aufmerksamkeit brauchen &ndash; und welche wieder auftauchen sollten.</span></div>
-    </div>
-    <div class="beat-img">
-      <div class="product-shot" aria-label="Dashboard und Relevanz-Radar">
-        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span>Dashboard</span></div>
-        <div class="product-body">
-          <div class="product-heading"><b>Dashboard</b><span>Mo, 29. Juni 2026</span></div>
-          <div class="mock-card focus"><div class="mock-label">Heute im Fokus &middot; 2 f&auml;llig</div><div class="mock-row"><span class="mock-dot"></span><span class="grow">Angebot Reinmann finalisieren</span><span class="mock-meta">17:00</span></div></div>
-          <div class="mock-card"><div class="mock-label">Relevante Notizen</div><div class="mock-row"><span class="mock-score">41</span><span class="mock-dot"></span><span class="grow"><b>Erm&ouml;glichung durch KI</b><br><span class="mock-meta">k&uuml;rzlich aktiv</span></span></div><div class="mock-row"><span class="mock-score">28</span><span class="mock-dot green"></span><span class="grow"><b>Optimierung vs. Transformation</b><br><span class="mock-meta">diese Woche</span></span></div></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
 
   <!-- 4a2 · Der Agent -->
-  <section class="story beat rev">
+  <section class="story beat">
     <div class="beat-text">
-      <div class="num" data-i18n="st.bag.num">WARUM 02 &middot; AUFTR&Auml;GE</div>
+      <div class="num" data-i18n="st.bag.num">WARUM 01 &middot; AUFTR&Auml;GE</div>
       <h2 class="st-h" data-i18n="st.bag.h">Sag, was zu tun ist &mdash; <em>und pr&uuml;fe, was dabei herauskommt.</em></h2>
       <p class="st-lead" data-i18n="st.bag.lead">Der Agent ist kein Chatfenster, das Text ausspuckt. Du gibst ihm einen Auftrag und deine Unterlagen &ndash; Excel, Word, PDF, ganze Ordner. Er sucht in deinen eigenen Notizen, arbeitet Schritt f&uuml;r Schritt und legt fertige Dateien vor. Geschrieben wird erst, wenn du zugestimmt hast.</p>
-      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.bag.f"><b>Skills statt Prompt-Basteln:</b> Deine Arbeitsweise bringst du ihm als ganz normale Notiz bei &ndash; offener SKILL.md-Standard. Was du ihm einmal sagst, merkt er sich.</span></div>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.bag.f"><b>Fertige Dateien statt Chattext:</b> PowerPoint nach deiner Vorlage, Word mit deinem Briefkopf, Excel aus einem ganzen Ordner zusammengef&uuml;hrt. Deine Arbeitsweise bringst du ihm als Skill bei &ndash; eine ganz normale Notiz (offener SKILL.md-Standard).</span></div>
     </div>
     <div class="beat-img">
       <div class="product-shot" data-i18n-aria="st.bag.alt" aria-label="Notiz-Agent: Auftrag, Kontext-Dateien und Ergebnis zur Pr&uuml;fung">
@@ -693,10 +675,56 @@
     </div>
   </section>
 
+  <!-- 4a3 · Vault-Chat mit Quellen -->
+  <section class="story beat rev">
+    <div class="beat-text">
+      <div class="num" data-i18n="st.vc.num">WARUM 02 &middot; QUELLEN</div>
+      <h2 class="st-h" data-i18n="st.vc.h">Frag deinen Vault &mdash; <em>und sieh, woher die Antwort kommt.</em></h2>
+      <p class="st-lead" data-i18n="st.vc.lead">Der Vault-Chat beantwortet Fragen &uuml;ber alle deine Notizen und setzt Fu&szlig;noten zu den Stellen, auf die er sich st&uuml;tzt. Die App pr&uuml;ft, welche S&auml;tze zu ihrer Quelle passen, und stellt diese Quellen nach oben &ndash; den Rest klappt sie ein, versteckt ihn aber nie. Findet sie nichts Passendes, sagt sie das, statt zu raten.</p>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.vc.f"><b>Auf deinem Rechner gerechnet:</b> Der Suchindex entsteht lokal und nur, wenn du ihn f&uuml;r einen Vault einschaltest. Die Antworten schreibt ausschlie&szlig;lich ein lokales Modell.</span></div>
+    </div>
+    <div class="beat-img">
+      <div class="product-shot" data-i18n-aria="st.vc.alt" aria-label="Vault-Chat: Frage, Antwort mit Fu&szlig;noten und Quellenliste">
+        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span data-i18n="st.vc.win">Vault-Chat</span></div>
+        <div class="product-body">
+          <div class="agent-prompt" data-i18n="st.vc.q">Was haben wir zur Raumplanung der Projektwoche vereinbart?</div>
+          <div class="vc-answer"><span data-i18n="st.vc.a">Die Workshops finden in den Räumen 1.12 und 1.14 statt.</span><sup class="vc-fn">1</sup> <span data-i18n="st.vc.a2">Der Raumplan geht bis Freitag an die Schulleitung.</span><sup class="vc-fn">2</sup></div>
+          <div class="mock-card agent-review">
+            <div class="mock-label" data-i18n="st.vc.src">Quellen &middot; passen zur Antwort</div>
+            <div class="mock-row"><sup class="vc-fn">1</sup><span class="grow"><b data-i18n="st.vc.s1">Projektwoche Planung</b></span></div>
+            <div class="mock-row"><sup class="vc-fn">2</sup><span class="grow"><b data-i18n="st.vc.s2">Teamsitzung 2. Juli</b></span></div>
+          </div>
+          <div class="vc-more" data-i18n="st.vc.more">Weitere Treffer (2) &middot; eingeklappt</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4a · Klarheit -->
+  <section class="story beat">
+    <div class="beat-text">
+      <div class="num" data-i18n="st.b1.num">WARUM 03 &middot; KLARHEIT</div>
+      <h2 class="st-h" data-i18n="st.b1.h">Das Wichtige von heute &mdash; <em>von selbst.</em></h2>
+      <p class="st-lead" data-i18n="st.b1.lead">Du &ouml;ffnest morgens einen Tab, nicht zehn. MindGraph zeigt &uuml;berf&auml;llige Aufgaben, Mails die Antwort erwarten, heutige Termine &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Warst du f&uuml;nf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.</p>
+      <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b1.f"><b>Dashboard &amp; Relevanz-Radar:</b> zeigt, welche offenen Probleme gerade Aufmerksamkeit brauchen &ndash; nach Fristen, Verkn&uuml;pfungen, passenden Mails und Terminen. Nachvollziehbare Regeln statt Blackbox.</span></div>
+    </div>
+    <div class="beat-img">
+      <div class="product-shot" aria-label="Dashboard und Relevanz-Radar">
+        <div class="product-bar"><span class="traffic"><i></i><i></i><i></i></span><span>Dashboard</span></div>
+        <div class="product-body">
+          <div class="product-heading"><b>Dashboard</b><span>Mo, 29. Juni 2026</span></div>
+          <div class="mock-card focus"><div class="mock-label">Heute im Fokus &middot; 2 f&auml;llig</div><div class="mock-row"><span class="mock-dot"></span><span class="grow">Angebot Reinmann finalisieren</span><span class="mock-meta">17:00</span></div></div>
+          <div class="mock-card"><div class="mock-label">Relevante Notizen</div><div class="mock-row"><span class="mock-score">41</span><span class="mock-dot"></span><span class="grow"><b>Erm&ouml;glichung durch KI</b><br><span class="mock-meta">k&uuml;rzlich aktiv</span></span></div><div class="mock-row"><span class="mock-score">28</span><span class="mock-dot green"></span><span class="grow"><b>Optimierung vs. Transformation</b><br><span class="mock-meta">diese Woche</span></span></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
   <!-- 4b · Alles verbunden -->
   <section class="story beat rev">
     <div class="beat-text">
-      <div class="num" data-i18n="st.b2.num">WARUM 03 &middot; VERBUNDEN</div>
+      <div class="num" data-i18n="st.b2.num">WARUM 04 &middot; VERBUNDEN</div>
       <h2 class="st-h" data-i18n="st.b2.h">Ein Arbeitsraum &mdash; <em>statt acht Apps.</em></h2>
       <p class="st-lead" data-i18n="st.b2.lead">Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und R&uuml;ckverweis &ndash; ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b2.f"><b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail&rarr;Notiz, Tasks &ndash; Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em></span></div>
@@ -718,7 +746,7 @@
   <!-- 4c · Dein Rechner -->
   <section class="story beat">
     <div class="beat-text">
-      <div class="num" data-i18n="st.b3.num">WARUM 04 &middot; DEIN RECHNER</div>
+      <div class="num" data-i18n="st.b3.num">WARUM 05 &middot; DEIN RECHNER</div>
       <h2 class="st-h" data-i18n="st.b3.h">KI auf deinem Rechner — <em>deine Daten bleiben bei dir.</em></h2>
       <p class="st-lead" data-i18n="st.b3.lead">Viele KI-Tools stellen dich vor eine falsche Wahl: Komfort in der Cloud oder Kontrolle &uuml;ber deine Daten. MindGraph l&ouml;st das lokal &ndash; mit Modellen auf deinem Rechner (Ollama/LM&nbsp;Studio), ohne Cloud-Pflicht und ohne Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir geh&ouml;ren.</p>
       <div class="beat-feature"><span class="ic">&#10003;</span><span data-i18n="st.b3.f"><b>Lokale KI &amp; offene Daten:</b> <b>48&nbsp;%</b> der Unternehmen nennen Datenschutz-Anforderungen als gr&ouml;&szlig;tes KI-Hemmnis <span style="color:var(--text-muted)">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.</span></div>
@@ -746,7 +774,7 @@
   <!-- 4d · Du denkst weiter (Kognition + Test) -->
   <div class="kogband" id="kognition">
     <div class="kogband-in">
-      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.b4.label">Warum 05 &middot; Du denkst weiter</span></div>
+      <div class="st-eyebrow"><span class="d"></span><span data-i18n="st.b4.label">Warum 06 &middot; Du denkst weiter</span></div>
       <h2 class="st-h" style="font-size:clamp(1.8rem,4vw,2.8rem)" data-i18n="st.b4.h">KI, die dein Denken st&auml;rkt &mdash; <em>statt es zu ersetzen.</em></h2>
       <p class="st-lead" data-i18n="st.b4.lead">Wer Denken blind auslagert, verlernt es. In einer MIT-Studie zeigten Menschen, die mit einem Sprachmodell schrieben, die <b>schw&auml;chste Gehirnvernetzung</b> &ndash; viele konnten ihren eben verfassten Text nicht einmal wiedergeben <span style="color:var(--text-muted)">(Kosmyna et&nbsp;al. 2025, MIT Media Lab)</span>. MindGraph ist daf&uuml;r gebaut, dass du im Spiel bleibst: aktives Erinnern, Reflexion, bewusste Freigabe.</p>
       <div class="kogband-mini">
@@ -860,7 +888,7 @@
       <div>
         <div class="how-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
         <h3 data-i18n="how.p0h">Dein Tag auf einen Blick</h3>
-        <p data-i18n="how.p0">Ein Tab statt zehn: &uuml;berf&auml;llige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Eine lokale KI bewertet laufend, welche offenen Probleme Aufmerksamkeit brauchen &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Auch nach f&uuml;nf Tagen Pause liegt alles sortiert da.</p>
+        <p data-i18n="how.p0">Ein Tab statt zehn: &uuml;berf&auml;llige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Das Relevanz-Radar zeigt nach Fristen, Verkn&uuml;pfungen und passenden Mails, welche offenen Probleme Aufmerksamkeit brauchen &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Auch nach f&uuml;nf Tagen Pause liegt alles sortiert da.</p>
       </div>
       <div class="how-visual">
         <div class="halo"></div>
@@ -1337,7 +1365,7 @@
           <div>
             <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></div>
             <h3 data-i18n="cap.dashboard.title">Dashboard, Morning Briefing &amp; Relevante Notizen</h3>
-            <p data-i18n="cap.dashboard.desc">Der Tab, den du morgens &ouml;ffnest. &Uuml;berf&auml;llige Aufgaben, Emails die Antwort erwarten, heutige Termine, neue Anmeldungen &ndash; und 🔴-Probleme, deren Aktualit&auml;t eine lokale KI laufend bewertet, damit vergessene Notizen wieder ins Sichtfeld kommen.</p>
+            <p data-i18n="cap.dashboard.desc">Der Tab, den du morgens &ouml;ffnest. &Uuml;berf&auml;llige Aufgaben, Emails die Antwort erwarten, heutige Termine, neue Anmeldungen &ndash; und 🔴-Probleme, die das Relevanz-Radar nach Fristen und Verkn&uuml;pfungen nach oben holt, damit vergessene Notizen wieder ins Sichtfeld kommen.</p>
             <div class="cap-tags">
               <span class="cap-tag">Widgets</span>
               <span class="cap-tag">Briefing</span>
@@ -1350,8 +1378,7 @@
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f1">Aufgaben, &uuml;berf&auml;llig &middot; heute &middot; diese Woche</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f2">Emails mit Antwort-Dringlichkeit (Ollama)</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f3">Kalender via EventKit / lokaler API</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f7">Relevante Notizen mit KI-Begr&uuml;ndung statt nur Schlagworten</span></li>
-            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f8">Smart-Pairing 🔴 Problem &harr; 🟢 L&ouml;sung &middot; Closing-Workflow</span></li>
+            <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f7">Relevante Notizen nach Fristen, Backlinks, Mails und Terminen</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f9">Schl&auml;ft-Bucket f&uuml;r still gewordene Notizen (&gt; 14 Tage)</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f4">Widgets frei konfigurierbar pro Profil</span></li>
             <li><span class="cap-check">&#10003;</span> <span data-i18n="cap.dashboard.f5">Tab im Workspace &ndash; nicht Side-Panel</span></li>
@@ -1405,8 +1432,8 @@
       <!-- Telegram Bot -->
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/><path d="M8 10h.01"/><path d="M12 10h.01"/><path d="M16 10h.01"/></svg></div>
-        <h3 data-i18n="cap.telegram.title">Telegram-Bot</h3>
-        <p data-i18n="cap.telegram.desc">Dein Vault, deine Tasks, dein Kalender &ndash; unterwegs per Telegram abfragen. Bot l&auml;uft lokal in MindGraph, Daten verlassen den Rechner nicht. Ollama oder Anthropic als LLM-Backend, frei w&auml;hlbar.</p>
+        <h3 data-i18n="cap.telegram.title">Telegram-Bot (experimentell)</h3>
+        <p data-i18n="cap.telegram.desc">Vault, Aufgaben und Kalender unterwegs per Telegram abfragen. Der Bot l&auml;uft in MindGraph auf deinem Rechner; die Nachrichten gehen &uuml;ber Telegram, die Antworten rechnet Ollama lokal oder &ndash; wenn du es w&auml;hlst &ndash; Anthropic. Experimentell, standardm&auml;&szlig;ig aus.</p>
         <div class="cap-tags">
           <span class="cap-tag">/today</span>
           <span class="cap-tag">/agenda</span>
@@ -1433,7 +1460,7 @@
       <div class="cap-card fade-in">
         <div class="cap-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 01-1.287 1.288L3 12l5.8 1.9a2 2 0 011.288 1.287L12 21l1.9-5.8a2 2 0 011.287-1.288L21 12l-5.8-1.9a2 2 0 01-1.288-1.287Z"/></svg></div>
         <h3 data-i18n="cap.ai.title">Lokale KI</h3>
-        <p data-i18n="cap.ai.desc">Notes-Chat, Smart Connections, LanguageTool, Vision OCR und Whisper-Diktat &ndash; alles gegen Ollama oder LM Studio auf deinem Rechner. Diktieren l&auml;uft offline im Browser, ohne Installation. Terminal mit OpenCode oder Claude Code integriert.</p>
+        <p data-i18n="cap.ai.desc">Notes-Chat, Vault-Chat mit Quellenangaben, Smart Connections, LanguageTool, Vision OCR und Whisper-Diktat &ndash; gegen Ollama oder LM Studio auf deinem Rechner. Diktieren l&auml;uft offline in der App. Terminal mit OpenCode oder Claude Code integriert.</p>
         <div class="cap-tags">
           <span class="cap-tag">Ollama</span>
           <span class="cap-tag">LM Studio</span>
@@ -1477,13 +1504,13 @@
     <div class="compare-header">
       <div class="section-label" data-i18n="compare.label">Warum MindGraph Notes</div>
       <h2 class="section-heading" data-i18n="compare.heading">Ein integrierter Arbeitsplatz &mdash;<br>statt acht Apps und 30 Plugins.</h2>
-      <p class="section-sub" data-i18n="compare.sub">MindGraph ist f&uuml;r Einzelk&auml;mpfer, Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kernfunktionen sind eingebaut; signierte Plugins erweitern den Arbeitsraum gezielt.</p>
+      <p class="section-sub" data-i18n="compare.sub">MindGraph ist f&uuml;r Einzelk&auml;mpfer und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kernfunktionen sind eingebaut; signierte Plugins erweitern den Arbeitsraum gezielt.</p>
     </div>
 
     <div class="compare-grid">
       <div class="compare-card accent">
         <h3 data-i18n="compare.c1.title">Dashboard als Startpunkt</h3>
-        <p data-i18n="compare.c1.desc">Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: &uuml;berf&auml;llige Tasks, Emails mit Antwort-Pflicht, heutige Termine &mdash; und 🔴-Probleme, deren Relevanz eine lokale KI laufend bewertet, damit nichts in Vergessenheit ger&auml;t.</p>
+        <p data-i18n="compare.c1.desc">Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: &uuml;berf&auml;llige Tasks, Emails mit Antwort-Pflicht, heutige Termine &mdash; und 🔴-Probleme, die das Relevanz-Radar nach Fristen und Verkn&uuml;pfungen nach oben holt, damit nichts in Vergessenheit ger&auml;t.</p>
       </div>
       <div class="compare-card">
         <h3 data-i18n="compare.c2.title">Email direkt im Arbeitsraum</h3>
@@ -1491,7 +1518,7 @@
       </div>
       <div class="compare-card">
         <h3 data-i18n="compare.c3.title">Lokale KI als Standard</h3>
-        <p data-i18n="compare.c3.desc">Ollama oder LM Studio auf deinem Rechner. Kein OpenAI-Key, kein Datenabfluss. Notes-Chat, Email-Analyse, Smart Connections, Grammatikpr&uuml;fung &mdash; alles auf deiner Hardware.</p>
+        <p data-i18n="compare.c3.desc">Ollama oder LM Studio auf deinem Rechner sind der Standard &mdash; ohne Konto, ohne Datenabfluss. Cloud-Modelle schaltest du nur bewusst und pro Funktion zu. Notes-Chat, Vault-Chat, Smart Connections, Grammatikpr&uuml;fung &mdash; auf deiner Hardware.</p>
       </div>
       <div class="compare-card">
         <h3 data-i18n="compare.c4.title">Offene Daten statt Lock-in</h3>
@@ -1609,6 +1636,10 @@
       <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.templates">Templates</span></span>
       <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.transport">Quick Capture</span></span>
       <span class="module-chip core"><span class="chip-dot"></span><span data-i18n="modules.core.sync">E2E Sync</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.agent">Agent</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.vaultchat">Vault-Chat mit Quellen</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.webresearch">Webrecherche</span></span>
+      <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.workflow">Workflow Canvas</span></span>
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.noteschat">Notes-Chat</span></span>
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.smartconn">Smart Connections</span></span>
       <span class="module-chip"><span class="chip-dot"></span><span data-i18n="modules.opt.languagetool">LanguageTool</span></span>
@@ -1689,11 +1720,11 @@
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q2">Brauche ich Ollama?</h3>
-      <p data-i18n="faq.a2">F&uuml;r den vollen Funktionsumfang ja. MindGraph nutzt Ollama als lokale KI-Schicht: Tagesres&uuml;mee (Brain), E-Mail-Analyse, Aufgaben-Extraktion, Projekt-Status, Smart Connections und das Workflow-Canvas laufen dar&uuml;ber &ndash; komplett auf deinem Rechner, ohne Cloud. Editor, Wissensgraph, Dashboard und Sync funktionieren auch ohne Ollama; die meisten KI-Module fehlen dann aber. Ollama l&auml;dst du einmal von <a href="https://ollama.ai" target="_blank" rel="noopener noreferrer">ollama.ai</a> herunter.</p>
+      <p data-i18n="faq.a2">F&uuml;r die KI-Funktionen brauchst du ein Sprachmodell. Standard ist ein lokales Modell &uuml;ber Ollama oder LM Studio &ndash; dann bleibt alles auf deinem Rechner. Bei schwacher Hardware kannst du f&uuml;r einzelne Funktionen bewusst ein Cloud-Modell einschalten (LLMBase in der EU oder OpenRouter); Brain und der E-Mail-Chat bleiben immer lokal. Editor, Wissensgraph, Dashboard und Sync funktionieren auch ganz ohne KI.</p>
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q3">Was ist MindGraph eigentlich?</h3>
-      <p data-i18n="faq.a3">Eine lokale Arbeitsumgebung mit drei Schwerpunkten: erstens KI auf dem eigenen Rechner &ndash; Tagesres&uuml;mee, Posteingang-Analyse, Projekt-Status und Workflow-Automation, ohne dass Daten den Rechner verlassen. Zweitens ein integrierter Kern aus Markdown-Editor, Wissensgraph, Posteingang und Aufgaben, gezielt erweiterbar durch signierte Plugins. Drittens ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.</p>
+      <p data-i18n="faq.a3">Ein lokaler Wissens- und Arbeitsraum, in dem KI-Arbeit nachvollziehbar bleibt. Drei Dinge machen das aus: Der Agent erledigt Auftr&auml;ge mit deinen Unterlagen und legt die Ergebnisse zur Pr&uuml;fung vor, bevor etwas gespeichert wird. Der Vault-Chat beantwortet Fragen &uuml;ber deine Notizen mit Quellenangaben. Und das Dashboard zeigt jeden Morgen, was z&auml;hlt. Darunter liegt ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.</p>
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q4">Funktionieren bestehende Markdown-Notizen?</h3>
@@ -1701,7 +1732,7 @@
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q5">Wo liegen meine Daten?</h3>
-      <p data-i18n="faq.a5">Auf deinem Rechner. Keine Cloud, keine Telemetrie, keine Tracker. Der optionale Sync ist Ende-zu-Ende verschl&uuml;sselt (AES-256-GCM, scrypt-Key-Derivation) &ndash; der Server sieht nur verschl&uuml;sselte Daten, die Passphrase verl&auml;sst nie dein Ger&auml;t.</p>
+      <p data-i18n="faq.a5">Auf deinem Rechner. Standardm&auml;&szlig;ig keine Cloud, keine Telemetrie, keine Tracker. Cloud-Modelle, Webrecherche oder Bildgenerierung schaltest du nur bewusst ein &ndash; die App sagt dir dann, welche Daten wohin gehen. Der optionale Sync ist Ende-zu-Ende verschl&uuml;sselt (AES-256-GCM, scrypt-Key-Derivation) &ndash; der Server sieht nur verschl&uuml;sselte Daten, die Passphrase verl&auml;sst nie dein Ger&auml;t.</p>
     </div>
     <div class="faq-item">
       <h3 data-i18n="faq.q6">Ist die App stabil? Sie ist im Beta.</h3>
@@ -1778,6 +1809,23 @@
   <script>
     const translations = {
       de: {
+        "modules.opt.workflow": "Workflow Canvas",
+        "modules.opt.webresearch": "Webrecherche",
+        "modules.opt.vaultchat": "Vault-Chat mit Quellen",
+        "modules.opt.agent": "Agent",
+        "st.vc.more": "Weitere Treffer (2) &middot; eingeklappt",
+        "st.vc.s2": "Teamsitzung 2. Juli",
+        "st.vc.s1": "Projektwoche Planung",
+        "st.vc.src": "Quellen &middot; passen zur Antwort",
+        "st.vc.a2": "Der Raumplan geht bis Freitag an die Schulleitung.",
+        "st.vc.a": "Die Workshops finden in den Räumen 1.12 und 1.14 statt.",
+        "st.vc.q": "Was haben wir zur Raumplanung der Projektwoche vereinbart?",
+        "st.vc.alt": "Vault-Chat: Frage, Antwort mit Fu&szlig;noten und Quellenliste",
+        "st.vc.win": "Vault-Chat",
+        "st.vc.f": "<b>Auf deinem Rechner gerechnet:</b> Der Suchindex entsteht lokal und nur, wenn du ihn f&uuml;r einen Vault einschaltest. Die Antworten schreibt ausschlie&szlig;lich ein lokales Modell.",
+        "st.vc.lead": "Der Vault-Chat beantwortet Fragen &uuml;ber alle deine Notizen und setzt Fu&szlig;noten zu den Stellen, auf die er sich st&uuml;tzt. Die App pr&uuml;ft, welche S&auml;tze zu ihrer Quelle passen, und stellt diese Quellen nach oben &ndash; den Rest klappt sie ein, versteckt ihn aber nie. Findet sie nichts Passendes, sagt sie das, statt zu raten.",
+        "st.vc.h": "Frag deinen Vault &mdash; <em>und sieh, woher die Antwort kommt.</em>",
+        "st.vc.num": "WARUM 02 &middot; QUELLEN",
         "cloud.label": "Neu &middot; Cloud nach deiner Entscheidung",
         "cloud.heading": "Gro&szlig;e Modelle.<br>Auch auf kleinen Rechnern.",
         "cloud.sub": "Manche Aufgaben verdienen ein Flaggschiff-Modell &mdash; aber dein Laptop hat 8&nbsp;GB RAM. Daf&uuml;r gibt es jetzt zwei Cloud-Ausg&auml;nge, beide strikt opt-in und pro Funktion einzeln freigeschaltet.",
@@ -1821,15 +1869,15 @@
         "st.enemy.s3n": "1 Tag",
         "st.enemy.s3": "krank, im Stau oder abgelenkt – und das Kartenhaus aus Merkzetteln im Kopf wackelt.",
         "st.enemy.s3src": "dein Alltag",
-        "st.shift": "Was, wenn dein Arbeitsraum <em>mitdenkt</em> — und dir jeden Morgen zeigt, was heute zählt, ohne dich zu ersetzen?",
-        "st.b1.num": "WARUM 01 · KLARHEIT",
+        "st.shift": "Was, wenn KI dir Arbeit abnimmt &mdash; <em>und du bei jedem Ergebnis siehst, woher es kommt?</em>",
+        "st.b1.num": "WARUM 03 &middot; KLARHEIT",
         "st.b1.h": "Das Wichtige von heute — <em>von selbst.</em>",
         "st.b1.lead": "Du öffnest morgens einen Tab, nicht zehn. MindGraph zeigt überfällige Aufgaben, Mails die Antwort erwarten, heutige Termine – und holt vergessene Notizen zurück ins Sichtfeld. Warst du fünf Tage weg? Es liegt alles da, sortiert nach Relevanz. Nichts verloren.",
-        "st.b1.f": "<b>Dashboard &amp; Relevanz-Radar:</b> eine lokale KI bewertet laufend, welche offenen Probleme gerade Aufmerksamkeit brauchen – und welche wieder auftauchen sollten.",
-        "st.bag.num": "WARUM 02 · AUFTRÄGE",
+        "st.b1.f": "<b>Dashboard &amp; Relevanz-Radar:</b> zeigt, welche offenen Probleme gerade Aufmerksamkeit brauchen &ndash; nach Fristen, Verkn&uuml;pfungen, passenden Mails und Terminen. Nachvollziehbare Regeln statt Blackbox.",
+        "st.bag.num": "WARUM 01 &middot; AUFTR&Auml;GE",
         "st.bag.h": "Sag, was zu tun ist — <em>und prüfe, was dabei herauskommt.</em>",
         "st.bag.lead": "Der Agent ist kein Chatfenster, das Text ausspuckt. Du gibst ihm einen Auftrag und deine Unterlagen – Excel, Word, PDF, ganze Ordner. Er sucht in deinen eigenen Notizen, arbeitet Schritt für Schritt und legt fertige Dateien vor. Geschrieben wird erst, wenn du zugestimmt hast.",
-        "st.bag.f": "<b>Skills statt Prompt-Basteln:</b> Deine Arbeitsweise bringst du ihm als ganz normale Notiz bei – offener SKILL.md-Standard. Was du ihm einmal sagst, merkt er sich.",
+        "st.bag.f": "<b>Fertige Dateien statt Chattext:</b> PowerPoint nach deiner Vorlage, Word mit deinem Briefkopf, Excel aus einem ganzen Ordner zusammengef&uuml;hrt. Deine Arbeitsweise bringst du ihm als Skill bei &ndash; eine ganz normale Notiz (offener SKILL.md-Standard).",
         "st.bag.win": "Notiz-Agent",
         "st.bag.alt": "Notiz-Agent: Auftrag, Kontext-Dateien und Ergebnis zur Prüfung",
         "st.bag.m1": "„Fasse den Projektordner Digitalpakt zu einem Statusbericht zusammen.“",
@@ -1845,15 +1893,15 @@
         "st.bag.file": "Statusbericht Digitalpakt II.md",
         "st.bag.ok": "Übernehmen",
         "st.bag.no": "Verwerfen",
-        "st.b2.num": "WARUM 03 · VERBUNDEN",
+        "st.b2.num": "WARUM 04 &middot; VERBUNDEN",
         "st.b2.h": "Ein Arbeitsraum — <em>statt acht Apps.</em>",
         "st.b2.lead": "Notizen, Aufgaben, Mails, Dokumente, Wissensgraph: alles an einem Ort, alles verlinkt. Eine relevante Mail wird zur Notiz mit Aufgabe und Rückverweis – ohne Copy&amp;Paste zwischen zehn Programmen. Weniger Wechsel, weniger Reibung, weniger verloren.",
         "st.b2.f": "<b>Ein Vault statt Tool-Wildwuchs:</b> Markdown, Wissensgraph, Mail→Notiz, Tasks – Module schaltest du nach Bedarf an. <em>1 Arbeitsraum statt 8 Apps und 30 Plugins.</em>",
-        "st.b3.num": "WARUM 04 · DEIN RECHNER",
+        "st.b3.num": "WARUM 05 &middot; DEIN RECHNER",
         "st.b3.h": "KI auf deinem Rechner — <em>deine Daten bleiben bei dir.</em>",
         "st.b3.lead": "Viele KI-Tools stellen dich vor eine falsche Wahl: Komfort in der Cloud oder Kontrolle über deine Daten. MindGraph löst das lokal – mit Modellen auf deinem Rechner (Ollama/LM Studio), ohne Cloud-Pflicht und ohne Telemetrie. Deine Notizen bleiben Markdown-Dateien, die dir gehören.",
         "st.b3.f": "<b>Lokale KI &amp; offene Daten:</b> <b>48 %</b> der Unternehmen nennen Datenschutz-Anforderungen als größtes KI-Hemmnis <span style=\"color:var(--text-muted)\">(Bitkom 2025)</span>. MindGraph braucht diesen Kompromiss nicht.",
-        "st.b4.label": "Warum 05 · Du denkst weiter",
+        "st.b4.label": "Warum 06 &middot; Du denkst weiter",
         "st.b4.h": "KI, die dein Denken stärkt — <em>statt es zu ersetzen.</em>",
         "st.b4.lead": "Wer Denken blind auslagert, verlernt es. In einer MIT-Studie zeigten Menschen, die mit einem Sprachmodell schrieben, die <b>schwächste Gehirnvernetzung</b> – viele konnten ihren eben verfassten Text nicht einmal wiedergeben <span style=\"color:var(--text-muted)\">(Kosmyna et al. 2025, MIT Media Lab)</span>. MindGraph ist dafür gebaut, dass du im Spiel bleibst: aktives Erinnern, Reflexion, bewusste Freigabe.",
         "st.b4.gain": "<b>↑ Du gewinnst</b>Aktives Erinnern (Karteikarten), Reflexion (Brain), Mensch-in-der-Schleife.",
@@ -1892,7 +1940,7 @@
         "how.t3": "Lernen &amp; Karteikarten",
         "how.t4": "Agent &amp; Skills",
         "how.p0h": "Dein Tag auf einen Blick",
-        "how.p0": "Ein Tab statt zehn: überfällige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Eine lokale KI bewertet laufend, welche offenen Probleme Aufmerksamkeit brauchen – und holt vergessene Notizen zurück ins Sichtfeld. Auch nach fünf Tagen Pause liegt alles sortiert da.",
+        "how.p0": "Ein Tab statt zehn: &uuml;berf&auml;llige Aufgaben, Mails mit Antwort-Dringlichkeit, heutige Termine. Das Relevanz-Radar zeigt nach Fristen, Verkn&uuml;pfungen und passenden Mails, welche offenen Probleme Aufmerksamkeit brauchen &ndash; und holt vergessene Notizen zur&uuml;ck ins Sichtfeld. Auch nach f&uuml;nf Tagen Pause liegt alles sortiert da.",
         "how.p1h": "Alles verbunden",
         "how.p1": "Notizen, Aufgaben, Mails und Dokumente in einem Vault – verlinkt im Wissensgraph. Eine relevante Mail wird zur Notiz mit Aufgabe und Rückverweis, ohne Copy&amp;Paste zwischen Programmen. Dein bestehender Markdown-/Obsidian-Vault öffnet 1:1.",
         "how.p2h": "KI auf deinem Rechner",
@@ -1912,21 +1960,21 @@
         "hero.soundOn": "Ton an",
         "hero.soundOff": "Ton aus",
         "hero.videoAlt": "Ablauf in der App: eine E-Mail trifft ein, die Aufgabe darin wird erkannt, daraus entsteht eine Notiz, und am nächsten Morgen steht alles im Dashboard.",
-        "hero.title": "Der Fokus bleibt.<br><em>Auch wenn das Leben dazwischenkommt.</em>",
-        "hero.sub": "MindGraph zeigt dir jeden Morgen, was heute z\u00e4hlt \u2014 Aufgaben, Mails, Termine, vergessene F\u00e4den. Du gehst aufs Bike, ins Wochenende, liegst mal f\u00fcnf Tage flach. Und nichts f\u00e4llt durch. Lokal, ohne Cloud-Zwang.",
+        "hero.title": "KI-Arbeit,<br><em>die du nachpr&uuml;fen kannst.</em>",
+        "hero.sub": "MindGraph ist dein lokaler Wissens- und Arbeitsraum. Der Agent erledigt Auftr&auml;ge mit deinen Unterlagen, der Vault-Chat antwortet mit Quellen aus deinen Notizen, das Dashboard zeigt jeden Morgen, was z&auml;hlt. Gespeichert wird erst, wenn du zugestimmt hast. Lokal ist der Standard &ndash; Cloud nur, wenn du sie einschaltest.",
         "hero.cta": "Kostenlos herunterladen",
         "cap.label": "Was der Workspace kann",
         "cap.heading": "Ein Arbeitsraum,<br>Module nach Bedarf.",
         "cap.sub": "Dashboard, Editor, Aufgaben und Wissensgraph sind immer dabei. Email, Lernen, KI, Ger\u00e4te und Fachintegrationen schaltest du pro Modul an, wenn du sie brauchst.",
         "cap.dashboard.title": "Dashboard, Morning Briefing & Relevante Notizen",
-        "cap.dashboard.desc": "Der Tab, den du morgens \u00f6ffnest. \u00dcberf\u00e4llige Aufgaben, Emails die Antwort erwarten, heutige Termine, neue Anmeldungen \u2013 und \ud83d\udd34-Probleme, deren Aktualit\u00e4t eine lokale KI laufend bewertet, damit vergessene Notizen wieder ins Sichtfeld kommen.",
+        "cap.dashboard.desc": "Der Tab, den du morgens &ouml;ffnest. &Uuml;berf&auml;llige Aufgaben, Emails die Antwort erwarten, heutige Termine, neue Anmeldungen &ndash; und 🔴-Probleme, die das Relevanz-Radar nach Fristen und Verkn&uuml;pfungen nach oben holt, damit vergessene Notizen wieder ins Sichtfeld kommen.",
         "cap.dashboard.f1": "Aufgaben, \u00fcberf\u00e4llig \u00b7 heute \u00b7 diese Woche",
         "cap.dashboard.f2": "Emails mit Antwort-Dringlichkeit (Ollama)",
         "cap.dashboard.f3": "Kalender via EventKit / lokaler API",
         "cap.dashboard.f4": "Widgets frei konfigurierbar pro Profil",
         "cap.dashboard.f5": "Tab im Workspace \u2013 nicht Side-Panel",
         "cap.dashboard.f6": "Morgen-Briefing einmal pro Tag",
-        "cap.dashboard.f7": "Relevante Notizen mit KI-Begr\u00fcndung statt nur Schlagworten",
+        "cap.dashboard.f7": "Relevante Notizen nach Fristen, Backlinks, Mails und Terminen",
         "cap.dashboard.f8": "Smart-Pairing \ud83d\udd34 Problem \u2194 \ud83d\udfe2 L\u00f6sung \u00b7 Closing-Workflow",
         "cap.dashboard.f9": "Schl\u00e4ft-Bucket f\u00fcr still gewordene Notizen (> 14 Tage)",
         "cap.notes.title": "Wissensraum & Graph",
@@ -1935,25 +1983,25 @@
         "cap.email.desc": "IMAP + SMTP. Lokales Ollama bewertet Relevanz, erkennt Termine, pr\u00fcft Kalender-Konflikte, generiert Antwort-Entw\u00fcrfe \u2013 alles ohne Cloud-Analyse. Optional aktivierbar.",
         "cap.workflow.title": "Workflow Canvas",
         "cap.workflow.desc": "Verbinde deine Module zu Abl\u00e4ufen: E-Mail, Projekte, lokale KI und Notizen werden zu Bausteinen mit typisierten Ports auf einem Canvas. Trockenlauf zum Pr\u00fcfen, echte L\u00e4ufe gegen lokales Ollama \u2013 und menschliche Freigabe als bewusster Halt. Opt-in-Modul.",
-        "cap.telegram.title": "Telegram-Bot",
-        "cap.telegram.desc": "Dein Vault, deine Tasks, dein Kalender \u2013 unterwegs per Telegram abfragen. Bot l\u00e4uft lokal in MindGraph, Daten verlassen den Rechner nicht. Ollama oder Anthropic als LLM-Backend, frei w\u00e4hlbar.",
+        "cap.telegram.title": "Telegram-Bot (experimentell)",
+        "cap.telegram.desc": "Vault, Aufgaben und Kalender unterwegs per Telegram abfragen. Der Bot l&auml;uft in MindGraph auf deinem Rechner; die Nachrichten gehen &uuml;ber Telegram, die Antworten rechnet Ollama lokal oder &ndash; wenn du es w&auml;hlst &ndash; Anthropic. Experimentell, standardm&auml;&szlig;ig aus.",
         "cap.learn.title": "Lernen & Flashcards",
         "cap.learn.desc": "Karteikarten mit Spaced Repetition (SM-2), KI-Quiz-Generierung direkt aus deinen Notizen, Anki-Import, Lernstreak und Aktivit\u00e4ts-Heatmap.",
         "cap.ai.title": "Lokale KI",
-        "cap.ai.desc": "Notes-Chat, Smart Connections, LanguageTool, Vision OCR und Whisper-Diktat \u2013 alles gegen Ollama oder LM Studio auf deinem Rechner. Diktieren l\u00e4uft offline im Browser, ohne Installation. Terminal mit OpenCode oder Claude Code integriert.",
+        "cap.ai.desc": "Notes-Chat, Vault-Chat mit Quellenangaben, Smart Connections, LanguageTool, Vision OCR und Whisper-Diktat &ndash; gegen Ollama oder LM Studio auf deinem Rechner. Diktieren l&auml;uft offline in der App. Terminal mit OpenCode oder Claude Code integriert.",
         "cap.integrations.title": "Integrationen",
         "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress-Publishing, edoobox-Agent f\u00fcr Veranstaltungsmanagement. Jede Integration ein Toggle.",
         "cap.security.title": "Sicherheit & Sync",
         "cap.security.desc": "Standardm\u00e4\u00dfig lokal. Optionaler E2E-verschl\u00fcsselter Sync (AES-256-GCM, Zero-Knowledge). Keine Telemetrie. DOMPurify-Sanitization und geh\u00e4rteter Prompt-Injection-Schutz im KI-Modul.",
         "compare.label": "Warum MindGraph Notes",
         "compare.heading": "Ein integrierter Arbeitsplatz \u2014<br>statt acht Apps und 30 Plugins.",
-        "compare.sub": "MindGraph ist f\u00fcr Einzelk\u00e4mpfer, Teams und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kernfunktionen sind eingebaut; signierte Plugins erweitern den Arbeitsraum gezielt.",
+        "compare.sub": "MindGraph ist f&uuml;r Einzelk&auml;mpfer und Power-User, die Wissen, Emails, Aufgaben, Dokumente und KI nicht in zehn Tools verteilen wollen. Kernfunktionen sind eingebaut; signierte Plugins erweitern den Arbeitsraum gezielt.",
         "compare.c1.title": "Dashboard als Startpunkt",
-        "compare.c1.desc": "Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: \u00fcberf\u00e4llige Tasks, Emails mit Antwort-Pflicht, heutige Termine \u2014 und \ud83d\udd34-Probleme, deren Relevanz eine lokale KI laufend bewertet, damit nichts in Vergessenheit ger\u00e4t.",
+        "compare.c1.desc": "Klassische Notiz-Apps zeigen dir eine leere Seite. MindGraph zeigt dir <strong>was heute wichtig ist</strong>: &uuml;berf&auml;llige Tasks, Emails mit Antwort-Pflicht, heutige Termine &mdash; und 🔴-Probleme, die das Relevanz-Radar nach Fristen und Verkn&uuml;pfungen nach oben holt, damit nichts in Vergessenheit ger&auml;t.",
         "compare.c2.title": "Email direkt im Arbeitsraum",
         "compare.c2.desc": "Relevante Mails werden automatisch zu Markdown-Notizen mit Tasks und Wikilinks \u2014 direkt in deinem Vault. Kein Copy&Paste aus Thunderbird. Alles lokal, kein Cloud-Leak.",
         "compare.c3.title": "Lokale KI als Standard",
-        "compare.c3.desc": "Ollama oder LM Studio auf deinem Rechner. Kein OpenAI-Key, kein Datenabfluss. Notes-Chat, Email-Analyse, Smart Connections, Grammatikpr\u00fcfung \u2014 alles auf deiner Hardware.",
+        "compare.c3.desc": "Ollama oder LM Studio auf deinem Rechner sind der Standard &mdash; ohne Konto, ohne Datenabfluss. Cloud-Modelle schaltest du nur bewusst und pro Funktion zu. Notes-Chat, Vault-Chat, Smart Connections, Grammatikpr&uuml;fung &mdash; auf deiner Hardware.",
         "compare.c4.title": "Offene Daten statt Lock-in",
         "compare.c4.desc": "Dein bestehender Vault \u00f6ffnet 1:1: Markdown, Wikilinks, Tags, Frontmatter, Canvas, Dataview. Wenn MindGraph nicht passt, nimmst du deine Daten ohne Migration mit.",
         "modelq.label": "Qualit\u00e4tsnachweis",
@@ -2002,13 +2050,13 @@
         "faq.q1": "Brauche ich ein Konto?",
         "faq.a1": "Nein. Alles l\u00e4uft lokal. Deine Notizen sind Markdown-Dateien auf deinem Rechner. Der optionale Sync braucht nur eine Passphrase.",
         "faq.q2": "Brauche ich Ollama?",
-        "faq.a2": "F\u00fcr den vollen Funktionsumfang ja. MindGraph nutzt Ollama als lokale KI-Schicht: Tagesres\u00fcmee (Brain), E-Mail-Analyse, Aufgaben-Extraktion, Projekt-Status, Smart Connections und das Workflow-Canvas laufen dar\u00fcber \u2013 komplett auf deinem Rechner, ohne Cloud. Editor, Wissensgraph, Dashboard und Sync funktionieren auch ohne Ollama; die meisten KI-Module fehlen dann aber. Ollama l\u00e4dst du einmal von ollama.ai herunter.",
+        "faq.a2": "F&uuml;r die KI-Funktionen brauchst du ein Sprachmodell. Standard ist ein lokales Modell &uuml;ber Ollama oder LM Studio &ndash; dann bleibt alles auf deinem Rechner. Bei schwacher Hardware kannst du f&uuml;r einzelne Funktionen bewusst ein Cloud-Modell einschalten (LLMBase in der EU oder OpenRouter); Brain und der E-Mail-Chat bleiben immer lokal. Editor, Wissensgraph, Dashboard und Sync funktionieren auch ganz ohne KI.",
         "faq.q3": "Was ist MindGraph eigentlich?",
-        "faq.a3": "Eine lokale Arbeitsumgebung mit drei Schwerpunkten: erstens KI auf dem eigenen Rechner \u2013 Tagesres\u00fcmee, Posteingang-Analyse, Projekt-Status und Workflow-Automation, ohne dass Daten den Rechner verlassen. Zweitens ein integrierter Kern aus Markdown-Editor, Wissensgraph, Posteingang und Aufgaben, gezielt erweiterbar durch signierte Plugins. Drittens ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.",
+        "faq.a3": "Ein lokaler Wissens- und Arbeitsraum, in dem KI-Arbeit nachvollziehbar bleibt. Drei Dinge machen das aus: Der Agent erledigt Auftr&auml;ge mit deinen Unterlagen und legt die Ergebnisse zur Pr&uuml;fung vor, bevor etwas gespeichert wird. Der Vault-Chat beantwortet Fragen &uuml;ber deine Notizen mit Quellenangaben. Und das Dashboard zeigt jeden Morgen, was z&auml;hlt. Darunter liegt ein offenes Format: Notizen sind Markdown-Dateien, kein Lock-in.",
         "faq.q4": "Funktionieren bestehende Markdown-Notizen?",
         "faq.a4": "Ja. Alles ist Markdown \u2013 die Notizen sind reine Textdateien auf deinem Rechner. Ein bestehendes Obsidian-Vault l\u00e4sst sich direkt \u00f6ffnen: Wikilinks, Tags, Frontmatter, Dataview und Canvas sprechen dieselbe Syntax. Du beh\u00e4ltst dein Format und kannst jederzeit auch wieder weg.",
         "faq.q5": "Wo liegen meine Daten?",
-        "faq.a5": "Auf deinem Rechner. Keine Cloud, keine Telemetrie, keine Tracker. Der optionale Sync ist Ende-zu-Ende verschl\u00fcsselt (AES-256-GCM, scrypt-Key-Derivation) \u2013 der Server sieht nur verschl\u00fcsselte Daten, die Passphrase verl\u00e4sst nie dein Ger\u00e4t.",
+        "faq.a5": "Auf deinem Rechner. Standardm&auml;&szlig;ig keine Cloud, keine Telemetrie, keine Tracker. Cloud-Modelle, Webrecherche oder Bildgenerierung schaltest du nur bewusst ein &ndash; die App sagt dir dann, welche Daten wohin gehen. Der optionale Sync ist Ende-zu-Ende verschl&uuml;sselt (AES-256-GCM, scrypt-Key-Derivation) &ndash; der Server sieht nur verschl&uuml;sselte Daten, die Passphrase verl&auml;sst nie dein Ger&auml;t.",
         "faq.q6": "Ist die App stabil? Sie ist im Beta.",
         "faq.a6": "Sie wird t\u00e4glich produktiv genutzt \u2013 Vaults mit 3000+ Notizen laufen stabil. Das Beta-Label bedeutet: neue Features kommen regelm\u00e4\u00dfig, das Datenformat (Markdown) ist aber stabil und offen. Kein Risiko eines Lock-in.",
         "faq.q7": "Ist die App wirklich kostenlos?",
@@ -2046,6 +2094,23 @@
         "privacy.contact.title": "6. Verantwortliche Stelle"
       },
       en: {
+        "modules.opt.workflow": "Workflow Canvas",
+        "modules.opt.webresearch": "Web research",
+        "modules.opt.vaultchat": "Vault chat with sources",
+        "modules.opt.agent": "Agent",
+        "st.vc.more": "More hits (2) · collapsed",
+        "st.vc.s2": "Team meeting 2 July",
+        "st.vc.s1": "Project week planning",
+        "st.vc.src": "Sources · match the answer",
+        "st.vc.a2": "The room plan goes to the school management by Friday.",
+        "st.vc.a": "The workshops take place in rooms 1.12 and 1.14.",
+        "st.vc.q": "What did we agree on for the room plan of project week?",
+        "st.vc.alt": "Vault chat: question, answer with footnotes and source list",
+        "st.vc.win": "Vault chat",
+        "st.vc.f": "<b>Computed on your machine:</b> the search index is built locally and only when you switch it on for a vault. Answers are written exclusively by a local model.",
+        "st.vc.lead": "Vault chat answers questions across all your notes and adds footnotes to the passages it relies on. The app checks which sentences match their source and puts those sources on top &ndash; the rest is collapsed, never hidden. If nothing fits, it says so instead of guessing.",
+        "st.vc.h": "Ask your vault &mdash; <em>and see where the answer comes from.</em>",
+        "st.vc.num": "WHY 02 · SOURCES",
         "cloud.label": "New &middot; Cloud on your terms",
         "cloud.heading": "Big models.<br>Even on small machines.",
         "cloud.sub": "Some tasks deserve a flagship model &mdash; but your laptop has 8&nbsp;GB of RAM. There are now two cloud exits for that, both strictly opt-in and enabled per feature.",
@@ -2089,15 +2154,15 @@
         "st.enemy.s3n": "1 day",
         "st.enemy.s3": "sick, stuck in traffic or distracted – and the house of cards of mental notes wobbles.",
         "st.enemy.s3src": "your everyday",
-        "st.shift": "What if your workspace <em>thinks along</em> — showing you every morning what matters today, without replacing you?",
-        "st.b1.num": "WHY 01 · CLARITY",
+        "st.shift": "What if AI takes work off your plate &mdash; <em>and you can see where every result comes from?</em>",
+        "st.b1.num": "WHY 03 · CLARITY",
         "st.b1.h": "What matters today — <em>on its own.</em>",
         "st.b1.lead": "In the morning you open one tab, not ten. MindGraph shows overdue tasks, emails awaiting a reply, today's appointments – and brings forgotten notes back into view. Been away for five days? It's all there, sorted by relevance. Nothing lost.",
-        "st.b1.f": "<b>Dashboard &amp; relevance radar:</b> a local AI continuously assesses which open problems need attention right now – and which should resurface.",
-        "st.bag.num": "WHY 02 · ASSIGNMENTS",
+        "st.b1.f": "<b>Dashboard &amp; relevance radar:</b> shows which open problems need attention right now &ndash; based on deadlines, links, matching emails and appointments. Transparent rules instead of a black box.",
+        "st.bag.num": "WHY 01 · ASSIGNMENTS",
         "st.bag.h": "Say what needs doing — <em>then check what comes back.</em>",
         "st.bag.lead": "The agent is not a chat box that spits out text. You give it an assignment and your material – spreadsheets, documents, PDFs, whole folders. It searches your own notes, works step by step and hands you finished files. Nothing is written until you say so.",
-        "st.bag.f": "<b>Skills instead of prompt fiddling:</b> you teach it how you work in a plain note – the open SKILL.md standard. Tell it once, and it remembers.",
+        "st.bag.f": "<b>Finished files instead of chat text:</b> PowerPoint in your template, Word on your letterhead, Excel merged from a whole folder. You teach it how you work with a skill &ndash; a plain note (open SKILL.md standard).",
         "st.bag.win": "Note agent",
         "st.bag.alt": "Note agent: assignment, context files and a result waiting for review",
         "st.bag.m1": "“Turn the Digital Pact project folder into a status report.”",
@@ -2113,15 +2178,15 @@
         "st.bag.file": "Status report Digital Pact II.md",
         "st.bag.ok": "Accept",
         "st.bag.no": "Discard",
-        "st.b2.num": "WHY 03 · CONNECTED",
+        "st.b2.num": "WHY 04 · CONNECTED",
         "st.b2.h": "One workspace — <em>instead of eight apps.</em>",
         "st.b2.lead": "Notes, tasks, emails, documents, knowledge graph: all in one place, all linked. A relevant email becomes a note with a task and a backlink – no copy&amp;paste across ten programs. Fewer switches, less friction, less lost.",
         "st.b2.f": "<b>One vault instead of tool sprawl:</b> Markdown, knowledge graph, email→note, tasks – switch modules on as you need them. <em>1 workspace instead of 8 apps and 30 plugins.</em>",
-        "st.b3.num": "WHY 04 · YOUR MACHINE",
+        "st.b3.num": "WHY 05 · YOUR MACHINE",
         "st.b3.h": "AI on your machine — <em>your data stays with you.</em>",
         "st.b3.lead": "Many AI tools present a false choice: cloud convenience or control over your data. MindGraph keeps it local – with models running on your machine (Ollama/LM Studio), no cloud requirement and no telemetry. Your notes stay Markdown files that belong to you.",
         "st.b3.f": "<b>Local AI &amp; open data:</b> <b>48%</b> of companies cite data-protection requirements as the biggest barrier to AI <span style=\"color:var(--text-muted)\">(Bitkom 2025)</span>. MindGraph doesn't need that trade-off.",
-        "st.b4.label": "Why 05 · You keep thinking",
+        "st.b4.label": "Why 06 · You keep thinking",
         "st.b4.h": "AI that strengthens your thinking — <em>instead of replacing it.</em>",
         "st.b4.lead": "Outsource thinking blindly and you unlearn it. In an MIT study, people who wrote with a language model showed the <b>weakest brain connectivity</b> – many couldn't even recall the text they had just written <span style=\"color:var(--text-muted)\">(Kosmyna et al. 2025, MIT Media Lab)</span>. MindGraph is built to keep you in the loop: active recall, reflection, deliberate approval.",
         "st.b4.gain": "<b>↑ You gain</b>Active recall (flashcards), reflection (Brain), human-in-the-loop.",
@@ -2160,7 +2225,7 @@
         "how.t3": "Learning &amp; flashcards",
         "how.t4": "Agent &amp; skills",
         "how.p0h": "Your day at a glance",
-        "how.p0": "One tab instead of ten: overdue tasks, emails by reply urgency, today's appointments. A local AI continuously rates which open problems need attention – and brings forgotten notes back into view. Even after a five-day break, everything is there, sorted.",
+        "how.p0": "One tab instead of ten: overdue tasks, emails by reply urgency, today's appointments. The relevance radar shows, based on deadlines, links and matching emails, which open problems need attention – and brings forgotten notes back into view. Even after a five-day break, everything is there, sorted.",
         "how.p1h": "Everything connected",
         "how.p1": "Notes, tasks, emails and documents in one vault – linked in the knowledge graph. A relevant email becomes a note with a task and a backlink, without copy&amp;paste between programs. Your existing Markdown/Obsidian vault opens as-is.",
         "how.p2h": "AI on your machine",
@@ -2180,21 +2245,21 @@
         "hero.soundOn": "Sound on",
         "hero.soundOff": "Sound off",
         "hero.videoAlt": "What happens in the app: an email arrives, the task inside it is spotted, a note is created from it, and the next morning everything sits on your dashboard.",
-        "hero.title": "Shows you<br><em>what matters today.</em>",
-        "hero.sub": "MindGraph Notes connects your notes, tasks, emails and documents \u2014 and ranks them by relevance. Dashboard, knowledge graph and local AI in one desktop app. No cloud lock-in.",
+        "hero.title": "AI work<br><em>you can check.</em>",
+        "hero.sub": "MindGraph is your local workspace for knowledge and work. The agent completes tasks with your documents, vault chat answers with sources from your notes, and the dashboard shows each morning what matters. Nothing is saved until you approve it. Local is the default &ndash; cloud only when you switch it on.",
         "hero.cta": "Download for free",
         "cap.label": "What the workspace can do",
         "cap.heading": "One workspace,<br>modules on demand.",
         "cap.sub": "Dashboard, editor, tasks and knowledge graph are always there. Email, learning, AI, devices and domain integrations are switched on per module when you need them.",
         "cap.dashboard.title": "Dashboard, Morning Briefing & Relevant Notes",
-        "cap.dashboard.desc": "The tab you open every morning. Overdue tasks, emails awaiting a reply, today's meetings, new registrations \u2013 and \ud83d\udd34-problems whose currency a local AI continuously evaluates, so forgotten notes resurface.",
+        "cap.dashboard.desc": "The tab you open every morning. Overdue tasks, emails awaiting a reply, today's meetings, new registrations – and 🔴-problems that the relevance radar brings up based on deadlines and links, so forgotten notes resurface.",
         "cap.dashboard.f1": "Tasks, overdue \u00b7 today \u00b7 this week",
         "cap.dashboard.f2": "Emails with reply urgency (Ollama)",
         "cap.dashboard.f3": "Calendar via EventKit / local API",
         "cap.dashboard.f4": "Widgets freely configurable per profile",
         "cap.dashboard.f5": "Tab in the workspace \u2013 not a side panel",
         "cap.dashboard.f6": "Morning briefing once a day",
-        "cap.dashboard.f7": "Relevant notes with AI rationale instead of just keywords",
+        "cap.dashboard.f7": "Relevant notes by deadlines, backlinks, emails and appointments",
         "cap.dashboard.f8": "Smart-pairing \ud83d\udd34 problem \u2194 \ud83d\udfe2 solution \u00b7 closing workflow",
         "cap.dashboard.f9": "Sleeping bucket for notes gone quiet (> 14 days)",
         "cap.notes.title": "Knowledge Space & Graph",
@@ -2203,25 +2268,25 @@
         "cap.email.desc": "IMAP + SMTP. Local Ollama scores relevance, detects appointments, checks calendar conflicts, generates reply drafts \u2013 all without cloud analysis. Optional.",
         "cap.workflow.title": "Workflow Canvas",
         "cap.workflow.desc": "Wire your modules into flows: email, projects, local AI and notes become building blocks with typed ports on a canvas. Dry-run to preview, real runs against local Ollama \u2013 with human approval as a deliberate checkpoint. Opt-in module.",
-        "cap.telegram.title": "Telegram Bot",
-        "cap.telegram.desc": "Your vault, your tasks, your calendar \u2013 query them on the go via Telegram. The bot runs locally inside MindGraph, data never leaves your machine. Ollama or Anthropic as LLM backend, freely selectable.",
+        "cap.telegram.title": "Telegram bot (experimental)",
+        "cap.telegram.desc": "Query your vault, tasks and calendar on the go via Telegram. The bot runs inside MindGraph on your machine; messages travel through Telegram, answers are computed by local Ollama or &ndash; if you choose &ndash; Anthropic. Experimental, off by default.",
         "cap.learn.title": "Learning & Flashcards",
         "cap.learn.desc": "Flashcards with spaced repetition (SM-2), AI quiz generation straight from your notes, Anki import, streak and activity heatmap.",
         "cap.ai.title": "Local AI",
-        "cap.ai.desc": "Notes Chat, Smart Connections, LanguageTool, Vision OCR and Whisper dictation \u2013 all against Ollama or LM Studio on your machine. Dictation runs offline in the browser, no installation. Terminal with OpenCode or Claude Code integrated.",
+        "cap.ai.desc": "Notes Chat, vault chat with sources, Smart Connections, LanguageTool, Vision OCR and Whisper dictation &ndash; against Ollama or LM Studio on your machine. Dictation runs offline inside the app. Terminal with OpenCode or Claude Code integrated.",
         "cap.integrations.title": "Integrations",
         "cap.integrations.desc": "Zotero, Semantic Scholar, Readwise, reMarkable USB, WordPress publishing, edoobox agent for event management. Each integration a toggle.",
         "cap.security.title": "Security & Sync",
         "cap.security.desc": "Local by default. Optional E2E encrypted sync (AES-256-GCM, zero-knowledge). No telemetry. DOMPurify sanitization and hardened prompt injection defense in the AI module.",
         "compare.label": "Why MindGraph Notes",
         "compare.heading": "One integrated workplace \u2014<br>instead of eight apps and 30 plugins.",
-        "compare.sub": "MindGraph is for solo operators, teams and power users who do not want knowledge, email, tasks, documents and AI scattered across ten tools. Core capabilities are built in; signed plugins extend the workspace deliberately.",
+        "compare.sub": "MindGraph is for solo operators and power users who do not want knowledge, email, tasks, documents and AI scattered across ten tools. Core capabilities are built in; signed plugins extend the workspace deliberately.",
         "compare.c1.title": "Dashboard as starting point",
-        "compare.c1.desc": "Classic note apps show you an empty page. MindGraph shows you <strong>what matters today</strong>: overdue tasks, emails awaiting reply, today's meetings — and 🔴-problems whose relevance a local AI continuously evaluates, so nothing falls off the radar.",
+        "compare.c1.desc": "Classic note apps show you an empty page. MindGraph shows you <strong>what matters today</strong>: overdue tasks, emails awaiting reply, today's meetings — and 🔴-problems the relevance radar brings up based on deadlines and links, so nothing falls off the radar.",
         "compare.c2.title": "Email inside your workspace",
         "compare.c2.desc": "Relevant mails become Markdown notes with tasks and wikilinks \u2014 directly in your vault. No copy&paste from Thunderbird. All local, no cloud leak.",
         "compare.c3.title": "Local AI by default",
-        "compare.c3.desc": "Ollama or LM Studio on your machine. No OpenAI key, no data leak. Notes Chat, email analysis, Smart Connections, grammar check \u2014 all on your hardware.",
+        "compare.c3.desc": "Ollama or LM Studio on your machine are the default &mdash; no account, no data leaving. Cloud models are switched on deliberately, per feature. Notes Chat, vault chat, Smart Connections, grammar check &mdash; on your hardware.",
         "compare.c4.title": "Open data instead of lock-in",
         "compare.c4.desc": "Your existing vault opens 1:1: Markdown, wikilinks, tags, frontmatter, canvas, dataview. If MindGraph doesn't fit, you take your data with you without migration.",
         "modelq.label": "Quality proof",
@@ -2270,13 +2335,13 @@
         "faq.q1": "Do I need an account?",
         "faq.a1": "No. Everything runs locally. Your notes are Markdown files on your computer. The optional sync only needs a passphrase.",
         "faq.q2": "Do I need Ollama?",
-        "faq.a2": "For the full feature set, yes. MindGraph uses Ollama as a local AI layer: daily brain recap, email analysis, task extraction, project status, Smart Connections and the Workflow Canvas all run through it \u2013 entirely on your machine, no cloud. Editor, knowledge graph, dashboard and sync also work without Ollama, but most AI-powered modules won't. Install Ollama once from ollama.ai.",
+        "faq.a2": "The AI features need a language model. The default is a local model via Ollama or LM Studio &ndash; then everything stays on your computer. On weak hardware you can deliberately switch on a cloud model for individual features (LLMBase in the EU or OpenRouter); Brain and email chat always stay local. Editor, knowledge graph, dashboard and sync also work without any AI.",
         "faq.q3": "What is MindGraph, really?",
-        "faq.a3": "A local workspace built around three things: first, AI on your own machine \u2013 daily recap, inbox analysis, project status and workflow automation, with no data leaving the device. Second, an integrated core of Markdown editor, knowledge graph, inbox and tasks, deliberately extensible through signed plugins. Third, an open format: notes are plain Markdown files, no lock-in.",
+        "faq.a3": "A local workspace for knowledge and work in which AI work stays traceable. Three things make it up: the agent completes tasks with your documents and presents the results for review before anything is saved. Vault chat answers questions about your notes with sources. And the dashboard shows each morning what matters. Underneath is an open format: notes are Markdown files, no lock-in.",
         "faq.q4": "Do my existing Markdown notes work?",
         "faq.a4": "Yes. Everything is Markdown \u2013 your notes are plain text files on your machine. An existing Obsidian vault opens directly: wikilinks, tags, frontmatter, dataview and canvas speak the same syntax. Your format stays portable, you can leave any time.",
         "faq.q5": "Where is my data stored?",
-        "faq.a5": "On your computer. No cloud, no telemetry, no trackers. The optional sync is end-to-end encrypted (AES-256-GCM, scrypt key derivation) \u2013 the server only sees encrypted data, the passphrase never leaves your device.",
+        "faq.a5": "On your computer. By default no cloud, no telemetry, no trackers. Cloud models, web research or image generation are switched on deliberately &ndash; the app then tells you which data goes where. The optional sync is end-to-end encrypted (AES-256-GCM, scrypt key derivation) &ndash; the server only sees encrypted data, the passphrase never leaves your device.",
         "faq.q6": "Is the app stable? It's still in beta.",
         "faq.a6": "It is used daily in production \u2013 vaults with 3000+ notes run stably. The beta label means: new features ship regularly, but the data format (Markdown) is stable and open. No lock-in risk.",
         "faq.q7": "Is the app really free?",
