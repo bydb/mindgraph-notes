@@ -81,7 +81,7 @@ const TabItem: React.FC<TabItemProps> = memo(({ tab, isActive, onActivate, onClo
     'tab-tone-editor'
 
   // Translate title for global-canvas tabs
-  const rawTitle = tab.type === 'global-canvas' ? t('tabs.allNotes') : tab.title
+  const rawTitle = tab.type === 'global-canvas' ? t('tabs.allNotes') : tab.type === 'agent' ? t('agentTab.title') : tab.title
   const noteKind = tab.type === 'editor' || tab.type === 'canvas'
     ? getNoteKindFromText(rawTitle)
     : null

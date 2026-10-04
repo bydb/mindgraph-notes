@@ -48,13 +48,27 @@ const SUBMIT_KEYS = HAS_MAC_TOOLS ? '\u2318\u21A9' : 'Ctrl+Enter'
 // Angebote. Arbeitsblatt: Web — die Arbeitsblatt-Skill bricht ohne web_search/web_fetch
 // ab. Wissensrecherche und Überblick brauchen nichts außer dem Vault — beide tragen im
 // Starter-Vault (Thema „Projekte“ kommt in allen vier vor, Codex F09).
-const EXAMPLES: Array<{ cat: TranslationKey; text: TranslationKey; docs: TranslationKey; result: TranslationKey; need: AgentExampleNeed }> = [
-  { cat: 'agentCard.ex1Cat', text: 'agentCard.ex1', docs: 'agentCard.ex1Docs', result: 'agentCard.ex1Result', need: 'folder' },
-  { cat: 'agentCard.ex2Cat', text: 'agentCard.ex2', docs: 'agentCard.ex2Docs', result: 'agentCard.ex2Result', need: 'files2' },
-  { cat: 'agentCard.ex3Cat', text: 'agentCard.ex3', docs: 'agentCard.ex3Docs', result: 'agentCard.ex3Result', need: 'none' },
-  { cat: 'agentCard.ex4Cat', text: 'agentCard.ex4', docs: 'agentCard.ex4Docs', result: 'agentCard.ex4Result', need: 'web' },
-  { cat: 'agentCard.ex5Cat', text: 'agentCard.ex5', docs: 'agentCard.ex5Docs', result: 'agentCard.ex5Result', need: 'none' }
+type ExampleIcon = 'table' | 'compare' | 'projects' | 'school' | 'links'
+
+const EXAMPLES: Array<{ icon: ExampleIcon; title: TranslationKey; text: TranslationKey; docs: TranslationKey; result: TranslationKey; need: AgentExampleNeed }> = [
+  { icon: 'table', title: 'agentCard.ex1Title', text: 'agentCard.ex1', docs: 'agentCard.ex1Docs', result: 'agentCard.ex1Result', need: 'folder' },
+  { icon: 'compare', title: 'agentCard.ex2Title', text: 'agentCard.ex2', docs: 'agentCard.ex2Docs', result: 'agentCard.ex2Result', need: 'files2' },
+  { icon: 'projects', title: 'agentCard.ex3Title', text: 'agentCard.ex3', docs: 'agentCard.ex3Docs', result: 'agentCard.ex3Result', need: 'none' },
+  { icon: 'school', title: 'agentCard.ex4Title', text: 'agentCard.ex4', docs: 'agentCard.ex4Docs', result: 'agentCard.ex4Result', need: 'web' },
+  { icon: 'links', title: 'agentCard.ex5Title', text: 'agentCard.ex5', docs: 'agentCard.ex5Docs', result: 'agentCard.ex5Result', need: 'none' }
 ]
+
+/** Kleine Symbole der Beispielkarten — Strichzeichnung wie die übrigen App-Icons. */
+function ExampleGlyph({ icon }: { icon: ExampleIcon }) {
+  const common = { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  switch (icon) {
+    case 'table': return <svg {...common}><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></svg>
+    case 'compare': return <svg {...common}><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3 3 0 0 0 6 0z"/><path d="M19 7l-3 7a3 3 0 0 0 6 0z"/></svg>
+    case 'projects': return <svg {...common}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 13h8M8 16h5"/></svg>
+    case 'school': return <svg {...common}><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>
+    case 'links': return <svg {...common}><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8.3 7l7.3.7M7 8.3l2.2 7.4M16.3 10l-4.6 6"/></svg>
+  }
+}
 
 type PermState = 'on' | 'off' | 'locked' | 'modOff' | 'setup'
 
@@ -572,12 +586,12 @@ export function AgentView({ tabId }: Props) {
                       inputRef.current?.focus()
                     }}
                   >
-                    <span className="agent-card-example-cat">{t(ex.cat)}</span>
-                    <span className="agent-card-example-text">{t(ex.text)}</span>
-                    <span className="agent-card-example-tags">
-                      <span className="agent-card-tag">{t('agentCard.exDocs', { x: t(ex.docs) })}</span>
-                      <span className="agent-card-tag is-accent">{t('agentCard.exResult', { x: t(ex.result) })}</span>
-                      {ex.need === 'web' && <span className="agent-card-tag is-out">{t('agentCard.exNeedsWeb')}</span>}
+                    <span className="agent-card-example-icon" aria-hidden="true"><ExampleGlyph icon={ex.icon} /></span>
+                    <span className="agent-card-example-body">
+                      <span className="agent-card-example-title">{t(ex.title)}</span>
+                      <span className="agent-card-example-meta">
+                        {t(ex.docs)} <span aria-hidden="true">&rarr;</span> <span className="is-accent">{t(ex.result)}</span>
+                      </span>
                     </span>
                   </button>
                 ))}
