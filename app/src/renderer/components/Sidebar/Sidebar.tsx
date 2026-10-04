@@ -1,4 +1,5 @@
 import React, { useEffect, useCallback, useState, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { FileTree } from './FileTree'
 import { BookmarksBar } from './BookmarksBar'
 import { PluginSlot } from '../../plugins/slots'
@@ -41,6 +42,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const [newNoteDialogOpen, setNewNoteDialogOpen] = useState(false)
   const [newNoteName, setNewNoteName] = useState('')
   const newNoteInputRef = useRef<HTMLInputElement>(null)
+  // Fokus vor dem Öffnen (meist der Editor) — Abbrechen gibt ihn zurück.
+  const newNoteReturnFocusRef = useRef<HTMLElement | null>(null)
 
   // Guard gegen doppeltes Laden (React Strict Mode)
   const isLoadingRef = useRef(false)
@@ -169,10 +172,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       handleOpenVault()
       return
     }
+    const active = document.activeElement
+    newNoteReturnFocusRef.current = active instanceof HTMLElement && active !== document.body ? active : null
     setNewNoteName('')
     setNewNoteDialogOpen(true)
     setTimeout(() => newNoteInputRef.current?.focus(), 50)
   }, [vaultPath, handleOpenVault])
+
+  // Abbrechen/Escape/Hintergrund: Fokus zurück, damit der nächste Tastendruck wieder im
+  // Editor landet. Nach dem Erstellen nicht — dann gehört der Fokus der neuen Notiz.
+  const cancelNewNoteDialog = useCallback(() => {
+    setNewNoteDialogOpen(false)
+    const target = newNoteReturnFocusRef.current
+    newNoteReturnFocusRef.current = null
+    if (target?.isConnected) setTimeout(() => target.focus(), 0)
+  }, [])
 
   const handleSubmitNewNote = useCallback(async () => {
     if (!window.electronAPI || !vaultPath || !newNoteName.trim()) return
@@ -200,6 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       addNote(note)
       selectNote(note.id)
 
+      newNoteReturnFocusRef.current = null
       setNewNoteDialogOpen(false)
       setNewNoteName('')
     } catch (error) {
@@ -385,6 +400,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Die Sidebar ist auch ausgeblendet und unter dem Onboarding gemountet. Dort darf
+      // weder ein Vault-Dialog am geführten Weg vorbei aufgehen noch ein verdeckter
+      // „Neue Notiz“-Dialog die Tastatur übernehmen.
+      if (useUIStore.getState().onboardingOpen) return
       // Nur reines Ctrl/Cmd+N — Shift/Alt-Kombinationen nicht abfangen,
       // damit globale Shortcuts wie CommandOrControl+Shift+N (Transport) nicht kollidieren.
       if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') {
@@ -408,8 +427,40 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
     }
   }, [handleNewNote, handleOpenVault])
   
+  // Dialog für neue Notiz als Portal am body: die Sidebar bleibt auch ausgeblendet
+  // gemountet (App.tsx), ihre Hülle ist dann aber display:none. So öffnen ⌘N, Palette
+  // und Sprachbefehl den Dialog sichtbar, ohne die gespeicherte Sidebar-Wahl zu ändern.
+  // QuickEventModal ist in App.tsx gemountet, damit er auch bei geschlossener Sidebar erreichbar bleibt.
+  const newNoteDialog = newNoteDialogOpen ? createPortal(
+    <div className="new-note-dialog-overlay" onClick={cancelNewNoteDialog}>
+      <div className="new-note-dialog" role="dialog" aria-modal="true" aria-label={t('sidebar.newNote')} onClick={(e) => e.stopPropagation()}>
+        <input
+          ref={newNoteInputRef}
+          type="text"
+          placeholder="Name der neuen Notiz..."
+          value={newNoteName}
+          onChange={(e) => setNewNoteName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && newNoteName.trim()) handleSubmitNewNote()
+            if (e.key === 'Escape') cancelNewNoteDialog()
+          }}
+          autoFocus
+        />
+        <div className="new-note-dialog-buttons">
+          <button onClick={cancelNewNoteDialog}>
+            Abbrechen
+          </button>
+          <button onClick={handleSubmitNewNote} className="btn-primary" disabled={!newNoteName.trim()}>
+            Erstellen
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  ) : null
+
   if (!sidebarVisible) {
-    return null
+    return newNoteDialog
   }
   
   return (
@@ -552,34 +603,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         </div>
       )}
 
-      {/* Dialog für neue Notiz */}
-      {/* QuickEventModal ist in App.tsx gemountet, damit er auch bei geschlossener Sidebar erreichbar bleibt. */}
-      {newNoteDialogOpen && (
-        <div className="new-note-dialog-overlay" onClick={() => setNewNoteDialogOpen(false)}>
-          <div className="new-note-dialog" onClick={(e) => e.stopPropagation()}>
-            <input
-              ref={newNoteInputRef}
-              type="text"
-              placeholder="Name der neuen Notiz..."
-              value={newNoteName}
-              onChange={(e) => setNewNoteName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && newNoteName.trim()) handleSubmitNewNote()
-                if (e.key === 'Escape') setNewNoteDialogOpen(false)
-              }}
-              autoFocus
-            />
-            <div className="new-note-dialog-buttons">
-              <button onClick={() => setNewNoteDialogOpen(false)}>
-                Abbrechen
-              </button>
-              <button onClick={handleSubmitNewNote} className="btn-primary" disabled={!newNoteName.trim()}>
-                Erstellen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {newNoteDialog}
 
     </div>
   )

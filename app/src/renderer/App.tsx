@@ -1544,16 +1544,18 @@ const App: React.FC = () => {
         
         <div className="main-content">
           <div className="content-area" ref={contentAreaRef}>
+            {/* Sidebar bleibt auch ausgeblendet gemountet: in ihr läuft das Laden des
+                letzten Vaults (plus ⌘O/⌘N). Vorher startete die App mit gespeicherter
+                ausgeblendeter Sidebar ohne Vault. Die Komponente rendert sich bei
+                `!sidebarVisible` selbst zu null; hier verschwindet nur die Hülle. */}
+            <div style={sidebarVisible ? { width: sidebarWidth, minWidth: sidebarWidth, flexShrink: 0 } : { display: 'none' }}>
+              <Sidebar onOpenSearch={() => setQuickSearchOpen(true)} />
+            </div>
             {sidebarVisible && (
-              <>
-                <div style={{ width: sidebarWidth, minWidth: sidebarWidth, flexShrink: 0 }}>
-                  <Sidebar onOpenSearch={() => setQuickSearchOpen(true)} />
-                </div>
-                <div
-                  className="sidebar-divider"
-                  onMouseDown={handleSidebarDividerMouseDown}
-                />
-              </>
+              <div
+                className="sidebar-divider"
+                onMouseDown={handleSidebarDividerMouseDown}
+              />
             )}
 
             {/* Workspace wrapper - contains TabBar and workspace */}

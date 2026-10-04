@@ -6707,7 +6707,6 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 16px;
   box-shadow: var(--shadow-lg);
   min-width: 260px;
-  transform: translate(-50%, -50%);
 }
 
 .new-note-dialog input {
