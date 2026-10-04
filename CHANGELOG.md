@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.33-beta] - 2026-10-04
+
+**Unter Linux mit Hyprland, Sway und ähnlichen Oberflächen speichert die App Passwörter und API-Schlüssel jetzt zuverlässig.** Bisher gingen dort Zugangsdaten für Cloud-Modelle (LLMBase, OpenRouter), Mail-Konten und Sync beim Speichern still verloren – „Verbindung testen“ blieb dann grau. Die App nutzt dort jetzt automatisch den Schlüsselbund des Systems.
+
+### Hintergrund
+
+- **Auslöser:** Auf Oberflächen, die Chromium nicht kennt, wählt es einen Klartext-Speicher, und die App verweigert dann aus Sicherheitsgründen jedes Geheimnis. Betroffen waren unter anderem Omarchy/Hyprland, Sway und i3.
+- **Was sich ändert:** Auf unbekannten Oberflächen startet die App mit dem Schlüsselbund (gnome-keyring über libsecret). GNOME, KDE, XFCE, Cinnamon und andere bekannte Oberflächen bleiben unberührt; wer `--password-store` selbst übergibt, behält seine Wahl.
+- **Grenze:** Läuft kein Schlüsselbund-Dienst, kann die App weiterhin nichts speichern. Die Fehlermeldung beim Speichern eines Cloud-Schlüssels sagt jetzt, woran es liegt und was hilft.
+- **Einmal neu eingeben:** Schlüssel und Passwörter, die vorher nicht gespeichert wurden, musst du nach dem Update einmal neu eintragen.
+
 ## [0.11.32-beta] - 2026-10-04
 
 **Der Agent heißt jetzt Petrol Agent und ist deutlich aufgeräumter.** Die Beispiele sind kompakte Karten mit Symbol, Kurztitel und „Unterlagen → Ergebnis“; ein Klick füllt den Auftrag. Auf breiten Bildschirmen steht der Auftrag links und Unterlagen, Ablage, Befugnisse und Modell rechts daneben. Der Knopf heißt „Auftrag losschicken“.
