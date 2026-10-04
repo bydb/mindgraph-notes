@@ -272,10 +272,7 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           className="help-restart-onboarding"
           title={t('help.restartOnboardingTitle')}
           onClick={() => {
-            const { setOnboardingCompleted, setOnboardingOpen, setUserProfile } = useUIStore.getState()
-            setOnboardingCompleted(false)
-            setUserProfile(null)
-            setOnboardingOpen(true)
+            useUIStore.getState().restartOnboarding()
             onClose()
           }}
         >

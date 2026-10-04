@@ -1151,3 +1151,9 @@
   color: var(--text-error, #e53935);
   margin: 8px 0 0;
 }
+
+/* Fehler im Schwerpunkt-Schritt (z. B. Start-Vault ließ sich nicht speichern) */
+.onboarding-error {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}

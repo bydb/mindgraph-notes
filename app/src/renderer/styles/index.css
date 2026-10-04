@@ -575,6 +575,26 @@ h2 { letter-spacing: -0.016em; }
   }
 }
 
+/* Schwerpunkt „Agent“ (uiStore.workFocus): der Agent-Knopf ist getönt und behält seine
+   Beschriftung auch dort, wo die übrigen Knöpfe nur Symbole zeigen. Ein Knopf mehr mit
+   Text — die 1300-px-Schwelle oben hat dafür Luft. */
+.view-mode-btn.is-focus:not(.active) {
+  color: var(--category-color);
+  background-color: color-mix(in srgb, var(--category-color) 12%, transparent);
+}
+.view-mode-btn.is-focus:not(.active) svg {
+  stroke: var(--category-color);
+}
+@media (max-width: 1300px) {
+  .titlebar-center .view-mode-btn.is-focus {
+    width: auto;
+    padding: 0 11px;
+  }
+  .titlebar-center .view-mode-btn.is-focus .view-mode-label {
+    display: inline;
+  }
+}
+
 @media (max-width: 1000px) {
   .titlebar .beta-badge {
     display: none;
@@ -21471,6 +21491,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   gap: 9px;
 }
 .agent-card-examples-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+/* Ungerade Anzahl: das letzte Beispiel über die volle Breite statt einer Lücke daneben. */
+.agent-card-examples-grid > :last-child:nth-child(odd) { grid-column: 1 / -1; }
 @media (max-width: 640px) { .agent-card-examples-grid { grid-template-columns: 1fr; } }
 .agent-card-example {
   display: flex;
@@ -21512,6 +21534,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-card-label { color: var(--text-secondary); font-size: 11.5px; padding-top: 3px; }
 .agent-card-row.is-center .agent-card-label { padding-top: 0; }
 .agent-card-value { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.agent-card-missing-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
 .agent-card-value .ai-bar-context { padding: 0; }
 .agent-card-target {
   display: inline-flex;

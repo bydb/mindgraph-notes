@@ -215,6 +215,55 @@ eingeblendeter Sidebar: ein Overlay, mittig, „Abbrechen“ schließt, Sidebar 
    (Elemente unter `display: none`), das automatische Einblenden in `handleNewNote`.
 4. Übersehene Folgen der Rev. 3.
 
+## Umsetzung Rev. 3 (04.10.2026, uncommittet)
+
+Gebaut nach Rev. 3, Abweichungen ausdrücklich benannt:
+
+- **`shared/workFocus.ts`** (+ Test, 7 Fälle): `normalizeWorkFocus`, `InitialVaultLoad`,
+  `shouldOpenAgentOnStart`, `isStartDecisionDue`, `agentDefaultModel`.
+- **uiStore**: `workFocus` (persistiert, beim Laden normalisiert), `setWorkFocus`, `restartOnboarding()`
+  — ⇧⌘O (`App.tsx`) und Hilfe (`HelpGuide.tsx`) rufen nur noch diese.
+- **notesStore**: `initialVaultLoad` + `settleInitialVaultLoad` (wirkt nur aus `pending`).
+  `Sidebar.tsx` `loadLastVault`: `none` ohne gespeicherten Vault, `failed` im catch, `ready` nur bei
+  unverändertem `vaultPath`; bei `workFocus === 'agent'` keine automatische Willkommen-Auswahl.
+- **App.tsx**: Effekt auf `initialVaultLoad` mit `useRef`-Merker → einmal `openAgentTab()`.
+  Agent-Knopf als `agentTitlebarButton`, bei `agent` vor Dashboard und mit Klasse `is-focus`
+  (`index.css`: Tönung, Beschriftung auch unter 1300 px).
+- **Einstellungen → Allgemein**: Karte „Schwerpunkt“ ganz oben (`Segmented`), Texte in `settingsPages.ts`.
+- **Onboarding**: `FocusStep` (neu) als Schritt 1 im Wizard; Direktweg `focus-direct` ohne
+  Schrittanzeige mit „Fertig“, `setLastVault` erst dort, Fehler hält den Assistenten offen;
+  `completeOnboarding` macht bei Fehler nicht mehr still weiter (F26) und speichert `workFocus`.
+  `AgentFocusHint` (neu) im KI-Schritt bzw. im Direktweg: Weg aus `noteAgentRoutePreflight`
+  (Standardmodell, `cloud: null`), RAM-Satz nur bei `kind === 'local'` und < 16 GB, ohne Modell
+  „Noch kein Modell gewählt“. Missionen: bei `agent` erste Zeile „Ersten Auftrag an den Agenten geben“
+  (Textzeile). Profil-Untertitel lautet jetzt „Optional: Voreinstellungen …“ (`translations.ts`).
+  Texte in neuem Modul `utils/i18n/workFocus.ts`.
+- **Agent-Tab**: `modelMissing` (kein Modell, keine Cloud-Route) → Zeile „Kein Modell gewählt ·
+  KI einrichten“ (Anker `ai-default-model`), `canRun` verlangt ein Modell, Startknopf nennt die
+  Lücke, Routen-Chip entfällt ohne Modell. Sperrseite (`ollama.enabled === false`) mit Knopf
+  „KI einrichten“ (Anker `ai-backend`).
+- **Beispiele (F09)**: Beispiel 3 sucht jetzt nach **Projekten** statt „Datenschutz bei
+  Cloud-Diensten“ — Letzteres kommt in keinem Starter-Vault vor (nur „Cloud“ in den KI-Features-Notizen),
+  Projekte in allen vier (Projektplanung / Project Planning / Projektakte / 100 - Projekte).
+  Neues Beispiel 5 „Überblick“ (`need: 'none'`). Ungerade Anzahl: letztes Beispiel volle Breite.
+
+Belege: `npm run typecheck` grün, `npm run build` grün, `npm run test` 2600/2602 (1 übersprungen,
+1 = bekannter Lastwackler `shellExecution.test.ts`). Dev-App per CDP (Profil-Klon, Testvault):
+- Bestandsprofil `workFocus: 'agent'` → nach Start einziger Tab „Agent“ aktiv, Agent-Knopf vor
+  Dashboard; bei 1200 px nur „Agent“ mit Text und Tönung.
+- ⇧⌘O → Schritt 1 von 5 „Womit möchtest du …“, „Agent“ vorausgewählt.
+- Direktweg „Notiz-Ordner öffnen“ (Systemdialog per osascript) → Schwerpunkt-Schritt ohne Anzeige,
+  „Fertig“; Auswahl „Notizen“ → gespeichert `notes`, Assistent zu, kein Sprung, Hervorhebung weg.
+- Einstellungs-Karte → „Agent“ → sofort `is-focus`, gespeichert `agent`.
+- Profil ohne Modell → Modell-Zeile „Kein Modell gewählt · KI einrichten“, Start gesperrt;
+  „KI einrichten“ öffnet Einstellungen am Standardmodell.
+
+**Nicht geprüft:** Wizard-Weg bis zum KI-Schritt (jeder Vault-Weg dort braucht einen Systemdialog;
+der Hinweis im KI-Schritt ist daher nur im Direktweg-Code gleich verdrahtet, nicht gesehen);
+Cloud-Satz von `AgentFocusHint`; Sperrseite mit Knopf; die **manuellen Agent-Läufe** der Beispiele 3
+und 5 gegen DE/EN-Starter-Vault (je mehrere Minuten mit lokalem 27B-Modell) — das Thema „Projekte“
+ist am Inhalt der Starter-Vaults geprüft, nicht an einem echten Lauf.
+
 ## Codex-Findings
 
 ### F01 — Eingeklappte Sidebar verhindert den Vault-Start
@@ -434,6 +483,41 @@ Status: [OFFEN]
 Der neue Portal-Weg ist erstmals auch bei ausgeblendeter Sidebar benutzbar. Beim Öffnen fokussiert er das Eingabefeld (`app/src/renderer/components/Sidebar/Sidebar.tsx:419-430`); Abbrechen, Escape und Klick auf den Hintergrund setzen nur `newNoteDialogOpen` auf `false` (`:417`, `:425-435`), und auch der Erfolgspfad schließt nur den Dialog (`:178-205`). Es wird weder das zuvor fokussierte Element gemerkt noch nach dem Unmount des Portals dorthin zurückfokussiert. Wer `⌘N` aus dem Editor bei ausgeblendeter Sidebar nutzt und abbricht, verliert damit die Schreibposition als Tastaturziel; ein nächster Tastendruck landet nicht zuverlässig wieder im Editor.
 Vorschlag: Beim Öffnen `document.activeElement` speichern und nach jedem Schließpfad dorthin zurückfokussieren, falls es noch verbunden ist. Dialog semantisch als `role="dialog"`/`aria-modal="true"` auszeichnen und Tab-Fokus während der Öffnung darin halten.
 
+### F32 — Erneutes Onboarding behält alten Wizard-Vault
+Schwere: hoch
+Stelle: app/src/renderer/components/Onboarding/Onboarding.tsx:37
+Status: [OFFEN]
+Beim erneuten Öffnen werden Schritt, Profil, Schwerpunkt und Direktweg zurückgesetzt, aber `vaultPath` und `createdStarterVault` bleiben erhalten (`app/src/renderer/components/Onboarding/Onboarding.tsx:33-45`). Nach einem ersten Wizard mit Vault A kann der Nutzer später Vault B öffnen und das Onboarding erneut starten; im Wizard ist A weiterhin ausgewählt, der Vault-Schritt erlaubt damit sofort „Weiter“ (`app/src/renderer/components/Onboarding/steps/IntentStep.tsx:309-320`), und „Fertig“ speichert A wieder als Start-Vault (`app/src/renderer/components/Onboarding/Onboarding.tsx:58-63`). Die Missionsanzeige kann zudem eine Willkommen-Notiz als erledigt markieren, obwohl der diesmal gewählte Vault nur geöffnet wurde (`app/src/renderer/components/Onboarding/Onboarding.tsx:48-51`, `:220`; `app/src/renderer/components/Onboarding/steps/MissionsStep.tsx:109-113`).
+Vorschlag: Beim Neustart `vaultPath` und `createdStarterVault` zurücksetzen oder den aktuell geöffneten Vault ausdrücklich und sichtbar als neue Auswahl übernehmen. „Starter-Vault erstellt“ nur im jeweiligen Erstellpfad setzen.
+
+### F33 — Fehler beim Lesen des Start-Vaults wird als „kein Vault“ verbucht
+Schwere: mittel
+Stelle: app/src/renderer/components/Sidebar/Sidebar.tsx:320
+Status: [OFFEN]
+Wirft `getLastVault()`, protokolliert der `catch` nur den Fehler (`app/src/renderer/components/Sidebar/Sidebar.tsx:320-324`). `targetVault` bleibt `null`; der folgende Zweig setzt deshalb `initialVaultLoad` auf `none` (`:325-328`). Der Einmal-Merker in `App` verbraucht damit die Startentscheidung (`app/src/renderer/App.tsx:188-195`), obwohl tatsächlich ein Lese- oder IPC-Fehler vorlag. Rev. 3 unterscheidet `none` und `failed` ausdrücklich (`docs/codex-collab/schwerpunkt-beim-einrichten.md:73-83`).
+Vorschlag: Im `getLastVault`-Catch `failed` setzen und zurückkehren; `none` nur bei erfolgreich gelesener, leerer Einstellung setzen.
+
+### F34 — Agent-Mission verspricht nach erneutem Onboarding einen Tab-Sprung
+Schwere: mittel
+Stelle: app/src/renderer/utils/i18n/workFocus.ts:16
+Status: [OFFEN]
+Die neue Mission sagt „Der Agent-Tab öffnet sich nach dem Einrichten“ (EN ebenso `app/src/renderer/utils/i18n/workFocus.ts:35`). Bei erneutem Onboarding in derselben Sitzung ist die Startentscheidung aber bereits verbraucht: `startDecisionMadeRef` lässt keinen zweiten Sprung zu (`app/src/renderer/App.tsx:187-195`), und `settleInitialVaultLoad` kann den Status nicht erneut aus `pending` setzen (`app/src/renderer/stores/notesStore.ts:97-101`). Nach „Fertig“ bleibt der vorher aktive Tab stehen. Das widerspricht der eigenen Semantik für erneutes Onboarding (`docs/codex-collab/schwerpunkt-beim-einrichten.md:70-72`, `:104-108`).
+Vorschlag: Die Mission ohne unmittelbare Öffnungszusage formulieren, etwa „Öffne den Agent-Tab über den Knopf in der Titelleiste“; den Startsprung als Verhalten beim nächsten App-Start beschreiben.
+
+### F35 — Cloud-Hinweis verspricht eine Zustimmungsfrage auch nach bereits erteilter Zustimmung
+Schwere: niedrig
+Stelle: app/src/renderer/utils/i18n/workFocus.ts:19
+Status: [OFFEN]
+Der neue Cloud-Satz behauptet in DE und EN eine Nachfrage „vor dem ersten Lauf“ (`app/src/renderer/utils/i18n/workFocus.ts:19`, `:38`). `AgentFocusHint` zeigt ihn allein anhand der Route und prüft die vom Main zurückgegebene Gate-Entscheidung nicht (`app/src/renderer/components/Onboarding/steps/AgentFocusHint.tsx:29-40`). Der Main gibt bei bereits gültiger Zustimmung `ok: true` zurück (`app/src/main/index.ts:4545-4549`, `:4560-4564`); nach erneutem Onboarding erfolgt daher keine neue Frage. Der Satz ist gerade im Wiederholungsweg falsch und betrifft eine Datenschutzentscheidung.
+Vorschlag: „Cloud-Läufe mit Vault-Zugriff brauchen deine ausdrückliche Zustimmung“ formulieren oder die Gate-Entscheidung im Hinweis berücksichtigen.
+
+### F36 — Beispielaufträge wurden trotz Rev.-3-Prüfbedingung nicht ausgeführt
+Schwere: mittel
+Stelle: app/src/renderer/components/Agent/AgentView.tsx:49
+Status: [OFFEN]
+Die beiden `need: 'none'`-Beispiele werden als ohne Unterlagen auswählbar angeboten (`app/src/renderer/components/Agent/AgentView.tsx:49-55`, `:565-581`); Beispiel 3 verspricht eine Projektzusammenfassung und Beispiel 5 eine Übersichtsnotiz mit Links (`app/src/renderer/utils/i18n/agentCard.ts:23-34`, `:150-161`). Rev. 3 verlangt, beide gegen DE/EN-Starter-Vault **manuell auszuführen** und nur bei belegtem Ergebnis stehen zu lassen (`docs/codex-collab/schwerpunkt-beim-einrichten.md:141-146`). Die Umsetzungsnotiz nennt diese Läufe ausdrücklich als „Nicht geprüft“ (`docs/codex-collab/schwerpunkt-beim-einrichten.md:261-265`). Ein bloßes Vorkommen des Wortes „Projekte“ im Vault belegt weder die benötigten Ziel-/Stand-/Aufgaben-Felder noch die zugesagten Links.
+Vorschlag: Die vier geplanten Läufe durchführen und Ergebnisse samt gelesenen Quellen prüfen; andernfalls die Beispiele oder ihre Ergebniszusagen bis dahin nicht als verifiziert ausgeben.
+
 ## Claude-Antwort
 
 Runde 1, alle 14 Befunde gegen den Code nachgeprüft, alle tragen. Nutzerentscheidung 04.10.2026:
@@ -507,10 +591,34 @@ ausgeblendete Sidebars aus. Nutzerfreigabe 04.10.2026: beheben.
   Dev-App: Fokus auf Titelleisten-Knopf → ⌘N → Eingabefeld fokussiert → Escape bzw. Hintergrundklick →
   Fokus wieder auf dem Knopf.
 
+Runde 5 (Code-Prüfung der Umsetzung), fünf Befunde, alle nachgeprüft. Nutzerfreigabe 04.10.2026:
+F32–F35 beheben, F36 mit zwei deutschen Läufen (Variante b).
+
+- **F32** [ADRESSIERT] — Neustart des Assistenten setzt auch `vaultPath` und `createdStarterVault`
+  zurück (`Onboarding.tsx`). Fehler bestand schon vorher, lag aber im angefassten Effekt.
+- **F33** [ADRESSIERT] — Lesefehler von `getLastVault` setzt `failed` und kehrt zurück (`Sidebar.tsx`).
+- **F34** [ADRESSIERT] — Mission ohne Öffnungszusage: „Öffne den Agent-Tab über den Knopf „Agent“ in
+  der Titelleiste …“ (DE/EN).
+- **F35** [ADRESSIERT] — Cloud-Satz: „Cloud-Läufe mit Vault-Zugriff brauchen deine ausdrückliche
+  Zustimmung.“ (DE/EN), keine Zusage einer Nachfrage mehr.
+- **F36** [ADRESSIERT] — zwei Läufe gegen eine Kopie des deutschen Starter-Vaults, `qwen3.8:27b-mlx` lokal,
+  Ziel „Ergebnisse“, Dev-App per CDP:
+  - **Beispiel 3 „Projekte“** (≈ 8 min, 12 Schritte: 7× `note_search`, 4× `note_read`, `list_target_folder`):
+    Inhalt korrekt — offene/erledigte Aufgaben mit Datum aus `Projektplanung.md`, Checkliste aus
+    `Markdown Showcase.md`, Frontmatter aus `Dataview Beispiel.md`; sagt ehrlich, dass es nur
+    Beispiel-Notizen gibt, nennt die vier gelesenen Notizen. **Aber keine Notiz geschrieben** — die
+    Antwort stand nur im Lauf, nichts zum Übernehmen, obwohl die Karte „Ergebnis: Notiz“ verspricht.
+    Der alte Text („fasse zusammen“) hatte dieselbe Lücke. Behoben durch „Schreib das als Notiz …“
+    im Beispieltext (DE/EN), wie in Beispiel 5. **Nach dieser Änderung nicht erneut gelaufen.**
+  - **Beispiel 5 „Überblick“** (≈ 6 min): Notiz `Ergebnisse/Vault-Überblick.md` geschrieben (übernommen
+    per Klick auf der Karte). Alle 12 Wikilinks zeigen auf existierende Notizen; Kernaussage
+    „nur Dataview Beispiel und Zotero Beispiel haben keinen Rücklink zum Wissensnetz“ per `grep`
+    bestätigt. Kleiner Widerspruch im Text („Analyse aller 14 Notizen“ oben, „12 von 12“ unten).
+  - Englischer Starter-Vault: nicht gelaufen (Variante b).
+
 ## Status
 
-Runden 1–4 (F01–F31) beantwortet. F16 umgesetzt inkl. F24, F30, F31 (uncommittet): `npm run typecheck`
-grün, `npm run build` grün, `npm run test` 2594/2595 — der eine Ausfall ist `shellExecution.test.ts`
-(Umgebungsprobe), scheitert nur unter Last der Gesamtsuite, einzeln 4/4 grün, Hauptprozess-Code ohne
-Bezug zur Änderung. Dev-App-Gegenproben siehe Abschnitt „Vorgezogen“ und F30/F31.
-Der Schwerpunkt selbst (Rev. 3) ist geplant, aber noch nicht gebaut.
+Runden 1–5 (F01–F36) beantwortet. F16 committet (6b04ce9c). Rev. 3 umgesetzt inkl. F32–F36
+(uncommittet): typecheck grün, build grün, test 2600/2602 (1 übersprungen, 1 bekannter Lastwackler).
+Offen: Beispiel 3 mit neuem Text nicht erneut gelaufen; englischer Starter-Vault nicht gelaufen;
+Wizard-Weg bis zum KI-Schritt, Cloud-Satz und Sperrseite nicht in der GUI gesehen.

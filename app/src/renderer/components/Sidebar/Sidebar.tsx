@@ -321,8 +321,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         targetVault = await window.electronAPI.getLastVault()
       } catch (error) {
         console.error('[Sidebar] Failed to get last vault:', error)
+        // Lesefehler ist nicht „kein Vault gespeichert“ (Codex F33).
+        useNotesStore.getState().settleInitialVaultLoad('failed')
+        return
       }
-      if (!targetVault) return
+      if (!targetVault) {
+        // Kein gespeicherter Vault: Startentscheidung ohne Sprung abschließen (Codex F27).
+        useNotesStore.getState().settleInitialVaultLoad('none')
+        return
+      }
 
       // Skip if already loaded (same vault)
       if (vaultPath === targetVault) return
@@ -372,9 +379,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         // Nach Onboarding: Willkommen-Notiz genau EINMAL automatisch öffnen. Ohne das
         // transiente Flag würde sie bei jedem App-Start erneut aufspringen, solange
         // die Datei im Vault-Root liegt.
+        // Beim Schwerpunkt „Agent“ ist der Agent-Tab die Begrüßung; eine automatische
+        // Notizauswahl würde ihn über den Tab-Effekt in App.tsx wieder verdrängen (Codex F15).
         if (useUIStore.getState().welcomeNotePending) {
           useUIStore.getState().setWelcomeNotePending(false)
-          const welcomeNote = loadedNotes.find(n =>
+          const welcomeNote = useUIStore.getState().workFocus === 'agent' ? undefined : loadedNotes.find(n =>
             n.path === 'Willkommen.md' || n.path === 'Welcome.md'
           )
           if (welcomeNote) {
@@ -388,9 +397,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
         })
 
         setLoading(false)
+        // Startladen fertig — aber nur „ready“, wenn inzwischen nicht über ⌘O ein anderer
+        // Vault geöffnet wurde (Codex F28). Wirkt nur beim ersten Mal pro Prozess.
+        useNotesStore.getState().settleInitialVaultLoad(
+          useNotesStore.getState().vaultPath === targetVault ? 'ready' : 'failed'
+        )
       } catch (error) {
         console.error('Fehler beim Auto-Laden des Vaults:', error)
         setLoading(false)
+        useNotesStore.getState().settleInitialVaultLoad('failed')
       }
     }
 

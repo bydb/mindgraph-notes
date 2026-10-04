@@ -11,6 +11,8 @@ import { PresentationSection } from './PresentationSection'
 import { PageHeader, SectionTitle, Card, Row, Details, Toggle, Segmented, Select, Button, TextInput } from './SettingsUI'
 
 export const GeneralSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
+  const workFocus = useUIStore(s => s.workFocus)
+  const setWorkFocus = useUIStore(s => s.setWorkFocus)
   const theme = useUIStore(s => s.theme)
   const setTheme = useUIStore(s => s.setTheme)
   const accentColor = useUIStore(s => s.accentColor)
@@ -41,6 +43,21 @@ export const GeneralSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   return (
     <div className="settings-section">
       <PageHeader title={t('settings.tab.general')} subtitle={t('settings.general.subtitle')} />
+
+      <SectionTitle title={t('settings.general.groupFocus')} />
+      <Card>
+        <Row label={t('settings.general.workFocus')} hint={t('settings.general.workFocusHint')}>
+          <Segmented
+            options={[
+              { value: 'notes' as const, label: t('settings.general.workFocus.notes') },
+              { value: 'agent' as const, label: t('settings.general.workFocus.agent') }
+            ]}
+            value={workFocus}
+            onChange={setWorkFocus}
+            ariaLabel={t('settings.general.workFocus')}
+          />
+        </Row>
+      </Card>
 
       <SectionTitle title={t('settings.general.groupAppearance')} />
       <Card>

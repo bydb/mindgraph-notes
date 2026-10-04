@@ -1,4 +1,5 @@
 import { DEFAULT_SHELL_GUARDRAILS, type ShellGuardrails } from '../../shared/shellGuardrails'
+import { normalizeWorkFocus, type WorkFocus } from '../../shared/workFocus'
 import { DEFAULT_COMPUTER_CONTROL, type ComputerControlSettings } from '../../shared/computerControl'
 import { create } from 'zustand'
 import { MAX_SKILL_REFERENCE_MINUTES, isSkillId, type ValuedType, type ReferenceMinutes, type ReferenceSources, type ReferenceSource, type SkillReferences } from '../../shared/activityLog'
@@ -839,6 +840,8 @@ interface UIState {
 
   // User Profile
   userProfile: UserProfile
+  /** Schwerpunkt: Startansicht + hervorgehobener Knopf (shared/workFocus.ts). Schaltet nichts aus. */
+  workFocus: WorkFocus
 
   // Actions
   setViewMode: (mode: ViewMode) => void
@@ -942,6 +945,9 @@ interface UIState {
   setPresentationHintDismissed: (dismissed: boolean) => void
   setUserProfile: (profile: UserProfile) => void
   applyProfileDefaults: (profile: UserProfile) => void
+  setWorkFocus: (focus: WorkFocus) => void
+  /** Onboarding erneut öffnen (⇧⌘O und Hilfe). Schwerpunkt bleibt — der Schritt wählt ihn vor. */
+  restartOnboarding: () => void
 
   // Transport (Quick Capture)
   transport: TransportSettings
@@ -1235,6 +1241,7 @@ const defaultState = {
 
   // User Profile
   userProfile: null as UserProfile,
+  workFocus: 'notes' as WorkFocus,
 
   // Transport (Quick Capture)
   transport: {
@@ -1307,6 +1314,7 @@ const persistedKeys = [
   'customLogo',
   'onboardingCompleted',
   'userProfile',
+  'workFocus',
   'slashCommandDateFormat',
   'slashCommandTimeFormat',
   'showFormattingToolbar',
@@ -1502,6 +1510,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   ),
   setPresentationHintDismissed: (dismissed) => set({ presentationHintDismissed: dismissed }),
   setUserProfile: (profile) => set({ userProfile: profile }),
+  setWorkFocus: (focus) => set({ workFocus: normalizeWorkFocus(focus) }),
+  restartOnboarding: () => set({ onboardingCompleted: false, userProfile: null, onboardingOpen: true }),
   setTransport: (settings) => set((state) => ({
     transport: { ...state.transport, ...settings }
   })),
@@ -1863,6 +1873,8 @@ export async function initializeUISettings(): Promise<void> {
       if (validSettings.userProfile && profileMigration[validSettings.userProfile as string]) {
         validSettings.userProfile = profileMigration[validSettings.userProfile as string]
       }
+      // Unbekannte Schwerpunkt-IDs (alt, künftig, von Hand editiert) → 'notes' (Codex F13).
+      validSettings.workFocus = normalizeWorkFocus(validSettings.workFocus)
       // A-pre Schritt 3: Legacy Top-Level-Configs der Vertikalen → generische pluginConfig.<id>.
       const legacyPresent = LEGACY_PLUGIN_CONFIG_IDS.filter(
         (id) => { const v = (savedSettings as Record<string, unknown>)[id]; return v != null && typeof v === 'object' }

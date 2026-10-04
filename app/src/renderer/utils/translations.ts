@@ -2,6 +2,7 @@ import type { Language } from '../stores/uiStore'
 import * as settingsPagesI18n from './i18n/settingsPages'
 import * as helpGuideI18n from './i18n/helpGuide'
 import * as agentCardI18n from './i18n/agentCard'
+import * as workFocusI18n from './i18n/workFocus'
 
 type TranslationKey = keyof typeof translations.de
 
@@ -10,6 +11,7 @@ const translations = {
     ...settingsPagesI18n.de,
     ...helpGuideI18n.de,
     ...agentCardI18n.de,
+    ...workFocusI18n.de,
     // ── Einstellungen · Redesign 09/2026: geteilte Bausteine, Integrationen, KI-Tab, Modul-Tab ──
     'settings.ui.saved': 'Gespeichert',
     'settings.ui.remove': 'Entfernen',
@@ -2735,7 +2737,7 @@ const translations = {
 
     // Intent Step (new onboarding)
     'onboarding.intent.title': 'Wie wirst du MindGraph Notes nutzen?',
-    'onboarding.intent.subtitle': 'Wir passen die Einstellungen an deinen Workflow an. Du kannst alles jederzeit in den Einstellungen ändern.',
+    'onboarding.intent.subtitle': 'Optional: Voreinstellungen für deine Arbeitsweise (Module, Dashboard). Du kannst alles jederzeit in den Einstellungen ändern.',
     'onboarding.intent.office.title': 'Büro & Mittelstand',
     'onboarding.intent.office.badges': 'E-Mails, Meetings, Projekte, Aufgaben, Kunden',
     'onboarding.intent.student.title': 'Schule & Lernen',
@@ -3379,6 +3381,7 @@ const translations = {
     ...settingsPagesI18n.en,
     ...helpGuideI18n.en,
     ...agentCardI18n.en,
+    ...workFocusI18n.en,
     // ── Settings · Redesign 09/2026: shared building blocks, integrations, AI tab, modules tab ──
     'settings.ui.saved': 'Saved',
     'settings.ui.remove': 'Remove',
@@ -6104,7 +6107,7 @@ const translations = {
 
     // Intent Step (new onboarding)
     'onboarding.intent.title': 'How will you use MindGraph Notes?',
-    'onboarding.intent.subtitle': 'We\'ll adjust settings for your workflow. You can change everything anytime in settings.',
+    'onboarding.intent.subtitle': 'Optional: presets for how you work (modules, dashboard). You can change everything anytime in settings.',
     'onboarding.intent.office.title': 'Office & Business',
     'onboarding.intent.office.badges': 'Emails, Meetings, Projects, Tasks, Customers',
     'onboarding.intent.student.title': 'School & Learning',

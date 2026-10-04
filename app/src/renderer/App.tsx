@@ -68,6 +68,7 @@ import { ImpactIndicator } from './components/Shared/ImpactIndicator'
 import { ComparisonView } from './components/Comparison/ComparisonView'
 import { initLlmTelemetry } from './stores/llmTelemetryStore'
 import { LlmPerformanceView } from './components/LlmPerformance/LlmPerformanceView'
+import { isStartDecisionDue, shouldOpenAgentOnStart } from '../shared/workFocus'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 
@@ -178,6 +179,20 @@ const App: React.FC = () => {
   const openDashboardTab = useTabStore(state => state.openDashboardTab)
   const openWorkflowCanvasTab = useTabStore(state => state.openWorkflowCanvasTab)
   const openAgentTab = useTabStore(state => state.openAgentTab)
+  const workFocus = useUIStore(state => state.workFocus)
+  const initialVaultLoad = useNotesStore(state => state.initialVaultLoad)
+  // Schwerpunkt „Agent“: einmal pro App-Start in den Agent-Tab, sobald das automatische
+  // Vault-Laden abgeschlossen ist. Nie bei späterem Vault-Wechsel oder nach Umstellen der
+  // Einstellung in derselben Sitzung (docs/codex-collab/schwerpunkt-beim-einrichten.md §3).
+  const startDecisionMadeRef = useRef(false)
+  useEffect(() => {
+    if (startDecisionMadeRef.current || !isStartDecisionDue(initialVaultLoad)) return
+    startDecisionMadeRef.current = true
+    if (shouldOpenAgentOnStart(useUIStore.getState().workFocus, initialVaultLoad)) {
+      useUIStore.getState().setViewMode('editor')
+      openAgentTab()
+    }
+  }, [initialVaultLoad, openAgentTab])
   const openLlmPerformanceTab = useTabStore(state => state.openLlmPerformanceTab)
   const openComparisonTab = useTabStore(state => state.openComparisonTab)
   const { unreadRelevantCount } = useEmailStore()
@@ -1043,10 +1058,7 @@ const App: React.FC = () => {
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'o' || e.key === 'O') && !e.altKey) {
         e.preventDefault()
         e.stopPropagation()
-        const { setOnboardingCompleted, setOnboardingOpen, setUserProfile } = useUIStore.getState()
-        setOnboardingCompleted(false)
-        setUserProfile(null)
-        setOnboardingOpen(true)
+        useUIStore.getState().restartOnboarding()
       }
     }
 
@@ -1244,6 +1256,33 @@ const App: React.FC = () => {
     })
   })
 
+  // Agent-Tab als fester Einstieg: vorher nur über Befehlspalette, Ordner-Kontextmenü
+  // und Hilfe erreichbar — zu versteckt für eines der wichtigsten Werkzeuge. Kein
+  // Modul-Gate, wie openAgentTab selbst.
+  // Beim Schwerpunkt „Agent“ steht er vor Dashboard/Workflow und behält seinen Text auch
+  // unter 1300 px (`.is-focus` in index.css). Es verschwindet kein anderer Knopf.
+  const agentTitlebarButton = (
+    <button
+      className={`view-mode-btn cat-ai ${activeTab?.type === 'agent' ? 'active' : ''} ${workFocus === 'agent' ? 'is-focus' : ''}`}
+      onClick={() => {
+        setViewMode('editor')
+        openAgentTab()
+      }}
+      data-tooltip={t('commandPalette.openAgent')}
+      aria-label={t('commandPalette.openAgent')}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 8V4H8"/>
+        <rect x="4" y="12" width="16" height="8" rx="2"/>
+        <path d="M2 14h2"/>
+        <path d="M20 14h2"/>
+        <path d="M15 16h.01"/>
+        <path d="M9 16h.01"/>
+      </svg>
+      <span className="view-mode-label">Agent</span>
+    </button>
+  )
+
   return (
     <ReactFlowProvider>
       <div className="app">
@@ -1295,6 +1334,7 @@ const App: React.FC = () => {
               <ViewModeButton mode="canvas" currentMode={viewMode} onClick={() => { setViewMode('canvas'); useUIStore.getState().setBrainLensActive(true) }} title="Brain" label="Brain">
                 <BrainIcon size={14} />
               </ViewModeButton>
+              {workFocus === 'agent' && agentTitlebarButton}
               {dashboardEnabled && (
                 <button
                   className={`view-mode-btn cat-organize ${activeTab?.type === 'dashboard' ? 'active' : ''}`}
@@ -1332,28 +1372,7 @@ const App: React.FC = () => {
                   <span className="view-mode-label">Workflow</span>
                 </button>
               )}
-              {/* Agent-Tab als fester Einstieg: vorher nur über Befehlspalette,
-                  Ordner-Kontextmenü und Hilfe erreichbar — zu versteckt für eines
-                  der wichtigsten Werkzeuge. Kein Modul-Gate, wie openAgentTab selbst. */}
-              <button
-                className={`view-mode-btn cat-ai ${activeTab?.type === 'agent' ? 'active' : ''}`}
-                onClick={() => {
-                  setViewMode('editor')
-                  openAgentTab()
-                }}
-                data-tooltip={t('commandPalette.openAgent')}
-                aria-label={t('commandPalette.openAgent')}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 8V4H8"/>
-                  <rect x="4" y="12" width="16" height="8" rx="2"/>
-                  <path d="M2 14h2"/>
-                  <path d="M20 14h2"/>
-                  <path d="M15 16h.01"/>
-                  <path d="M9 16h.01"/>
-                </svg>
-                <span className="view-mode-label">Agent</span>
-              </button>
+              {workFocus !== 'agent' && agentTitlebarButton}
               <span className="view-mode-separator" />
               <button
                 className={`view-mode-btn cat-editor ${textSplitEnabled ? 'active' : ''}`}

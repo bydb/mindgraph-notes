@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { Note, FileEntry } from '../../shared/types'
 import { extractLinks, extractTags, extractTitle, generateNoteId, extractHeadings, extractBlocks, extractTaskStatsForCache } from '../utils/linkExtractor'
 import { trackContextEvent } from '../utils/contextMemory'
+import type { InitialVaultLoad } from '../../shared/workFocus'
 
 interface NotesState {
   vaultPath: string | null
@@ -18,6 +19,10 @@ interface NotesState {
   selectedOfficePath: string | null  // Relativer Pfad zur ausgewählten Office-Datei
   selectedOfficeType: 'excel' | 'word' | 'powerpoint' | null
   isLoading: boolean
+  /** Ergebnis des automatischen Vault-Ladens beim App-Start (nicht persistiert). Nur
+   *  `loadLastVault` setzt es, genau einmal pro Prozess — Grundlage des Startsprungs
+   *  beim Schwerpunkt „Agent“ (shared/workFocus.ts). */
+  initialVaultLoad: InitialVaultLoad
 
   // Multi-Select
   selectedPaths: Set<string>  // Relative Pfade der selektierten Dateien
@@ -29,6 +34,8 @@ interface NotesState {
 
   // Actions
   setVaultPath: (path: string | null) => void
+  /** Setzt den Startlade-Status nur aus `pending` heraus; spätere Aufrufe sind wirkungslos. */
+  settleInitialVaultLoad: (result: Exclude<InitialVaultLoad, 'pending'>) => void
   setFileTree: (tree: FileEntry[]) => void
   setNotes: (notes: Note[]) => void
   addNote: (note: Note) => void
@@ -74,6 +81,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   selectedOfficePath: null,
   selectedOfficeType: null,
   isLoading: false,
+  initialVaultLoad: 'pending',
   selectedPaths: new Set<string>(),
   lastClickedPath: null,
   navigationHistory: [],
@@ -87,6 +95,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     }
   },
   
+  settleInitialVaultLoad: (result) => {
+    if (get().initialVaultLoad !== 'pending') return
+    set({ initialVaultLoad: result })
+  },
+
   setFileTree: (tree) => set({ fileTree: tree }),
   
   setNotes: (notes) => {

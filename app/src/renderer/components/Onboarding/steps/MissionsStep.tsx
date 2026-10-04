@@ -10,6 +10,23 @@ interface MissionsStepProps {
   standalone?: boolean
   stepNumber?: number
   totalSteps?: number
+  /** Schwerpunkt „Agent“: erste Mission ist der erste Auftrag (reine Textzeile, nicht klickbar). */
+  agentFocus?: boolean
+}
+
+const agentMission = {
+  id: 'agent',
+  shortcut: undefined as string | undefined,
+  icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 8V4H8"/>
+      <rect x="4" y="12" width="16" height="8" rx="2"/>
+      <path d="M2 14h2"/>
+      <path d="M20 14h2"/>
+      <path d="M15 16h.01"/>
+      <path d="M9 16h.01"/>
+    </svg>
+  )
 }
 
 const missions = [
@@ -75,9 +92,11 @@ export const MissionsStep: React.FC<MissionsStepProps> = ({
   hasStarterVault = false,
   standalone = false,
   stepNumber = 4,
-  totalSteps = 4
+  totalSteps = 4,
+  agentFocus = false
 }) => {
   const { t } = useTranslation()
+  const shown = agentFocus ? [agentMission, ...missions] : missions
 
   return (
     <div className="onboarding-step">
@@ -87,7 +106,7 @@ export const MissionsStep: React.FC<MissionsStepProps> = ({
       <p className="onboarding-step-desc">{t('onboarding.missions.subtitle')}</p>
 
       <div className="onboarding-missions-list">
-        {missions.map((mission, index) => (
+        {shown.map((mission, index) => (
           <div
             key={mission.id}
             className={`onboarding-mission-item ${mission.id === 'welcome' && hasStarterVault ? 'auto-done' : ''}`}

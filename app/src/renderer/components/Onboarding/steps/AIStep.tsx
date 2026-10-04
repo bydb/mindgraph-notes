@@ -3,10 +3,13 @@ import { useTranslation } from '../../../utils/translations'
 import { useUIStore } from '../../../stores/uiStore'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../../shared/modelCompatibility'
 import { StepIndicator } from './StepIndicator'
+import { AgentFocusHint } from './AgentFocusHint'
 
 interface AIStepProps {
   onBack: () => void
   onNext: () => void
+  /** Schwerpunkt „Agent“: ehrlicher Satz zum Agenten auf diesem Rechner. */
+  showAgentHint?: boolean
   stepNumber: number
   totalSteps: number
 }
@@ -38,7 +41,7 @@ const capabilities = [
   }
 ]
 
-export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, stepNumber, totalSteps }) => {
+export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, stepNumber, totalSteps }) => {
   const { t } = useTranslation()
   const { ollama, setOllama } = useUIStore()
   const [ollamaConnected, setOllamaConnected] = useState(false)
@@ -267,6 +270,8 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, stepNumber, tota
           </span>
         </div>
       )}
+
+      {showAgentHint && <AgentFocusHint />}
 
       <div className="onboarding-nav">
         <button className="onboarding-btn-secondary" onClick={onBack}>

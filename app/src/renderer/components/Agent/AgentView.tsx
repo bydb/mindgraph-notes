@@ -46,12 +46,14 @@ const SUBMIT_KEYS = HAS_MAC_TOOLS ? '\u2318\u21A9' : 'Ctrl+Enter'
 // `need`: was der unveränderte Beispielauftrag zwingend braucht (Codex F25/F29/F30).
 // Verwaltung: ein Ordner (collect_table gibt es nur mit Ordner-Anhang). Beschaffung: zwei
 // Angebote. Arbeitsblatt: Web — die Arbeitsblatt-Skill bricht ohne web_search/web_fetch
-// ab. Wissensrecherche braucht nichts außer dem Vault.
+// ab. Wissensrecherche und Überblick brauchen nichts außer dem Vault — beide tragen im
+// Starter-Vault (Thema „Projekte“ kommt in allen vier vor, Codex F09).
 const EXAMPLES: Array<{ cat: TranslationKey; text: TranslationKey; docs: TranslationKey; result: TranslationKey; need: AgentExampleNeed }> = [
   { cat: 'agentCard.ex1Cat', text: 'agentCard.ex1', docs: 'agentCard.ex1Docs', result: 'agentCard.ex1Result', need: 'folder' },
   { cat: 'agentCard.ex2Cat', text: 'agentCard.ex2', docs: 'agentCard.ex2Docs', result: 'agentCard.ex2Result', need: 'files2' },
   { cat: 'agentCard.ex3Cat', text: 'agentCard.ex3', docs: 'agentCard.ex3Docs', result: 'agentCard.ex3Result', need: 'none' },
-  { cat: 'agentCard.ex4Cat', text: 'agentCard.ex4', docs: 'agentCard.ex4Docs', result: 'agentCard.ex4Result', need: 'web' }
+  { cat: 'agentCard.ex4Cat', text: 'agentCard.ex4', docs: 'agentCard.ex4Docs', result: 'agentCard.ex4Result', need: 'web' },
+  { cat: 'agentCard.ex5Cat', text: 'agentCard.ex5', docs: 'agentCard.ex5Docs', result: 'agentCard.ex5Result', need: 'none' }
 ]
 
 type PermState = 'on' | 'off' | 'locked' | 'modOff' | 'setup'
@@ -423,7 +425,10 @@ export function AgentView({ tabId }: Props) {
   // Dateien blieben ohne Knopf zum Übernehmen im Zwischenspeicher (Codex F35).
   const resultsPending = run.phase === 'review' && run.results.some(r => r.state === 'pending')
   const gateBlock = preGate && !preGate.ok ? preGate.code : scope.startGate?.code ?? null
-  const canRun = !!vaultPath && hasTarget && hasTask && !docsMissing && !webMissing && !resultsPending && !gateBlock && !busy
+  // Frische Installation: KI an, aber kein Modell gewählt — ohne diese Zeile sah die Karte
+  // startklar aus, und der Lauf scheiterte erst im Main (Codex F29).
+  const modelMissing = !activeCloudRoute && !effectiveModel.trim()
+  const canRun = !!vaultPath && !modelMissing && hasTarget && hasTask && !docsMissing && !webMissing && !resultsPending && !gateBlock && !busy
 
   const submit = async () => {
     if (!canRun || !vaultPath) return
@@ -478,7 +483,14 @@ export function AgentView({ tabId }: Props) {
     return (
       <div className="agent-view">
         <div className="agent-view-inner">
-          <div className="agent-view-empty">{t('agentTab.aiDisabled')}</div>
+          <div className="agent-view-empty">
+            {t('agentTab.aiDisabled')}
+            <div>
+              <button type="button" className="agent-card-btn" onClick={() => openSettingsAt('ai', 'ai-backend')}>
+                {t('agentCard.setupAi')}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -487,6 +499,7 @@ export function AgentView({ tabId }: Props) {
   // Startknopf: erste Lücke in fester Reihenfolge — Auftrag, dann Zielordner.
   const buttonLabel = busy ? t('aiBar.agent.working')
     : !vaultPath ? t('agentCard.btnNoVault')
+    : modelMissing ? t('agentCard.modelMissing')
     : resultsPending ? t('agentCard.btnPending')
     : gateBlock === 'consent' ? t('agentCard.btnConsent')
     : gateBlock === 'optin' ? t('agentCard.btnOptin')
@@ -718,8 +731,8 @@ export function AgentView({ tabId }: Props) {
 
           {/* Modell + Datenwege nach Weg, nicht nach Hersteller. Vor dem Lauf zeigt die Karte die
               Vorabprüfung, während des Laufs ausschließlich den beim Start gespeicherten Befund. */}
-          <div className="agent-card-row is-two-col">
-            <span className="agent-card-label">{t('agentCard.rowModel')}</span>
+          <div className={`agent-card-row is-two-col ${modelMissing && !running ? 'is-missing' : ''}`}>
+            <span className="agent-card-label">{t('agentCard.rowModel')}{modelMissing && !running && <> &#9679;</>}</span>
             <div className="agent-card-value">
               {running
                 ? <span className="agent-card-running-model">{run.model}</span>
@@ -739,7 +752,16 @@ export function AgentView({ tabId }: Props) {
                   />
                 )}
               {!running && modelsFailed && <span className="agent-card-help">{t('agentCard.modelsNotLoaded')}</span>}
-              {(() => {
+              {!running && modelMissing && (
+                <span className="agent-card-missing-line">
+                  <span className="agent-card-missing-title">{t('agentCard.modelMissing')}</span>
+                  <button type="button" className="agent-card-link-btn is-strong" onClick={() => openSettingsAt('ai', 'ai-default-model')}>
+                    {t('agentCard.setupAi')}
+                  </button>
+                </span>
+              )}
+              {/* Ohne Modell gibt es keinen Weg zu prüfen — sonst bliebe „wird geprüft …“ stehen. */}
+              {(running || !modelMissing) && (() => {
                 const route = running ? run.route : preRoute
                 const webShown = running ? runWeb : webOn
                 return (
