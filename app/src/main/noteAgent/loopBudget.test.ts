@@ -106,3 +106,37 @@ describe('Kontextbudget im Loop', () => {
     expect(mockChat.mock.calls[0][2].disableMiddleOut).toBe(true)
   })
 })
+
+describe('Treffer außerhalb des angehängten Ordners', () => {
+  it('note_read markiert Notizen außerhalb, liest Notizen im Anhang unverändert', async () => {
+    const { registerContextFolder, clearContextAttachments } = await import('./contextFiles')
+    await fs.mkdir(path.join(vault, 'Journal'), { recursive: true })
+    await fs.mkdir(path.join(vault, 'Anderes'), { recursive: true })
+    await fs.writeFile(path.join(vault, 'Journal', 'innen.md'), 'innen', 'utf8')
+    await fs.writeFile(path.join(vault, 'Anderes', 'aussen.md'), 'aussen', 'utf8')
+    const agentRun = makeRun()
+    const reg = await registerContextFolder(agentRun.senderId, path.join(vault, 'Journal'), true, vault)
+    if (!reg.ok) throw new Error(reg.error)
+    agentRun.attachmentIds = [reg.attachment.id]
+    try {
+      mockChat
+        .mockResolvedValueOnce({
+          text: '',
+          toolCalls: [
+            { id: 'a', name: 'note_read', arguments: { path: 'Journal/innen.md' } },
+            { id: 'b', name: 'note_read', arguments: { path: 'Anderes/aussen.md' } }
+          ],
+          assistantMessage: { role: 'assistant', content: '' },
+          promptTokens: 3_000
+        })
+        .mockResolvedValueOnce(done(3_200))
+      await run(agentRun)
+      const [innen, aussen] = toolMessages(1)
+      expect(innen.content).not.toContain('außerhalb der angehängten Ordner')
+      expect(aussen.content).toContain('HINWEIS: Diese Notiz liegt außerhalb der angehängten Ordner')
+      expect(aussen.content).toContain('aussen')
+    } finally {
+      clearContextAttachments(agentRun.senderId)
+    }
+  })
+})

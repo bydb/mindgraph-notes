@@ -85,6 +85,10 @@ export interface ChatOptions {
   // UNGEPRÜFT gegen einen echten ≤8k-Endpunkt (kein Schlüssel im Test); laut OpenRouter-
   // Doku („Message Transforms“) schaltet ein leeres Array die Kompression ab.
   disableMiddleOut?: boolean
+  // Nur Ollama-Werkzeugpfad: Ausgabegrenze (`num_predict`) für EINZELNE, bewusst kurze
+  // Aufrufe (Auswertungspakete von folder_digest). Der Agent-Loop setzt sie nie — dort
+  // bleibt die Ausgabe wie bisher nur vom Kontextfenster begrenzt.
+  ollamaNumPredict?: number
   // Reproduzierbare, modellabhängige Laufparameter. Der aufrufende Agent löst
   // das Profil einmal auf; der Ollama-Adapter setzt es konsistent auf Wire-Ebene um.
   executionProfile?: LlmExecutionProfile
@@ -656,8 +660,10 @@ async function chatWithToolsViaOllama(
   // ChatOptions: Ollama-Modelle bringen abgestimmte Defaults mit, und der Skill-Benchmark
   // misst auf ihnen. Auch KEIN num_predict — der Server laesst die Ausgabe sonst
   // unbegrenzt bis zum Kontextfenster laufen, ein Limit hier waere eine neue Decke.
+  // Einzige Ausnahme: ein ausdruecklich gesetztes ollamaNumPredict (folder_digest-Pakete).
   const ollamaOptions = {
     ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}),
+    ...(opts.ollamaNumPredict ? { num_predict: opts.ollamaNumPredict } : {}),
     ...(execution.temperature !== undefined ? { temperature: execution.temperature } : {}),
     ...(execution.topP !== undefined ? { top_p: execution.topP } : {})
   }

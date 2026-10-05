@@ -792,6 +792,28 @@ Umsetzung: `shared/contextBudget.ts` (rein, getestet), `loop.ts` (Budget nach je
 Lesesperre, Ablehnung zu großer Leseergebnisse, Stopp vor dem Senden), `read_context_file` blättert
 nach Budget (`maxTokens`), `collect_table` verdichtet, `chatClient.ts` `disableMiddleOut`.
 
+### Baustein C umgesetzt (05.10.2026)
+
+`shared/folderDigest.ts` (rein: Datierung Frontmatter > Name > Pfad, nie mtime; Gruppen
+Monat/Woche/Quartal/Unterordner; Pakete an Dateigrenzen, große Dateien in Abschnitte `Pfad#n`;
+Fundstellen-Prüfung; Abdeckung), `main/noteAgent/folderDigest.ts` (Werkzeug: Lesen über die
+Inventur aus A mit eigenen Grenzen und Teilstatus, Paketgröße aus dem Fenster des Modellwegs
+höchstens 12 000 Token, werkzeuglose Auswertungsaufrufe über denselben Modellweg mit
+`num_predict`/`max_tokens` 2 048, Erkennen-Schicht = Überlauf-Wächter je Aufruf → Paket halbieren,
+Aufrufgrenze 40 Pakete vorab / 50 gesamt mit Teilergebnis, Zusammenführen bis ins Budget,
+Modellweg-Prüfung gegen `run.route`, Verbrauch über `ctx.recordUsage`). Allowlist, Ordner-Prompt
+(Entscheidungsregel), Manifest-Hinweis ab 15 Nicht-Tabellen, Arbeitsart `summary` nachrangig,
+Datenweg-Satz auf der Karte (DE/EN). Dazu: `note_search`-Treffer und `note_read`-Notizen außerhalb
+der angehängten Ordner werden markiert (Nutzerentscheidung: Transparenz statt Sperre).
+
+**GUI-Gegenprobe C (Computer use):** derselbe Auftrag auf Journal-Gross (88 Einträge, ~45 000
+Token). Der Agent wählte `folder_digest` selbst (group_by Monat), las 88/88 Dateien, drei
+Auswertungsaufrufe (je Monat), las danach die drei Marker-Einträge gezielt nach und schrieb die
+Notiz, ~5 min. Ergebnis: alle drei BESONDERS-Marker mit richtigem Thema, neun Stichproben-Daten
+korrekt, keine Einträge aus dem anderen Ordner, nichts erfunden. Rest: Die Notiz nennt die
+Abdeckung nur vage (die genaue Zeile steht in den Quellen der Karte) — das Modell folgte der
+Anweisung „Abdeckung nennen“ nicht wörtlich.
+
 ## Status
 
 Rev. 3, drei Codex-Runden. **Baustein A umgesetzt (05.10.2026), nicht committet:**
@@ -826,4 +848,4 @@ begrenzt) und erfand ein Detail („Laubholzer Weg“). Die Lückenangabe blieb 
 Einträge“). Ein Budget verhindert den Überlauf, macht aber aus Stichproben keine Vollständigkeit —
 das kann nur die Verdichtung durch die App (`folder_digest`).
 
-Offen: C (`folder_digest`). Zu prüfen: soll `note_search` in Ordner-Läufen auf den Anhang begrenzt werden oder die Fundstelle außerhalb kennzeichnen?
+**Baustein C umgesetzt (05.10.2026), nicht committet.** Offen aus „Später“: einzeln übernehmbare Gruppenkarten, Wiederaufnahme, Starter-Skill „Rückblick“, inhaltliche Befundprüfung.

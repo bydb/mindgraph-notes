@@ -45,6 +45,12 @@ function accepted(over: Partial<Extract<ActivityEvent, { kind: 'agent-result-acc
 }
 
 describe('deriveActivityType', () => {
+  it('folder_digest ist Zusammenfassen, aber nachrangig zu Tabellen und Dokumenten (F16)', () => {
+    expect(deriveActivityType(['folder_digest'])).toBe('summary')
+    expect(deriveActivityType(['folder_digest', 'write_note'])).toBe('summary')
+    expect(deriveActivityType(['folder_digest', 'write_xlsx'])).toBe('table-merge')
+    expect(deriveActivityType(['folder_digest', 'write_docx'])).toBe('document')
+  })
   it('erkennt die Tabellen-Auswertung am kennzeichnenden Werkzeug', () => {
     expect(deriveActivityType(['list_context_folder', 'collect_table', 'write_xlsx'])).toBe('table-merge')
   })

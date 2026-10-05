@@ -32,7 +32,7 @@ const BUDGETED_READ_TOOLS = new Set([
   'peek_dataset', 'use_skill', 'read_skill_file', 'list_target_folder', 'inspect_pptx_template'
 ])
 // Vor dem Lauf gesperrt wie die Lesewerkzeuge, aber nie nachträglich abgelehnt.
-const LOCK_ONLY_TOOLS = new Set(['collect_table'])
+const LOCK_ONLY_TOOLS = new Set(['collect_table', 'folder_digest'])
 
 // Ordner-Läufe brauchen mehr Luft: Manifest, zwei bis drei Stichproben, das
 // Zusammenführen und erst danach die Ergebnisdateien — das sind schnell acht
@@ -75,6 +75,8 @@ function buildSystemPrompt(run: AgentRun, noteContent: string, senderId: number,
 ANGEHÄNGTE ORDNER (${folders.map(f => `"${f.name}"`).join(', ')}):
 - Arbeite so: (1) list_context_folder für die Übersicht — sie zeigt auch Unterordner; bei großen Ordnern mit subfolder hineingehen, (2) read_context_file für die Dateien, die du wirklich brauchst — einzeln, mit dem Pfad aus dem Manifest, bei großen Tabellen abschnittsweise über offset/max_rows.
 - Unterordner gehören zum Ordner. Durchsuche sie, wenn der Auftrag den ganzen Ordner meint — nicht nur die oberste Ebene.
+- Welcher Weg: gleich aufgebaute Tabellen → collect_table. Eine Frage über VIELE Text- oder Mischdateien, einen Zeitraum oder alle Unterordner (Rückblick, Zusammenfassung, „alles zu X“) → folder_digest: die App wertet dann JEDE Datei aus, du bekommst Befunde mit Fundstelle. Einzelne bekannte Dateien → read_context_file. Lies bei vielen Dateien NICHT Stichproben und rate den Rest — das lässt Einträge still weg.
+- Die Notizsuche (note_search, vault_search) durchsucht den GANZEN Vault, nicht nur den angehängten Ordner. Treffer von note_search und Notizen aus note_read außerhalb des Anhangs sind markiert; verwende sie nur, wenn der Auftrag sie meint.
 - Sind die Dateien gleich aufgebaut (z.B. Rückmeldungen mehrerer Stellen zum selben Formular), lies ZWEI oder DREI davon als Stichprobe, um Aufbau und Spaltennamen zu verstehen — NICHT alle. Führe sie danach mit collect_table zusammen: die App liest dann alle Dateien selbst und legt einen Datensatz an, den du mit write_xlsx (Parameter dataset) schreibst. Tippe die Zeilen NIEMALS selbst ab — bei vielen Dateien passen sie nicht in deinen Kontext, und Abgetipptes ist fehleranfällig.
 - collect_table kann direkt filtern (nicht_leer, enthaelt, gleich, datum_zwischen). Nur wenn du Zeilen inhaltlich beurteilen musst, hole sie portionsweise mit peek_dataset.
 - Wenn eine Datei nicht gelesen oder nicht zugeordnet werden konnte, nenne sie im Ergebnis. Lieber eine ehrliche Lücke als eine stille.`
@@ -220,6 +222,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     allowed.add('read_context_file')
     allowed.add('collect_table')
     allowed.add('peek_dataset')
+    allowed.add('folder_digest')
   }
   if (run.skills.length > 0) {
     allowed.add('use_skill')
@@ -300,6 +303,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   addToBudget(budget, messages.map(m => m.content ?? '').join('\n'))
   addToBudget(budget, JSON.stringify(tools.map(t => ({ type: 'function', function: t }))))
   ctx.maxResultTokens = () => maxToolResultTokens(budget)
+  ctx.chatOptions = chatOptions
   if (contextWindow.source === 'assumed') {
     onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
   }
@@ -317,6 +321,8 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const maxIterations = hasFolder || run.shell || run.computer ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   // Verbrauch jeder Iteration einzeln — daraus wird am Ende die Lauf-Bilanz.
   const callUsages: Array<CallUsage | null> = []
+  // Zusätzliche Modellaufrufe von Werkzeugen (folder_digest) zählen in die Lauf-Bilanz.
+  ctx.recordUsage = usage => { callUsages.push(usage) }
   // Preise jetzt holen, nicht erst beim Bilanzieren: sonst wartet der Nutzer am
   // Ende des Laufs auf eine Netzabfrage, die längst hätte laufen können.
   warmPricingCache(chatOptions)

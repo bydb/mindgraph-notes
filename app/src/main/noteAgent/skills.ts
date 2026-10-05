@@ -37,6 +37,9 @@ import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
 import { shellExecuteTool, shellStageFileTool } from './shellTools'
 import { computerMailDraftTool, computerOpenTool, computerPrintTool, computerRevealTool } from './computerTools'
 import { skillActivityId } from '../skillActivityId'
+import { parseDigestArgs, runFolderDigest } from './folderDigest'
+import type { ChatOptions } from '../llm/chatClient'
+import type { CallUsage } from '../../shared/llmCost'
 
 export interface NoteAgentContext {
   senderId: number
@@ -60,7 +63,32 @@ export interface NoteAgentContext {
    * sich daran an, statt vom Loop abgelehnt zu werden. Ohne Budget (Tests): unbegrenzt.
    */
   maxResultTokens?: () => number
+  /**
+   * Aufgelöste Modell-Optionen des Laufs (aus loop.ts, nur lesen). Nur folder_digest nutzt
+   * sie — für werkzeuglose Auswertungsaufrufe über DENSELBEN Modellweg wie der Lauf.
+   */
+  chatOptions?: ChatOptions
+  /** Verbrauch zusätzlicher Modellaufrufe eines Werkzeugs in die Lauf-Bilanz (F11). */
+  recordUsage?: (usage: CallUsage | null) => void
 }
+
+/**
+ * Liegt ein vault-relativer Pfad außerhalb der angehängten Vault-Ordner dieses Laufs?
+ * null = der Lauf hat keinen angehängten Vault-Ordner (dann gibt es nichts zu markieren).
+ * Transparenz statt Sperre: Treffer werden gekennzeichnet, nicht entfernt — die Vault-Suche
+ * bleibt nutzbar, aber das Modell sieht, was nicht zum Anhang gehört (real 05.10.2026: ein
+ * Jahresrückblick mischte Einträge aus einem zweiten Journal-Ordner ein).
+ */
+function outsideAttachedFolders(ctx: NoteAgentContext, relPath: string): boolean | null {
+  const folders = getContextAttachmentInfos(ctx.senderId, ctx.run.attachmentIds)
+    .filter(a => a.kind === 'folder' && a.insideVault)
+    .map(a => a.name.replace(/ \(\d+\)$/, '').replace(/\/+$/, '').toLowerCase())
+  if (folders.length === 0) return null
+  const p = relPath.replace(/\\/g, '/').replace(/^\/+/, '').toLowerCase()
+  return !folders.some(f => p === f || p.startsWith(f + '/'))
+}
+
+const OUTSIDE_NOTE = 'außerhalb der angehängten Ordner'
 
 /** Hat dieser Lauf das Werkzeug? Ohne Allowlist (Tests) konservativ: ja. */
 function isToolAvailable(ctx: NoteAgentContext, name: string): boolean {
@@ -131,7 +159,9 @@ function formatFolderManifest(manifest: FolderManifest): string {
     manifest.dirs.reduce((n, d) => n + d.tables, 0)
   const howTo = tableCount >= MIN_TABLES_FOR_COLLECT_GUARD
     ? `Dieser Ordner enthält ${tableCount} Tabellen. Der vorgesehene Weg: HÖCHSTENS ${MAX_SINGLE_READS_BEFORE_COLLECT} davon mit read_context_file als Stichprobe ansehen, um die Spaltenüberschriften zu lernen — danach ALLE auf einmal mit collect_table zusammenführen (liest auch die Unterordner). Jede Tabelle einzeln zu lesen sprengt deinen Kontext und lässt den Auftrag scheitern.`
-    : 'Inhalte holst du einzeln mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.'
+    : manifest.totalFiles - tableCount >= MIN_FILES_FOR_DIGEST_HINT
+      ? `Das sind ${manifest.totalFiles} Dateien. Für eine Frage über viele davon (Zusammenfassung, Rückblick, „alles zu X“) nimm folder_digest — die App wertet dann JEDE Datei aus. Stichproben mit read_context_file lassen den Rest still weg. Einzelne bekannte Dateien liest du mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.`
+      : 'Inhalte holst du einzeln mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.'
   return [
     header,
     [...dirLines, ...fileLines].join('\n'),
@@ -216,6 +246,8 @@ async function readVaultBinary(vaultPath: string, relPath: string, maxBytes: num
 const MAX_SINGLE_READS_BEFORE_COLLECT = 3
 const MAX_SINGLE_READS_AFTER_COLLECT = 8
 const MIN_TABLES_FOR_COLLECT_GUARD = 8
+// Ab so vielen lesbaren Nicht-Tabellen nennt das Manifest folder_digest als Weg (F19).
+const MIN_FILES_FOR_DIGEST_HINT = 15
 
 function requireString(args: Record<string, unknown>, key: string): string | null {
   const v = args[key]
@@ -537,6 +569,49 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     }
   })
 
+  // Ordner-Auswertung mit Frage (Baustein C): die App liest alle Dateien selbst und lässt
+  // das Laufmodell sie paketweise auswerten — der Agent bekommt nur Befunde + Abdeckung.
+  registry.register({
+    name: 'folder_digest',
+    description:
+      'Wertet ALLE lesbaren Dateien eines angehängten Ordners samt Unterordnern zu EINER Frage aus — die App liest die Dateien selbst, lässt sie paketweise auswerten und gibt dir Befunde mit Fundstelle (Pfad) plus eine Abdeckung zurück, nicht die Texte. Nutze das für Fragen über viele Text-/Mischdateien, einen Zeitraum oder alle Unterordner (z. B. Jahresrückblick aus einem Journal, „alle Zusagen von Frau X“). Für gleich aufgebaute Tabellen ist collect_table der richtige Weg. Parameter: folder, question (die Frage aus dem Auftrag, die jede Datei beantworten soll), group_by (month | week | quarter | subfolder | none; Standard subfolder), optional subfolder (nur dieser Teil), from/to (JJJJ-MM-TT), kinds (z. B. ["md","pdf"]). Dauert je nach Ordner einige Minuten.',
+    parameters: {
+      type: 'object',
+      properties: {
+        folder: { type: 'string', description: 'Exakte Ordnerbezeichnung aus der Anhang-Liste' },
+        question: { type: 'string', description: 'Die Frage, die für jede Datei beantwortet werden soll' },
+        group_by: { type: 'string', description: 'month | week | quarter | subfolder | none' },
+        subfolder: { type: 'string', description: 'Nur dieser Unterordner (Pfad relativ zum Ordner)' },
+        from: { type: 'string', description: 'JJJJ-MM-TT' },
+        to: { type: 'string', description: 'JJJJ-MM-TT' },
+        kinds: { type: 'array', items: { type: 'string' }, description: 'Nur diese Formate, z. B. ["md"]' }
+      },
+      required: ['folder', 'question']
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const parsed = parseDigestArgs(args)
+      if (typeof parsed === 'string') return err(parsed)
+      if (!ctx.chatOptions) return err('Ordner-Auswertung ist in diesem Lauf nicht verfügbar.')
+      try {
+        const res = await runFolderDigest(parsed, {
+          senderId: ctx.senderId,
+          run: ctx.run,
+          chatOptions: ctx.chatOptions,
+          maxResultTokens: ctx.maxResultTokens ?? (() => 8_000),
+          recordUsage: ctx.recordUsage ?? (() => {}),
+          onStep: summary => ctx.onStep?.('folder_digest', summary)
+        })
+        if (!res.ok) return err(res.content.replace(/^Fehler:\s*/, ''))
+        ctx.run.sources.add(`Ordner: ${parsed.folder}`)
+        if (res.coverageLine) ctx.run.sources.add(res.coverageLine)
+        return { ok: true, content: res.content, display: `folder_digest: ${parsed.folder}` }
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e))
+      }
+    }
+  })
+
   registry.register({
     name: 'peek_dataset',
     description:
@@ -659,8 +734,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           display: `note_read: ${rel}`
         }
       }
+      const outside = res.ok && rel ? outsideAttachedFolders(ctx, rel) : null
+      const content = outside
+        ? `HINWEIS: Diese Notiz liegt ${OUTSIDE_NOTE} — verwende sie nur, wenn der Auftrag sie meint.\n\n${res.content}`
+        : res.content
       // display neutral halten (Telegram-Displays tragen Emojis — hier Klartext-Protokoll).
-      return { ...res, display: rel ? `note_read: ${rel}` : undefined }
+      return { ...res, content, display: rel ? `note_read: ${rel}` : undefined }
     }
   })
 
@@ -672,7 +751,16 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     run: async (args, ctx) => {
       const res = await noteSearchTool.run(args, telegramCtx(ctx))
       const query = requireString(args, 'query')
-      return { ...res, display: query ? `note_search: „${query}"` : undefined }
+      let content = res.content
+      if (res.ok) {
+        try {
+          const hits = JSON.parse(content) as Array<{ path: string; excerpt: string; hinweis?: string }>
+          if (Array.isArray(hits) && hits.some(h => outsideAttachedFolders(ctx, h.path) === true)) {
+            content = JSON.stringify(hits.map(h => (outsideAttachedFolders(ctx, h.path) ? { ...h, hinweis: OUTSIDE_NOTE } : h)), null, 2)
+          }
+        } catch { /* „Keine Treffer.“ o. ä. — kein JSON, nichts zu markieren */ }
+      }
+      return { ...res, content, display: query ? `note_search: „${query}"` : undefined }
     }
   })
 
