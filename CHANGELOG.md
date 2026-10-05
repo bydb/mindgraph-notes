@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.35-beta] - 2026-10-06
+
+**Du kannst dem Petrol Agent jetzt antworten.** Unter dem Ergebnis eines Laufs steht eine Zeile „Antworten und weitermachen“: Schreib einen Nachtrag oder beantworte seine Frage, und der Agent arbeitet mit allem weiter, was er schon gelesen hat – du musst den Auftrag nicht neu starten.
+
+### Hintergrund
+
+- **Auslöser:** Nach einem Jahresrückblick fragte der Agent „Soll ich das als Notiz zusammenstellen?“ – und es gab keinen Weg zu antworten außer einem neuen Auftrag.
+- **Weniger Rückfragen:** Endet der Agent ohne Ergebnis mit einer Frage, schickt die App ihn einmal zurück: Er soll selbst entscheiden, seine Annahme nennen und das Ergebnis schreiben.
+- **Wie der Folgelauf arbeitet:** Er läuft über dieselben Prüfungen wie ein neuer Auftrag (Cloud-Freigabe, Modell, Shell- und Rechner-Dialog) und zeigt oben deine Antwort. Zusammengeführte Tabellen des vorigen Laufs bleiben verfügbar.
+- **Grenzen:** Fortsetzen lässt sich nur der zuletzt beendete Lauf und nicht bei Webrecherche. Offene Ergebniskarten erst übernehmen oder verwerfen, dann antworten.
+- **Journal-Datumsformat:** Die Ordner-Auswertung erkennt jetzt auch Dateinamen wie `05.10.2026.md` – solche Einträge fielen bei einer Auswertung mit Zeitraum bisher als „ohne Datum“ heraus.
+
 ## [0.11.34-beta] - 2026-10-05
 
 **Der Petrol Agent wertet jetzt ganze Ordner aus – samt Unterordnern.** Hängst du zum Beispiel dein Journal an und bittest um einen Jahresrückblick oder um „alle Zusagen“, liest die App jede Datei selbst und gibt dem Agenten die Befunde mit Fundstelle. Das Ergebnis sagt dir, wie viele Dateien gefunden und ausgewertet wurden und was fehlt.
