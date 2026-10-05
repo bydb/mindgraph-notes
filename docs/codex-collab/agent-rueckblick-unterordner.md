@@ -900,6 +900,27 @@ Alle elf Befunde am Code nachgeprüft: alle tragen. Nutzer: „alle 11“.
 
 typecheck/build grün, `npm run test` 2684 grün, 1 bekannter Ausreißer (`shellExecution.test.ts` Umgebungsprobe, Zeitüberschreitung unter Last).
 
+### Werkzeugwahl folder_digest vs. Einzellesen (05.10.2026)
+
+Anlass: In der GUI las qwen3.6 bei „Liste alle Zusagen …“ einmal 30 Dateien einzeln. Messung mit
+`app/scripts/agent-tool-choice-probe.ts`: echter Systemprompt (`buildSystemPrompt`, dafür exportiert),
+echte Werkzeuge, echtes Manifest, gemessen wird nur der Schritt nach `list_context_folder`.
+qwen3.6:35b-a3b-nvfp4 lokal, 5 Wiederholungen je Fall, Test-Vault (synthetisch).
+
+| Fall | Ausgang | Variante B |
+|---|---|---|
+| 30 Zusagen, „Liste alle … auf“ | 3/5 folder_digest | 5/5 |
+| 88 Einträge, Jahreszusammenfassung | 5/5 | 5/5 |
+| 9 Einträge, „Fasse zusammen“ (beides richtig) | 1/5 Digest | 2/5 Digest |
+
+Ursache: Schritt (2) der Ordner-Anleitung zeigte pauschal aufs Einzellesen („read_context_file für
+die Dateien, die du wirklich brauchst — einzeln“), und als Beispiele für folder_digest standen nur
+Rückblick/Zusammenfassung — Auflistungsaufträge kamen nicht vor. Variante B setzt die Wahl in
+Schritt (2) (folder_digest bei allen/vielen Dateien inkl. „alles auflisten, alle X finden“, sonst
+collect_table bzw. read_context_file) und spiegelt das im Manifest-Hinweis.
+Grenzen: ein Modell, n = 5; kein deterministischer Riegel (eine Einzel-Lese-Sperre wie bei
+collect_table wäre die nächste Stufe, falls andere Modelle weiter einzeln lesen).
+
 ## Status
 
 Rev. 3, drei Codex-Runden. **Baustein A umgesetzt (05.10.2026), committet `627702d6`:**

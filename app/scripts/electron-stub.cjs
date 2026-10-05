@@ -13,5 +13,7 @@ module.exports = {
   },
   BrowserWindow: { getAllWindows: () => [] },
   ipcMain: { handle: () => undefined, on: () => undefined },
-  safeStorage: { isEncryptionAvailable: () => false }
+  safeStorage: { isEncryptionAvailable: () => false },
+  // Chat-Aufrufe laufen in der App über Chromiums net.fetch — headless über Nodes fetch.
+  net: { fetch: (...args) => fetch(...args) }
 }

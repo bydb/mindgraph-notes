@@ -160,7 +160,7 @@ function formatFolderManifest(manifest: FolderManifest): string {
   const howTo = tableCount >= MIN_TABLES_FOR_COLLECT_GUARD
     ? `Dieser Ordner enthält ${tableCount} Tabellen. Der vorgesehene Weg: HÖCHSTENS ${MAX_SINGLE_READS_BEFORE_COLLECT} davon mit read_context_file als Stichprobe ansehen, um die Spaltenüberschriften zu lernen — danach ALLE auf einmal mit collect_table zusammenführen (liest auch die Unterordner). Jede Tabelle einzeln zu lesen sprengt deinen Kontext und lässt den Auftrag scheitern.`
     : manifest.totalFiles - tableCount >= MIN_FILES_FOR_DIGEST_HINT
-      ? `Das sind ${manifest.totalFiles} Dateien. Für eine Frage über viele davon (Zusammenfassung, Rückblick, „alles zu X“) nimm folder_digest — die App wertet dann JEDE Datei aus. Stichproben mit read_context_file lassen den Rest still weg. Einzelne bekannte Dateien liest du mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.`
+      ? `Das sind ${manifest.totalFiles} Dateien. Betrifft der Auftrag alle oder viele davon (alles auflisten, alle X finden, Zusammenfassung, Rückblick), nimm folder_digest — die App wertet dann JEDE Datei aus. Jede Datei einzeln mit read_context_file zu lesen füllt deinen Kontext, Stichproben lassen den Rest still weg. Einzelne bekannte Dateien liest du mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.`
       : 'Inhalte holst du einzeln mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.'
   return [
     header,

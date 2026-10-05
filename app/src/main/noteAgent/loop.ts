@@ -60,7 +60,7 @@ export interface NoteAgentLoopResult {
 
 const registry = createNoteAgentRegistry()
 
-function buildSystemPrompt(run: AgentRun, noteContent: string, senderId: number, agentMemory: string, shellAttachments: string): string {
+export function buildSystemPrompt(run: AgentRun, noteContent: string, senderId: number, agentMemory: string, shellAttachments: string): string {
   const attachments = getContextAttachmentInfos(senderId, run.attachmentIds)
   const attachmentList = attachments.length
     ? attachments.map(a => `- ${a.name} (${a.kind === 'folder' ? 'Ordner' : a.kind})`).join('\n')
@@ -73,9 +73,12 @@ function buildSystemPrompt(run: AgentRun, noteContent: string, senderId: number,
     ? `
 
 ANGEHÄNGTE ORDNER (${folders.map(f => `"${f.name}"`).join(', ')}):
-- Arbeite so: (1) list_context_folder für die Übersicht — sie zeigt auch Unterordner; bei großen Ordnern mit subfolder hineingehen, (2) read_context_file für die Dateien, die du wirklich brauchst — einzeln, mit dem Pfad aus dem Manifest, bei großen Tabellen abschnittsweise über offset/max_rows.
+- Arbeite so: (1) list_context_folder für die Übersicht — sie zeigt auch Unterordner; bei großen Ordnern mit subfolder hineingehen. (2) Dann den Weg nach Manifest und Auftrag wählen:
+  • Betrifft der Auftrag ALLE oder VIELE Text-/Mischdateien (ab etwa 15) — alles auflisten, alle X finden, zusammenfassen, Rückblick, Zeitraum — → folder_digest. Die App wertet dann JEDE Datei aus, du bekommst Befunde mit Fundstelle und eine Abdeckung.
+  • Gleich aufgebaute Tabellen → collect_table.
+  • Wenige bestimmte Dateien → read_context_file, einzeln, mit dem Pfad aus dem Manifest, bei großen Tabellen abschnittsweise über offset/max_rows.
 - Unterordner gehören zum Ordner. Durchsuche sie, wenn der Auftrag den ganzen Ordner meint — nicht nur die oberste Ebene.
-- Welcher Weg: gleich aufgebaute Tabellen → collect_table. Eine Frage über VIELE Text- oder Mischdateien, einen Zeitraum oder alle Unterordner (Rückblick, Zusammenfassung, „alles zu X“) → folder_digest: die App wertet dann JEDE Datei aus, du bekommst Befunde mit Fundstelle. Einzelne bekannte Dateien → read_context_file. Lies bei vielen Dateien NICHT Stichproben und rate den Rest — das lässt Einträge still weg.
+- Lies bei vielen Dateien NICHT jede einzeln oder Stichproben und rate den Rest — einzeln läuft dein Kontext voll, Stichproben lassen Einträge still weg.
 - Die Notizsuche (note_search, vault_search) durchsucht den GANZEN Vault, nicht nur den angehängten Ordner. Treffer von note_search und Notizen aus note_read außerhalb des Anhangs sind markiert; verwende sie nur, wenn der Auftrag sie meint.
 - Sind die Dateien gleich aufgebaut (z.B. Rückmeldungen mehrerer Stellen zum selben Formular), lies ZWEI oder DREI davon als Stichprobe, um Aufbau und Spaltennamen zu verstehen — NICHT alle. Führe sie danach mit collect_table zusammen: die App liest dann alle Dateien selbst und legt einen Datensatz an, den du mit write_xlsx (Parameter dataset) schreibst. Tippe die Zeilen NIEMALS selbst ab — bei vielen Dateien passen sie nicht in deinen Kontext, und Abgetipptes ist fehleranfällig.
 - collect_table kann direkt filtern (nicht_leer, enthaelt, gleich, datum_zwischen). Nur wenn du Zeilen inhaltlich beurteilen musst, hole sie portionsweise mit peek_dataset.
