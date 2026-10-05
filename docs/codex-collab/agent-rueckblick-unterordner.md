@@ -760,6 +760,38 @@ fließen in die Umsetzung ein, Befunde zu B/C bleiben bis zu deren Umsetzung off
 - **F37 [OFFEN bis Baustein B]** Wichtig für B: `collect_table`-Bericht darf nie nachträglich
   abgelehnt werden, wenn der Datensatz schon registriert ist.
 
+### Baustein B umgesetzt (05.10.2026) — Antworten F34–F37
+
+**Eichung vor B (F22, Plan-Vorgabe):** Ollama `prompt_eval_count` gegen Zeichen, drei Modelle
+(qwen3.6:35b-a3b, qwen3.8:27b, gemma4:12b; qwen-Varianten identisch). Zeichen pro Token:
+Fließtext DE 3,27–3,36 · Werkzeug-JSON 3,56–3,64 · **Tabelle 1,86 · Pfadliste 1,30–1,33**.
+Rev. 3 mit festen 2,5 Zeichen/Token hätte Manifeste und Tabellen um fast die Hälfte unterschätzt —
+genau das, was die Ordner-Werkzeuge liefern. Deshalb Schätzung nach Zeichenarten:
+`Buchstaben/2,9 + Ziffern·1,4 + Satzzeichen·0,65 + Umbrüche`. Überschätzt auf den Eichtexten
+8–37 %, in der Gegenprobe (CHANGELOG, TS-Code, Journal, englischer Text; zusätzlich llama3.1 mit
+anderem Tokenizer) 15–71 %, unterschätzt nie. Cloud/LM Studio nicht gemessen (kein Schlüssel) —
+dort korrigiert die gemeldete Prompt-Token-Zahl ab der zweiten Iteration.
+
+- **F34 [ADRESSIERT]** Keine eigene 95-%-Regel. Nach jeder Server-Meldung ist der Verbrauch exakt,
+  und der Loop stoppt VOR dem Senden, wenn weniger als 2 048 Token für eine Antwort frei sind
+  (`hasRoomForNextCall`) — laut, mit Hinweis zum Aufteilen. Das ist die Kapazitätsgrenze, nicht
+  ein Kürzungsnachweis; der Überlauf-Wächter bleibt als harte Erkennung unverändert.
+- **F35 [ADRESSIERT]** OpenRouter-Agent-Läufe senden `transforms: []` (`disableMiddleOut`) — ein
+  Überlauf an einem ≤ 8k-Endpunkt wird damit zum Fehler statt zur stillen Mitten-Kürzung. Fenster
+  für alle Nicht-Ollama-Wege fest 32 768 („angenommen“, im Lauf-Protokoll genannt), kein
+  Katalogwert. UNGEPRÜFT gegen einen echten ≤ 8k-Endpunkt (kein Schlüssel) — im Code vermerkt.
+- **F36 [ADRESSIERT durch Ehrlichkeit]** Kein neues lokales Ausgabelimit (bewusste Entscheidung in
+  `index.ts`). Die 8 192 sind eine Planungsgröße: ab dort sperrt das Lesen; die Garantie bleibt der
+  Stopp vor dem Senden + Überlauf-Wächter.
+- **F37 [ADRESSIERT]** Der Loop lehnt nur Werkzeuge OHNE Nebenwirkung nachträglich ab
+  (`BUDGETED_READ_TOOLS`). `collect_table` wird vor dem Lauf gesperrt (vor jeder Registrierung)
+  und verdichtet seinen Bericht danach selbst (20 → 8 → 3 → 0 Beispielzeilen), die Datensatz-ID
+  steht immer drin (`collectBudget.test.ts`).
+
+Umsetzung: `shared/contextBudget.ts` (rein, getestet), `loop.ts` (Budget nach jeder Nachricht,
+Lesesperre, Ablehnung zu großer Leseergebnisse, Stopp vor dem Senden), `read_context_file` blättert
+nach Budget (`maxTokens`), `collect_table` verdichtet, `chatClient.ts` `disableMiddleOut`.
+
 ## Status
 
 Rev. 3, drei Codex-Runden. **Baustein A umgesetzt (05.10.2026), nicht committet:**
@@ -780,4 +812,18 @@ listet den Ordner, liest alle 9 Einträge per Pfad, schreibt eine korrekte Monat
 Fehlermeldung mit den verfügbaren Pfaden führte sofort zur Korrektur. Möglicher Feinschliff:
 bei Nicht-Treffer die ähnlichsten Pfade zuerst nennen statt die ersten 30.
 
-Offen: B und C; F34–F37 vor B beantworten.
+**Baustein B umgesetzt (05.10.2026), nicht committet** — siehe Claude-Antwort „Baustein B umgesetzt“.
+
+**GUI-Gegenprobe B (Computer use, 05.10.2026):** Journal-Gross, 88 Einträge à ~1 500 Zeichen in
+`2026/01–03` (~45 000 Token, passt bewusst nicht in 32k), qwen3.6:35b-a3b lokal, 32 Schritte, ~4 min.
+Technisch wie geplant: zwei Leseergebnisse abgelehnt („Platz für 114 / 25 Token“), dann
+Lesesperre „Kontext fast voll“, danach `write_note` mit Hinweis auf nicht gelesene Einträge. Kein
+Überlauf-Abbruch, kein stilles Kürzen.
+**Inhaltlich schwach — Beleg für Baustein C:** Das Modell las Stichproben statt aller Einträge
+(Suchen + ~15 Dateien), verpasste den Marker 02-13, mischte über `note_search`/`note_read`
+Einträge aus dem ANDEREN Ordner `Journal/` ein (die Vault-Suche ist nicht auf den Anhang
+begrenzt) und erfand ein Detail („Laubholzer Weg“). Die Lückenangabe blieb vage („nicht alle
+Einträge“). Ein Budget verhindert den Überlauf, macht aber aus Stichproben keine Vollständigkeit —
+das kann nur die Verdichtung durch die App (`folder_digest`).
+
+Offen: C (`folder_digest`). Zu prüfen: soll `note_search` in Ordner-Läufen auf den Anhang begrenzt werden oder die Fundstelle außerhalb kennzeichnen?

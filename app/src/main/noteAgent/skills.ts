@@ -16,6 +16,7 @@ import {
 } from './contextFiles'
 import { registerResult, registerDataset, getDataset, type AgentRun } from './runRegistry'
 import { formatCollectReport, type RowFilter, type RowFilterOp } from '../../shared/tableCollect'
+import { estimateTokens } from '../../shared/contextBudget'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
 import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
 import { markdownToDocx, markdownToDocxBuffer } from '../office/officeService'
@@ -52,6 +53,13 @@ export interface NoteAgentContext {
    * scheinbar still.
    */
   onStep?: (skill: string, summary: string) => void
+  /**
+   * Kontextbudget des Laufs (Baustein B, aus loop.ts). Höchstgröße des NÄCHSTEN
+   * Werkzeugergebnisses in Token, frisch berechnet. Werkzeuge, die blättern können
+   * (read_context_file) oder einen Bericht verdichten können (collect_table), passen
+   * sich daran an, statt vom Loop abgelehnt zu werden. Ohne Budget (Tests): unbegrenzt.
+   */
+  maxResultTokens?: () => number
 }
 
 /** Hat dieser Lauf das Werkzeug? Ohne Allowlist (Tests) konservativ: ja. */
@@ -425,7 +433,8 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         const res = await readFolderFile(ctx.senderId, ctx.run.attachmentIds, folder, file, {
           sheet: typeof args.sheet === 'string' ? args.sheet : undefined,
           offset: typeof args.offset === 'number' ? args.offset : undefined,
-          maxRows: typeof args.max_rows === 'number' ? args.max_rows : undefined
+          maxRows: typeof args.max_rows === 'number' ? args.max_rows : undefined,
+          maxTokens: ctx.maxResultTokens?.()
         })
         ctx.run.sources.add(`${res.folderName}/${res.fileName}`)
         ctx.run.folderReads.set(res.folderName, (ctx.run.folderReads.get(res.folderName) ?? 0) + 1)
@@ -506,9 +515,20 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         const truncNote = table.truncated
           ? `\n\nACHTUNG: Es wurden nicht alle Daten übernommen (Obergrenze für Dateien oder Zeilen erreicht). Nenne das im Ergebnis.`
           : ''
+        // Der Datensatz ist registriert — der Bericht darf deshalb NIE nachträglich
+        // abgelehnt werden, sonst sieht das Modell die Datensatz-ID nicht (F37). Statt-
+        // dessen verdichtet er sich selbst, bis er ins Budget passt; im äußersten Fall
+        // geht er ohne Beispielzeilen raus, die ID steht immer drin.
+        const limit = ctx.maxResultTokens?.()
+        const variants = [{ sampleRows: 20, maxProblemLines: 30 }, { sampleRows: 8, maxProblemLines: 15 }, { sampleRows: 3, maxProblemLines: 10 }, { sampleRows: 0, maxProblemLines: 5 }]
+        let report = formatCollectReport(datasetId, table, variants[0]) + truncNote
+        for (const v of variants.slice(1)) {
+          if (limit === undefined || estimateTokens(report) <= limit) break
+          report = formatCollectReport(datasetId, table, v) + truncNote
+        }
         return {
           ok: true,
-          content: formatCollectReport(datasetId, table) + truncNote,
+          content: report,
           display: `collect_table: ${table.rows.length} Zeilen aus ${table.files.length} Dateien → ${datasetId}`
         }
       } catch (e) {

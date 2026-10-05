@@ -22,6 +22,7 @@ import {
   assertFolderRootIdentity, captureFolderRoot, inventoryFolder, parseFolderRelPath, readFileInFolder,
   MAX_INVENTORY_DEPTH, MAX_INVENTORY_ENTRIES, type FolderInventory, type FolderRoot
 } from './folderInventory'
+import { linesFittingTokens } from '../../shared/contextBudget'
 
 export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'folder'
 
@@ -568,7 +569,16 @@ export interface ReadFolderFileOptions {
   offset?: number
   /** Maximale Zeilenzahl. Default 200 (xlsx) bzw. 400 Textzeilen. */
   maxRows?: number
+  /**
+   * Kontextbudget des Laufs in Token (Baustein B). Passt der Bereich nicht hinein, wird
+   * weniger geliefert und mit offset auf den Rest verwiesen — blättern statt abgelehnt
+   * werden. Ohne Angabe gelten nur die festen Grenzen.
+   */
+  maxTokens?: number
 }
+
+// Platz für Überschriften und Blätter-Hinweise neben dem eigentlichen Inhalt.
+const READ_TOKEN_MARGIN = 300
 
 const DEFAULT_ROWS_XLSX = 200
 const DEFAULT_LINES_TEXT = 400
@@ -608,7 +618,17 @@ export async function readFolderFile(
       if (!picked) throw new Error(`Blatt "${wanted}" gibt es nicht. Vorhanden: ${data.sheets.map(s => s.name).join(', ')}`)
       sheets = [picked]
     }
-    const maxRows = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_ROWS_XLSX))
+    let maxRows = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_ROWS_XLSX))
+    // Budget: so viele Zeilen je Blatt, wie zusammen in den Kontext passen (geschätzt).
+    if (opts.maxTokens !== undefined) {
+      const tokenRoom = Math.max(0, opts.maxTokens - READ_TOKEN_MARGIN)
+      const shownSheets = sheets.slice(0, MAX_XLSX_SHEETS)
+      const perSheet = Math.floor(tokenRoom / Math.max(1, shownSheets.length))
+      for (const sheet of shownSheets) {
+        const lines = sheet.rows.slice(offset - 1, offset - 1 + maxRows).map(r => `| ${r.join(' | ')} |`)
+        maxRows = Math.max(1, Math.min(maxRows, linesFittingTokens(lines, perSheet)))
+      }
+    }
     const parts: string[] = []
     for (const sheet of sheets.slice(0, MAX_XLSX_SHEETS)) {
       const slice = sheet.rows.slice(offset - 1, offset - 1 + maxRows)
@@ -632,7 +652,11 @@ export async function readFolderFile(
     const full = hygieneText(await extractContentFromBuffer(info.kind, buf)).trim()
     if (!full) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
     const lines = full.split('\n')
-    const maxLines = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_LINES_TEXT))
+    let maxLines = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_LINES_TEXT))
+    if (opts.maxTokens !== undefined) {
+      const fit = linesFittingTokens(lines.slice(offset - 1, offset - 1 + maxLines), Math.max(0, opts.maxTokens - READ_TOKEN_MARGIN))
+      maxLines = Math.max(1, Math.min(maxLines, fit))
+    }
     const slice = lines.slice(offset - 1, offset - 1 + maxLines)
     content = slice.join('\n')
     if (offset - 1 + slice.length < lines.length) {

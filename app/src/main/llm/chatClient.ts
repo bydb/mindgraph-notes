@@ -79,6 +79,12 @@ export interface ChatOptions {
   // Bewusst pro Request statt nur als Account-Einstellung, damit ein sensibler Lauf
   // auch mit einem falsch konfigurierten persönlichen Account fail-closed bleibt.
   zeroDataRetention?: boolean
+  // Nur OpenRouter: stille „middle-out“-Kompression abschalten (`transforms: []`). Ohne das
+  // kürzen Endpunkte mit ≤ 8k Kontext die MITTE der Konversation, statt einen Fehler zu
+  // melden — der Notiz-Agent will den lauten Fehler (Baustein B, F35).
+  // UNGEPRÜFT gegen einen echten ≤8k-Endpunkt (kein Schlüssel im Test); laut OpenRouter-
+  // Doku („Message Transforms“) schaltet ein leeres Array die Kompression ab.
+  disableMiddleOut?: boolean
   // Reproduzierbare, modellabhängige Laufparameter. Der aufrufende Agent löst
   // das Profil einmal auf; der Ollama-Adapter setzt es konsistent auf Wire-Ebene um.
   executionProfile?: LlmExecutionProfile
@@ -513,10 +519,10 @@ function openAiCompatibleTarget(backend: ChatBackend, opts: ChatOptions): OpenAi
 
 /** Provider-spezifische Datenschutzvorgaben für den Request-Body. */
 function cloudRequestPolicy(backend: ChatBackend, opts: ChatOptions): Record<string, unknown> {
-  if (backend === 'openrouter' && opts.zeroDataRetention) {
-    return { provider: { zdr: true } }
-  }
-  return {}
+  const policy: Record<string, unknown> = {}
+  if (backend === 'openrouter' && opts.zeroDataRetention) policy.provider = { zdr: true }
+  if (backend === 'openrouter' && opts.disableMiddleOut) policy.transforms = []
+  return policy
 }
 
 /**

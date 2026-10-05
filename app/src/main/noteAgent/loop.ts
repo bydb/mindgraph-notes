@@ -9,6 +9,10 @@ import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatCl
 import { costOfCalls, warmPricingCache } from '../llm/chatClient'
 import type { CallUsage, RunCost } from '../../shared/llmCost'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
+import {
+  addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, maxToolResultTokens,
+  recordServerPromptTokens, resolveContextWindow, ASSUMED_OUTPUT_RESERVE
+} from '../../shared/contextBudget'
 import { getContextAttachmentInfos, getShellAttachmentPaths } from './contextFiles'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { nextSeq, recordToolUse, type AgentRun } from './runRegistry'
@@ -17,6 +21,18 @@ import { nextSeq, recordToolUse, type AgentRun } from './runRegistry'
 // brauchen Luft für die Schreib-Iteration plus eine Fehler-Korrektur — real lief ein
 // 20-Tool-Call-Lauf mit GLM 5.2 ins Limit, bevor das Ergebnis fertig war.
 const MAX_ITERATIONS = 12
+
+// Kontextbudget (Baustein B): Werkzeuge, die nur lesen. Sie werden gesperrt, wenn nur
+// noch Platz für die Antwort bleibt, und ein zu großes Ergebnis wird durch einen kurzen
+// Hinweis ersetzt — sie haben keine Nebenwirkung, eine Ablehnung verliert nichts.
+// Werkzeuge MIT Nebenwirkung (collect_table registriert einen Datensatz, Writer legen
+// Dateien an) werden nie nachträglich abgelehnt (F37); sie begrenzen ihre Antwort selbst.
+const BUDGETED_READ_TOOLS = new Set([
+  'note_read', 'note_search', 'vault_search', 'read_attachment', 'list_context_folder', 'read_context_file',
+  'peek_dataset', 'use_skill', 'read_skill_file', 'list_target_folder', 'inspect_pptx_template'
+])
+// Vor dem Lauf gesperrt wie die Lesewerkzeuge, aber nie nachträglich abgelehnt.
+const LOCK_ONLY_TOOLS = new Set(['collect_table'])
 
 // Ordner-Läufe brauchen mehr Luft: Manifest, zwei bis drei Stichproben, das
 // Zusammenführen und erst danach die Ergebnisdateien — das sind schnell acht
@@ -271,7 +287,25 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     timeoutMs: 600_000,
     // Explizit statt geerbt: Ohne num_ctx hängt der Überlauf an Ollamas globaler
     // Einstellung, die die App nicht kennt — und der Überlauf ist still.
-    numCtx: params.chatOptions?.numCtx ?? (run.web ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX)
+    numCtx: params.chatOptions?.numCtx ?? (run.web ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX),
+    // Überlauf bei OpenRouter laut melden statt still die Mitte zu kürzen (F35).
+    disableMiddleOut: true
+  }
+
+  // Kontextbudget (Baustein B): vorsichtige Schätzung bis zur ersten Server-Meldung, danach
+  // gemeldete Prompt-Token + Schätzung des seither Angehängten. Steuert nur — die harte
+  // Grenze bleibt der Überlauf-Wächter unten (looksTruncated).
+  const contextWindow = resolveContextWindow(chatOptions.backend, chatOptions.numCtx)
+  const budget = createContextBudget(contextWindow.tokens, chatOptions.maxTokens ?? ASSUMED_OUTPUT_RESERVE)
+  addToBudget(budget, messages.map(m => m.content ?? '').join('\n'))
+  addToBudget(budget, JSON.stringify(tools.map(t => ({ type: 'function', function: t }))))
+  ctx.maxResultTokens = () => maxToolResultTokens(budget)
+  if (contextWindow.source === 'assumed') {
+    onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
+  }
+  const pushMessage = (message: ChatMessage): void => {
+    messages.push(message)
+    addToBudget(budget, message.content ?? '')
   }
 
   let lastText = ''
@@ -288,6 +322,11 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   warmPricingCache(chatOptions)
 
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
+    // Vor dem Senden: Reicht der Platz noch für eine Antwort? Sonst laut stoppen statt
+    // still überzulaufen (F23) — mit Hinweis, wie der Auftrag doch gelingt.
+    if (!hasRoomForNextCall(budget)) {
+      throw failWithHint(`Der Arbeitsspeicher des Modells (Kontext, ${budget.window.toLocaleString('de-DE')} Token) ist voll, bevor ein Ergebnis geschrieben wurde. Teile den Auftrag auf (z. B. einen Unterordner oder Zeitraum nach dem anderen) oder wähle ein Modell mit größerem Kontext.`)
+    }
     const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
     const result = await chatWithTools(messages, tools, { ...chatOptions, telemetryModule: 'note-agent', telemetryRunId: run.runId })
     callUsages.push(result.usage ?? null)
@@ -301,9 +340,11 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
       throw new Error(contextTruncationMessage(result.promptTokens!, Math.min(previousPromptTokens ?? Infinity, sentChars / 4), chatOptions.numCtx))
     }
     if (typeof result.promptTokens === 'number') previousPromptTokens = result.promptTokens
+    recordServerPromptTokens(budget, result.promptTokens)
 
     lastText = result.text
     messages.push(result.assistantMessage)
+    addToBudget(budget, (result.assistantMessage.content ?? '') + JSON.stringify(result.toolCalls))
 
     if (result.toolCalls.length === 0) {
       // Web-Lauf-Vertrag (0e): „genau EIN Write", nicht „höchstens einer". Stoppt das Modell,
@@ -311,7 +352,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
       if (run.web && !run.web.wrote) {
         if (!nudgedForWrite && iteration < maxIterations) {
           nudgedForWrite = true
-          messages.push({
+          pushMessage({
             role: 'user',
             content: 'Du hast noch kein Ergebnis geschrieben. Schließe die Recherche ab, indem du das Ergebnis JETZT speicherst — mit write_note als Markdown-Notiz, mit write_html, wenn eine HTML-Seite verlangt war, oder mit write_pptx, wenn eine Präsentation verlangt war. Ein Schreib-Aufruf ist im Recherche-Modus der einzige Weg, den Lauf zu beenden.'
           })
@@ -328,7 +369,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
       if (run.results.size === 0 && result.text.trim() === '') {
         if (!nudgedForWrite && iteration < maxIterations) {
           nudgedForWrite = true
-          messages.push({
+          pushMessage({
             role: 'user',
             content: 'Du hast weder eine Datei erzeugt noch geantwortet. Führe den Auftrag JETZT aus — erzeuge das Ergebnis mit einem Schreib-Tool (z.B. write_note) oder gib eine inhaltliche Antwort.'
           })
@@ -343,7 +384,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
       if (run.abort.signal.aborted) throw new Error('Abgebrochen')
       const tool = registry.get(call.name)
       if (!tool || !allowed.has(call.name)) {
-        messages.push({
+        pushMessage({
           role: 'tool',
           tool_call_id: call.id,
           tool_name: call.name,
@@ -352,6 +393,14 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         continue
       }
       onStep(nextSeq(run), call.name, summarizeArgs(call.name, call.arguments))
+      // Nur noch Platz für die Antwort: Lesen sperren, bevor das Werkzeug läuft (auch
+      // collect_table — dort VOR der Registrierung eines Datensatzes, F37).
+      if ((BUDGETED_READ_TOOLS.has(call.name) || LOCK_ONLY_TOOLS.has(call.name)) && isReadLocked(budget)) {
+        const msg = 'Fehler: Kontext fast voll — es ist nur noch Platz für das Ergebnis. Lies nichts mehr nach, sondern schreibe JETZT das Ergebnis aus dem, was du schon gelesen hast, und nenne im Ergebnis, was du nicht mehr lesen konntest.'
+        onStep(nextSeq(run), call.name, shortToolError(msg))
+        pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: msg })
+        continue
+      }
       try {
         const toolResult = await tool.run(call.arguments, ctx)
         if (run.abort.signal.aborted) throw new Error('Abgebrochen')
@@ -361,16 +410,27 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         // Nur ERFOLGREICHE Aufrufe zählen für die Tätigkeitsart: Ein abgelehntes
         // write_xlsx macht aus einem Rechercheauftrag keine Tabellen-Auswertung.
         else recordToolUse(run, call.name)
-        messages.push({
+        let content = toolResult.content
+        // Zu großes Leseergebnis: nie still kürzen, sondern durch einen Hinweis ersetzen,
+        // der den Weg zum Blättern nennt. Nur für Werkzeuge ohne Nebenwirkung (F37).
+        if (BUDGETED_READ_TOOLS.has(call.name)) {
+          const size = estimateTokens(content)
+          const limit = maxToolResultTokens(budget)
+          if (size > limit) {
+            content = `Fehler: Das Ergebnis wäre zu groß für den verbleibenden Kontext (etwa ${size.toLocaleString('de-DE')} Token, Platz für ${limit.toLocaleString('de-DE')}). Hole kleinere Stücke: list_context_folder mit subfolder bzw. offset, read_context_file mit offset/max_rows — oder schreibe das Ergebnis aus dem, was du schon hast.`
+            onStep(nextSeq(run), call.name, shortToolError(content))
+          }
+        }
+        pushMessage({
           role: 'tool',
           tool_call_id: call.id,
           tool_name: call.name,
-          content: toolResult.content
+          content
         })
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
         if (!run.abort.signal.aborted) onStep(nextSeq(run), call.name, shortToolError(msg))
-        messages.push({
+        pushMessage({
           role: 'tool',
           tool_call_id: call.id,
           tool_name: call.name,

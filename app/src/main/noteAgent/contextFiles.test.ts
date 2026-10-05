@@ -213,3 +213,30 @@ describe('Kontextordner mit Unterordnern', () => {
     }
   })
 })
+
+// Baustein B: read_context_file blättert passend zum Kontextbudget, statt abgelehnt zu werden.
+describe('Lesen nach Kontextbudget', () => {
+  it('liefert weniger Zeilen und verweist mit offset auf den Rest', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mindgraph-read-budget-'))
+    const senderId = 731_201
+    try {
+      const folder = path.join(root, 'Texte')
+      await fs.mkdir(folder, { recursive: true })
+      const lines = Array.from({ length: 150 }, (_, i) => `Zeile ${i + 1}: Die Robotik-AG baut einen Linienfolger mit sieben Schülern.`)
+      await fs.writeFile(path.join(folder, 'lang.md'), lines.join('\n'), 'utf8')
+      const reg = await registerContextFolder(senderId, folder, false)
+      if (!reg.ok) throw new Error(reg.error)
+      const ids = [reg.attachment.id]
+
+      const full = await readFolderFile(senderId, ids, 'Texte', 'lang.md')
+      expect(full.truncated).toBe(false)
+      const paged = await readFolderFile(senderId, ids, 'Texte', 'lang.md', { maxTokens: 1_000 })
+      expect(paged.truncated).toBe(true)
+      expect(paged.content).toMatch(/weiter mit offset=\d+/)
+      expect(paged.content.length).toBeLessThan(full.content.length / 3)
+    } finally {
+      clearContextAttachments(senderId)
+      await fs.rm(root, { recursive: true, force: true })
+    }
+  })
+})
