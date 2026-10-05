@@ -18,6 +18,10 @@ import {
   extractFromSheet, pickSheet, parseDelimitedText, alwaysMissingColumns,
   type CollectedTable, type FileCollectStatus, type RowFilter, type SheetLike
 } from '../../shared/tableCollect'
+import {
+  assertFolderRootIdentity, captureFolderRoot, inventoryFolder, parseFolderRelPath, readFileInFolder,
+  MAX_INVENTORY_DEPTH, MAX_INVENTORY_ENTRIES, type FolderInventory, type FolderRoot
+} from './folderInventory'
 
 export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'folder'
 
@@ -35,6 +39,9 @@ interface AttachmentEntry extends ContextAttachmentInfo {
   // erneut per realpath gegen diesen Root geprüft. OS-Dialog-Anhänge (insideVault=false)
   // sind bewusst extern und tragen keinen Root.
   vaultRoot?: string
+  // Nur Ordner: Identität beim Anhängen (realpath, dev, ino). Grenze für alle
+  // Ordner-Werkzeuge ist DIESER Ordner, nicht der Vault (F05/F26, folderInventory.ts).
+  folderRoot?: FolderRoot
 }
 
 // C01/TOCTOU: kanonische Lese-Grenze vor JEDEM Read. Fängt einen zwischen Attach und
@@ -165,11 +172,12 @@ export async function registerContextFolder(
   vaultRoot?: string
 ): Promise<{ ok: true; attachment: ContextAttachmentInfo } | { ok: false; error: string }> {
   const baseName = path.basename(absPath)
+  let folderRoot: FolderRoot
   try {
-    const st = await fs.stat(absPath)
-    if (!st.isDirectory()) return { ok: false, error: `Kein Ordner: ${baseName}` }
-  } catch {
-    return { ok: false, error: `Ordner nicht lesbar: ${baseName}` }
+    folderRoot = await captureFolderRoot(absPath, insideVault, vaultRoot)
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException)?.code
+    return { ok: false, error: code ? `Ordner nicht lesbar: ${baseName}` : (e instanceof Error ? e.message : String(e)) }
   }
   const id = randomBytes(8).toString('hex')
   let map = registryBySender.get(senderId)
@@ -178,7 +186,7 @@ export async function registerContextFolder(
     registryBySender.set(senderId, map)
   }
   const name = attachmentName(map, absPath, insideVault, vaultRoot, 'folder')
-  map.set(id, { id, name, kind: 'folder', insideVault, sizeBytes: 0, absPath, vaultRoot })
+  map.set(id, { id, name, kind: 'folder', insideVault, sizeBytes: 0, absPath, vaultRoot, folderRoot })
   return { ok: true, attachment: { id, name, kind: 'folder', insideVault, sizeBytes: 0 } }
 }
 
@@ -221,7 +229,7 @@ export async function readAttachmentRaw(
   const entry = registryBySender.get(senderId)?.get(id)
   if (!entry) throw new Error('Anhang nicht (mehr) registriert')
   if (entry.kind === 'folder') {
-    const res = await readFolderContext(entry, instruction, MAX_CHARS_TOTAL)
+    const res = await readFolderContext(entry, instruction, MAX_CHARS_TOTAL, true)
     return { name: entry.name, content: res.content, truncated: res.truncated }
   }
   let content = hygieneText(await extractContent(entry)).trim()
@@ -238,15 +246,31 @@ export function clearContextAttachments(senderId: number): void {
 // ── Selektives Ordner-Lesen im Agent-Loop (Plan §„Ordner als Kontext", Stufe 2) ──
 // Der Single-Shot-Weg (readFolderContext über read_attachment) kippt einen ganzen
 // Ordner in EIN Tool-Ergebnis und ist bei 20 Dateien am Anschlag. Hier bekommt das
-// Modell stattdessen erst ein Manifest (ohne Inhalte, deshalb ohne Zeichen-Budget)
-// und liest danach gezielt einzelne Dateien.
+// Modell stattdessen erst ein Manifest (ohne Inhalte) und liest danach gezielt einzelne
+// Dateien.
+//
+// Seit 10/2026 mit Unterordnern (docs/codex-collab/agent-rueckblick-unterordner.md,
+// Baustein A): ALLE Ordner-Werkzeuge sehen denselben Baum aus `inventoryFolder`, Dateien
+// heißen nach ihrem Pfad relativ zum Anhang. Bei Dateien direkt im Ordner ist das der
+// Dateiname — flache Ordner verhalten sich wie vorher.
 
 // Sheet-Details kosten einen vollen Parser-Lauf pro Datei — bei großen Ordnern wäre
 // das Manifest sonst minutenlang. Darüber hinaus wird das Detail weggelassen und im
 // Manifest als solches vermerkt (keine stillen Kürzungen).
 const MAX_MANIFEST_DETAIL_FILES = 40
+// Feste Seitengröße des Manifests (F03): die Ausgabe bleibt begrenzt, egal ob 2 000
+// Dateien in einem Ordner oder in 2 000 Unterordnern liegen. Bis zu dieser Zahl wird
+// ein (Teil-)Baum als flache Pfadliste gezeigt, darüber als Übersicht mit Unterordnern.
+const MANIFEST_PAGE_SIZE = 100
+// Unterordner, die der automatische Ordner-Kontext beim Start aufzählt.
+const MAX_CONTEXT_SUBFOLDER_LINES = 30
+// Die Inventur wird je Anhang kurz zwischengespeichert (F38): sonst durchläuft jede
+// Stichprobe und jede Leitplanken-Prüfung den ganzen Baum neu. Die Sicherheitsprüfung
+// je Datei läuft trotzdem bei jedem Lesen frisch (readFileInFolder).
+const INVENTORY_CACHE_MS = 15_000
 
 export interface FolderFileManifestEntry {
+  /** Pfad relativ zum Ordner (`/`-getrennt); direkt im Ordner = Dateiname. */
   name: string
   kind: ContextFileKind
   sizeBytes: number
@@ -257,11 +281,37 @@ export interface FolderFileManifestEntry {
   problem?: string
 }
 
+export interface FolderManifestDir {
+  /** Pfad relativ zum Ordner. */
+  relPath: string
+  /** Unterstützte Dateien in diesem Unterordner samt seiner Unterordner. */
+  files: number
+  tables: number
+}
+
 export interface FolderManifest {
   folderName: string
+  /** Gezeigte Dateien dieser Seite. */
   files: FolderFileManifestEntry[]
+  /** Gezeigte Unterordner dieser Seite (nur in der Übersicht). */
+  dirs: FolderManifestDir[]
+  /** 'list' = flache Pfadliste des (Teil-)Baums, 'overview' = Unterordner + direkte Dateien. */
+  mode: 'list' | 'overview'
+  /** Eingegrenzter Unterordner, '' = ganzer Anhang. */
+  subfolder: string
+  /** Unterstützte Dateien im eingegrenzten (Teil-)Baum. */
+  totalFiles: number
+  /** Einträge (Unterordner + Dateien) auf allen Seiten dieser Ansicht. */
+  totalItems: number
+  /** 1-basierte Position des ersten gezeigten Eintrags. */
+  offset: number
+  /** Gesetzt, wenn es weitere Einträge gibt. */
+  nextOffset?: number
   unsupportedCount: number
   detailsOmitted: number
+  hiddenCount: number
+  symlinkCount: number
+  incomplete?: FolderInventory['incomplete']
 }
 
 function attachmentsOf(senderId: number, ids: string[]): AttachmentEntry[] {
@@ -297,49 +347,142 @@ function requireFolderEntry(senderId: number, ids: string[], folderName: string)
   return hit
 }
 
-/** Direkte, unterstützte Dateien eines Ordners — gemeinsame Basis für Manifest und Einzel-Lesen. */
+function requireFolderRoot(entry: AttachmentEntry): FolderRoot {
+  if (!entry.folderRoot) throw new Error(`Ordner "${entry.name}" ist nicht (mehr) korrekt angehängt — bitte neu anhängen.`)
+  return entry.folderRoot
+}
+
+const inventoryCache = new WeakMap<AttachmentEntry, { at: number; inv: FolderInventory<ContextFileKind> }>()
+
+async function folderInventoryOf(entry: AttachmentEntry): Promise<FolderInventory<ContextFileKind>> {
+  const root = requireFolderRoot(entry)
+  const cached = inventoryCache.get(entry)
+  if (cached && Date.now() - cached.at < INVENTORY_CACHE_MS) {
+    await assertFolderRootIdentity(root, entry.name)
+    return cached.inv
+  }
+  const inv = await inventoryFolder(root, entry.name, contextKindFromFilename)
+  inventoryCache.set(entry, { at: Date.now(), inv })
+  return inv
+}
+
+/** Unterstützte Dateien des ganzen Baums — gemeinsame Basis aller Ordner-Werkzeuge. */
 async function listSupportedFolderFiles(
   entry: AttachmentEntry
-): Promise<{ dirReal: string; files: FolderFileInfo[]; unsupportedCount: number }> {
-  const dirReal = await assertEntryReadable(entry)
-  const dirents = await fs.readdir(dirReal, { withFileTypes: true })
-  const files: FolderFileInfo[] = []
-  let unsupportedCount = 0
-  for (const d of dirents) {
-    if (d.isSymbolicLink() || !d.isFile() || d.name.startsWith('.')) continue
-    const kind = contextKindFromFilename(d.name)
-    if (!kind) {
-      unsupportedCount++
-      continue
-    }
-    let st
-    try {
-      st = await fs.stat(path.join(dirReal, d.name))
-    } catch {
-      continue
-    }
-    files.push({ name: d.name, kind, sizeBytes: st.size, mtimeMs: st.mtimeMs, keywordHit: false })
-  }
-  files.sort((a, b) => a.name.localeCompare(b.name, 'de'))
-  return { dirReal, files, unsupportedCount }
+): Promise<{ files: FolderFileInfo[]; unsupportedCount: number; inv: FolderInventory<ContextFileKind> }> {
+  const inv = await folderInventoryOf(entry)
+  const files = inv.files.map(f => ({
+    name: f.relPath,
+    dir: f.dir,
+    kind: f.kind,
+    sizeBytes: f.sizeBytes,
+    mtimeMs: f.mtimeMs,
+    keywordHit: false
+  }))
+  return { files, unsupportedCount: inv.unsupportedCount, inv }
 }
 
 function maxBytesFor(kind: ContextFileKind): number {
   return kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
 }
 
-/** Manifest eines angehängten Ordners: alle unterstützten Dateien, KEINE Inhalte. */
-export async function listFolderManifest(senderId: number, ids: string[], folderName: string): Promise<FolderManifest> {
+function readFolderBuffer(entry: AttachmentEntry, file: FolderFileInfo): Promise<Buffer> {
+  return readFileInFolder(requireFolderRoot(entry), file.name, maxBytesFor(file.kind), entry.name)
+}
+
+function isTableKind(kind: ContextFileKind): boolean {
+  return kind === 'xlsx' || kind === 'csv'
+}
+
+function dirStats(files: FolderFileInfo[], dirRel: string): { files: number; tables: number } {
+  const prefix = dirRel + '/'
+  let n = 0
+  let t = 0
+  for (const f of files) {
+    if (f.name.startsWith(prefix)) {
+      n++
+      if (isTableKind(f.kind)) t++
+    }
+  }
+  return { files: n, tables: t }
+}
+
+/** Unterordner, die direkt unter `baseRel` liegen ('' = Anhang selbst). */
+function childDirsOf(inv: FolderInventory<ContextFileKind>, baseRel: string): string[] {
+  const depth = baseRel ? baseRel.split('/').length + 1 : 1
+  const prefix = baseRel ? baseRel + '/' : ''
+  return inv.dirs
+    .map(d => d.relPath)
+    .filter(rel => rel.startsWith(prefix) && rel.split('/').length === depth)
+}
+
+export interface ListFolderManifestOptions {
+  /** Nur diesen Unterordner (Pfad relativ zum Anhang) zeigen. */
+  subfolder?: string
+  /** 1-basierte Position für die nächste Seite. */
+  offset?: number
+}
+
+/**
+ * Manifest eines angehängten Ordners — KEINE Inhalte. Kleine (Teil-)Bäume als flache
+ * Pfadliste, große als Übersicht (Unterordner mit Zählern + direkte Dateien), beides
+ * in festen Seiten. So bleibt die Ausgabe begrenzt, und das Modell kann gezielt in einen
+ * Unterordner gehen.
+ */
+export async function listFolderManifest(
+  senderId: number,
+  ids: string[],
+  folderName: string,
+  opts: ListFolderManifestOptions = {}
+): Promise<FolderManifest> {
   const entry = requireFolderEntry(senderId, ids, folderName)
-  const { dirReal, files, unsupportedCount } = await listSupportedFolderFiles(entry)
+  const { files, unsupportedCount, inv } = await listSupportedFolderFiles(entry)
   if (files.length === 0) {
-    throw new Error(`Ordner "${entry.name}" enthält keine unterstützten Dateien (direkte Ebene)`)
+    throw new Error(`Ordner "${entry.name}" enthält keine unterstützten Dateien (auch nicht in Unterordnern)`)
+  }
+
+  let subfolder = ''
+  if (opts.subfolder && opts.subfolder.trim() && opts.subfolder.trim() !== '/') {
+    subfolder = parseFolderRelPath(opts.subfolder.trim().replace(/\/+$/, '')).join('/')
+    const known = inv.dirs.some(d => d.relPath === subfolder) ||
+      inv.dirs.find(d => d.relPath.toLowerCase() === subfolder.toLowerCase())
+    if (!known) {
+      const top = childDirsOf(inv, '').slice(0, 20)
+      throw new Error(`Unterordner "${subfolder}" gibt es in "${entry.name}" nicht.${top.length ? ` Unterordner auf oberster Ebene: ${top.join(', ')}` : ' Der Ordner hat keine Unterordner.'}`)
+    }
+    if (!inv.dirs.some(d => d.relPath === subfolder)) {
+      subfolder = inv.dirs.find(d => d.relPath.toLowerCase() === subfolder.toLowerCase())!.relPath
+    }
+  }
+
+  const inScope = subfolder ? files.filter(f => f.name.startsWith(subfolder + '/')) : files
+  const offset = Math.max(1, Math.floor(opts.offset ?? 1))
+  let mode: FolderManifest['mode']
+  let pageDirs: FolderManifestDir[] = []
+  let pageFiles: FolderFileInfo[]
+  let totalItems: number
+
+  if (inScope.length <= MANIFEST_PAGE_SIZE) {
+    mode = 'list'
+    totalItems = inScope.length
+    pageFiles = inScope.slice(offset - 1, offset - 1 + MANIFEST_PAGE_SIZE)
+  } else {
+    mode = 'overview'
+    const direct = inScope.filter(f => f.dir === subfolder)
+    const items: Array<{ dir: string } | { file: FolderFileInfo }> = [
+      ...childDirsOf(inv, subfolder).map(dir => ({ dir })),
+      ...direct.map(file => ({ file }))
+    ]
+    totalItems = items.length
+    const page = items.slice(offset - 1, offset - 1 + MANIFEST_PAGE_SIZE)
+    pageDirs = page.filter((i): i is { dir: string } => 'dir' in i).map(i => ({ relPath: i.dir, ...dirStats(files, i.dir) }))
+    pageFiles = page.filter((i): i is { file: FolderFileInfo } => 'file' in i).map(i => i.file)
   }
 
   const out: FolderFileManifestEntry[] = []
   let detailsOmitted = 0
   let detailed = 0
-  for (const f of files) {
+  for (const f of pageFiles) {
     const item: FolderFileManifestEntry = { name: f.name, kind: f.kind, sizeBytes: f.sizeBytes, mtimeMs: f.mtimeMs }
     if (f.sizeBytes > maxBytesFor(f.kind)) {
       item.problem = 'zu groß, kann nicht gelesen werden'
@@ -347,16 +490,8 @@ export async function listFolderManifest(senderId: number, ids: string[], folder
       if (detailed < MAX_MANIFEST_DETAIL_FILES) {
         detailed++
         try {
-          // C01: kanonisch prüfen UNMITTELBAR vor dem Lesen und aus dem geprüften
-          // Pfad lesen — auch hier, nicht nur beim Inhalts-Lesen. Zwischen readdir
-          // und parseExcel kann ein Symlink untergeschoben worden sein.
-          const src = await assertEntryReadable({
-            absPath: path.join(dirReal, f.name),
-            insideVault: entry.insideVault,
-            vaultRoot: entry.vaultRoot,
-            name: f.name
-          })
-          const data = await parseExcel(src)
+          // Über den geprüften Deskriptor lesen — nie den Pfad erneut an den Parser geben.
+          const data = await parseExcel(await readFolderBuffer(entry, f))
           item.sheets = data.sheets.map(s => ({
             name: s.name,
             rows: s.rows.length,
@@ -371,7 +506,24 @@ export async function listFolderManifest(senderId: number, ids: string[], folder
     }
     out.push(item)
   }
-  return { folderName: entry.name, files: out, unsupportedCount, detailsOmitted }
+
+  const shownUntil = offset - 1 + pageDirs.length + pageFiles.length
+  return {
+    folderName: entry.name,
+    files: out,
+    dirs: pageDirs,
+    mode,
+    subfolder,
+    totalFiles: inScope.length,
+    totalItems,
+    offset,
+    nextOffset: shownUntil < totalItems ? shownUntil + 1 : undefined,
+    unsupportedCount,
+    detailsOmitted,
+    hiddenCount: inv.hiddenCount,
+    symlinkCount: inv.symlinkCount,
+    incomplete: inv.incomplete
+  }
 }
 
 /**
@@ -383,11 +535,30 @@ export function resolveFolderName(senderId: number, ids: string[], folderName: s
   return requireFolderEntry(senderId, ids, folderName).name
 }
 
-/** Wie viele Tabellen (Excel/CSV) liegen im Ordner? Ohne Parser — nur Verzeichnis lesen. */
+/** Wie viele Tabellen (Excel/CSV) liegen im Ordner samt Unterordnern? Ohne Parser. */
 export async function countFolderTables(senderId: number, ids: string[], folderName: string): Promise<number> {
   const entry = requireFolderEntry(senderId, ids, folderName)
   const { files } = await listSupportedFolderFiles(entry)
-  return files.filter(f => f.kind === 'xlsx' || f.kind === 'csv').length
+  return files.filter(f => isTableKind(f.kind)).length
+}
+
+/**
+ * Datei im Baum per Pfad finden. Ein reiner Dateiname ohne Pfad wird auch in den
+ * Unterordnern gesucht, wenn er dort genau einmal vorkommt — mehrdeutig heißt Fehler
+ * mit den Kandidaten, nie die erstbeste Datei.
+ */
+function findFolderFile(entry: AttachmentEntry, files: FolderFileInfo[], fileArg: string): FolderFileInfo {
+  const wanted = parseFolderRelPath(fileArg).join('/')
+  const exact = files.find(f => f.name === wanted) || files.find(f => f.name.toLowerCase() === wanted.toLowerCase())
+  if (exact) return exact
+  if (!wanted.includes('/')) {
+    const byBase = files.filter(f => path.posix.basename(f.name).toLowerCase() === wanted.toLowerCase())
+    if (byBase.length === 1) return byBase[0]
+    if (byBase.length > 1) {
+      throw new Error(`"${wanted}" gibt es mehrfach in "${entry.name}" — gib den Pfad an: ${byBase.slice(0, 10).map(f => f.name).join(', ')}${byBase.length > 10 ? ' …' : ''}`)
+    }
+  }
+  throw new Error(`Datei "${wanted}" liegt nicht im Ordner "${entry.name}". Verfügbar u. a.: ${files.slice(0, 30).map(f => f.name).join(', ')}`)
 }
 
 export interface ReadFolderFileOptions {
@@ -415,36 +586,19 @@ export async function readFolderFile(
   opts: ReadFolderFileOptions = {}
 ): Promise<{ folderName: string; fileName: string; content: string; truncated: boolean }> {
   const entry = requireFolderEntry(senderId, ids, folderName)
-  const base = path.basename(fileName)
-  if (!base || base !== fileName.trim()) {
-    throw new Error('Dateiname darf keinen Pfad enthalten — nur den Namen aus dem Manifest angeben.')
-  }
-  const { dirReal, files } = await listSupportedFolderFiles(entry)
-  const info = files.find(f => f.name === base) || files.find(f => f.name.toLowerCase() === base.toLowerCase())
-  if (!info) {
-    throw new Error(`Datei "${base}" liegt nicht im Ordner "${entry.name}". Verfügbar: ${files.slice(0, 30).map(f => f.name).join(', ')}`)
-  }
+  const { files } = await listSupportedFolderFiles(entry)
+  const info = findFolderFile(entry, files, fileName)
   if (info.sizeBytes > maxBytesFor(info.kind)) {
-    throw new Error(`"${base}" ist zu groß (${Math.round(info.sizeBytes / 1024 / 1024)} MB)`)
+    throw new Error(`"${info.name}" ist zu groß (${Math.round(info.sizeBytes / 1024 / 1024)} MB)`)
   }
 
-  const fileEntry: AttachmentEntry = {
-    id: '',
-    name: info.name,
-    kind: info.kind,
-    insideVault: entry.insideVault,
-    sizeBytes: info.sizeBytes,
-    absPath: path.join(dirReal, info.name),
-    vaultRoot: entry.vaultRoot
-  }
-
+  const buf = await readFolderBuffer(entry, info)
   const offset = Math.max(1, Math.floor(opts.offset ?? 1))
   let content: string
   let truncated = false
 
   if (info.kind === 'xlsx') {
-    const src = await assertEntryReadable(fileEntry)
-    const data = await parseExcel(src)
+    const data = await parseExcel(buf)
     const wanted = opts.sheet?.trim()
     let sheets = data.sheets
     if (wanted) {
@@ -475,7 +629,7 @@ export async function readFolderFile(
     }
     content = parts.join('\n\n')
   } else {
-    const full = hygieneText(await extractContent(fileEntry)).trim()
+    const full = hygieneText(await extractContentFromBuffer(info.kind, buf)).trim()
     if (!full) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
     const lines = full.split('\n')
     const maxLines = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_LINES_TEXT))
@@ -504,10 +658,11 @@ function hygieneText(text: string): string {
     .replace(/[\u202A-\u202E\u2066-\u2069]/g, '')
 }
 
-async function extractPdfText(absPath: string): Promise<string> {
+async function extractPdfText(data: Buffer): Promise<string> {
   // Legacy-ESM-Build läuft im Electron-Main ohne Canvas (gleiches Muster wie pdfReflow).
   const pdfjs: typeof import('pdfjs-dist') = await import('pdfjs-dist/legacy/build/pdf.mjs')
-  const bytes = new Uint8Array(await fs.readFile(absPath))
+  // Kopie statt View: pdfjs übernimmt (transferiert) den Speicher des Arrays.
+  const bytes = new Uint8Array(data)
   const doc = await pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise
   try {
     const pages = Math.min(doc.numPages, MAX_PDF_PAGES)
@@ -539,12 +694,12 @@ async function extractPdfText(absPath: string): Promise<string> {
   }
 }
 
-async function extractContent(entry: AttachmentEntry): Promise<string> {
-  // C01: kanonischen Pfad UNMITTELBAR vor dem Read auflösen/prüfen und daraus lesen.
-  const src = await assertEntryReadable(entry)
-  switch (entry.kind) {
+// Inhalt aus bereits gelesenen Bytes extrahieren. Ordner-Dateien kommen über den
+// geprüften Deskriptor (readFileInFolder) hierher; der Pfad wird nicht erneut geöffnet.
+async function extractContentFromBuffer(kind: ContextFileKind, buf: Buffer): Promise<string> {
+  switch (kind) {
     case 'xlsx': {
-      const data = await parseExcel(src)
+      const data = await parseExcel(buf)
       const parts: string[] = []
       const sheets = data.sheets.slice(0, MAX_XLSX_SHEETS)
       for (const sheet of sheets) {
@@ -560,29 +715,36 @@ async function extractContent(entry: AttachmentEntry): Promise<string> {
       return parts.join('\n\n')
     }
     case 'docx': {
-      const d = await parseDocx(src)
+      const d = await parseDocx(buf)
       return d.markdown || d.html
     }
     case 'pptx': {
-      const d = await parsePptx(src)
+      const d = await parsePptx(buf)
       return d.slides
         .map(s => `## Folie ${s.index}${s.title ? `: ${s.title}` : ''}\n${s.text}${s.notes ? `\nNotizen: ${s.notes}` : ''}`)
         .join('\n\n')
     }
     case 'pdf':
-      return extractPdfText(src)
+      return extractPdfText(buf)
     case 'html': {
       // Zurückgegeben wird NUR der selbst verfasste Teil, nicht das ganze Dokument:
       // genau das erwartet write_html als body_html zurück. Das Gerüst der App
       // (KaTeX-Verweise, Seiten-CSS, Titel-Kopfzeile, KI-Fußzeile) gehört NICHT dazu
       // — käme es mit zurück, wickelte die App es ein zweites Mal ein. Fremde
       // HTML-Dateien fallen auf den Body und zuletzt auf den Rohtext zurück.
-      const raw = await fs.readFile(src, 'utf-8')
+      const raw = buf.toString('utf-8')
       return extractAuthoredBodyHtml(raw) ?? extractArticleBody(raw) ?? raw
     }
     default:
-      return fs.readFile(src, 'utf-8')
+      return buf.toString('utf-8')
   }
+}
+
+// Einzel-Anhänge (Dateien, keine Ordner): kanonisch prüfen, dann lesen.
+async function extractContent(entry: AttachmentEntry): Promise<string> {
+  // C01: kanonischen Pfad UNMITTELBAR vor dem Read auflösen/prüfen und daraus lesen.
+  const src = await assertEntryReadable(entry)
+  return extractContentFromBuffer(entry.kind, await fs.readFile(src))
 }
 
 // Wörter (≥4 Zeichen) aus der Nutzer-Anweisung — priorisieren Dateien im Ordner,
@@ -593,63 +755,47 @@ function instructionTokens(instruction: string): string[] {
 }
 
 interface FolderFileInfo {
+  /** Pfad relativ zum Ordner; direkt im Ordner = Dateiname. */
   name: string
+  /** Unterordner, '' = direkte Ebene. */
+  dir: string
   kind: ContextFileKind
   sizeBytes: number
   mtimeMs: number
   keywordHit: boolean
 }
 
-// Liest einen Ordner-Anhang: Manifest aller unterstützten Dateien (direkte Ebene) +
+// Liest einen Ordner-Anhang: Manifest der unterstützten Dateien der DIREKTEN Ebene +
 // Inhalte nach Priorität (Anweisungs-Keyword im Namen, dann jüngste zuerst) bis
-// `budget` Zeichen. Keine stillen Kürzungen — nicht gelesene Dateien stehen im
-// Manifest als solche. Einzelne unlesbare Dateien brechen den Ordner nicht ab.
+// `budget` Zeichen. Unterordner werden nur gemeldet (mit Zählern), nicht gelesen —
+// rekursiv wäre das eine stille Auswahl der jüngsten Dateien. Keine stillen Kürzungen:
+// nicht gelesene Dateien stehen im Manifest als solche. Einzelne unlesbare Dateien
+// brechen den Ordner nicht ab. `withToolHints` nur im Agent-Loop (read_attachment):
+// im Vorschlagsmodus gibt es keine Ordner-Werkzeuge, auf die der Hinweis zeigen könnte.
 async function readFolderContext(
   entry: AttachmentEntry,
   instruction: string,
-  budget: number
+  budget: number,
+  withToolHints = false
 ): Promise<{ content: string; truncated: boolean }> {
-  // C01: Ordner selbst kanonisch prüfen und aus dem realen Pfad lesen.
-  const dirReal = await assertEntryReadable(entry)
-  const dirents = await fs.readdir(dirReal, { withFileTypes: true })
+  const { files: all, inv } = await listSupportedFolderFiles(entry)
+  if (all.length === 0) {
+    throw new Error(`Ordner "${entry.name}" enthält keine unterstützten Dateien (auch nicht in Unterordnern)`)
+  }
   const tokens = instructionTokens(instruction)
 
   const supported: FolderFileInfo[] = []
-  let unsupportedCount = 0
   let oversizedCount = 0
-  for (const d of dirents) {
-    // Symlinks nicht anbieten (C01) — d.isFile() ist für Symlinks bereits false,
-    // der explizite Check hält es robust.
-    if (d.isSymbolicLink() || !d.isFile() || d.name.startsWith('.')) continue
-    const kind = contextKindFromFilename(d.name)
-    if (!kind) {
-      unsupportedCount++
-      continue
-    }
-    let st
-    try {
-      st = await fs.stat(path.join(dirReal, d.name))
-    } catch {
-      continue
-    }
-    const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
-    if (st.size > maxBytes) {
+  for (const f of all) {
+    if (f.dir !== '') continue
+    if (f.sizeBytes > maxBytesFor(f.kind)) {
       oversizedCount++
       continue
     }
-    const nameLower = d.name.toLowerCase()
-    supported.push({
-      name: d.name,
-      kind,
-      sizeBytes: st.size,
-      mtimeMs: st.mtimeMs,
-      keywordHit: tokens.some(tok => nameLower.includes(tok))
-    })
+    const nameLower = f.name.toLowerCase()
+    supported.push({ ...f, keywordHit: tokens.some(tok => nameLower.includes(tok)) })
   }
-
-  if (supported.length === 0) {
-    throw new Error(`Ordner "${entry.name}" enthält keine unterstützten Dateien (direkte Ebene)`)
-  }
+  const nested = all.filter(f => f.dir !== '')
 
   // Priorität: Keyword-Treffer zuerst, innerhalb dessen jüngste zuerst.
   supported.sort((a, b) => (Number(b.keywordHit) - Number(a.keywordHit)) || (b.mtimeMs - a.mtimeMs))
@@ -672,16 +818,7 @@ async function readFolderContext(
       continue
     }
     try {
-      const fileEntry: AttachmentEntry = {
-        id: '',
-        name: f.name,
-        kind: f.kind,
-        insideVault: entry.insideVault,
-        sizeBytes: f.sizeBytes,
-        absPath: path.join(dirReal, f.name),
-        vaultRoot: entry.vaultRoot // C01: Vault-Grenze erbt auf die Ordner-Dateien
-      }
-      let content = hygieneText(await extractContent(fileEntry)).trim()
+      let content = hygieneText(await extractContentFromBuffer(f.kind, await readFolderBuffer(entry, f))).trim()
       if (!content) {
         status.set(f.name, 'übersprungen (leer)')
         continue
@@ -716,11 +853,40 @@ async function readFolderContext(
     manifestLines.push(`… ${supported.length - MAX_FOLDER_MANIFEST_LINES} weitere Dateien nicht aufgeführt`)
   }
   const extra: string[] = []
-  if (unsupportedCount > 0) extra.push(`${unsupportedCount} nicht unterstützte Dateien übersprungen`)
+  if (inv.unsupportedCount > 0) extra.push(`${inv.unsupportedCount} nicht unterstützte Dateien übersprungen`)
   if (oversizedCount > 0) extra.push(`${oversizedCount} zu große Dateien übersprungen`)
+  if (inv.symlinkCount > 0) extra.push(`${inv.symlinkCount} Verknüpfungen nicht verfolgt`)
 
-  const header = `Ordner "${entry.name}" — ${supported.length} unterstützte Dateien (nur direkte Ebene${extra.length ? '; ' + extra.join(', ') : ''}):`
-  return { content: [header, manifestLines.join('\n'), ...sections].join('\n\n'), truncated }
+  const parts: string[] = []
+  parts.push(`Ordner "${entry.name}" — ${supported.length + oversizedCount} unterstützte Dateien direkt im Ordner${extra.length ? ` (${extra.join(', ')})` : ''}:`)
+  if (manifestLines.length) parts.push(manifestLines.join('\n'))
+  else parts.push('(direkt im Ordner liegen keine lesbaren Dateien)')
+
+  if (nested.length > 0) {
+    const topDirs = childDirsOf(inv, '')
+    const dirLines = topDirs.slice(0, MAX_CONTEXT_SUBFOLDER_LINES).map(d => {
+      const s = dirStats(all, d)
+      return `- ${d}/ — ${s.files} Dateien${s.tables ? `, davon ${s.tables} Tabellen` : ''}`
+    })
+    if (topDirs.length > MAX_CONTEXT_SUBFOLDER_LINES) dirLines.push(`… ${topDirs.length - MAX_CONTEXT_SUBFOLDER_LINES} weitere Unterordner`)
+    const hint = withToolHints
+      ? ' Auflisten mit list_context_folder (Parameter subfolder), lesen mit read_context_file und dem Pfad aus dem Manifest.'
+      : ''
+    parts.push(`UNTERORDNER: ${nested.length} weitere Dateien in Unterordnern — ihre Inhalte sind hier NICHT enthalten.${hint}\n${dirLines.join('\n')}`)
+  }
+  if (inv.incomplete) parts.push(describeIncomplete(inv.incomplete))
+  parts.push(...sections)
+  return { content: parts.join('\n\n'), truncated: truncated || nested.length > 0 }
+}
+
+/** Unvollständige Inventur in Worten — mit Ort, nie mit erfundener Restzahl (F07). */
+export function describeIncomplete(inc: NonNullable<FolderInventory['incomplete']>): string {
+  const why = inc.reason === 'depth'
+    ? `mehr als ${MAX_INVENTORY_DEPTH} Ordnerebenen`
+    : inc.reason === 'entries'
+      ? `mehr als ${MAX_INVENTORY_ENTRIES} Einträge`
+      : 'ein Unterordner hat sich während des Lesens verändert oder ist nicht lesbar'
+  return `ACHTUNG: Die Übersicht ist UNVOLLSTÄNDIG (${why}, zuerst bei "${inc.at}"). Dateien dort und dahinter fehlen — nenne das im Ergebnis.`
 }
 
 // ── Deterministische Zusammenführung vieler gleichartiger Tabellen ──
@@ -739,7 +905,7 @@ export interface CollectFolderOptions {
   /** Blattname oder 1-basierte Nummer; ohne Angabe das erste Blatt jeder Datei. */
   sheet?: string
   filters?: RowFilter[]
-  /** Nur diese Dateien berücksichtigen (Namen aus dem Manifest). */
+  /** Nur diese Dateien berücksichtigen (Pfade aus dem Manifest oder eindeutige Dateinamen). */
   files?: string[]
   /** Fortschritt fürs Lauf-Protokoll — 60 Dateien zu parsen dauert spürbar. */
   onProgress?: (done: number, total: number, file: string) => void
@@ -748,21 +914,21 @@ export interface CollectFolderOptions {
 }
 
 /** Tabellenblätter einer Datei — Excel direkt, CSV über den einfachen Trennzeichen-Parser. */
-async function sheetsForTableFile(absPath: string, kind: ContextFileKind): Promise<SheetLike[]> {
+async function sheetsForTableFile(buf: Buffer, kind: ContextFileKind, name: string): Promise<SheetLike[]> {
   if (kind === 'xlsx') {
-    const data = await parseExcel(absPath)
+    const data = await parseExcel(buf)
     return data.sheets
   }
   if (kind === 'csv' || kind === 'txt') {
-    const text = await fs.readFile(absPath, 'utf-8')
-    return [{ name: path.basename(absPath), rows: parseDelimitedText(hygieneText(text)) }]
+    return [{ name: path.posix.basename(name), rows: parseDelimitedText(hygieneText(buf.toString('utf-8'))) }]
   }
   throw new Error('kein Tabellenformat (nur Excel und CSV)')
 }
 
 /**
- * Liest ALLE Tabellen eines angehängten Ordners und führt die gewünschten Spalten
- * zusammen. Ergebnis: eine Tabelle mit Herkunftsspalte plus ein Statusbericht je Datei.
+ * Liest ALLE Tabellen eines angehängten Ordners samt Unterordnern und führt die
+ * gewünschten Spalten zusammen. Ergebnis: eine Tabelle mit Herkunftsspalte (Pfad
+ * relativ zum Ordner) plus ein Statusbericht je Datei.
  */
 export async function collectFolderTable(
   senderId: number,
@@ -772,15 +938,19 @@ export async function collectFolderTable(
   opts: CollectFolderOptions = {}
 ): Promise<CollectedTable & { folderName: string; truncated: boolean }> {
   const entry = requireFolderEntry(senderId, ids, folderName)
-  const { dirReal, files } = await listSupportedFolderFiles(entry)
+  const { files, inv } = await listSupportedFolderFiles(entry)
 
-  const wantedNames = opts.files?.length
-    ? new Set(opts.files.map(n => path.basename(n).toLowerCase()))
+  // Pfad oder reiner Dateiname: ein Dateiname trifft gleichnamige Dateien in allen
+  // Unterordnern — das Modell bekommt sie im Bericht mit Pfad zurück.
+  const wanted = opts.files?.length
+    ? new Set(opts.files.map(n => n.trim().replace(/\\/g, '/').toLowerCase()))
     : null
   let candidates = files.filter(f => (f.kind === 'xlsx' || f.kind === 'csv' || f.kind === 'txt'))
-  if (wantedNames) candidates = candidates.filter(f => wantedNames.has(f.name.toLowerCase()))
+  if (wanted) {
+    candidates = candidates.filter(f => wanted.has(f.name.toLowerCase()) || wanted.has(path.posix.basename(f.name).toLowerCase()))
+  }
   if (candidates.length === 0) {
-    throw new Error(`Ordner "${entry.name}" enthält keine Tabellen (Excel oder CSV)${wantedNames ? ' unter den angegebenen Dateien' : ''}.`)
+    throw new Error(`Ordner "${entry.name}" enthält keine Tabellen (Excel oder CSV)${wanted ? ' unter den angegebenen Dateien' : ''}.`)
   }
 
   const outColumns = [...columns, 'Quelldatei']
@@ -789,7 +959,8 @@ export async function collectFolderTable(
   // Beispiel-Zeilen der ersten Dateien — nur nötig, wenn am Ende Spalten überall
   // fehlen; dann zeigen sie dem Modell die echten Überschriften.
   const headerCandidates: Array<{ file: string; rows: string[] }> = []
-  let truncated = false
+  // Eine unvollständige Inventur heißt: es kann Tabellen geben, die hier fehlen.
+  let truncated = Boolean(inv.incomplete)
 
   // Dateien jenseits der Datei-Obergrenze NICHT stillschweigend weglassen: sie
   // stehen namentlich im Bericht, sonst sieht eine gekappte Auswertung vollständig aus.
@@ -819,17 +990,7 @@ export async function collectFolderTable(
       continue
     }
     try {
-      const fileEntry: AttachmentEntry = {
-        id: '',
-        name: f.name,
-        kind: f.kind,
-        insideVault: entry.insideVault,
-        sizeBytes: f.sizeBytes,
-        absPath: path.join(dirReal, f.name),
-        vaultRoot: entry.vaultRoot
-      }
-      const src = await assertEntryReadable(fileEntry)
-      const sheets = await sheetsForTableFile(src, f.kind)
+      const sheets = await sheetsForTableFile(await readFolderBuffer(entry, f), f.kind, f.name)
       const sheet = pickSheet(sheets, opts.sheet)
       if (!sheet) {
         statuses.push({ file: f.name, status: 'fehler', rows: 0, message: `Blatt "${opts.sheet}" nicht vorhanden` })

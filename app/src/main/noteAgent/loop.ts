@@ -57,7 +57,8 @@ function buildSystemPrompt(run: AgentRun, noteContent: string, senderId: number,
     ? `
 
 ANGEHÄNGTE ORDNER (${folders.map(f => `"${f.name}"`).join(', ')}):
-- Arbeite so: (1) list_context_folder für die Übersicht, (2) read_context_file für die Dateien, die du wirklich brauchst — einzeln, bei großen Tabellen abschnittsweise über offset/max_rows.
+- Arbeite so: (1) list_context_folder für die Übersicht — sie zeigt auch Unterordner; bei großen Ordnern mit subfolder hineingehen, (2) read_context_file für die Dateien, die du wirklich brauchst — einzeln, mit dem Pfad aus dem Manifest, bei großen Tabellen abschnittsweise über offset/max_rows.
+- Unterordner gehören zum Ordner. Durchsuche sie, wenn der Auftrag den ganzen Ordner meint — nicht nur die oberste Ebene.
 - Sind die Dateien gleich aufgebaut (z.B. Rückmeldungen mehrerer Stellen zum selben Formular), lies ZWEI oder DREI davon als Stichprobe, um Aufbau und Spaltennamen zu verstehen — NICHT alle. Führe sie danach mit collect_table zusammen: die App liest dann alle Dateien selbst und legt einen Datensatz an, den du mit write_xlsx (Parameter dataset) schreibst. Tippe die Zeilen NIEMALS selbst ab — bei vielen Dateien passen sie nicht in deinen Kontext, und Abgetipptes ist fehleranfällig.
 - collect_table kann direkt filtern (nicht_leer, enthaelt, gleich, datum_zwischen). Nur wenn du Zeilen inhaltlich beurteilen musst, hole sie portionsweise mit peek_dataset.
 - Wenn eine Datei nicht gelesen oder nicht zugeordnet werden konnte, nenne sie im Ergebnis. Lieber eine ehrliche Lücke als eine stille.`

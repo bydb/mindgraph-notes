@@ -12,7 +12,7 @@ import type { ToolContext as TelegramToolContext } from '../telegram/agent/tools
 import {
   getContextAttachmentInfos, readAttachmentRaw, extractFileContentRaw,
   listFolderManifest, readFolderFile, collectFolderTable,
-  resolveFolderName, countFolderTables, type FolderManifest
+  resolveFolderName, countFolderTables, describeIncomplete, type FolderManifest
 } from './contextFiles'
 import { registerResult, registerDataset, getDataset, type AgentRun } from './runRegistry'
 import { formatCollectReport, type RowFilter, type RowFilterOp } from '../../shared/tableCollect'
@@ -92,26 +92,45 @@ function formatSearchResults(hits: WebSearchHit[]): string {
 function formatFolderManifest(manifest: FolderManifest): string {
   const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`
   const day = (ms: number) => new Date(ms).toISOString().slice(0, 10)
-  const lines = manifest.files.map(f => {
+  const fileLines = manifest.files.map(f => {
     const head = `- ${f.name} (${f.kind}, ${kb(f.sizeBytes)}, geändert ${day(f.mtimeMs)})${f.problem ? ` — ${f.problem}` : ''}`
     if (!f.sheets?.length) return head
     return [head, ...f.sheets.map(s => `    Blatt "${s.name}": ${s.rows} Zeilen, ${s.cols} Spalten`)].join('\n')
   })
+  const dirLines = manifest.dirs.map(d => `- ${d.relPath}/ — Unterordner, ${d.files} Dateien${d.tables ? `, davon ${d.tables} Tabellen` : ''}`)
   const notes: string[] = []
   if (manifest.unsupportedCount > 0) notes.push(`${manifest.unsupportedCount} Dateien mit nicht unterstütztem Format übersprungen`)
+  if (manifest.symlinkCount > 0) notes.push(`${manifest.symlinkCount} Verknüpfungen nicht verfolgt`)
   if (manifest.detailsOmitted > 0) notes.push(`bei ${manifest.detailsOmitted} Excel-Dateien wurden die Blatt-Details ausgelassen (zu viele Dateien) — bei Bedarf einzeln mit read_context_file öffnen`)
+  const scope = manifest.subfolder ? `Unterordner "${manifest.subfolder}" in Ordner "${manifest.folderName}"` : `Ordner "${manifest.folderName}"`
+  const shownTo = manifest.offset - 1 + manifest.dirs.length + manifest.files.length
+  const range = manifest.totalItems > manifest.dirs.length + manifest.files.length
+    ? ` — Einträge ${manifest.offset}–${shownTo} von ${manifest.totalItems}`
+    : ''
+  const header = manifest.mode === 'list'
+    ? `${scope} — ${manifest.totalFiles} unterstützte Dateien samt Unterordnern${range}${notes.length ? `; ${notes.join('; ')}` : ''}. Pfade gelten relativ zum Ordner:`
+    : `${scope} — ${manifest.totalFiles} unterstützte Dateien samt Unterordnern, zu viele für eine Liste. Übersicht: Unterordner mit Dateizahl, danach die Dateien direkt auf dieser Ebene${range}${notes.length ? `; ${notes.join('; ')}` : ''}:`
+  const paging = manifest.nextOffset
+    ? `Weitere Einträge: list_context_folder mit offset=${manifest.nextOffset}${manifest.subfolder ? ` und subfolder="${manifest.subfolder}"` : ''}.`
+    : ''
+  const drill = manifest.mode === 'overview'
+    ? 'Dateien eines Unterordners: list_context_folder mit subfolder = Pfad des Unterordners.'
+    : ''
   // Bei vielen Tabellen ist der vorgesehene Weg das Zusammenführen, nicht das
   // Einzellesen — und das muss GENAU HIER stehen, im Moment der Entscheidung.
   // Im Prompt allein hat das Modell es zweimal überlesen.
-  const tableCount = manifest.files.filter(f => f.kind === 'xlsx' || f.kind === 'csv').length
+  const tableCount = manifest.files.filter(f => f.kind === 'xlsx' || f.kind === 'csv').length +
+    manifest.dirs.reduce((n, d) => n + d.tables, 0)
   const howTo = tableCount >= MIN_TABLES_FOR_COLLECT_GUARD
-    ? `Dieser Ordner enthält ${tableCount} Tabellen. Der vorgesehene Weg: HÖCHSTENS ${MAX_SINGLE_READS_BEFORE_COLLECT} davon mit read_context_file als Stichprobe ansehen, um die Spaltenüberschriften zu lernen — danach ALLE auf einmal mit collect_table zusammenführen. Jede Tabelle einzeln zu lesen sprengt deinen Kontext und lässt den Auftrag scheitern.`
-    : 'Inhalte holst du einzeln mit read_context_file(folder, file).'
+    ? `Dieser Ordner enthält ${tableCount} Tabellen. Der vorgesehene Weg: HÖCHSTENS ${MAX_SINGLE_READS_BEFORE_COLLECT} davon mit read_context_file als Stichprobe ansehen, um die Spaltenüberschriften zu lernen — danach ALLE auf einmal mit collect_table zusammenführen (liest auch die Unterordner). Jede Tabelle einzeln zu lesen sprengt deinen Kontext und lässt den Auftrag scheitern.`
+    : 'Inhalte holst du einzeln mit read_context_file(folder, file) — file ist der Pfad aus dieser Liste.'
   return [
-    `Ordner "${manifest.folderName}" — ${manifest.files.length} unterstützte Dateien (nur direkte Ebene)${notes.length ? `; ${notes.join('; ')}` : ''}:`,
-    lines.join('\n'),
+    header,
+    [...dirLines, ...fileLines].join('\n'),
+    manifest.incomplete ? describeIncomplete(manifest.incomplete) : '',
+    [paging, drill].filter(Boolean).join(' '),
     howTo
-  ].join('\n\n')
+  ].filter(Boolean).join('\n\n')
 }
 
 // Filter-Argumente des Modells prüfen. Rückgabe: Filterliste oder Fehlertext —
@@ -327,22 +346,29 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'list_context_folder',
     description:
-      'Listet die Dateien eines angehängten Ordners — Name, Typ, Größe, Datum, bei Excel zusätzlich Blattnamen mit Zeilen- und Spaltenzahl. Liefert KEINE Inhalte (die holt read_context_file). Parameter: folder = exakte Ordnerbezeichnung aus der Anhang-Liste; sie kann den vault-relativen Pfad enthalten.',
+      'Listet die Dateien eines angehängten Ordners SAMT UNTERORDNERN — Pfad relativ zum Ordner, Typ, Größe, Datum, bei Excel zusätzlich Blattnamen mit Zeilen- und Spaltenzahl. Liefert KEINE Inhalte (die holt read_context_file). Große Ordner kommen als Übersicht (Unterordner mit Dateizahl); dann mit subfolder hineingehen. Parameter: folder = exakte Ordnerbezeichnung aus der Anhang-Liste (kann den vault-relativen Pfad enthalten); optional subfolder = Unterordner-Pfad aus einer vorherigen Übersicht; optional offset = nächste Seite (steht in der Ausgabe).',
     parameters: {
       type: 'object',
-      properties: { folder: { type: 'string', description: 'Exakte Ordnerbezeichnung aus der Anhang-Liste' } },
+      properties: {
+        folder: { type: 'string', description: 'Exakte Ordnerbezeichnung aus der Anhang-Liste' },
+        subfolder: { type: 'string', description: 'Nur diesen Unterordner zeigen (Pfad relativ zum Ordner, z. B. "2026/03")' },
+        offset: { type: 'number', description: 'Erste Position der nächsten Seite, wie in der Ausgabe angegeben' }
+      },
       required: ['folder']
     },
     isWrite: false,
     run: async (args, ctx) => {
       const folder = requireString(args, 'folder') || ''
       try {
-        const manifest = await listFolderManifest(ctx.senderId, ctx.run.attachmentIds, folder)
+        const manifest = await listFolderManifest(ctx.senderId, ctx.run.attachmentIds, folder, {
+          subfolder: typeof args.subfolder === 'string' ? args.subfolder : undefined,
+          offset: typeof args.offset === 'number' ? args.offset : undefined
+        })
         ctx.run.sources.add(`Ordner: ${manifest.folderName}`)
         return {
           ok: true,
           content: formatFolderManifest(manifest),
-          display: `list_context_folder: ${manifest.folderName} (${manifest.files.length} Dateien)`
+          display: `list_context_folder: ${manifest.subfolder ? `${manifest.folderName}/${manifest.subfolder}` : manifest.folderName} (${manifest.totalFiles} Dateien)`
         }
       } catch (e) {
         return err(e instanceof Error ? e.message : String(e))
@@ -353,12 +379,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'read_context_file',
     description:
-      'Liest EINE Datei aus einem angehängten Ordner (Excel, Word, PowerPoint, PDF, Markdown, Text, CSV, HTML). Parameter: folder = exakte Ordnerbezeichnung aus der Anhang-Liste, file = exakter Dateiname aus dem Manifest, optional sheet (Excel: Blattname oder Nummer), offset (erste Zeile, 1-basiert, Default 1) und max_rows (Default 200 Tabellenzeilen bzw. 400 Textzeilen). Bei großen Dateien in Abschnitten lesen statt alles auf einmal.',
+      'Liest EINE Datei aus einem angehängten Ordner oder seinen Unterordnern (Excel, Word, PowerPoint, PDF, Markdown, Text, CSV, HTML). Parameter: folder = exakte Ordnerbezeichnung aus der Anhang-Liste, file = Pfad der Datei relativ zum Ordner, genau wie im Manifest (z. B. "2026/03/eintrag.md"; bei Dateien direkt im Ordner nur der Name), optional sheet (Excel: Blattname oder Nummer), offset (erste Zeile, 1-basiert, Default 1) und max_rows (Default 200 Tabellenzeilen bzw. 400 Textzeilen). Bei großen Dateien in Abschnitten lesen statt alles auf einmal.',
     parameters: {
       type: 'object',
       properties: {
         folder: { type: 'string', description: 'Exakte Ordnerbezeichnung aus der Anhang-Liste' },
-        file: { type: 'string', description: 'Dateiname aus dem Manifest, ohne Pfad' },
+        file: { type: 'string', description: 'Pfad aus dem Manifest, relativ zum Ordner' },
         sheet: { type: 'string', description: 'Nur Excel: Blattname oder 1-basierte Nummer' },
         offset: { type: 'number', description: 'Erste Zeile (1-basiert), Default 1' },
         max_rows: { type: 'number', description: 'Maximale Zeilenzahl' }
@@ -420,7 +446,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'collect_table',
     description:
-      'Führt gleichartige Tabellen (Excel/CSV) eines angehängten Ordners zu EINEM Datensatz zusammen. Die App liest dabei alle Dateien selbst; du bekommst Kennzahlen, Beispielzeilen und eine Liste der Dateien mit Problemen zurück — nicht alle Zeilen. Parameter: folder, columns (gewünschte Spaltenüberschriften, ungefähre Schreibweise genügt), optional sheet (Blattname oder Nummer), filter (Array aus {column, op, value|from|to} mit op = nicht_leer | enthaelt | gleich | datum_zwischen) und files (nur bestimmte Dateien). Der Datensatz bekommt automatisch die Spalte "Quelldatei". Schreibe ihn danach mit write_xlsx und dem Parameter dataset.',
+      'Führt gleichartige Tabellen (Excel/CSV) eines angehängten Ordners samt Unterordnern zu EINEM Datensatz zusammen. Die App liest dabei alle Dateien selbst; du bekommst Kennzahlen, Beispielzeilen und eine Liste der Dateien mit Problemen zurück — nicht alle Zeilen. Parameter: folder, columns (gewünschte Spaltenüberschriften, ungefähre Schreibweise genügt), optional sheet (Blattname oder Nummer), filter (Array aus {column, op, value|from|to} mit op = nicht_leer | enthaelt | gleich | datum_zwischen) und files (nur bestimmte Dateien: Pfade aus dem Manifest oder Dateinamen). Der Datensatz bekommt automatisch die Spalte "Quelldatei" mit dem Pfad relativ zum Ordner. Schreibe ihn danach mit write_xlsx und dem Parameter dataset.',
     parameters: {
       type: 'object',
       properties: {

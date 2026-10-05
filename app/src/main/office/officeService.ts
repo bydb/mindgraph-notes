@@ -29,9 +29,11 @@ export interface PowerPointData {
   slides: PowerPointSlide[]
 }
 
-export async function parseExcel(filePath: string): Promise<ExcelData> {
+// Alle drei Parser nehmen auch einen Buffer: der Notiz-Agent liest Ordner-Dateien über
+// einen geprüften Deskriptor und darf den Pfad danach nicht erneut öffnen lassen.
+export async function parseExcel(input: string | Buffer): Promise<ExcelData> {
   const XLSX = await import('xlsx')
-  const buf = await fs.readFile(filePath)
+  const buf = typeof input === 'string' ? await fs.readFile(input) : input
   const wb = XLSX.read(buf, { type: 'buffer' })
   const sheets: ExcelSheet[] = wb.SheetNames.map((name) => {
     const sheet = wb.Sheets[name]
@@ -61,10 +63,11 @@ export function sheetToMarkdownTable(sheet: ExcelSheet): string {
   return lines.join('\n')
 }
 
-export async function parseDocx(filePath: string): Promise<WordData> {
+export async function parseDocx(input: string | Buffer): Promise<WordData> {
   const mammoth = await import('mammoth')
-  const htmlResult = await mammoth.convertToHtml({ path: filePath })
-  const mdResult = await mammoth.extractRawText({ path: filePath })
+  const source = typeof input === 'string' ? { path: input } : { buffer: input }
+  const htmlResult = await mammoth.convertToHtml(source)
+  const mdResult = await mammoth.extractRawText(source)
   return {
     html: htmlResult.value,
     markdown: mdResult.value,
@@ -767,9 +770,9 @@ function decodeXmlEntities(s: string): string {
     .replace(/&amp;/g, '&')
 }
 
-export async function parsePptx(filePath: string): Promise<PowerPointData> {
+export async function parsePptx(input: string | Buffer): Promise<PowerPointData> {
   const AdmZip = (await import('adm-zip')).default
-  const zip = new AdmZip(filePath)
+  const zip = new AdmZip(input)
   const entries = zip.getEntries()
 
   // Slides sortiert nach Slide-Nummer
