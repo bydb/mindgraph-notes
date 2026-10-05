@@ -37,6 +37,13 @@ describe('collect_table unter Kontextbudget', () => {
       expect(estimateTokens(tight.content)).toBeLessThanOrEqual(900)
       expect(tight.content).toMatch(/Datensatz "tabelle2" erstellt: 360 Zeilen/)
       expect(tight.content).toContain('dataset="tabelle2"')
+
+      // F44: auch bei fast vollem Kontext eine garantiert kurze Antwort mit ID
+      const minimal = await tool.run(args, { senderId, run, maxResultTokens: () => 120 } as NoteAgentContext)
+      expect(minimal.ok).toBe(true)
+      expect(estimateTokens(minimal.content)).toBeLessThanOrEqual(120)
+      expect(minimal.content).toContain('dataset="tabelle3"')
+      expect(minimal.content).toMatch(/360 Zeilen aus 12 Dateien/)
     } finally {
       clearContextAttachments(senderId)
       await fs.rm(root, { recursive: true, force: true })

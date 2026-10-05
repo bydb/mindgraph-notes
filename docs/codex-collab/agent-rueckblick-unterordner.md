@@ -663,6 +663,72 @@ Stelle: docs/codex-collab/agent-rueckblick-unterordner.md:93
 Status: [OFFEN]
 Rev. 3 lässt **jeden** Verbraucher `inventoryFolder(entry)` über bis zu 20.000 Einträge nutzen (Rev. 3 :95–99, :143–153). Heute lesen `countFolderTables`, `readFolderFile` und `readFolderContext` nur die direkte Ebene (`app/src/main/noteAgent/contextFiles.ts:301–324`, `:386–390`, `:422–423`, `:612–614`); die Einzel-Lese-Sperre zählt vor jedem weiteren Read erneut Tabellen (`app/src/main/noteAgent/skills.ts:378–387`). Ein großer Baum würde vor jedem Stichproben-Read, Guard-Check oder Startkontext vollständig neu durchlaufen und kann die bewährten 60-Rückläufe-Läufe spürbar verlangsamen oder an der 20k-Schutzgrenze als unvollständig markieren. Vorschlag: eine laufbezogene Inventur mit Invalidierung und pro Datei frischer Sicherheitsprüfung spezifizieren; direkte-Ebene-Regression und 60-Tabellen-Latenz messen.
 
+### F39 — Digest-Abdeckung lässt vorab gefilterte Dateien verschwinden
+Schwere: hoch
+Stelle: app/src/main/noteAgent/contextFiles.ts:1217
+Status: [OFFEN]
+`subfolder` und `kinds` filtern die Inventur vor dem Aufbau von `items`; `runFolderDigest` setzt `found` anschließend auf `read.items.length` und erstellt Status nur für diese Einträge (`app/src/main/noteAgent/folderDigest.ts:173–193`). Nicht gewählte Formate und Unterordner erscheinen weder als gefunden noch mit Filtergrund, obwohl der Plan für jede nicht gewählte Datei einen Grund verlangt (`docs/codex-collab/agent-rueckblick-unterordner.md:237–239`). Auch `unsupportedCount`, Symlinks und Punkt-Einträge der Inventur gehen in der Digest-Abdeckung verloren (`app/src/main/noteAgent/contextFiles.ts:1194–1199`, `app/src/main/noteAgent/folderInventory.ts:178–186`). Eine scheinbar vollständige Abdeckung kann damit nur den gefilterten Ausschnitt meinen, ohne dessen Umfang auszuweisen. Vorschlag: Inventur-Gesamtzahl und alle ausgeschlossenen Kategorien getrennt zählen; pro unterstützter Datei einen Status mit Filtergrund erzeugen und die Summe gegen die Inventur prüfen.
+
+### F40 — Höchstens 15 Befunde pro Paket werden als vollständige Auswertung ausgewiesen
+Schwere: hoch
+Stelle: app/src/main/noteAgent/folderDigest.ts:132
+Status: [OFFEN]
+Der Map-Prompt begrenzt die Antwort auf 15 Befunde, auch wenn ein Paket viele Dateien und mehr als 15 einschlägige Ereignisse enthält (`app/src/main/noteAgent/folderDigest.ts:118–136`). Nach jeder gültig formatierten Antwort gelten alle betroffenen Dateien als `ausgewertet` beziehungsweise `abschnitte`, unabhängig davon, ob ihr Inhalt in einem Befund vorkommt (`:283–289`, `:190–193`). Die GUI-Gegenprobe mit drei Markern prüft diesen Fall nicht (`docs/codex-collab/agent-rueckblick-unterordner.md:809–815`). Für Fragen wie „alle Zusagen“ geht Inhalt damit still verloren. Vorschlag: Pakete auch nach erwartbarer Befundzahl begrenzen oder pro Datei eine explizite Auswertungsentscheidung verlangen; Überhang als unvollständig ausweisen und mit einem Test mit mehr als 15 relevanten Befunden prüfen.
+
+### F41 — Abschnitts-Fundstellen lassen sich syntaktisch erfinden
+Schwere: mittel
+Stelle: app/src/shared/folderDigest.ts:200
+Status: [OFFEN]
+`validateFindings` akzeptiert `[Datei#999]`, sobald `[Datei]` erlaubt ist, weil der `#n`-Suffix vor der Prüfung entfernt wird. Im Reduce erlaubt `allRefsOf` zudem pauschal `#1` bis `#20` für jede Gruppendatei, ohne die tatsächlich gebildeten Abschnitte zu prüfen (`app/src/main/noteAgent/folderDigest.ts:302–303`, `:316–319`). Die Behauptung „Fundstellen sind geprüft“ in der Werkzeugantwort (`:340–342`) ist damit für Abschnittsnummern zu stark. Vorschlag: ausschließlich die in den jeweiligen Paketen tatsächlich erzeugten Referenzen zulassen; Reduce-Referenzen aus validierten Map-Befunden ableiten.
+
+### F42 — Eine überlange Zeile sprengt das Digest-Paket trotz Teilungsregel
+Schwere: hoch
+Stelle: app/src/shared/folderDigest.ts:171
+Status: [OFFEN]
+Wenn eine einzelne Zeile das Paketbudget übersteigt, gibt `linesFittingTokens` null zurück; `splitIntoPieces` nimmt dann dennoch die ganze Zeile. `buildPackages` übernimmt auch ein bereits übergroßes einzelnes Stück (`app/src/shared/folderDigest.ts:151–158`). Im Map-Lauf kann der Kürzungsverdacht ein Paket mit nur einem Stück nicht halbieren und markiert dessen Datei als Fehler (`app/src/main/noteAgent/folderDigest.ts:258–271`). Eine minifizierte HTML-Datei, eine CSV-Zeile oder ein langer Absatz wird deshalb weder vollständig ausgewertet noch in handhabbare Abschnitte geteilt. Vorschlag: lange Zeilen zusätzlich an Zeichen- oder Tokengrenzen schneiden, die echte Paketgröße vor dem Aufruf prüfen und diesen Grenzfall testen.
+
+### F43 — Digest-Rückgabe kann das verbleibende Agent-Budget überschreiten
+Schwere: hoch
+Stelle: app/src/main/noteAgent/folderDigest.ts:304
+Status: [OFFEN]
+`limit()` beträgt mindestens 500 Token, selbst wenn `maxResultTokens()` null oder nur wenige Token meldet. Die abschließende Kürzung prüft nur `render()`, nicht den fertigen Werkzeugtext mit Frage, Einleitung, Abdeckung und Handlungsanweisung (`app/src/main/noteAgent/folderDigest.ts:327–345`); eine einzelne lange Zeile bleibt durch `keep >= 1` ebenfalls erhalten. Im Loop gehört `folder_digest` zu `LOCK_ONLY_TOOLS` und seine Antwort wird nach dem Lauf nicht gegen `maxToolResultTokens` geprüft (`app/src/main/noteAgent/loop.ts:34–35`, `:419–435`). Damit kann der Digest den nächsten Prompt trotz Budgetsteuerung überfüllen. Vorschlag: den vollständigen Rückgabetext vor dem Anhängen gegen das aktuelle Budget prüfen; bei Platzmangel ein kurzes, sichtbares Teilresultat oder einen geblätterten Abruf liefern.
+
+### F44 — `collect_table` garantiert die Berichtgröße nach der Registrierung nicht
+Schwere: hoch
+Stelle: app/src/main/noteAgent/skills.ts:554
+Status: [OFFEN]
+Nach `registerDataset` probiert `collect_table` nur vier feste Berichtvarianten und gibt die letzte selbst dann zurück, wenn sie das Limit weiter überschreitet (`app/src/main/noteAgent/skills.ts:543–565`). Der Loop begrenzt `LOCK_ONLY_TOOLS` nachträglich absichtlich nicht (`app/src/main/noteAgent/loop.ts:34–35`, `:419–435`). Lange Spaltennamen, Probleme oder ein sehr kleines Restbudget reichen dafür aus; die Datensatz-ID bleibt zwar sichtbar, aber die Zusage „verdichtet sich, bis es ins Budget passt“ ist nicht erfüllt (`docs/codex-collab/agent-rueckblick-unterordner.md:786–789`). Der Test nutzt nur 12 statt 60 Dateien und ein 900-Token-Limit (`app/src/main/noteAgent/collectBudget.test.ts:14–40`). Vorschlag: eine garantiert begrenzte Minimalantwort mit ID, Zeilenzahl und Abrufhinweis vorsehen; 60 Rückläufe und sehr kleine Restbudgets prüfen.
+
+### F45 — Datei kann nach der Größenprüfung am Handle wachsen
+Schwere: mittel
+Stelle: app/src/main/noteAgent/folderInventory.ts:145
+Status: [OFFEN]
+`readFileInFolder` prüft `fstat().size` vor `fh.readFile()`, kontrolliert danach aber weder die gelesene Bytezahl noch die Dateigröße oder Änderungszeit (`app/src/main/noteAgent/folderInventory.ts:145–158`). Ein anderer Prozess kann dieselbe Inode während des Lesens vergrößern oder überschreiben; `dev/ino` und die Pfad-Nachprüfung bleiben dabei gleich. So können `maxBytes` und die Annahme einer stabilen Momentaufnahme unterlaufen werden. Das ist unabhängig vom bereits ausdrücklich akzeptierten Zwischenordner-Tausch (Modulkopf :9–15). Vorschlag: aus dem Handle höchstens `maxBytes + 1` Bytes lesen und Überschreitung ablehnen; nach dem Lesen `fstat` und Änderungsmerkmale erneut prüfen oder Änderungen sichtbar als unvollständig melden.
+
+### F46 — Inventur verschweigt verschwindende Dateien
+Schwere: mittel
+Stelle: app/src/main/noteAgent/folderInventory.ts:277
+Status: [OFFEN]
+Nach erfolgreichem `readdir` und Verzeichnis-Nachcheck kann `lstat` für einen gemeldeten Dateinamen fehlschlagen oder einen anderen Typ sehen; beide Fälle werden kommentarlos übersprungen (`app/src/main/noteAgent/folderInventory.ts:239–243`, `:277–285`). `inv.incomplete` bleibt leer, sodass Manifest und Digest eine vollständige Inventur melden können, obwohl ein währenddessen bewegter Eintrag fehlt (`app/src/main/noteAgent/contextFiles.ts:1244`, `app/src/main/noteAgent/folderDigest.ts:190–194`). Vorschlag: solche Änderungen als `incomplete: changed` markieren und bei Bedarf neu inventarisieren; einen Datei-Austausch während der Inventur testen.
+
+### F47 — Der Digest hält alle extrahierten Texte gleichzeitig im Speicher
+Schwere: hoch
+Stelle: app/src/main/noteAgent/contextFiles.ts:1218
+Status: [OFFEN]
+`readFolderSourcesForDigest` liest und parst alle ausgewählten Dateien nacheinander und behält jeden extrahierten Volltext in `items`; `runFolderDigest` kopiert diese Texte danach in `sources`, bevor das erste Paket ans Modell geht (`app/src/main/noteAgent/contextFiles.ts:1218–1244`, `app/src/main/noteAgent/folderDigest.ts:173–209`). Die 20.000-Einträge-Inventurgrenze und Dateiobergrenzen begrenzen weder die Summe der dekodierten Texte noch Parser-Zwischenobjekte (`app/src/main/noteAgent/folderInventory.ts:27–29`, `app/src/main/noteAgent/contextFiles.ts:724–767`). Große Ordner können so vor der 40-Aufruf-Prüfung den Main-Prozess erschöpfen. Vorschlag: Dateien paketweise lesen und nach Map freigeben oder eine explizite Gesamt-Speichergrenze mit sichtbarem Teilstatus einführen; einen großen Mischordner als Lasttest aufnehmen.
+
+### F48 — Reduce umgeht die eigene Kürzungs- und Fehlerbehandlung
+Schwere: mittel
+Stelle: app/src/main/noteAgent/folderDigest.ts:316
+Status: [OFFEN]
+Map-Aufrufe prüfen `looksTruncated`, halbieren Pakete und markieren Fehler (`app/src/main/noteAgent/folderDigest.ts:253–281`). Die zusätzlichen Reduce-Aufrufe verwenden weder diese Prüfung noch einen Fehlerpfad mit Teilergebnis (`:313–324`). Eine gekürzte, aber plausibel formatierte Reduce-Antwort kann frühere Befunde still ersetzen; bei einem Requestfehler verwirft der Tool-Catch den bereits erstellten Digest vollständig (`app/src/main/noteAgent/skills.ts:597–610`). Vorschlag: auch Reduce-Antworten auf Kürzung prüfen und bei Fehlern die bisherigen validierten Befunde samt unvollständiger Abdeckung zurückgeben; entsprechende Tests ergänzen.
+
+### F49 — Nutzerabbruch liefert die versprochene Teilabdeckung nicht
+Schwere: niedrig
+Stelle: app/src/main/noteAgent/folderDigest.ts:242
+Status: [OFFEN]
+Der Plan verspricht bei Abbruch die bisherigen Gruppen mit Status „unvollständig“ (`docs/codex-collab/agent-rueckblick-unterordner.md:274–280`). Tatsächlich wirft der Map-Loop bei `signal.aborted`; die Lesephase wirft ebenfalls (`app/src/main/noteAgent/contextFiles.ts:1219–1220`), und `skills.ts` macht daraus nur `Fehler: Abgebrochen` (`app/src/main/noteAgent/skills.ts:609–610`). Bereits validierte Befunde und die Abdeckung werden nicht zurückgegeben. Vorschlag: die bisherige Auswertung auf Abbruch als unvollständiges Teilergebnis serialisieren oder die Planzusage ausdrücklich zurücknehmen.
+
 ## Claude-Antwort
 
 Runde 1 beantwortet am 05.10.2026. Alle Befunde gegen den Code nachgeprüft; keinen halte ich für
@@ -814,9 +880,29 @@ korrekt, keine Einträge aus dem anderen Ordner, nichts erfunden. Rest: Die Noti
 Abdeckung nur vage (die genaue Zeile steht in den Quellen der Karte) — das Modell folgte der
 Anweisung „Abdeckung nennen“ nicht wörtlich.
 
+### Runde 4 — Antworten F39–F49 (05.10.2026, Code-Prüfung)
+
+Alle elf Befunde am Code nachgeprüft: alle tragen. Nutzer: „alle 11“.
+
+- **F39 [ADRESSIERT]** `readFolderSourcesForDigest` zählt per `subfolder`/`kinds` Ausgefiltertes (`excludedBySubfolder`, `excludedByKind`) sowie andere Formate, versteckte Einträge und Verknüpfungen. `found` umfasst jetzt alle lesbaren Dateien des Ordners, Ausgefiltertes steht mit Grund in „Ausgelassen“, Nicht-Lesbares in einer eigenen Zeile (`formatCoverage`). Test: `folderDigest.test.ts` „zählt per kinds/subfolder …“, `shared/folderDigest.test.ts` „zählt vorab Ausgefiltertes …“.
+- **F40 [ADRESSIERT]** Die Grenze „höchstens 15 Befunde“ ist aus dem Map-Prompt entfernt („Nenne JEDEN einschlägigen Befund“). `ChatWithToolsResult.outputCut` (Ollama `done_reason`, OpenAI `finish_reason` = `length`) halbiert das Paket. Ist es nicht mehr teilbar, bleiben die gültigen Befunde, und die Dateien gelten als „teilweise“ statt „ausgewertet“. **GUI-Befund dazu:** Bei 30 Einträgen lieferte qwen3.6 **0 Zeichen**, weil das Denken die 2048 Ausgabe-Token verbrauchte. Die neue Erkennung meldete ehrlich „teilweise“. Behoben mit `ChatOptions.ollamaThink: false` nur für die Auswertungsaufrufe. Danach: ein Paket, 30/30 vollständig, alle 30 Zusagen korrekt gegen die Testdaten geprüft.
+- **F41 [ADRESSIERT]** `validateFindings` lässt nur exakte Fundstellen zu (kein Abschneiden von `#n`). Beim Reduce sind nur die Fundstellen des jeweiligen Bündels erlaubt (`refsInFindings`), keine pauschalen `#1–#20`.
+- **F42 [ADRESSIERT]** `splitLongLine` teilt überlange Zeilen per binärer Suche an Zeichengrenzen, jedes Stück passt ins Budget, zusammengesetzt ergibt sich wieder die Zeile. Test mit minifiziertem HTML.
+- **F43 [ADRESSIERT]** Gegen das Budget wird der ganze Rückgabetext gemessen (Kopf, Hinweis, Abdeckung, Schluss), nicht nur der Befundteil. Die Untergrenze von 500 entfällt. Stufen: kürzere Fehlerliste, dann eine kompakte Antwort mit Abdeckungszeile. Zusätzlich kürzt der Loop `LOCK_ONLY_TOOLS` als letzte Sicherung sichtbar. Test mit Budgets 900/250/60.
+- **F44 [ADRESSIERT]** `collect_table` hat nach den vier Varianten eine garantiert kurze Minimalantwort (ID, Zeilen/Dateien/Spalten, Hinweis bei Obergrenze, `dataset="…"`). Test mit 120 Token. Zusätzlich die Sicherung im Loop (siehe F43).
+- **F45 [ADRESSIERT]** `readFileInFolder` liest höchstens `maxBytes + 1` und vergleicht danach `fstat` (Größe, mtime, gelesene Bytes). Ohne Test (Wettlauf nicht deterministisch herstellbar).
+- **F46 [ADRESSIERT]** Scheitert `lstat` nach `readdir` oder hat der Eintrag einen anderen Typ, setzt das `incomplete: changed`. Ohne Test (ebenfalls ein Wettlauf).
+- **F47 [ADRESSIERT]** Der Zeitraum-Filter läuft beim Lesen (`admit`), ausgefilterte Texte bleiben nicht im Speicher. `maxTotalTokens` = 40 × Paketgröße × 1,25 beendet das Lesen vorzeitig mit Ablehnung und Weg zum Eingrenzen. Dabei fiel auf: Bei kleinem Fenster wurde die Paketgröße negativ, deshalb gilt jetzt `MIN_PACKAGE_TOKENS` (1000) mit eigener Ablehnung. Tests für beides.
+- **F48 [ADRESSIERT]** Reduce: Bei Fehler, Kürzungsverdacht oder abgeschnittener Antwort bleibt das Bündel unverändert, die Auswertung geht nie verloren. Test „ein fehlschlagendes Zusammenführen …“.
+- **F49 [ADRESSIERT — Planzusage zurückgenommen]** Ein Abbruch durch den Nutzer beendet den ganzen Agent-Lauf (`loop.ts` wirft nach jedem Werkzeug bei `signal.aborted`). Ein Teilergebnis hätte also keinen Empfänger. Die Zusage „bisherige Gruppen als unvollständig“ gilt nur für Modellfehler und die Aufrufgrenze (dort umgesetzt). Begründung steht als Kommentar im Map-Loop.
+
+**Neuer Befund aus der GUI-Probe (offen, nicht behoben):** Ohne den Hinweis „nutze folder_digest“ las qwen3.6 einmal alle 30 Dateien einzeln (mehrere pro Schritt) und schrieb eine Excel-Liste mit 30 korrekten Zeilen, aber einem falschen Begleitsatz („7 Personen“ statt 10). Die Werkzeugwahl ist also nicht stabil. Das ist kein Fehler im Code, die Entscheidungsregel im Prompt wirkt aber nicht zuverlässig.
+
+typecheck/build grün, `npm run test` 2684 grün, 1 bekannter Ausreißer (`shellExecution.test.ts` Umgebungsprobe, Zeitüberschreitung unter Last).
+
 ## Status
 
-Rev. 3, drei Codex-Runden. **Baustein A umgesetzt (05.10.2026), nicht committet:**
+Rev. 3, drei Codex-Runden. **Baustein A umgesetzt (05.10.2026), committet `627702d6`:**
 `main/noteAgent/folderInventory.ts` (neu: Anhang-Identität, Inventur mit Prüfung vor/nach
 `readdir`, Lesen über Deskriptor mit Nachprüfung, Restrisiko im Modulkopf benannt),
 `contextFiles.ts` (alle Ordner-Werkzeuge auf der gemeinsamen Inventur, Manifest als Liste bzw.
@@ -834,7 +920,7 @@ listet den Ordner, liest alle 9 Einträge per Pfad, schreibt eine korrekte Monat
 Fehlermeldung mit den verfügbaren Pfaden führte sofort zur Korrektur. Möglicher Feinschliff:
 bei Nicht-Treffer die ähnlichsten Pfade zuerst nennen statt die ersten 30.
 
-**Baustein B umgesetzt (05.10.2026), nicht committet** — siehe Claude-Antwort „Baustein B umgesetzt“.
+**Baustein B umgesetzt (05.10.2026), committet `9ba4c42e`** — siehe Claude-Antwort „Baustein B umgesetzt“.
 
 **GUI-Gegenprobe B (Computer use, 05.10.2026):** Journal-Gross, 88 Einträge à ~1 500 Zeichen in
 `2026/01–03` (~45 000 Token, passt bewusst nicht in 32k), qwen3.6:35b-a3b lokal, 32 Schritte, ~4 min.
@@ -848,4 +934,6 @@ begrenzt) und erfand ein Detail („Laubholzer Weg“). Die Lückenangabe blieb 
 Einträge“). Ein Budget verhindert den Überlauf, macht aber aus Stichproben keine Vollständigkeit —
 das kann nur die Verdichtung durch die App (`folder_digest`).
 
-**Baustein C umgesetzt (05.10.2026), nicht committet.** Offen aus „Später“: einzeln übernehmbare Gruppenkarten, Wiederaufnahme, Starter-Skill „Rückblick“, inhaltliche Befundprüfung.
+**Baustein C umgesetzt (05.10.2026), committet `d11db8cc`.** Offen aus „Später“: einzeln übernehmbare Gruppenkarten, Wiederaufnahme, Starter-Skill „Rückblick“, inhaltliche Befundprüfung.
+
+**Runde 4 (05.10.2026): Code-Prüfung A+B+C** gegen `627702d6..d11db8cc` (Diff `git diff 41b60dca..d11db8cc`). Findings ab F39. Alle elf umgesetzt (05.10.2026), nicht committet.

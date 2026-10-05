@@ -426,6 +426,17 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
             content = `Fehler: Das Ergebnis wäre zu groß für den verbleibenden Kontext (etwa ${size.toLocaleString('de-DE')} Token, Platz für ${limit.toLocaleString('de-DE')}). Hole kleinere Stücke: list_context_folder mit subfolder bzw. offset, read_context_file mit offset/max_rows — oder schreibe das Ergebnis aus dem, was du schon hast.`
             onStep(nextSeq(run), call.name, shortToolError(content))
           }
+        } else if (LOCK_ONLY_TOOLS.has(call.name)) {
+          // Diese Werkzeuge verdichten sich selbst und dürfen nicht abgelehnt werden (der
+          // Datensatz ist schon angelegt, die Auswertung schon bezahlt). Passt es trotzdem
+          // nicht, als letzte Sicherung sichtbar kürzen — der Anfang trägt ID bzw. Abdeckung (F43/F44).
+          const limit = maxToolResultTokens(budget)
+          if (estimateTokens(content) > limit) {
+            const marker = '\n[gekürzt: Kontext fast voll — schreibe jetzt das Ergebnis aus dem, was du hast]'
+            const lines = content.split('\n')
+            while (lines.length > 1 && estimateTokens(lines.join('\n') + marker) > limit) lines.pop()
+            content = lines.join('\n') + marker
+          }
         }
         pushMessage({
           role: 'tool',

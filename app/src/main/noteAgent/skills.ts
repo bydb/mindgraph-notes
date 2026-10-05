@@ -558,6 +558,16 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           if (limit === undefined || estimateTokens(report) <= limit) break
           report = formatCollectReport(datasetId, table, v) + truncNote
         }
+        if (limit !== undefined && estimateTokens(report) > limit) {
+          // Auch ohne Beispielzeilen zu groß (lange Spaltennamen, viele Probleme, fast voller
+          // Kontext): garantiert kurze Antwort, die ID steht immer drin (F44).
+          const skipped = table.files.filter(f => f.status === 'nicht_ausgewertet').length
+          report = [
+            `Datensatz "${datasetId}" erstellt: ${table.rows.length} Zeilen aus ${table.files.length} Dateien, ${table.columns.length} Spalten.`,
+            skipped || table.truncated ? 'ACHTUNG: Nicht alle Daten übernommen (Obergrenze erreicht) — nenne das im Ergebnis.' : '',
+            `Der ausführliche Bericht passt nicht mehr in den Kontext. Schreibe die Tabelle mit write_xlsx und dem Parameter dataset="${datasetId}" — gib die Zeilen NICHT selbst ein.`
+          ].filter(Boolean).join('\n')
+        }
         return {
           ok: true,
           content: report,

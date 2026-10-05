@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  buildPackages, chunkByTokens, dateOfFile, formatCoverage, groupOf, inDateRange, validateFindings, NO_DATE_GROUP
+  buildPackages, chunkByTokens, dateOfFile, formatCoverage, groupOf, inDateRange, refsInFindings, splitLongLine, validateFindings, NO_DATE_GROUP
 } from './folderDigest'
 
 describe('dateOfFile', () => {
@@ -69,7 +69,35 @@ describe('buildPackages', () => {
   })
 })
 
+describe('überlange Zeilen (F42)', () => {
+  it('teilt eine einzelne Riesenzeile in Abschnitte, die ins Paket passen, ohne Zeichen zu verlieren', () => {
+    const line = '<div class="x">Robotik-AG Linienfolger 2026</div>'.repeat(400)
+    const pkgs = buildPackages([{ relPath: 'seite.html', group: 'g', text: `Kopf\n${line}\nFuß` }], 500)
+    for (const p of pkgs) expect(p.tokens).toBeLessThanOrEqual(500)
+    const pieces = pkgs.flatMap(p => p.pieces)
+    expect(pieces.length).toBeGreaterThan(2)
+    expect(pieces.map(p => p.text).join('').replace(/\n/g, '')).toBe(`Kopf${line}Fuß`)
+  })
+
+  it('splitLongLine: jedes Stück passt, zusammen ergibt es die Zeile', () => {
+    const line = '1234567890'.repeat(300)
+    const parts = splitLongLine(line, 100)
+    expect(parts.join('')).toBe(line)
+    expect(parts.length).toBeGreaterThan(1)
+  })
+})
+
 describe('validateFindings', () => {
+  it('erfundene Abschnittsnummern fliegen raus (F41)', () => {
+    const v = validateFindings('- a [a.md#5]\n- b [a.md]\n- c [g.md#3]', ['a.md', 'g.md#1', 'g.md#2'])
+    expect(v.kept).toEqual(['- b [a.md]'])
+    expect(v.dropped).toBe(2)
+  })
+
+  it('refsInFindings liefert die Fundstellen der Befunde', () => {
+    expect(refsInFindings(['- x [a.md] [b.md#2]', '- y [c.md]'])).toEqual(['a.md', 'b.md#2', 'c.md'])
+  })
+
   it('behält nur Befunde mit Fundstelle aus dem Paket', () => {
     const text = [
       'Hier die Befunde:',
@@ -109,5 +137,18 @@ describe('formatCoverage', () => {
     expect(text).toContain('1 × Filter: Zeitraum')
     expect(text).toContain('- c.pdf: gekürzt: nur die ersten 500 von 812 Seiten')
     expect(text).toContain('2 Befunde ohne gültige Fundstelle wurden verworfen.')
+  })
+
+  it('zählt vorab Ausgefiltertes mit und nennt Nicht-Lesbares (F39)', () => {
+    const text = formatCoverage({
+      found: 6,
+      droppedFindings: 0,
+      files: [{ relPath: 'a.md', status: 'ausgewertet' }, { relPath: 'b.md', status: 'ausgewertet' }],
+      excluded: [{ reason: 'Filter: Format', count: 3 }, { reason: 'Filter: anderer Unterordner', count: 1 }],
+      notReadable: { otherFormats: 2, hidden: 1, symlinks: 0 }
+    })
+    expect(text).toContain('6 Dateien gefunden — 2 vollständig ausgewertet, 0 in Abschnitten vollständig ausgewertet, 0 nur teilweise lesbar, 4 ausgelassen, 0 nicht lesbar.')
+    expect(text).toContain('3 × Filter: Format, 1 × Filter: anderer Unterordner')
+    expect(text).toContain('nicht mitgezählt und nicht gelesen: 2 in nicht lesbaren Formaten, 1 versteckte.')
   })
 })

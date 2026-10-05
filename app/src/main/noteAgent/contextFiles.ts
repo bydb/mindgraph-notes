@@ -22,7 +22,7 @@ import {
   assertFolderRootIdentity, captureFolderRoot, inventoryFolder, parseFolderRelPath, readFileInFolder,
   MAX_INVENTORY_DEPTH, MAX_INVENTORY_ENTRIES, type FolderInventory, type FolderRoot
 } from './folderInventory'
-import { linesFittingTokens } from '../../shared/contextBudget'
+import { estimateTokens, linesFittingTokens } from '../../shared/contextBudget'
 
 export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'folder'
 
@@ -1189,20 +1189,38 @@ export interface DigestReadItem {
   partial?: string
   /** Gesetzt, wenn die Datei gar nicht gelesen werden konnte. */
   error?: string
+  /** Gesetzt, wenn die Datei gelesen, aber vom Aufrufer ausgefiltert wurde (z. B. Zeitraum) — ohne Text. */
+  skipped?: string
 }
 
 export interface DigestReadResult {
   folderName: string
   items: DigestReadItem[]
+  /** Vorab ausgefiltert, nur gezählt — gehören zu den gefundenen Dateien (F39). */
+  excludedBySubfolder: number
+  excludedByKind: number
   unsupportedCount: number
+  hiddenCount: number
+  symlinkCount: number
   incomplete?: FolderInventory['incomplete']
+  /** Gesetzt, wenn das Lesen wegen `maxTotalTokens` vorzeitig endete (F47). */
+  stoppedAt?: { read: number; total: number }
 }
 
 export async function readFolderSourcesForDigest(
   senderId: number,
   ids: string[],
   folderName: string,
-  opts: { subfolder?: string; kinds?: ContextFileKind[]; signal?: AbortSignal; onProgress?: (done: number, total: number) => void } = {}
+  opts: {
+    subfolder?: string
+    kinds?: ContextFileKind[]
+    signal?: AbortSignal
+    onProgress?: (done: number, total: number) => void
+    /** Filter nach dem Lesen (z. B. Zeitraum): Grund = auslassen, Text wird nicht behalten. */
+    admit?: (relPath: string, text: string) => string | undefined
+    /** Summe der behaltenen Texte in Token; darüber endet das Lesen (Speicherschutz, F47). */
+    maxTotalTokens?: number
+  } = {}
 ): Promise<DigestReadResult> {
   const entry = requireFolderEntry(senderId, ids, folderName)
   const { files, unsupportedCount, inv } = await listSupportedFolderFiles(entry)
@@ -1214,8 +1232,20 @@ export async function readFolderSourcesForDigest(
     subfolder = hit.relPath
   }
   const wantedKinds = opts.kinds?.length ? new Set(opts.kinds) : null
-  const selected = files.filter(f => (!subfolder || f.name.startsWith(subfolder + '/')) && (!wantedKinds || wantedKinds.has(f.kind)))
-  const items: DigestReadItem[] = []
+  const inSubfolder = files.filter(f => !subfolder || f.name.startsWith(subfolder + '/'))
+  const selected = inSubfolder.filter(f => !wantedKinds || wantedKinds.has(f.kind))
+  const result: DigestReadResult = {
+    folderName: entry.name,
+    items: [],
+    excludedBySubfolder: files.length - inSubfolder.length,
+    excludedByKind: inSubfolder.length - selected.length,
+    unsupportedCount,
+    hiddenCount: inv.hiddenCount,
+    symlinkCount: inv.symlinkCount,
+    incomplete: inv.incomplete
+  }
+  const items = result.items
+  let keptTokens = 0
   for (let i = 0; i < selected.length; i++) {
     if (opts.signal?.aborted) throw new Error('Abgebrochen')
     const f = selected[i]
@@ -1235,11 +1265,23 @@ export async function readFolderSourcesForDigest(
       const partial = marker
         ? marker.slice(1, -1)
         : f.kind === 'pptx' ? 'PowerPoint: nur Text und Notizen, keine Bildinhalte' : undefined
+      const skip = opts.admit?.(f.name, text)
+      if (skip) {
+        items.push({ relPath: f.name, kind: f.kind, skipped: skip })
+        continue
+      }
       items.push({ relPath: f.name, kind: f.kind, text, partial })
+      keptTokens += estimateTokens(text)
+      if (opts.maxTotalTokens !== undefined && keptTokens > opts.maxTotalTokens && i + 1 < selected.length) {
+        // Schon jetzt mehr, als die Auswertung je verarbeiten würde — nicht weiter in den
+        // Speicher lesen (F47). Der Aufrufer lehnt ab und nennt den Weg zum Eingrenzen.
+        result.stoppedAt = { read: i + 1, total: selected.length }
+        break
+      }
     } catch (e) {
       if (opts.signal?.aborted) throw e
       items.push({ relPath: f.name, kind: f.kind, error: e instanceof Error ? e.message : String(e) })
     }
   }
-  return { folderName: entry.name, items, unsupportedCount, incomplete: inv.incomplete }
+  return result
 }

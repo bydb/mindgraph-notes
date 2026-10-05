@@ -14,6 +14,7 @@ vi.mock('../llm/chatClient', async (orig) => ({
 import { chatWithTools } from '../llm/chatClient'
 import { registerContextFolder, clearContextAttachments } from './contextFiles'
 import { assertSameRoute, parseDigestArgs, runFolderDigest, type FolderDigestArgs } from './folderDigest'
+import { estimateTokens } from '../../shared/contextBudget'
 import type { AgentRun } from './runRegistry'
 
 const mockChat = chatWithTools as unknown as ReturnType<typeof vi.fn>
@@ -84,7 +85,7 @@ describe('folder_digest', () => {
     expect(res.ok).toBe(true)
     expect(mockChat).toHaveBeenCalledTimes(3) // ein Paket je Monat
     expect(mockChat.mock.calls[0][1]).toEqual([]) // werkzeuglos
-    expect(mockChat.mock.calls[0][2]).toMatchObject({ ollamaNumPredict: 2048, maxTokens: 2048, telemetryModule: 'note-agent', telemetryRunId: 'r-digest' })
+    expect(mockChat.mock.calls[0][2]).toMatchObject({ ollamaNumPredict: 2048, ollamaThink: false, maxTokens: 2048, telemetryModule: 'note-agent', telemetryRunId: 'r-digest' })
     expect(res.content).toContain('## 2026-01')
     expect(res.content).toContain('## 2026-03')
     expect(res.content).toContain('[2026/02/2026-02-03.md]')
@@ -127,11 +128,87 @@ describe('folder_digest', () => {
   })
 
   it('verweigert vorab, wenn mehr als 40 Aufrufe nötig wären — mit Weg zum Eingrenzen', async () => {
-    const run = await setup(await journal(['01', '02', '03'], 20, 'Langer Text über den Tag. '.repeat(100)))
-    const res = await runFolderDigest(args(), deps(run, { chatOptions: { backend: 'ollama', ollamaModel: 'qwen-test', numCtx: 4_096 } }))
+    const run = await setup(await journal(['01', '02', '03'], 14, 'Langer Text über den Tag. '.repeat(190)))
+    const res = await runFolderDigest(args(), deps(run, { chatOptions: { backend: 'ollama', ollamaModel: 'qwen-test', numCtx: 6_000 } }))
     expect(res.ok).toBe(false)
     expect(res.content).toMatch(/bräuchte \d+ Modellaufrufe/)
     expect(res.content).toContain('subfolder')
+    expect(mockChat).not.toHaveBeenCalled()
+  })
+
+  it('hört bei sehr großen Ordnern schon beim Lesen auf, statt alles in den Speicher zu laden (F47)', async () => {
+    const run = await setup(await journal(['01', '02', '03'], 20, 'Langer Text über den Tag. '.repeat(400)))
+    const res = await runFolderDigest(args(), deps(run, { chatOptions: { backend: 'ollama', ollamaModel: 'qwen-test', numCtx: 6_000 } }))
+    expect(res.ok).toBe(false)
+    expect(res.content).toMatch(/schon nach \d+ von 60 Dateien/)
+    expect(res.content).toContain('subfolder')
+    expect(mockChat).not.toHaveBeenCalled()
+  })
+
+  it('zählt per kinds/subfolder Ausgefiltertes und nicht lesbare Formate in der Abdeckung (F39)', async () => {
+    const folder = await journal(['01', '02'], 2)
+    await fs.writeFile(path.join(folder, '2026', '01', 'liste.csv'), 'a;b\n1;2\n', 'utf8')
+    await fs.writeFile(path.join(folder, '2026', '01', 'bild.xyz'), 'x', 'utf8')
+    const run = await setup(folder)
+    mockChat.mockImplementation(answerWithRefs())
+    const res = await runFolderDigest(args({ subfolder: '2026/01', kinds: ['md'] }), deps(run))
+    expect(res.content).toContain('5 Dateien gefunden — 2 vollständig ausgewertet')
+    expect(res.content).toContain('2 × Filter: anderer Unterordner, 1 × Filter: Format')
+    expect(res.content).toContain('1 in nicht lesbaren Formaten')
+    expect(res.coverageLine).toBe('Ordner-Auswertung: 5 Dateien, 2 vollständig ausgewertet')
+  })
+
+  it('halbiert ein Paket, wenn die Antwort an der Ausgabegrenze abgeschnitten wurde (F40)', async () => {
+    const run = await setup(await journal(['01'], 4))
+    let first = true
+    mockChat.mockImplementation(async (messages: Array<{ content: string }>) => {
+      const r = (await answerWithRefs()(messages)) as Record<string, unknown>
+      if (first) { first = false; return { ...r, outputCut: true } }
+      return r
+    })
+    const res = await runFolderDigest(args(), deps(run))
+    expect(mockChat).toHaveBeenCalledTimes(3)
+    expect(res.content).toContain('4 Dateien gefunden — 4 vollständig ausgewertet')
+  })
+
+  it('nicht mehr teilbare abgeschnittene Antwort: Befunde bleiben, Datei gilt als nur teilweise (F40)', async () => {
+    const run = await setup(await journal(['01'], 1))
+    mockChat.mockImplementation(async (messages: Array<{ content: string }>) => ({ ...(await answerWithRefs()(messages)) as object, outputCut: true }))
+    const res = await runFolderDigest(args(), deps(run))
+    expect(res.content).toContain('[2026/01/2026-01-01.md]')
+    expect(res.content).toContain('1 Dateien gefunden — 0 vollständig ausgewertet, 0 in Abschnitten vollständig ausgewertet, 1 nur teilweise lesbar')
+    expect(res.content).toContain('Antwortgrenze des Modells abgeschnitten')
+  })
+
+  it('die ganze Rückgabe passt ins Budget, auch bei vielen Befunden (F43)', async () => {
+    const run = await setup(await journal(['01', '02', '03'], 10))
+    mockChat.mockImplementation(answerWithRefs())
+    for (const budget of [900, 250, 60]) {
+      const res = await runFolderDigest(args(), deps(run, { maxResultTokens: () => budget }))
+      expect(res.ok).toBe(true)
+      if (budget >= 250) expect(estimateTokens(res.content)).toBeLessThanOrEqual(budget)
+      expect(res.content).toMatch(/weitere Befunde nicht gezeigt|Kontext reicht nicht mehr/)
+      expect(res.content).toContain('30 Dateien gefunden')
+    }
+  })
+
+  it('ein fehlschlagendes Zusammenführen verwirft die Auswertung nicht (F48)', async () => {
+    const run = await setup(await journal(['01'], 10))
+    mockChat.mockImplementation(async (messages: Array<{ content: string }>) => {
+      if (!messages[1].content.includes('Fundstelle:')) throw new Error('Netz weg')
+      return answerWithRefs()(messages)
+    })
+    const res = await runFolderDigest(args(), deps(run, { maxResultTokens: () => 700 }))
+    expect(res.ok).toBe(true)
+    expect(res.content).toContain('[2026/01/2026-01-01.md]')
+    expect(res.content).toContain('10 Dateien gefunden — 10 vollständig ausgewertet')
+  })
+
+  it('lehnt ein zu kleines Kontextfenster mit Hinweis ab', async () => {
+    const run = await setup(await journal(['01'], 1))
+    const res = await runFolderDigest(args(), deps(run, { chatOptions: { backend: 'ollama', ollamaModel: 'qwen-test', numCtx: 4_096 } }))
+    expect(res.ok).toBe(false)
+    expect(res.content).toContain('zu klein für eine Ordner-Auswertung')
     expect(mockChat).not.toHaveBeenCalled()
   })
 

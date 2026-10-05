@@ -164,16 +164,42 @@ export function buildPackages(sources: DigestSource[], maxTokens: number): Diges
 
 function splitIntoPieces(f: DigestSource, budget: number): DigestPiece[] {
   if (estimateTokens(f.text) + 20 <= budget) return [{ ref: f.relPath, relPath: f.relPath, text: f.text }]
-  const lines = f.text.split('\n')
+  const max = budget - 40
+  // Eine einzelne Zeile über dem Budget (minifiziertes HTML, lange CSV-Zeile) wird an
+  // Zeichengrenzen geteilt — sonst sprengt sie das Paket (F42). Die Stücke ergeben
+  // zusammengesetzt wieder genau die Zeile.
+  const lines = f.text.split('\n').flatMap(line => (estimateTokens(line) > max ? splitLongLine(line, max) : [line]))
   const pieces: DigestPiece[] = []
   let start = 0
   while (start < lines.length) {
-    let take = linesFittingTokens(lines.slice(start), budget - 40)
-    if (take === 0) take = 1 // eine einzelne überlange Zeile trotzdem nehmen, sonst Endlosschleife
+    let take = linesFittingTokens(lines.slice(start), max)
+    if (take === 0) take = 1
     pieces.push({ ref: '', relPath: f.relPath, text: lines.slice(start, start + take).join('\n') })
     start += take
   }
   return pieces.map((p, i) => ({ ...p, ref: `${f.relPath}#${i + 1}` }))
+}
+
+/**
+ * Eine überlange Zeile in Stücke teilen, die jeweils in `maxTokens` passen. Jedes Stück
+ * ist so groß wie möglich (binäre Suche) — dadurch landen nie zwei Stücke derselben Zeile
+ * im selben Abschnitt, und `split('\n')`/`join('\n')` fügt keinen falschen Umbruch ein.
+ */
+export function splitLongLine(line: string, maxTokens: number): string[] {
+  const out: string[] = []
+  let rest = line
+  while (rest.length > 0) {
+    let lo = 1
+    let hi = rest.length
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2)
+      if (estimateTokens(rest.slice(0, mid)) <= maxTokens) lo = mid
+      else hi = mid - 1
+    }
+    out.push(rest.slice(0, lo))
+    rest = rest.slice(lo)
+  }
+  return out
 }
 
 export const NO_FINDINGS = 'KEINE BEFUNDE'
@@ -197,13 +223,19 @@ export function validateFindings(modelText: string, allowedRefs: Iterable<string
     const line = raw.trim()
     if (!/^[-*•]\s+/.test(line)) continue
     const refs = Array.from(line.matchAll(/\[([^\]\n]+)\]/g), m => m[1].trim().toLowerCase())
-    if (refs.length > 0 && refs.every(r => allowed.has(r) || allowed.has(r.replace(/#\d+$/, '')))) {
+    // Nur genau die Fundstellen, die es gibt — ein erfundenes `Datei#999` fliegt raus (F41).
+    if (refs.length > 0 && refs.every(r => allowed.has(r))) {
       kept.push(`- ${line.replace(/^[-*•]\s+/, '')}`)
     } else {
       dropped++
     }
   }
   return { kept, dropped }
+}
+
+/** Alle Fundstellen in Befund-Zeilen — die erlaubte Menge beim Zusammenführen (F41). */
+export function refsInFindings(lines: string[]): string[] {
+  return lines.flatMap(l => Array.from(l.matchAll(/\[([^\]\n]+)\]/g), m => m[1].trim()))
 }
 
 /** Befunde in Bündel teilen, die jeweils in `maxTokens` passen (für das Zusammenführen). */
@@ -229,6 +261,10 @@ export type DigestFileStatus =
 export interface DigestCoverage {
   found: number
   files: DigestFileStatus[]
+  /** Vorab ausgefiltert (Unterordner, Format), nur gezählt — gehören zu `found` (F39). */
+  excluded?: Array<{ reason: string; count: number }>
+  /** Einträge im Ordner, die gar nicht als lesbare Datei zählen (andere Formate, versteckt, Verknüpfung). */
+  notReadable?: { otherFormats: number; hidden: number; symlinks: number }
   droppedFindings: number
   /** Gesetzt, wenn die Auswertung nicht alle Gruppen geschafft hat. */
   incomplete?: string
@@ -240,10 +276,25 @@ export function formatCoverage(c: DigestCoverage, maxListed = 20): string {
   const skipped = c.files.filter((f): f is Extract<DigestFileStatus, { status: 'ausgelassen' }> => f.status === 'ausgelassen')
   const reasons = new Map<string, number>()
   for (const f of skipped) reasons.set(f.reason, (reasons.get(f.reason) ?? 0) + 1)
+  let excludedTotal = 0
+  for (const e of c.excluded ?? []) {
+    if (e.count <= 0) continue
+    excludedTotal += e.count
+    reasons.set(e.reason, (reasons.get(e.reason) ?? 0) + e.count)
+  }
   const lines = [
-    `ABDECKUNG: ${c.found} Dateien gefunden — ${count('ausgewertet')} vollständig ausgewertet, ${count('abschnitte')} in Abschnitten vollständig ausgewertet, ${count('teilweise')} nur teilweise lesbar, ${skipped.length} ausgelassen, ${count('fehler')} nicht lesbar.`
+    `ABDECKUNG: ${c.found} Dateien gefunden — ${count('ausgewertet')} vollständig ausgewertet, ${count('abschnitte')} in Abschnitten vollständig ausgewertet, ${count('teilweise')} nur teilweise lesbar, ${skipped.length + excludedTotal} ausgelassen, ${count('fehler')} nicht lesbar.`
   ]
   if (reasons.size) lines.push(`Ausgelassen: ${Array.from(reasons, ([r, n]) => `${n} × ${r}`).join(', ')}.`)
+  const nr = c.notReadable
+  if (nr && nr.otherFormats + nr.hidden + nr.symlinks > 0) {
+    const parts = [
+      nr.otherFormats ? `${nr.otherFormats} in nicht lesbaren Formaten` : '',
+      nr.hidden ? `${nr.hidden} versteckte` : '',
+      nr.symlinks ? `${nr.symlinks} Verknüpfungen` : ''
+    ].filter(Boolean)
+    lines.push(`Außerdem im Ordner, nicht mitgezählt und nicht gelesen: ${parts.join(', ')}.`)
+  }
   const notFull = c.files.filter(f => f.status === 'teilweise' || f.status === 'fehler')
   if (notFull.length) {
     lines.push('Nicht vollständig gelesen:')

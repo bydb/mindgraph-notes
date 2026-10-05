@@ -147,7 +147,23 @@ export async function readFileInFolder(root: FolderRoot, relPath: string, maxByt
       throw new Error(`"${relPath}" wurde während des Lesens verändert — nicht gelesen.`)
     }
     if (st.size > maxBytes) throw new Error(`zu groß (${Math.round(st.size / 1024 / 1024)} MB)`)
-    buf = await fh.readFile()
+    // Höchstens maxBytes + 1 lesen: wächst die Datei während des Lesens, merkt das die
+    // Grenze statt still mehr zu lesen (F45).
+    const chunks: Buffer[] = []
+    let total = 0
+    for (;;) {
+      const chunk = Buffer.alloc(Math.min(1024 * 1024, maxBytes + 1 - total))
+      const { bytesRead } = await fh.read(chunk, 0, chunk.length, null)
+      if (bytesRead === 0) break
+      chunks.push(bytesRead === chunk.length ? chunk : chunk.subarray(0, bytesRead))
+      total += bytesRead
+      if (total > maxBytes) throw new Error(`zu groß (während des Lesens über ${Math.round(maxBytes / 1024 / 1024)} MB gewachsen)`)
+    }
+    buf = Buffer.concat(chunks, total)
+    const st2 = await fh.stat()
+    if (st2.size !== st.size || st2.mtimeMs !== st.mtimeMs || total !== st.size) {
+      throw new Error(`"${relPath}" wurde während des Lesens verändert — nicht gelesen.`)
+    }
   } finally {
     await fh.close()
   }
@@ -278,9 +294,14 @@ export async function inventoryFolder<K extends string>(
       try {
         st = await fs.lstat(path.join(abs, d.name))
       } catch {
+        // Zwischen readdir und lstat verschwunden: nie still auslassen (F46).
+        markIncomplete('changed', childRel)
         continue
       }
-      if (!st.isFile()) continue
+      if (!st.isFile()) {
+        markIncomplete('changed', childRel)
+        continue
+      }
       filesHere++
       inv.files.push({ relPath: childRel, name: d.name, dir: rel, kind, sizeBytes: st.size, mtimeMs: st.mtimeMs })
     }

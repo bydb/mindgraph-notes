@@ -89,6 +89,10 @@ export interface ChatOptions {
   // Aufrufe (Auswertungspakete von folder_digest). Der Agent-Loop setzt sie nie — dort
   // bleibt die Ausgabe wie bisher nur vom Kontextfenster begrenzt.
   ollamaNumPredict?: number
+  // Denken für diesen Aufruf ausdrücklich an/aus (Ollama `think`), vor dem Ausführungsprofil.
+  // folder_digest schaltet es ab: bei einer reinen Auszugsaufgabe verbrauchte qwen3.6 die
+  // ganze Ausgabegrenze fürs Denken und lieferte 0 Zeichen Befunde (real, 05.10.2026).
+  ollamaThink?: boolean
   // Reproduzierbare, modellabhängige Laufparameter. Der aufrufende Agent löst
   // das Profil einmal auf; der Ollama-Adapter setzt es konsistent auf Wire-Ebene um.
   executionProfile?: LlmExecutionProfile
@@ -146,6 +150,9 @@ export interface ChatWithToolsResult {
   // nicht am Ende aus dem letzten Aufruf ableiten, weil jede Iteration die
   // komplette Konversation neu bezahlt.
   usage?: CallUsage
+  // true, wenn der Server die ANTWORT an der Ausgabegrenze abgeschnitten hat (Ollama
+  // `done_reason: "length"`, OpenAI-kompatibel `finish_reason: "length"`).
+  outputCut?: boolean
 }
 
 const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
@@ -398,6 +405,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatCallOptions): Pr
 // ─── OpenRouter: plain chat (OpenAI-kompatibel) ──────────────────────────────
 
 interface OpenAIChatChoice {
+  finish_reason?: string | null
   message?: {
     role?: string
     content?: string | null
@@ -687,7 +695,9 @@ async function chatWithToolsViaOllama(
       messages: messages.map(ollamaMessageToWire),
       tools: wireTools,
       stream: false,
-      ...(execution.think !== undefined ? { think: execution.think } : {}),
+      ...(opts.ollamaThink !== undefined
+        ? { think: opts.ollamaThink }
+        : execution.think !== undefined ? { think: execution.think } : {}),
       ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {})
     }),
   }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
@@ -706,6 +716,7 @@ async function chatWithToolsViaOllama(
       tool_calls?: OllamaToolCallWire[]
     }
     prompt_eval_count?: number
+    done_reason?: string
   } & OllamaTimings
 
   recordLlmRun(fromOllamaResponse(json, {
@@ -757,7 +768,8 @@ async function chatWithToolsViaOllama(
     toolCalls,
     backend: 'ollama',
     assistantMessage,
-    promptTokens: json.prompt_eval_count
+    promptTokens: json.prompt_eval_count,
+    outputCut: json.done_reason === 'length'
   }
 }
 
@@ -862,7 +874,8 @@ async function chatWithToolsViaOpenAiCompatible(
   return {
     text, toolCalls, backend, assistantMessage,
     promptTokens: json.usage?.prompt_tokens,
-    usage: parseCallUsage(json.usage) ?? undefined
+    usage: parseCallUsage(json.usage) ?? undefined,
+    outputCut: json.choices?.[0]?.finish_reason === 'length'
   }
 }
 
