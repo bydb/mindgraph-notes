@@ -74,6 +74,8 @@ export interface AgentRunUiState {
   /** Im Lauf geladene Skills (opake Kennung + Name) — Grundlage der Rückfrage nach der Referenzzeit. */
   skills?: Array<{ id: string; label: string }>
   vaultKey?: string
+  /** Folgelauf: die Antwort des Nutzers, mit der dieser Lauf fortgesetzt wurde. */
+  followUp?: string
 }
 
 export interface AgentScopeState {
@@ -100,6 +102,8 @@ export interface AgentScopeState {
   /** Start vom Main abgelehnt, weil Cloud-Freigabe oder Zustimmung fehlt — die Karte zeigt
    *  dafür eine eigene Zeile statt einer Fehlermeldung unter den Anhängen. */
   startGate?: { code: 'optin' | 'consent'; message: string } | null
+  /** Startparameter des letzten Laufs — Grundlage für „Antworten und weitermachen“. */
+  lastStart?: AgentStartParams
 }
 
 export interface AgentScopePrefs {
@@ -150,6 +154,8 @@ export interface AgentStartParams {
   instructionMs?: number
   /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
   comparisonCaseId?: string
+  /** Folgelauf: `instruction` ist die Antwort auf die letzte Nachricht dieses Laufs. */
+  continueFromRunId?: string
 }
 
 interface NoteAgentStoreState {
@@ -171,7 +177,10 @@ interface NoteAgentStoreState {
   setPickedExample: (scopeId: string, example: { text: string; need: AgentExampleNeed } | null) => void
   setPrefs: (scopeId: string, patch: AgentScopePrefs) => void
 
-  startRun: (scopeId: string, params: AgentStartParams) => Promise<void>
+  /** true, wenn der Lauf gestartet ist. */
+  startRun: (scopeId: string, params: AgentStartParams) => Promise<boolean>
+  /** Antwort auf die letzte Nachricht des Laufs — startet einen Folgelauf mit dessen Verlauf. */
+  continueRun: (scopeId: string, answer: string) => Promise<boolean>
   cancelRun: (scopeId: string) => void
   /** `openAfter`: nach dem Übernehmen die Datei im Standardprogramm öffnen (DOCX, XLSX …
    *  Formate, die die App selbst nicht anzeigt). Geöffnet wird die ECHTE Datei im Vault,
@@ -377,16 +386,21 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       shellAccess: params.shellAccess === true,
       computerAccess: params.computerAccess === true,
       instructionMs: params.instructionMs,
-      comparisonCaseId: params.comparisonCaseId
+      comparisonCaseId: params.comparisonCaseId,
+      continueFromRunId: params.continueFromRunId
     })
     if (!res.success || !res.runId) {
       if (res.code === 'optin' || res.code === 'consent') {
         set(s => withScope(s, scopeId, sc => ({ ...sc, startGate: { code: res.code as 'optin' | 'consent', message: res.error || '' } })))
       }
       get().setAttachError(scopeId, res.error || 'Start fehlgeschlagen')
-      return
+      return false
     }
-    set(s => withScope(s, scopeId, sc => ({ ...sc, startGate: null })))
+    set(s => withScope(s, scopeId, sc => ({
+      ...sc,
+      startGate: null,
+      lastStart: { ...params, continueFromRunId: undefined, instructionMs: undefined }
+    })))
     const runId = res.runId
     startWaitTimer(runId)
     set(s => ({
@@ -403,10 +417,18 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
           shellAccess: params.shellAccess === true,
           computerAccess: params.computerAccess === true,
           webResearch: params.webResearch === true,
-          route: res.route
+          route: res.route,
+          followUp: params.continueFromRunId ? params.instruction : undefined
         }
       }))
     }))
+    return true
+  },
+
+  continueRun: async (scopeId, answer) => {
+    const sc = get().getScope(scopeId)
+    if (!sc.lastStart || !sc.run.runId || sc.run.phase !== 'review' || !answer.trim()) return false
+    return get().startRun(scopeId, { ...sc.lastStart, instruction: answer.trim(), continueFromRunId: sc.run.runId })
   },
 
   cancelRun: (scopeId) => {

@@ -31,6 +31,8 @@ interface Props {
   onPreview: (resultId: string) => Promise<AgentPreviewResponse>
   onDismiss: () => void
   onRemember: (text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>
+  /** Antwort auf die letzte Nachricht — setzt den Lauf mit allem bisher Gelesenen fort. */
+  onContinue?: (answer: string) => Promise<boolean>
 }
 
 /**
@@ -67,13 +69,24 @@ function useElapsedLabel(startedAt: number | null, running: boolean): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, onDismiss, onRemember }: Props) {
+export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, onDismiss, onRemember, onContinue }: Props) {
   const { t } = useTranslation()
   const en = useUIStore(st => st.language) === 'en'
   const finalText = useAgentFinalText(run)
   // Ein Lauf mit lokalem 27B-Modell dauert real zehn Minuten. Ohne Uhr sieht das
   // wie ein Hänger aus; mit Uhr sieht man, dass etwas passiert und wie lange schon.
   const elapsed = useElapsedLabel(run.startedAt, run.phase === 'running')
+
+  // Antworten und weitermachen: nur nach einem erfolgreichen Lauf ohne Webrecherche (dort gilt
+  // „genau ein Ergebnis“). Offene Karten zuerst entscheiden — der Folgelauf ersetzt die Anzeige.
+  const [replyText, setReplyText] = useState('')
+  const canContinue = !!onContinue && run.phase === 'review' && run.outcome === 'ok' && !run.webResearch
+  const openCards = run.results.some(r => r.state === 'pending')
+  const submitReply = async () => {
+    if (!onContinue || !replyText.trim() || openCards) return
+    // Nur bei gestartetem Folgelauf leeren — sonst wäre die Antwort nach einer Ablehnung weg.
+    if (await onContinue(replyText.trim())) setReplyText('')
+  }
 
   // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
   const [rememberText, setRememberText] = useState('')
@@ -160,6 +173,9 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
           </span>
         </div>
       )}
+      {run.followUp && (
+        <div className="ai-bar-agent-followup">{t('aiBar.agent.followUpLabel')}: {run.followUp}</div>
+      )}
       {run.steps.length > 0 && (
         <div className="ai-bar-agent-steps">
           {run.steps.map(s => (
@@ -179,6 +195,24 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
       {run.phase === 'review' && (
         <>
           {finalText && <div className="ai-bar-agent-text">{finalText}</div>}
+          {canContinue && (
+            <div className="ai-bar-agent-reply">
+              <div className="ai-bar-agent-remember">
+                <input
+                  className="ai-bar-context-search"
+                  placeholder={t('aiBar.agent.replyPlaceholder')}
+                  value={replyText}
+                  disabled={openCards}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void submitReply() }}
+                />
+                <button type="button" className="ai-bar-send" onClick={() => void submitReply()} disabled={!replyText.trim() || openCards}>
+                  {t('aiBar.agent.reply')}
+                </button>
+              </div>
+              {openCards && <div className="ai-bar-agent-reply-hint">{t('aiBar.agent.replyBlocked')}</div>}
+            </div>
+          )}
           {/* Webrecherche-Provenienz: „N Suchen · M Seiten" inkl. Fehlversuchen (P1-1). */}
           {run.web && (run.web.searchCount > 0 || run.web.fetchCount > 0) && (
             <div className="ai-bar-agent-web">

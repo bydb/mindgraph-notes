@@ -159,7 +159,7 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud, shellLockReason } from '../shared/modelCompatibility'
-import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend } from './llm/chatClient'
+import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
@@ -195,7 +195,7 @@ import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
-import { startRun, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState, type AgentRun } from './noteAgent/runRegistry'
+import { startRun, peekContinuation, dropContinuation, type RunContinuation, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState, type AgentRun } from './noteAgent/runRegistry'
 import { randomBytes } from 'crypto'
 import { loadComparisons, updateComparisons, mainRandom } from './comparisonStore'
 import { createCampaign, createCase, startWork, markResultReady, addSession, correctSession, setAccepted, closeCase, abortCase, markNotMeasurable, endCampaign } from '../shared/comparison/model'
@@ -4528,6 +4528,9 @@ interface NoteAgentRunParams {
   instructionMs?: number
   // Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional).
   comparisonCaseId?: string
+  // Folgelauf: `instruction` ist dann die Antwort des Nutzers auf die letzte Nachricht
+  // dieses Laufs. Verlauf und Datensätze holt der Main selbst — nie aus dem Renderer.
+  continueFromRunId?: string
 }
 
 // ── Modellweg des Agenten: Einstufung + Cloud-Freigabe (Codex F15/F26–F28) ──────────
@@ -4612,6 +4615,20 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     }
     if (params.shellAccess === true && params.webResearch?.enabled) {
       return { success: false, error: 'Shell-Zugriff und Webrecherche-Modus können nicht im selben Lauf aktiviert werden.' }
+    }
+    // Folgelauf: Verlauf und Datensätze des Vorgängers JETZT sichern — startRun entfernt einen
+    // beendeten Vorgänger ohne offene Karten sofort. Nur derselbe Absender, derselbe Vault,
+    // ein erfolgreich beendeter Lauf, keine Webrecherche (dort gilt „genau ein Ergebnis“).
+    let continuation: { priorMessages: ChatMessage[]; answer: string; prev: RunContinuation } | undefined
+    if (typeof params.continueFromRunId === 'string') {
+      if (params.webResearch?.enabled) {
+        return { success: false, error: 'Läufe mit Webrecherche lassen sich nicht fortsetzen — starte den Auftrag neu.' }
+      }
+      const prev = peekContinuation(event.sender.id, params.continueFromRunId)
+      if (!prev || prev.vaultPath !== params.vaultPath) {
+        return { success: false, error: 'Dieser Lauf lässt sich nicht mehr fortsetzen — starte den Auftrag neu.' }
+      }
+      continuation = { priorMessages: prev.transcript, answer: params.instruction.trim(), prev }
     }
     if (params.shellAccess === true) {
       // Zweistufiges Opt-in wie bei der Webrecherche, HIER durchgesetzt und nicht nur im
@@ -4809,7 +4826,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       targetFolderRel: params.targetFolderRel,
       targetFolderAbs: targetAbs,
       attachmentIds: params.attachmentIds || [],
-      instruction: params.instruction.trim(),
+      instruction: continuation
+        ? `${continuation.prev.instruction}\n\nNachtrag: ${continuation.answer}`
+        : params.instruction.trim(),
       model: provenanceModel,
       // Aktive Zeit beim Formulieren (Renderer-Messung, Fenster im Vordergrund).
       instructionMs: typeof params.instructionMs === 'number' ? params.instructionMs : undefined,
@@ -4821,6 +4840,13 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       vaultSearch
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
+    if (continuation) {
+      // Datensätze (collect_table) und Lese-Zähler gehen mit — der Verlauf nennt ihre IDs.
+      for (const [id, table] of continuation.prev.datasets) run.datasets.set(id, table)
+      for (const [folder, n] of continuation.prev.folderReads) run.folderReads.set(folder, n)
+      for (const folder of continuation.prev.collectedFolders) run.collectedFolders.add(folder)
+      dropContinuation(event.sender.id, continuation.prev.runId)
+    }
     hookNoteAgentCleanup(event.sender)
     void cleanupOldStaging(params.vaultPath).catch(() => undefined)
     // C02: bei der Retention evakuierte Läufe mit offenen Karten sofort aufräumen —
@@ -4917,6 +4943,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           noteContent: params.noteContent || '',
           agentMemory,
           chatOptions,
+          continuation: continuation ? { priorMessages: continuation.priorMessages, answer: continuation.answer } : undefined,
           onStep: (seq, skill, summary) => {
             if (!sender.isDestroyed()) sender.send('note-agent-progress', { runId: run.runId, seq, skill, summary })
           }

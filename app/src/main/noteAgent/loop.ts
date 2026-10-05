@@ -8,6 +8,7 @@ import { computerVerbLabel, COMPUTER_TOOL_BY_VERB } from '../../shared/computerC
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
 import { costOfCalls, warmPricingCache } from '../llm/chatClient'
 import type { CallUsage, RunCost } from '../../shared/llmCost'
+import { endsWithQuestion } from '../../shared/agentClosingQuestion'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import {
   addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, maxToolResultTokens,
@@ -46,6 +47,9 @@ export interface NoteAgentLoopParams {
   agentMemory: string
   chatOptions: ChatOptions // Backend/Modell/Key vom Aufrufer; signal wird hier ergänzt
   onStep: (seq: number, skill: string, summary: string) => void
+  // Folgelauf („Antworten und weitermachen“): Verlauf des Vorgängers (ohne dessen
+  // Systemprompt, der wird für diesen Lauf frisch gebaut) plus die Antwort des Nutzers.
+  continuation?: { priorMessages: ChatMessage[]; answer: string }
 }
 
 export interface NoteAgentLoopResult {
@@ -280,10 +284,14 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   }
 
   const shellAttachments = run.shell ? JSON.stringify(await getShellAttachmentPaths(run.senderId, run.attachmentIds)) : ''
-  const messages: ChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt(run, params.noteContent, run.senderId, params.agentMemory, shellAttachments) },
-    { role: 'user', content: run.instruction }
-  ]
+  const systemMessage: ChatMessage = { role: 'system', content: buildSystemPrompt(run, params.noteContent, run.senderId, params.agentMemory, shellAttachments) }
+  const messages: ChatMessage[] = params.continuation
+    ? [
+        systemMessage,
+        ...params.continuation.priorMessages.filter(m => m.role !== 'system'),
+        { role: 'user', content: `Antwort auf deine letzte Nachricht: ${params.continuation.answer}\n\nSetze den Auftrag damit fort. Alles, was du oben schon gelesen hast, gilt weiter — lies es nicht erneut.` }
+      ]
+    : [systemMessage, { role: 'user', content: run.instruction }]
   // 10-Minuten-Fenster pro Request: große lokale Modelle (z.B. qwen3.6:27b-mlx) brauchen
   // mit gewachsenem Tool-Kontext deutlich länger als die 180s-Default — der Nutzer hat
   // einen echten Abbrechen-Button, das Timeout ist nur noch die Notbremse.
@@ -317,6 +325,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
 
   let lastText = ''
   let nudgedForWrite = false
+  let nudgedForQuestion = false
   let previousPromptTokens: number | undefined
   // Shell-Läufe brauchen Luft für Erkunden/Schreiben/Korrigieren — dasselbe Budget wie Ordner-Läufe.
   // Rechner-Läufe wie Shell-/Ordner-Läufe: das Ergebnis wird erst geschrieben und DANN
@@ -386,6 +395,18 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         }
         throw failWithHint('Der Lauf wurde ohne Ergebnis beendet — keine Datei erzeugt und keine Antwort gegeben. Bitte den Auftrag konkreter formulieren oder ein stärkeres Modell wählen.')
       }
+      // Rückfrage statt Ergebnis: Der Nutzer kann mitten im Lauf nicht antworten. Einmal
+      // zurückschicken — der Agent soll selbst entscheiden, die Annahme nennen und schreiben.
+      // Bleibt danach eine Frage offen, kann der Nutzer auf der Karte antworten (Fortsetzung).
+      if (run.results.size === 0 && endsWithQuestion(result.text) && !nudgedForQuestion && iteration < maxIterations) {
+        nudgedForQuestion = true
+        pushMessage({
+          role: 'user',
+          content: 'Ich kann dir während des Laufs nicht antworten. Entscheide selbst, was am besten zum Auftrag passt, nenne deine Annahme kurz im Ergebnis und erzeuge das Ergebnis JETZT mit einem Schreib-Werkzeug (z. B. write_note). Stelle keine Rückfrage.'
+        })
+        continue
+      }
+      run.transcript = messages.slice()
       return { text: withFormatHint(result.text), hitMaxIterations: false, cost: await costOfCalls(callUsages, chatOptions) }
     }
 
@@ -465,6 +486,8 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   if (run.web && !run.web.wrote) {
     throw failWithHint('Iterations-Limit erreicht, ohne dass die Recherche ein Ergebnis geschrieben hat. Der Auftrag war möglicherweise zu umfangreich für das Modell.')
   }
+  // Auch nach dem Iterations-Limit fortsetzbar: der Nutzer kann „mach weiter“ sagen.
+  run.transcript = messages.slice()
   return {
     text: withFormatHint(lastText || 'Iterations-Limit erreicht ohne abschließende Antwort.'),
     hitMaxIterations: true,

@@ -8,7 +8,7 @@ import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel, type AgentPreviewResponse } from '../Agent/AgentRunPanel'
 import { ShellAccessToggle } from '../Agent/ShellAccessToggle'
 import { ComputerAccessToggle } from '../Agent/ComputerAccessToggle'
-import type { AgentRunUiState } from '../../stores/noteAgentStore'
+import { useNoteAgentStore, type AgentRunUiState } from '../../stores/noteAgentStore'
 import { HumanIcon } from '../Shared/HumanIcon'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { diffStats, type DiffOp } from '../../utils/blockDiff'
@@ -424,6 +424,7 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
         onPreview={onAgentPreview}
         onDismiss={onAgentDismiss}
         onRemember={onRemember}
+        onContinue={scopeId ? answer => useNoteAgentStore.getState().continueRun(scopeId, answer) : undefined}
       />
 
       <div className="ai-bar-footer">

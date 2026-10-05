@@ -3,6 +3,7 @@
 // opake Result-Handles (der Renderer sieht nie Staging-Pfade), Results höchstens
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
+import type { ChatMessage } from '../llm/chatClient'
 import type { AgentRoute } from '../../shared/agentRoute'
 import type { VaultQueryResult } from '../rag/vaultRetrieve'
 import { randomBytes } from 'crypto'
@@ -121,6 +122,9 @@ export interface AgentRun {
   // lang und ändert sich nicht. Die Seite rendert dann komplett ohne Layout (real
   // aufgetreten, 01.09.2026). write_html setzt ihn deterministisch wieder ein.
   htmlSourceStyles?: string
+  // Gesprächsverlauf am Ende eines erfolgreichen Laufs — Grundlage für „Antworten und
+  // weitermachen“ (Folgelauf mit allem bisher Gelesenen). Nur Main-seitig, nie an den Renderer.
+  transcript?: ChatMessage[]
 }
 
 // Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
@@ -239,6 +243,48 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
   if (run.status === 'running') run.status = status
   activityEnds.get(run.runId)?.()
   activityEnds.delete(run.runId)
+  // Fortsetzbar ist nur der zuletzt beendete Lauf eines Fensters — und nur ein erfolgreicher
+  // ohne Webrecherche. Der Stand liegt NEBEN dem Lauf, weil ein Lauf, dessen Karten alle
+  // entschieden sind, sofort aus der Registry fällt (pruneRunIfConsumed) — genau dann will
+  // der Nutzer aber antworten (real im GUI-Test, 06.10.2026).
+  if (run.status === 'done' && run.transcript && !run.web) {
+    continuations.set(run.senderId, {
+      runId: run.runId,
+      vaultPath: run.vaultPath,
+      instruction: run.instruction,
+      transcript: run.transcript,
+      datasets: new Map(run.datasets),
+      folderReads: new Map(run.folderReads),
+      collectedFolders: new Set(run.collectedFolders)
+    })
+  } else {
+    continuations.delete(run.senderId)
+  }
+  run.transcript = undefined
+}
+
+export interface RunContinuation {
+  runId: string
+  vaultPath: string
+  instruction: string
+  transcript: ChatMessage[]
+  datasets: Map<string, CollectedTable>
+  folderReads: Map<string, number>
+  collectedFolders: Set<string>
+}
+
+const continuations = new Map<number, RunContinuation>()
+
+/** Stand zum Fortsetzen — nur für denselben Absender und genau diesen Lauf. Nur lesen:
+ *  gelöscht wird er erst, wenn der Folgelauf wirklich gestartet ist (dropContinuation) —
+ *  sonst ginge er bei einer späteren Ablehnung (Cloud-Freigabe, Zielordner) verloren. */
+export function peekContinuation(senderId: number, runId: string): RunContinuation | null {
+  const c = continuations.get(senderId)
+  return c && c.runId === runId ? c : null
+}
+
+export function dropContinuation(senderId: number, runId: string): void {
+  if (continuations.get(senderId)?.runId === runId) continuations.delete(senderId)
 }
 
 /** Summe aller einzeln gelesenen Ordner-Dateien — Grundlage der Fehlermeldung. */

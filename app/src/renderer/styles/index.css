@@ -22168,6 +22168,10 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-bar-agent-remember { display: flex; align-items: center; gap: 8px; }
 .ai-bar-agent-remember .ai-bar-context-search { flex: 1; }
 .ai-bar-agent-remember-saved { font-size: 11px; color: var(--accent-color); }
+/* Antworten und weitermachen: direkt unter dem Schlusstext, abgesetzt wie eine Antwortzeile */
+.ai-bar-agent-reply { display: flex; flex-direction: column; gap: 4px; padding: 8px 0 4px; border-top: 1px solid var(--border-color); }
+.ai-bar-agent-reply-hint { font-size: 11px; color: var(--text-secondary); }
+.ai-bar-agent-followup { font-size: 12px; color: var(--text-secondary); font-style: italic; white-space: pre-wrap; }
 /* Zeitbilanz: Rückfrage nach der Referenzzeit eines Skills (SkillReferencePrompt) */
 .ai-bar-agent-skillref { display: flex; flex-direction: column; gap: 4px; }
 .ai-bar-agent-skillref-question { font-size: 12px; color: var(--text-primary); }

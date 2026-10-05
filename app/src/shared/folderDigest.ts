@@ -39,6 +39,10 @@ function dateFromString(value: string): DigestDate | null {
   if (iso) return validDate(+iso[1], +iso[2], +iso[3])
   const compact = /(?<!\d)(\d{4})(\d{2})(\d{2})(?:\d{4})?(?!\d)/.exec(value)
   if (compact) return validDate(+compact[1], +compact[2], +compact[3])
+  // Deutsche Schreibweise TT.MM.JJJJ (auch T.M.JJJJ) — viele Journale heißen „05.10.2026.md“.
+  // Nur mit vierstelligem Jahr: „05.10.26“ ist nicht eindeutig genug.
+  const german = /(?<![\d.])(\d{1,2})\.(\d{1,2})\.(\d{4})(?![\d])/.exec(value)
+  if (german) return validDate(+german[3], +german[2], +german[1])
   return null
 }
 

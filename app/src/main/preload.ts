@@ -222,6 +222,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     instructionMs?: number
     /** Vergleichsfall, zu dem dieser Lauf gehört (Vergleichsmodus, optional). */
     comparisonCaseId?: string
+    /** Folgelauf: `instruction` ist die Antwort auf die letzte Nachricht dieses Laufs. */
+    continueFromRunId?: string
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) =>
     ipcRenderer.invoke('note-agent-route-preflight', params),

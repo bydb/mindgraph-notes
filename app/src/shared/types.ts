@@ -910,6 +910,8 @@ export interface ElectronAPI {
     computerAccess?: boolean;
     instructionMs?: number;
     comparisonCaseId?: string;
+    /** Folgelauf: `instruction` ist die Antwort auf die letzte Nachricht dieses Laufs. */
+    continueFromRunId?: string;
   }) => Promise<{ success: boolean; runId?: string; error?: string; code?: 'optin' | 'consent'; route?: import('./agentRoute').AgentRoute }>;
   noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) => Promise<{
     success: boolean;

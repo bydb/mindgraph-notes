@@ -992,6 +992,7 @@ export function AgentView({ tabId }: Props) {
           onDiscard={id => void store().discardResult(tabId, id)}
           onPreview={id => store().previewResult(tabId, id)}
           onDismiss={() => store().dismissRun(tabId)}
+          onContinue={answer => store().continueRun(tabId, answer)}
           onRemember={async text => {
             if (!vaultPath) return { success: false, error: 'Kein Vault geöffnet' }
             const res = await window.electronAPI.noteAgentRemember(vaultPath, text)

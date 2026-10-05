@@ -16,6 +16,14 @@ describe('dateOfFile', () => {
     expect(dateOfFile('202604221336 - Notiz.md', '')).toEqual({ year: 2026, month: 4, day: 22 })
   })
 
+  it('liest deutsche Daten TT.MM.JJJJ in Dateiname und Frontmatter', () => {
+    expect(dateOfFile('Journal/05.10.2026.md', '')).toEqual({ year: 2026, month: 10, day: 5 })
+    expect(dateOfFile('Journal/5.3.2026 Notiz.md', '')).toEqual({ year: 2026, month: 3, day: 5 })
+    expect(dateOfFile('x.md', '---\ndate: 14.03.2026\n---')).toEqual({ year: 2026, month: 3, day: 14 })
+    expect(dateOfFile('31.02.2026.md', '')).toBeNull()
+    expect(dateOfFile('05.10.26.md', '')).toBeNull()
+  })
+
   it('ungültige Daten zählen als ohne Datum', () => {
     expect(dateOfFile('2026-02-30.md', '')).toBeNull()
     expect(dateOfFile('notiz.md', '---\ndate: irgendwann\n---')).toBeNull()
