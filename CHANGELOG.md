@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.34-beta] - 2026-10-05
+
+**Der Petrol Agent wertet jetzt ganze Ordner aus – samt Unterordnern.** Hängst du zum Beispiel dein Journal an und bittest um einen Jahresrückblick oder um „alle Zusagen“, liest die App jede Datei selbst und gibt dem Agenten die Befunde mit Fundstelle. Das Ergebnis sagt dir, wie viele Dateien gefunden und ausgewertet wurden und was fehlt.
+
+### Hintergrund
+
+- **Auslöser:** Ein Jahresrückblick aus einem Journal mit Monatsordnern las nur die oberste Ebene. Bei großen Ordnern lief außerdem der Arbeitsspeicher des Modells still über, oder der Agent las nur Stichproben und riet den Rest.
+- **Unterordner:** Alle Ordner-Werkzeuge sehen jetzt den ganzen Baum. Große Ordner zeigt die Übersicht seitenweise, Dateien werden über ihren Pfad gelesen. Verknüpfungen und versteckte Ordner bleiben außen vor.
+- **Ordner-Auswertung:** Bei Fragen über viele Dateien teilt die App den Ordner in Pakete (etwa nach Monat) und lässt jedes mit derselben Frage und demselben Modell auswerten. Jeder Befund muss auf eine Datei im Paket verweisen, sonst wird er verworfen. Ist eine Antwort abgeschnitten, wird das Paket geteilt oder die Datei als „nur teilweise“ gemeldet, nie als vollständig. In der Karte unter „Welche Daten wohin gehen“ steht, dass dabei alle ausgewählten Dateien an das Modell gehen.
+- **Kein stiller Überlauf mehr:** Der Agent behält im Blick, wie viel Platz im Modell noch frei ist. Ein zu großes Leseergebnis wird abgelehnt, mit dem Hinweis, kleinere Stücke zu holen, und wird es knapp, schreibt der Agent das Ergebnis aus dem, was er hat, und nennt die Lücke.
+- **Notizsuche:** Treffer außerhalb des angehängten Ordners werden gekennzeichnet, damit sie nicht unbemerkt in eine Auswertung geraten.
+- **Grenzen:** Höchstens 40 Pakete je Auswertung – größere Ordner grenzt du über Unterordner, Zeitraum oder Format ein. Bilder in PDFs und Folien werden nicht gelesen. Ein lokales Modell braucht für rund 90 Journaleinträge etwa fünf Minuten.
+
 ## [0.11.33-beta] - 2026-10-04
 
 **Unter Linux mit Hyprland, Sway und ähnlichen Oberflächen speichert die App Passwörter und API-Schlüssel jetzt zuverlässig.** Bisher gingen dort Zugangsdaten für Cloud-Modelle (LLMBase, OpenRouter), Mail-Konten und Sync beim Speichern still verloren – „Verbindung testen“ blieb dann grau. Die App nutzt dort jetzt automatisch den Schlüsselbund des Systems.
