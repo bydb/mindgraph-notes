@@ -141,7 +141,7 @@ const App: React.FC = () => {
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId, noteSelectionNonce } = useNotesStore()
   const { tabs, activeTabId } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
-  const { t } = useTranslation()
+  const { t, language } = useTranslation()
   const { startChecking, stopChecking } = useReminderStore()
   const syncEnabled = useSyncStore(state => state.syncEnabled)
   const syncStatus = useSyncStore(state => state.syncStatus)
@@ -885,6 +885,12 @@ const App: React.FC = () => {
       root.setAttribute('data-theme', theme)
     }
   }, [theme])
+
+  // UI-Sprache auf <html lang> spiegeln: Silbentrennung und Screenreader folgen ihr, und Renderer-
+  // Plugins (Excalidraw) lesen daraus ihre Oberflächensprache — die Plugin-API kennt keine Sprache.
+  useEffect(() => {
+    document.documentElement.lang = language
+  }, [language])
 
   // Akzentfarbe auf document anwenden
   useEffect(() => {
