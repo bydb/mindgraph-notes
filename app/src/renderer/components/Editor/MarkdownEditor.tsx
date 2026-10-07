@@ -3162,6 +3162,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       if (!dt) return
       const hasFiles = dt.types.includes('Files') || dt.types.includes('text/uri-list')
       if (!hasFiles) return
+      // Nur Drops in DIESE Vorschau übernehmen: der Listener hängt dokumentweit in der
+      // Capture-Phase. Ohne die Prüfung schluckte ein Lesen-Editor im Split jeden Finder-Drop,
+      // auch auf eine Excalidraw-Fläche (Codex F03). Der Default für Drops ins Leere bleibt
+      // beim globalen Handler in App.tsx.
+      if (!isInsidePreview(e.target)) return
       // Hart blocken — Default + andere capture-listener (z.B. CodeMirro im hidden Editor).
       e.preventDefault()
       e.stopPropagation()
@@ -3174,11 +3179,11 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       if (!dt) return
       const hasFiles = dt.types.includes('Files') || dt.types.includes('text/uri-list')
       if (!hasFiles) return
+      if (!isInsidePreview(e.target)) return
       // Hart blocken — verhindert macOS Quick Look + andere Listener.
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()
-      if (!isInsidePreview(e.target)) return
       if (!vaultPath) return
 
       type DocCaret = Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
