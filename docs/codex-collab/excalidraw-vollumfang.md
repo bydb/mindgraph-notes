@@ -198,8 +198,25 @@ auswählbar. Wirkt ebenso für „Bibliothek öffnen“ (gleicher `fileOpen`-Pfa
 VOR `preventDefault`/`stopImmediatePropagation`. Drops außerhalb der eigenen Vorschau laufen weiter; der globale
 Default-Killer in `App.tsx` verhindert Quick Look. Nicht geprüft: echter Finder-Drop mit Lesen-Editor im Split.
 
-**F04–F10 — [OFFEN]** Schritt 2 ff. (Nutzerentscheidung steht aus). F10 (letzte Änderung geht beim schnellen
-Tab-Schließen verloren) ist im Code bestätigt (`renderer.tsx:214-219`) und erster Kandidat für Plugin 0.3.0.
+**F10 — [ADRESSIERT im Plugin 0.2.2, mit benannter Grenze]** (07.10.2026, Nutzerfreigabe „F10 angehen“)
+- `SaveController.dispose()` → `close()`: keine neuen Snapshots, aber der laufende Drain schreibt alles
+  Eingereihte zu Ende. Der Unmount reiht den noch im Debounce hängenden Stand sofort ein, statt den Timer zu
+  verwerfen (`pendingSceneRef`).
+- Neu gefundene Folgefalle: Tab zu und sofort wieder auf → der neue Editor las den alten Stand, während der
+  alte noch schrieb, und hätte ihn beim nächsten Edit überschrieben. Gegenmittel: `closingWrites` pro Datei,
+  der neue Editor wartet vor dem Lesen darauf.
+- Gemessen in der Dev-App (CDP, Bild einfügen per paste): 0.2.1 Tab zu nach 150 ms → 0 von 1 Elementen in der
+  Datei. 0.2.2 (finaler Build, Bytes gegen den Store verglichen): Tab zu nach 150 ms 2×/2 gesichert; zu + sofort
+  wieder auf + weiter zeichnen 2×/2 beide Änderungen gesichert.
+- **Grenze, gemessen:** Beim Abschalten/Aktualisieren des Plugins schließt der Host das Call-Gate, bevor er die
+  Mounts abbaut (`app/src/main/index.ts` `tearDownRenderer` → `rendererRuntime.drain`). Ein Speichern aus
+  `deactivate()` oder dem Unmount wird mit „Renderer-Instanz nicht aktiv“ abgelehnt — ein `deactivate`-Hook im
+  Plugin ist daher wirkungslos und wurde wieder entfernt. Verlust höchstens der letzten 500 ms vor dem
+  Abschalten; über die Einstellungen praktisch nicht erreichbar, nur bei einem Update im Hintergrund während des
+  Zeichnens. Eine Lösung bräuchte eine Host-Phase „Editor speichern lassen“ vor dem Drain (ADR-Änderung,
+  eigenes Review). Ebenso offen: App beenden innerhalb von 500 ms nach dem letzten Strich.
+
+**F04–F09 — [OFFEN]** Schritt 2 ff. (Nutzerentscheidung steht aus).
 
 Nebenbefund: Das Plugin-Repo hat kein `tsconfig.json`; `npm run typecheck` gibt nur die tsc-Hilfe aus und hat nie
 geprüft. Ebenso offen: `clipboard-read` wird vom Host verweigert → Excalidraws Kontextmenü „Einfügen“ vermutlich
@@ -207,4 +224,4 @@ wirkungslos (⌘V geht über das paste-Ereignis und funktioniert).
 
 ## Status
 
-Runde 1: Schritt 1 umgesetzt, wartet auf Abnahme durch den Nutzer (07.10.2026). Nicht committet, Plugin 0.2.1 nicht prod-signiert.
+Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 im Plugin 0.2.2 umgesetzt und getestet, nicht committet/released (07.10.2026).
