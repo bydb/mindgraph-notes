@@ -236,7 +236,26 @@ getestet (dev-signiertes 0.3.0, Bundle-Bytes gegen den Store verglichen):
   `INCLUDE_EXTENSIONS`, Test in `fileTracker.test.ts`; übergroße Dateien fängt `MAX_SYNC_FILE_SIZE` (64 MB) ab.
   Wirkt mit dem nächsten App-Release.
 
-**F04, F05, F07, F08 — [OFFEN]** (Bilder als Base64/Größe, Export, Links, Vault-Bilder).
+**F05 Export — [ADRESSIERT] Plugin 0.4.0 + App** (07.10.2026, Nutzerfreigabe „mach als Nächstes den Export“):
+- Excalidraws eigener Bild-Export-Dialog im Hauptmenü (PNG/SVG, Hintergrund, dunkler Modus, Skalierung, Szene
+  einbetten). Speichern läuft über Excalidraws Download-Weg (`<a download>`, seit 0.2.1 ohne File-System-API);
+  Electron zeigt dafür den nativen Speichern-Dialog — der Nutzer wählt das Ziel, auch außerhalb des Vaults.
+  Kein neuer Host-Vertrag, kein Vault-Schreiben ohne Dialog (Codex: Ziel/Überschreiben bleiben beim Nutzer).
+- **SVG mit Schriften:** Build-Patch (5) leitet `generateFontFaceDeclarations` auf einen Plugin-Hook um, der die
+  eingebetteten data:-@font-face-Regeln aus dem Plugin-Stylesheet nimmt — nur benutzte Familien und nur
+  Teilsätze, deren unicode-range benutzte Zeichen enthält. Kein Worker, kein Netz. Geprüft: SVG enthält genau
+  Excalifont-Latin, rendert in einem frischen Electron ohne Plugin-CSS mit Excalifont (inkl. „ü“, „ß“).
+- **Zwischenablage:** Host verweigerte `clipboard-sanitized-write`. App gibt jetzt NUR Schreiben frei, für die
+  App-Herkunft (`isTrustedRendererUrl`); `clipboard-read` bleibt zu. Herkunft reicht hier, weil Schreiben nichts
+  preisgibt. Geprüft: PNG 560×280 im Pasteboard.
+- Geprüft außerdem: PNG 2× (Excalifont, Umlaute), PNG mit eingebetteter Szene (`application/vnd.excalidraw+json`),
+  Dateiname aus der Zeichnung statt „Unbenannt-…“, Dialog-Überschriften in Systemschrift (Excalidraws UI-Schrift
+  „Assistant“ kam vom CDN und hatte an 7 Stellen keinen Rückfall → Serifenschrift).
+- Nicht angeboten: Export als `.excalidraw`-JSON („Speichern unter“) — die Zeichnung ist bereits eine Vault-Datei.
+- Nebenbefund (App): `plugin:uninstall` wenige Sekunden nach dem Start → „Renderer-Beitrag ließ sich nicht sauber
+  entladen — Neustart erforderlich“; nach 30 s Wartezeit sauber. Wettlauf mit der Aktivierung, nicht untersucht.
+
+**F04, F07, F08 — [OFFEN]** (Bilder als Base64/Größe, Links, Vault-Bilder).
 
 Nebenbefund: Das Plugin-Repo hat kein `tsconfig.json`; `npm run typecheck` gibt nur die tsc-Hilfe aus und hat nie
 geprüft. Ebenso offen: `clipboard-read` wird vom Host verweigert → Excalidraws Kontextmenü „Einfügen“ vermutlich
@@ -244,4 +263,4 @@ wirkungslos (⌘V geht über das paste-Ereignis und funktioniert).
 
 ## Status
 
-Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release) (07.10.2026).
+Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export als Plugin 0.4.0 + Zwischenablage-Freigabe (App), getestet, nicht committet (07.10.2026).

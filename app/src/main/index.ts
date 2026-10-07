@@ -1280,6 +1280,10 @@ function setupMediaPermissions(): void {
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const url = webContents.getURL()
+    if (permission === 'clipboard-sanitized-write') {
+      callback(isTrustedRendererUrl(url))
+      return
+    }
     if (permission === 'media') console.log(`[media] Anfrage-Handler aufgerufen, vertrauenswürdig=${isTrustedRendererUrl(url)}`)
     if (permission === 'media' && isTrustedRendererUrl(url)) {
       const mediaTypes = (details as { mediaTypes?: string[] }).mediaTypes ?? []
@@ -1309,6 +1313,11 @@ function setupMediaPermissions(): void {
   })
 
   session.defaultSession.setPermissionCheckHandler((_webContents, permission, requestingOrigin, details) => {
+    // Schreiben in die Zwischenablage (navigator.clipboard.write, z. B. Excalidraw „Als PNG kopieren"): erlaubt
+    // für die App-Herkunft, wie in jedem Browser nach einem Klick. NUR schreiben — `clipboard-read` bleibt zu.
+    // Die Herkunft reicht hier: Schreiben gibt nichts preis (anders als die abgelehnte fileSystem-Freigabe,
+    // docs/codex-collab/excalidraw-vollumfang.md F01/F02).
+    if (permission === 'clipboard-sanitized-write') return isTrustedRendererUrl(requestingOrigin)
     if (permission !== 'media' || !isTrustedRendererUrl(requestingOrigin)) return false
     const mediaType = details?.mediaType
     if (mediaType != null && mediaType !== 'audio') return false
