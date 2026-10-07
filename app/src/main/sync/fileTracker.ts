@@ -60,6 +60,10 @@ const EXCLUDE_PATTERNS = [
 const INCLUDE_EXTENSIONS = new Set([
   '.md',
   '.canvas',
+  // Excalidraw-Zeichnungen (Renderer-Plugin). Fehlten bis 10/2026 — eine Notiz mit `![[skizze.excalidraw]]`
+  // kam auf dem Zweitgerät an, die Zeichnung nicht. Eingebettete Bilder liegen als Base64 in der Datei;
+  // übergroße Dateien fängt MAX_SYNC_FILE_SIZE in syncEngine.ts ab.
+  '.excalidraw',
   '.json',
   '.png',
   '.jpg',

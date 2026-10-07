@@ -32,6 +32,13 @@ describe('isSyncable', () => {
     expect(isSyncable('doc.pdf')).toBe(true)
   })
 
+  it('synct Excalidraw-Zeichnungen (fehlten bis 10/2026)', () => {
+    expect(isSyncable('skizze.excalidraw')).toBe(true)
+    expect(isSyncable('Projekte/Ablauf.EXCALIDRAW')).toBe(true)
+    // Die Bibliothek liegt als JSON unter .mindgraph und war schon vorher syncbar.
+    expect(isSyncable('.mindgraph/excalidraw-library.json')).toBe(true)
+  })
+
   it('schließt OS-Müll und temporäre Dateien aus', () => {
     expect(isSyncable('.DS_Store')).toBe(false)
     expect(isSyncable('ordner/Thumbs.db')).toBe(false)

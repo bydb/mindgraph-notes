@@ -216,7 +216,27 @@ Default-Killer in `App.tsx` verhindert Quick Look. Nicht geprüft: echter Finder
   Zeichnens. Eine Lösung bräuchte eine Host-Phase „Editor speichern lassen“ vor dem Drain (ADR-Änderung,
   eigenes Review). Ebenso offen: App beenden innerhalb von 500 ms nach dem letzten Strich.
 
-**F04–F09 — [OFFEN]** Schritt 2 ff. (Nutzerentscheidung steht aus).
+**Kleine Punkte — Plugin 0.3.0** (07.10.2026, Nutzerfreigabe „mach die kleinen Punkte“), alles in der Dev-App
+getestet (dev-signiertes 0.3.0, Bundle-Bytes gegen den Store verglichen):
+- **Sprache:** App spiegelt `language` nach `<html lang>` (`App.tsx`), Plugin liest es (`langCode`, MutationObserver).
+  Geprüft: Einstellung de→en→de schaltet Werkzeugtitel live um. Excalidraw schreibt selbst `de-DE` in `<html lang>`
+  — gleicher Code, kein Pingpong. „Command palette“/„Find on canvas“ sind in Excalidraws de-DE-Übersetzung leer.
+- **Menü:** Befehlspalette, Suche, Hilfe ergänzt. Export bleibt aus (F05).
+- **F06 Bibliothek — [ADRESSIERT, lokal]:** `.mindgraph/excalidraw-library.json` (JSON in `.mindgraph` wird
+  synchronisiert), Format `.excalidrawlib`. Laden vor dem ersten Rendern über `initialData.libraryItems`,
+  Schreiben über den serialisierten SaveController, mehrere offene Editoren per `updateLibrary` gleichgezogen.
+  Unlesbare Datei → Hinweis im Editor, Datei bleibt byte-gleich (geprüft). Persistenz über Tab-Schließen und
+  App-Neustart geprüft. „Bibliotheken durchsuchen“ ausgeblendet (window.open wird vom Host verweigert).
+  Grenze: Eine per Sync geänderte Bibliothek wird erst übernommen, wenn kein Excalidraw-Editor offen ist.
+- **F09 Mermaid — [ADRESSIERT]:** lokal im Bundle, Vorschau und Einfügen funktionieren (Formen landen in der
+  Datei), keine CSP-Fehler. `aiEnabled={false}`: keine Server-KI-Einträge mehr. Web-Einbettung bleibt sichtbar,
+  lädt aber nichts (CSP) — offen.
+- **Neuer Befund (Sync):** `.excalidraw` steht nicht in `INCLUDE_EXTENSIONS` (`app/src/main/sync/fileTracker.ts`)
+  → Zeichnungen wurden NICHT synchronisiert. **[ADRESSIERT]** (Nutzerfreigabe „beides machen“): `.excalidraw` in
+  `INCLUDE_EXTENSIONS`, Test in `fileTracker.test.ts`; übergroße Dateien fängt `MAX_SYNC_FILE_SIZE` (64 MB) ab.
+  Wirkt mit dem nächsten App-Release.
+
+**F04, F05, F07, F08 — [OFFEN]** (Bilder als Base64/Größe, Export, Links, Vault-Bilder).
 
 Nebenbefund: Das Plugin-Repo hat kein `tsconfig.json`; `npm run typecheck` gibt nur die tsc-Hilfe aus und hat nie
 geprüft. Ebenso offen: `clipboard-read` wird vom Host verweigert → Excalidraws Kontextmenü „Einfügen“ vermutlich
@@ -224,4 +244,4 @@ wirkungslos (⌘V geht über das paste-Ereignis und funktioniert).
 
 ## Status
 
-Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 im Plugin 0.2.2 umgesetzt und getestet, nicht committet/released (07.10.2026).
+Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release) (07.10.2026).
