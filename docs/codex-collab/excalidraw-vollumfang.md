@@ -255,7 +255,25 @@ getestet (dev-signiertes 0.3.0, Bundle-Bytes gegen den Store verglichen):
 - Nebenbefund (App): `plugin:uninstall` wenige Sekunden nach dem Start → „Renderer-Beitrag ließ sich nicht sauber
   entladen — Neustart erforderlich“; nach 30 s Wartezeit sauber. Wettlauf mit der Aktivierung, nicht untersucht.
 
-**F04, F07, F08 — [OFFEN]** (Bilder als Base64/Größe, Links, Vault-Bilder).
+**F07 Links — [ADRESSIERT] Plugin 0.5.0 + App (Plugin-API 0.2.2)** (07.10.2026, Nutzerfreigabe „mach als Nächstes
+die Links in Zeichnungen“):
+- Plugin bricht JEDEN Link-Klick ab (`onLinkOpen` → `preventDefault`). Vorher: externe Links tot (window.open
+  verweigert), „lokale“ (`/…`) navigierten per `window.open(…, '_self')` das ganze App-Fenster weg.
+- Element-Links mit festem Format `#element=<id>` (`generateLinkForSelection`) → `scrollToContent` im Plugin.
+  Excalidraws Standard hing `?element=` an die Seitenadresse (Dev localhost vs. App file:// → fremd).
+- Alles andere geht an die neue optionale Host-Funktion `openLink` (API 0.2.2, additiv; `npm run build:signer`).
+  Regeln pur + getestet in `app/src/shared/pluginLink.ts`: Wikilink/Vault-Pfad → `findNoteForWikilink`, sonst
+  `resolvePluginFileLink`; `http(s)`/`mailto` → bestehendes `open-external` (gleiche Protokoll-Allowlist);
+  `www.…` → https; andere Schemata und `..` → abgelehnt. Wirkt nur bei `navigator.userActivation.isActive`.
+  Keine Sicherheitsgrenze (Renderer-Plugins teilen den Realm), sondern vorhersagbares Verhalten.
+- Ergebnis im Plugin als Hinweis (Toast): „Ziel nicht gefunden: …“ / „Dieser Link wird nicht geöffnet: …“;
+  auf älteren Hosts „braucht eine neuere Version“.
+- Geprüft in der Dev-App (echte Klicks auf die Link-Icons): `file:///etc/hosts` → abgelehnt, `/Projekte/gibtsnicht`
+  → nicht gefunden (App-Adresse unverändert), `#element=n` → Ansicht zentriert das Element, `[[00 - Start hier]]`
+  → Notiz-Tab öffnet, `https://example.org` → Chrome vorn. Typen: `openExternal` liefert `Promise<boolean>`
+  (Typ war fälschlich `void`). Nicht geprüft: Abschnitts-Sprung (`#Abschnitt`) — die Notiz öffnet, ohne zu springen.
+
+**F04, F08 — [OFFEN]** (Bilder als Base64/Größe, Vault-Bilder).
 
 Nebenbefund: Das Plugin-Repo hat kein `tsconfig.json`; `npm run typecheck` gibt nur die tsc-Hilfe aus und hat nie
 geprüft. Ebenso offen: `clipboard-read` wird vom Host verweigert → Excalidraws Kontextmenü „Einfügen“ vermutlich
@@ -263,4 +281,4 @@ wirkungslos (⌘V geht über das paste-Ereignis und funktioniert).
 
 ## Status
 
-Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export als Plugin 0.4.0 + Zwischenablage-Freigabe (App), getestet, nicht committet (07.10.2026).
+Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export released (Plugin v0.4.0, App `ab91441a`). Links als Plugin 0.5.0 + App (API 0.2.2), getestet, nicht committet (07.10.2026).

@@ -202,6 +202,39 @@ describe('ExternalRendererRegistry — Laden + Staging (F06/F11)', () => {
   })
 })
 
+describe('ExternalRendererRegistry — openLink (API 0.2.2, Codex F07)', () => {
+  const captureHost = (plugins: FakePlugin[]): { get: () => PluginRendererHost | null } => {
+    let captured: PluginRendererHost | null = null
+    plugins[0].module = {
+      id: 'demo',
+      activate: (h: PluginRendererHost) => {
+        captured = h
+        h.registerFileEditor({ editorId: 'draw', mount: () => () => {} })
+      },
+    }
+    return { get: () => captured }
+  }
+
+  it('reicht den Link an die Env weiter und gibt deren Ergebnis zurück', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'] }]
+    const { env } = makeEnv(plugins)
+    const opened: string[] = []
+    env.openLink = async (link) => { opened.push(link); return 'opened' }
+    const host = captureHost(plugins)
+    await new ExternalRendererRegistry(env).sync()
+    expect(await host.get()!.openLink!('[[Plan]]')).toBe('opened')
+    expect(opened).toEqual(['[[Plan]]'])
+  })
+
+  it('ohne Navigations-Env: refused statt Wurf', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'] }]
+    const { env } = makeEnv(plugins)
+    const host = captureHost(plugins)
+    await new ExternalRendererRegistry(env).sync()
+    expect(await host.get()!.openLink!('https://example.org')).toBe('refused')
+  })
+})
+
 describe('ExternalRendererRegistry — Lifecycle (F10/§5.5)', () => {
   it('captured instanceId: vault-Calls gehen an die Lade-instanceId', async () => {
     const plugins: FakePlugin[] = [{ pluginId: 'demo', instanceId: 'i1', editorIds: ['draw'] }]

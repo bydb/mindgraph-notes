@@ -9,6 +9,41 @@
 import { useSyncExternalStore } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { ExternalRendererRegistry, type RendererLoaderEnv } from './rendererRegistry'
+import { useNotesStore } from '../../stores/notesStore'
+import { useTabStore } from '../../stores/tabStore'
+import { findNoteForWikilink, resolvePluginFileLink } from '../../utils/linkExtractor'
+import { classifyPluginLink } from '../../../shared/pluginLink'
+
+/**
+ * Link aus einem Renderer-Plugin öffnen (Excalidraw-Element-Links, Codex F07). Nur während einer Nutzeraktion:
+ * ohne Klick soll ein Plugin weder Notizen umschalten noch den Browser öffnen. Notizen über denselben Weg wie
+ * Wikilinks im Editor (Notiz → sonst Plugin-Datei), extern über `open-external` (http/https/mailto).
+ */
+async function openPluginLink(link: string): Promise<'opened' | 'not-found' | 'refused'> {
+  if (!navigator.userActivation?.isActive) return 'refused'
+  const target = classifyPluginLink(link)
+  if (target.kind === 'refused') return 'refused'
+  if (target.kind === 'external') {
+    return (await window.electronAPI.openExternal(target.url)) ? 'opened' : 'refused'
+  }
+  const { notes, fileTree, selectNote } = useNotesStore.getState()
+  const note = findNoteForWikilink(target.target, notes)
+  if (note) {
+    selectNote(note.id)
+    return 'opened'
+  }
+  const pluginFile = resolvePluginFileLink(target.target, fileTree)
+  if (pluginFile) {
+    useTabStore.getState().openPluginEditorTab(
+      pluginFile.pluginEditor.pluginId,
+      pluginFile.path,
+      pluginFile.pluginEditor.editorId,
+      pluginFile.name,
+    )
+    return 'opened'
+  }
+  return 'not-found'
+}
 
 function effectiveTheme(): 'light' | 'dark' {
   const t = useUIStore.getState().theme
@@ -41,6 +76,7 @@ const prodEnv: RendererLoaderEnv = {
     document.head.querySelector(`style[${STYLE_ATTR}="${CSS.escape(pluginId)}"]`)?.remove()
   },
   getTheme: effectiveTheme,
+  openLink: openPluginLink,
   onThemeChange: (cb) => {
     let last = effectiveTheme()
     const fire = (): void => {

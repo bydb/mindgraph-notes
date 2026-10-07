@@ -1343,7 +1343,8 @@ export interface ElectronAPI {
 
   // Update & External
   downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
-  openExternal: (url: string) => Promise<void>;
+  /** true = an die OS-Shell übergeben (nur http/https/mailto, siehe open-external in main/index.ts). */
+  openExternal: (url: string) => Promise<boolean>;
 
   // Email attachments
   emailSelectAttachments: () => Promise<ComposeAttachment[]>;

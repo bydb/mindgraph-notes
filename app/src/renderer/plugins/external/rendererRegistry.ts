@@ -46,6 +46,8 @@ export interface RendererLoaderEnv {
   removeStyles(pluginId: string): void
   getTheme(): 'light' | 'dark'
   onThemeChange(cb: (theme: 'light' | 'dark') => void): () => void
+  /** Link aus einem Plugin öffnen (API ≥0.2.2). Optional, damit Test-Envs ohne Navigation auskommen. */
+  openLink?(link: string): Promise<'opened' | 'not-found' | 'refused'>
 }
 
 /** Registrierungsfehler während `activate` (unbekannte/doppelte editorId) — vom generischen activate-Wurf
@@ -423,6 +425,7 @@ export class ExternalRendererRegistry {
         }
       },
       log: (...args) => console.log(`[plugin:${pluginId}]`, ...args),
+      openLink: (link) => (env.openLink ? env.openLink(link) : Promise.resolve('refused' as const)),
     }
     return { host, closeStaging: () => { stagingOpen = false } }
   }

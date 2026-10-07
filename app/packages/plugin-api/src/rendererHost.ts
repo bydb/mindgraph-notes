@@ -70,6 +70,13 @@ export interface PluginRendererHost {
    * einen Fallback-Chip (Dateiname + Öffnen im Editor-Tab).
    */
   registerFileEmbed?(opts: { editorId: string; mount: FileEmbedMount }): void
+  /**
+   * Link öffnen (API ≥0.2.2, optional — feature-detected aufrufen: `host.openLink?.(link)`). Der Host entscheidet:
+   * Wikilink/Vault-Pfad → Notiz bzw. Plugin-Datei öffnen, `http(s)`/`mailto` → System-Browser/Mailprogramm,
+   * alles andere → `refused`. Wirkt nur während einer Nutzeraktion (Klick) — ohne sie `refused`.
+   * Regeln: `shared/pluginLink.ts`.
+   */
+  openLink?(link: string): Promise<'opened' | 'not-found' | 'refused'>
   /** Komfort-Vault-Bridge (siehe `PluginRendererVault`). */
   readonly vault: PluginRendererVault
   /** Aktuelles Host-Theme (live — spiegelt spätere Wechsel wider). */
