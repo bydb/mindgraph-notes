@@ -312,4 +312,4 @@ wirkungslos (⌘V geht über das paste-Ereignis und funktioniert).
 
 ## Status
 
-Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export released (Plugin v0.4.0, App `ab91441a`). Links released (Plugin v0.5.0, App `c727876b`, API 0.2.2) — wirkt erst mit dem nächsten App-Release, ältere Hosts zeigen „braucht eine neuere Version“. F04 + F08 als Plugin 0.6.0 (ohne App-Änderung), getestet (08.10.2026).
+Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export released (Plugin v0.4.0, App `ab91441a`). Links released (Plugin v0.5.0, App `c727876b`, API 0.2.2) — wirkt erst mit dem nächsten App-Release, ältere Hosts zeigen „braucht eine neuere Version“. F04 und F08 released (Plugin v0.6.0, prod-signiert, ohne App-Änderung, 08.10.2026).
