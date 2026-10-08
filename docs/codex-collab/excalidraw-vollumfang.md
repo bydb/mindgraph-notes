@@ -273,7 +273,38 @@ die Links in Zeichnungen“):
   → Notiz-Tab öffnet, `https://example.org` → Chrome vorn. Typen: `openExternal` liefert `Promise<boolean>`
   (Typ war fälschlich `void`). Nicht geprüft: Abschnitts-Sprung (`#Abschnitt`) — die Notiz öffnet, ohne zu springen.
 
-**F04, F08 — [OFFEN]** (Bilder als Base64/Größe, Vault-Bilder).
+**F04 Bildgröße — [ADRESSIERT] Plugin 0.6.0** (08.10.2026, Nutzerfreigabe „mach F04 und F08“):
+- Base64 bleibt in der `.excalidraw` (portabel, Format wie excalidraw.com), wie von Codex vorgeschlagen.
+- `status: 'pending'` bleibt unangetastet: Excalidraw 0.18.1 liest den Bildstatus nur für den Fehler-Platzhalter
+  (`status === "error"`), nicht beim Laden, Rendern oder Exportieren. Nichts setzt `saved` voraus.
+- Gemessen: Excalidraw verkleinert auf 1440 px und lehnt danach > 4 MB je Bild ab; gleiche Bilder teilen einen
+  Eintrag (ID = SHA-1 des Inhalts); `serializeAsJSON(…, 'local')` nimmt nur Dateien nicht gelöschter Elemente.
+  Backups betreffen `.excalidraw` nicht (`backupMarkdownBeforeWrite` nur für `.md`).
+- Neu: Grenze für die GANZE Zeichnung, 20 MB Summe der dataURLs (Sync nimmt 64 MB je Datei, jedes Autosave
+  schreibt alles neu). Ein NEU hinzugekommenes Bild darüber wird wieder entfernt (`newElementWith isDeleted`,
+  `CaptureUpdateAction.NEVER`), Hinweis: „Bild nicht eingefügt: Die Bilder dieser Zeichnung wären zusammen
+  24,3 MB groß (Grenze 20 MB). …“. Bilder, die beim Öffnen schon drin waren, bleiben immer; geprüft wird in
+  jedem `onChange`, also auch nach Wiederholen (⇧⌘Z).
+- Geprüft in der Dev-App (dev-signiertes 0.6.0, echte Drags per CDP `Input.setInterceptDrags`): vier 3,3-MB-
+  Rauschbilder + ein kleines → 19,95 MB angenommen, fünftes abgelehnt, Datei unverändert; ⌘Z/⇧⌘Z bringt das
+  abgelehnte nicht zurück; Tab zu/auf lädt alle 5 Bilder; Inline-Embed zeigt Bilder (2 bzw. 5 `<image>`, 20-MB-
+  Zeichnung in 0,55 s). Nicht geprüft: PNG-/SVG-Export mit Bildern.
+- Nebenbefund (Excalidraw, nicht Plugin): Per Drop eingefügte Bilder bekommen keinen eigenen Undo-Schritt — ein
+  ⌘Z nimmt alle seit dem letzten anderen Schritt eingefügten Bilder zurück, ⇧⌘Z stellt sie wieder her. Gegenprobe
+  mit direktem Datei-Drop ohne Plugin-Code: gleiches Verhalten.
+
+**F08 Vault-Bilder — [ADRESSIERT, anders als vorgeschlagen] Plugin 0.6.0:**
+- Statt einer neuen Host-Dateiauswahl: Bild aus der Dateiliste der App auf die Zeichnung ziehen. Die Dateiliste
+  liefert den Vault-Pfad als `text/plain` (relativ), Excalidraw ignorierte das. Das Plugin fängt den Drop in der
+  Capture-Phase am eigenen Wrapper ab, liest die Bytes über `vault.readBytes` (seit API 0.2.0 Teil von
+  `vault.read`, keine neue Capability, kein App-Release nötig) und schickt sie als echte Datei über Excalidraws
+  normalen Drop-Weg (Verkleinern, 4-MB-Grenze, Platzierung an der Maus). Nur relative Pfade ohne Schema, ohne
+  führendes `/` und ohne `..`; die Grenze bleibt `validatePath` im Host.
+- Der Bild-Knopf (seit 0.2.1 OS-Dialog) erreicht Vault-Bilder ohnehin; der Drag ist der vault-eigene Weg.
+- Geprüft: `Bilder/testbild.png` aus der Dateiliste → Bildelement an der Drop-Stelle, `files` mit `image/png`.
+- Bekannt, Excalidraw-Verhalten: Ein PNG mit eingebetteter Szene ersetzt beim Drop die Zeichnung (wie beim Drop
+  aus dem Finder); per ⌘Z rückgängig.
+- Plugin-Typdeklaration um `readBytes?` ergänzt (F08-Hinweis „an die echte API angleichen“).
 
 Nebenbefund: Das Plugin-Repo hat kein `tsconfig.json`; `npm run typecheck` gibt nur die tsc-Hilfe aus und hat nie
 geprüft. Ebenso offen: `clipboard-read` wird vom Host verweigert → Excalidraws Kontextmenü „Einfügen“ vermutlich
@@ -281,4 +312,4 @@ wirkungslos (⌘V geht über das paste-Ereignis und funktioniert).
 
 ## Status
 
-Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export released (Plugin v0.4.0, App `ab91441a`). Links released (Plugin v0.5.0, App `c727876b`, API 0.2.2) — wirkt erst mit dem nächsten App-Release, ältere Hosts zeigen „braucht eine neuere Version“. Offen: F04, F08 (Bilder als Base64/Größe, Vault-Bilder).
+Runde 1: Schritt 1 released (App `5c8a742a`, Plugin v0.2.1). F10 released (Plugin v0.2.2). Kleine Punkte (Sprache, Menü, Bibliothek, Mermaid) als Plugin v0.3.0; `.excalidraw` im Sync (App, nächstes Release). Export released (Plugin v0.4.0, App `ab91441a`). Links released (Plugin v0.5.0, App `c727876b`, API 0.2.2) — wirkt erst mit dem nächsten App-Release, ältere Hosts zeigen „braucht eine neuere Version“. F04 + F08 als Plugin 0.6.0 (ohne App-Änderung), getestet (08.10.2026).
