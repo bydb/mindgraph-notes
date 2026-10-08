@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.36-beta] - 2026-10-08
+
+**Excalidraw-Zeichnungen werden jetzt synchronisiert, und Links in Zeichnungen öffnen Notizen und Webseiten.** Eine Skizze, die du am Laptop anlegst, ist damit auch auf deinen anderen Geräten. Ein Klick auf das Link-Symbol an einem Element öffnet die verlinkte Notiz, Zeichnung oder Webseite.
+
+### Hintergrund
+
+- **Sync:** Dateien mit der Endung `.excalidraw` wurden bisher vom Sync übergangen. Sehr große Zeichnungen (über 64 MB) bleiben wie alle großen Dateien lokal.
+- **Links:** Gilt für `[[Notiz]]`, Pfade im Vault, `https://…`, `www.…` und `mailto:`. Andere Adressen (z. B. `file:`) werden nicht geöffnet, die Zeichnung zeigt dann einen Hinweis. Dafür braucht es das Excalidraw-Plugin ab Version 0.5.0.
+- **Exportieren in die Zwischenablage:** Ein Bild aus dem Export-Dialog einer Zeichnung lässt sich jetzt in die Zwischenablage kopieren. Die App erlaubt dafür nur das Schreiben in die Zwischenablage, nicht das Lesen.
+- **Sprache in Plugins:** Plugins übernehmen die Sprache der App, Excalidraw zeigt seine Oberfläche damit auf Deutsch oder Englisch.
+- **Dateien ablegen:** Eine Notiz im Lesen-Modus fängt abgelegte Dateien nur noch in ihrer eigenen Vorschau ab. Vorher konnte sie in der geteilten Ansicht einen Drop in den Bereich daneben verschlucken.
+
 ## [0.11.35-beta] - 2026-10-06
 
 **Du kannst dem Petrol Agent jetzt antworten.** Unter dem Ergebnis eines Laufs steht eine Zeile „Antworten und weitermachen“: Schreib einen Nachtrag oder beantworte seine Frage, und der Agent arbeitet mit allem weiter, was er schon gelesen hat – du musst den Auftrag nicht neu starten.
