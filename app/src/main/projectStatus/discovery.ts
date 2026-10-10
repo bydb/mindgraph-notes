@@ -12,6 +12,7 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { GENERIC_STOPWORDS } from '../../shared/projectMatch'
+import { isAppInternalRealPath } from '../telegram/agent/tools/vaultPaths'
 import type {
   DiscoveredProject,
   ProjectStatusMarker,
@@ -352,6 +353,9 @@ export async function discoverProjects(
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
     const folderAbs = path.join(projectsAbs, entry.name)
+    // Codex F26: Projekte im internen App-Ordner (auch per Symlink oder über einen
+    // Projekt-Wurzelordner darin) werden nie entdeckt — sonst läse project_ask dort Quellen.
+    if (await isAppInternalRealPath(vaultPath, folderAbs).catch(() => true)) continue
     const statusFile = path.join(folderAbs, '_STATUS.md')
 
     let statusContent: string

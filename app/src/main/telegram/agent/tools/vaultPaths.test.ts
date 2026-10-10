@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
-import { resolveInVaultSafe, ensureAbsInVaultSafe } from './vaultPaths'
+import { resolveInVaultSafe, ensureAbsInVaultSafe, isAppInternalRealPath } from './vaultPaths'
 
 let base: string
 let vault: string
@@ -133,5 +133,20 @@ describe('resolveInVaultSafe — .mindgraph gesperrt', () => {
     expect(await resolveInVaultSafe(vault, 'notiz.md')).toBe(path.join(vaultReal, 'notiz.md'))
     expect(await resolveInVaultSafe(vault, '.trash/alt.md')).toBe(path.join(vaultReal, '.trash', 'alt.md'))
     expect(await resolveInVaultSafe(vault, 'ordner/mindgraph-notizen.md')).toBe(path.join(vaultReal, 'ordner', 'mindgraph-notizen.md'))
+  })
+})
+
+describe('isAppInternalRealPath (Zielordner, Projektordner)', () => {
+  it('erkennt .mindgraph direkt, in anderer Schreibweise und per Symlink', async () => {
+    await fs.mkdir(path.join(vault, '.mindgraph', 'sub'), { recursive: true })
+    await fs.symlink(path.join(vault, '.mindgraph'), path.join(vault, 'tarnung'))
+    expect(await isAppInternalRealPath(vault, path.join(vault, '.mindgraph'))).toBe(true)
+    expect(await isAppInternalRealPath(vault, path.join(vault, '.MindGraph', 'sub'))).toBe(true)
+    expect(await isAppInternalRealPath(vault, path.join(vault, 'tarnung', 'sub'))).toBe(true)
+  })
+
+  it('normale Ordner sind nicht intern', async () => {
+    expect(await isAppInternalRealPath(vault, path.join(vault, 'ordner'))).toBe(false)
+    expect(await isAppInternalRealPath(vault, vault)).toBe(false)
   })
 })

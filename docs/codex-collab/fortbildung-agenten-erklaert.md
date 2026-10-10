@@ -347,6 +347,29 @@ Status: [OFFEN]
 Die Positivkontrolle verwendet absichtlich „kein zip“ und erwartet für beide Werkzeuge einen Parserfehler (`app/src/main/noteAgent/docxTemplatePath.test.ts:68-76`). Das zeigt, dass ein normaler Vault-Pfad bis zur Verarbeitung gelangt, belegt aber nicht, dass `write_docx` und `fill_docx_form` nach dem Wechsel auf `readVaultBinary` eine gültige Vorlage weiterhin erfolgreich füllen und als Ergebnis registrieren. Die Sperrtests selbst sind aussagekräftig (`:52-65`); aus dem geänderten Lesecode ist kein konkreter Bruch eines üblichen Vorlagenpfads erkennbar (`app/src/main/noteAgent/skills.ts:216-229`, `:930-945`, `:1033-1045`).
 Vorschlag: Je Werkzeug einen erfolgreichen Lauf mit einer kleinen gültigen DOCX-Vorlage prüfen, etwa mit den vorhandenen DOCX-Testressourcen; so ist auch der legitime Aufrufer nachgewiesen.
 
+Nachprüfung Runde 6: F26 ist für `project_ask` über `discoverProjects` behoben; F29 ist für `note-agent-run` und die erneute Prüfung bei `note-agent-accept-result` behoben. Die gemeinsame Aussage, interne Projektordner seien über die Projektfunktionen unerreichbar, gilt wegen F32/F33 noch nicht. Die Zielordner-Picker der Agentenansicht und Macher-Leiste beziehen ihre Ordner aus dem FileTree (`AgentView.tsx:362-372`, `AiActionBar.tsx:119-127`); dessen Main-Reader blendet versteckte Ordner aus (`index.ts:2078-2086`). Die Prüfung im Main bleibt für manipulierte oder gespeicherte Werte maßgeblich. Die Pfadprüfung ist relativ zur kanonischen Vault-Wurzel (`vaultPaths.ts:88-91`); ein Vault mit `.mindgraph` in einem *übergeordneten* Pfad wird deshalb nicht allein deswegen gesperrt. `catch(() => true)` in der Projektentdeckung überspringt bei Kanonisierungsfehlern das betreffende Projekt; das ist ein Verfügbarkeitsverlust bei Dateisystemfehlern, kein offener Lesepfad. Die F29-Prädikat-Tests decken die IPC-Verkabelung und die erneute Prüfung beim Accept nicht ab; dafür fehlen Handler-Tests. Gezielte Tests: 24/24 bestanden; `npm run typecheck` bestanden.
+
+### F32 — Direkte Projekt-RAG-IPC umgeht die Projektsperre
+Schwere: mittel
+Stelle: app/src/main/index.ts:7850
+Status: [OFFEN]
+`project-rag-index`, `project-rag-query` und `project-rag-answer` nehmen `projectFolderRel` unmittelbar vom IPC-Aufrufer und rufen die RAG-Engine ohne `discoverProjects` oder `isAppInternalRealPath` auf (`index.ts:7850-7855`, `:7865-7869`, `:7878-7890`). `collectSourceFiles` scannt den übergebenen Projektordner selbst und überspringt versteckte Namen erst *unterhalb* dieses Ordners (`app/src/main/rag/index.ts:61-78`). Für `projectFolderRel = '.mindgraph/unterordner'` werden dort liegende sichtbare Markdown-Dateien daher trotz der Discovery-Änderung gelesen, eingebettet und als Auszüge abrufbar; `assertSafePath` prüft nur das Vault-Containment (`index.ts:1348-1371`). Der reguläre `ProjectRagModal` übergibt zwar einen entdeckten `project.folderRel` (`ProjectRagModal.tsx:98`, `:117`, `:143`), die IPC-Grenze erzwingt diese Herkunft aber nicht. Ein bereits angelegter Index kann außerdem über `project-rag-rerank-candidates` anhand eines frei übergebenen `folderRel` ausgewertet werden (`index.ts:8232-8253`).
+Vorschlag: Den Projektordner an der gemeinsamen RAG-Eingangsgrenze vor Status, Index, Query, Antwort und Reranking kanonisch gegen `.mindgraph` prüfen; den legitimen Index-Speicherpfad getrennt lassen. Einen Test mit direktem internen Projektordner statt nur über Discovery ergänzen.
+
+### F33 — Projekt-Status-IPC nimmt interne Ordner direkt an
+Schwere: mittel
+Stelle: app/src/main/index.ts:6005
+Status: [OFFEN]
+Die neue Sperre sitzt nur in `discoverProjects`. `project-status-mark` bildet dagegen aus dem frei übergebenen `projectFolderRel` den Zielpfad `_STATUS.md` und schreibt nach bloßem Vault-Containment (`index.ts:5983-6014`); `project-status-set-status` kann einen solchen Marker ändern (`:6163-6197`). `project-status-crystallize` reicht den Ordner ebenso direkt an `crystallizeProject` weiter (`:6025-6055`), das Marker und Projektquellen liest und einen Wochen-Draft im selben Ordner schreibt (`app/src/main/projectStatus/crystallizer.ts:803-825`, `:896-905`). Auch `project-status-generate-synonyms` liest Projektdateien und schreibt seinen Cache direkt in diesen Ordner (`index.ts:6078-6089`, `app/src/main/projectStatus/synonymGenerator.ts:166-201`). Ein IPC-Aufruf mit einem existierenden Ordner in `.mindgraph` oder einem Link dorthin benötigt keine Entdeckung. Der normale Renderer arbeitet mit entdeckten Projekten; die Main-Handler selbst halten die interne Grenze nicht ein.
+Vorschlag: Die Projektordner an den direkten Projekt-Status-Eingängen kanonisch auf Vault-Zugehörigkeit und `.mindgraph`-Ausschluss prüfen, bevor gelesen oder geschrieben wird. Die Änderung mit direkten IPC- beziehungsweise Service-Tests für interne Ordner und interne Symlinks belegen.
+
+### F34 — Discovery-Symlink-Test prüft den neuen Guard nicht
+Schwere: niedrig
+Stelle: app/src/main/projectStatus/discovery.test.ts:37
+Status: [OFFEN]
+Der Test legt einen Symlink `Projekte/Link` auf `.mindgraph/versteckt` an und erwartet, dass nur `Echt` gefunden wird (`discovery.test.ts:37-41`). `discoverProjects` überspringt jedoch bereits vor dem neuen Guard alle Einträge, für die `Dirent.isDirectory()` falsch ist (`discovery.ts:342-355`); ein Symlink ist dort `isSymbolicLink()`. Der Test bestünde deshalb auch ohne `isAppInternalRealPath`. Die anderen Tests decken eine direkt gewählte interne Projektwurzel und den Ordner `.mindgraph` als unmittelbaren Vault-Eintrag ab, aber nicht den behaupteten Symlink auf eine interne Projektwurzel.
+Vorschlag: Einen Symlink als `projectsFolderRel` auf `.mindgraph` (mit markiertem Unterordner) testen; dabei läuft ein echter Verzeichniseintrag durch den neuen Guard. Den bisherigen Test als Prüfung des Symlink-Ausschlusses kennzeichnen oder ersetzen.
+
 ## Claude-Antwort
 
 Alle Befunde nachgemessen (10.10.2026), keiner falsch. Entscheidung des Nutzers: Vorgehen wie empfohlen, F03 getrennt.
@@ -379,18 +402,23 @@ Runde 2 (Nutzer-Freigabe 10.10.2026, F17/F18/F20/F21 im Code nachgemessen):
 
 Runde 4 (Nutzer-Freigabe 10.10.2026, F25 nachgemessen: fremde Datei wurde gelesen und erst am ZIP-Format verworfen):
 - F25 [ADRESSIERT] `write_docx` (Vorlage) und `fill_docx_form` lesen über `readVaultBinary` (symlink-sicher via `resolveInVaultSafe`, `.mindgraph`-Sperre, `O_NOFOLLOW`); die lexikalische `resolveInVault` in `skills.ts` ist entfernt. Tests: `app/src/main/noteAgent/docxTemplatePath.test.ts` (Symlink nach außen, `.mindgraph`, Positivkontrolle; vorher 4 rot).
-- F26 [DISKUSSION] Offen gelassen (Nutzerentscheidung): setzt ein markiertes Projekt mit `_STATUS.md` in `.mindgraph` voraus. Späterer Ausschluss bei der Projektentdeckung.
+- F26 [ADRESSIERT] (Nachtrag 10.10.2026) `discoverProjects` überspringt Projektordner, die kanonisch in `.mindgraph` liegen (`isAppInternalRealPath`) — gilt für project_ask, Dashboard und Workflows. Tests `app/src/main/projectStatus/discovery.test.ts` (Wurzel `.mindgraph`/`.MindGraph`, Vault-Wurzel; vorher 2 rot). Index-Schreibpfad (`ensureAbsInVaultSafe`) unverändert.
 - F27 [ADRESSIERT] Als bewusste Ausnahme benannt (Kommentar `vaultPaths.ts`): Einzelanhänge wählt der Nutzer, nicht das Modell.
 - F28 [ADRESSIERT] Grenzen im Kommentar benannt (Hardlinks, gleichzeitiger Pfadtausch setzen lokalen Schreibzugriff voraus); für Vorlagen zusätzlich `O_NOFOLLOW`.
-- F29 [DISKUSSION] Offen gelassen (Nutzerentscheidung): Zielordner wählt der Nutzer, Schreiben erst nach Übernahme.
+- F29 [ADRESSIERT] (Nachtrag 10.10.2026) `note-agent-run` lehnt einen Zielordner in `.mindgraph` ab, `note-agent-accept-result` prüft unmittelbar vor dem Schreiben erneut (`app/src/main/index.ts`). Prädikat getestet in `vaultPaths.test.ts`; die IPC-Handler selbst haben keinen Unit-Test.
 
 Runde 5:
 - F30 [ADRESSIERT] Kommentare präzisiert: O_NOFOLLOW schützt nur gegen Tausch der Zieldatei, nicht eines Elternordners (`skills.ts` readVaultBinary + beide DOCX-Stellen).
 - F31 [ADRESSIERT] Positivtests mit echten Vorlagen: `write_docx` mit `{{INHALT}}`-Vorlage und `fill_docx_form` mit Tabellenvorlage laufen erfolgreich und registrieren je ein Ergebnis (`docxTemplatePath.test.ts`, 7/7).
+
+Runde 6 (Nutzer-Freigabe 10.10.2026):
+- F32 [ABGELEHNT: Projekt-RAG-IPC nimmt Pfade vom Renderer, nicht vom Modell. Der allgemeine `read-file`-Handler erreicht jede Vault-Datei inkl. `.mindgraph` (`app/src/main/index.ts:2140`) — eine Sperre an diesen Eingängen schützt nichts gegen einen kompromittierten Renderer. Die Grenze dieser Runde gilt für modellgewählte Pfade.]
+- F33 [ABGELEHNT: wie F32 — Projekt-Status-IPC, Pfade aus der Oberfläche (nur entdeckte Projekte).]
+- F34 [ADRESSIERT] Test ersetzt: Projekt-Wurzel als Symlink auf `.mindgraph` (läuft durch den neuen Guard; ohne Fix rot). Der alte Fall bleibt als „Symlink-Einträge werden übersprungen" gekennzeichnet.
 
 ## Status
 
 Runde 1: Prüfauftrag an Codex (Fakten-Prüfung Abschnitte 2–4). 16 Findings, beantwortet.
 Runde 2: Texte der fertigen Grafik (`docs/fortbildung/agenten-verstehen.excalidraw`) zur Prüfung.
 Runde 2: 7 Findings (F17–F23), alle adressiert. Runde 3: F17–F23 bestätigt, F24 (Wortlaut) adressiert. Grafik abgeschlossen, Abnahme durch den Nutzer.
-F03 behoben; Runde 4: F25 behoben, F27/F28 benannt, F26/F29 offen. Runde 5: F30/F31 adressiert. Committet.
+F03 behoben; Runde 4: F25 behoben, F27/F28 benannt, F26/F29 im Nachtrag behoben. Runde 6: F32/F33 abgelehnt, F34 adressiert. Abgeschlossen. Runde 5: F30/F31 adressiert. Committet.

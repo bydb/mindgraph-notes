@@ -217,6 +217,7 @@ import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
 import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, agentMemoryStatus, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
+import { isAppInternalRealPath } from './telegram/agent/tools/vaultPaths'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
 import { supportsNativeToolCalls, isNonGenerativeModel } from '../shared/modelCompatibility'
 import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
@@ -4615,6 +4616,11 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     } catch {
       return { success: false, error: `Zielordner nicht erlaubt: ${params.targetFolderRel}` }
     }
+    // Codex F29: der interne App-Ordner ist kein Zielordner — sonst listet
+    // list_target_folder dort Dateinamen, und die Übernahme schriebe hinein.
+    if (await isAppInternalRealPath(params.vaultPath, targetAbs)) {
+      return { success: false, error: `Zielordner nicht erlaubt (interner App-Ordner): ${params.targetFolderRel}` }
+    }
     const targetStat = await fs.stat(targetAbs).catch(() => null)
     if (!targetStat?.isDirectory()) {
       return { success: false, error: `Zielordner nicht gefunden: ${params.targetFolderRel}` }
@@ -5097,6 +5103,9 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     // Übernahme erneut prüfen — fängt einen zwischen Run-Start und Accept
     // untergeschobenen Symlink ab.
     const targetDir = await assertSafePath(run.targetFolderAbs, 'note-agent-accept-target')
+    if (await isAppInternalRealPath(run.vaultPath, targetDir)) {
+      throw new Error('Zielordner liegt im internen App-Ordner .mindgraph')
+    }
     // R04: Name atomar reservieren (exklusives Create) statt check-then-write.
     const { finalName, destPath } = await reserveFreeName(targetDir, entry.suggestedName)
     reservedDest = destPath

@@ -72,10 +72,23 @@ export async function resolveInVaultSafe(vaultRoot: string, relativePath: string
  * assertSafePath und sind hier nicht gemeint.
  */
 function assertNotAppInternal(candidate: string, rootReal: string): void {
-  const segments = path.relative(rootReal, candidate).split(path.sep)
-  if (segments.some(seg => seg.toLowerCase() === '.mindgraph')) {
+  if (isAppInternalPath(rootReal, candidate)) {
     throw new Error('Pfad liegt im internen App-Ordner .mindgraph und ist für Werkzeuge gesperrt.')
   }
+}
+
+/** Liegt `candidate` (absolut) unterhalb von `<rootReal>/…/.mindgraph`? Rein lexikalisch —
+ *  für einen Symlink-sicheren Befund beide Seiten vorher per realpath kanonisieren. */
+export function isAppInternalPath(rootReal: string, candidate: string): boolean {
+  return path.relative(rootReal, candidate).split(path.sep).some(seg => seg.toLowerCase() === '.mindgraph')
+}
+
+/** Symlink-sichere Variante: kanonisiert Vault-Root und Pfad (Zielordner, Projektordner),
+ *  bevor geprüft wird — ein Vault-interner Link auf `.mindgraph` zählt als intern. */
+export async function isAppInternalRealPath(vaultRoot: string, absPath: string): Promise<boolean> {
+  const rootReal = await fs.realpath(path.resolve(vaultRoot))
+  const real = await canonicalizeDeepestExisting(path.resolve(absPath))
+  return isAppInternalPath(rootReal, real)
 }
 
 /**
