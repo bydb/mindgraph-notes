@@ -71,7 +71,7 @@ Der Ablauf steht in `.claude/commands/pruefen.md`. Kurzform der Mechanik:
 scripts/pruefgrenze.sh vorher docs/codex-collab/<thema>.md   # Vorzustand festhalten
 herdr pane split --current --direction right --cwd "$PWD" --no-focus
 herdr agent start pruefer --kind codex --pane <pane-id> --timeout 120000 \
-  -- --sandbox workspace-write --ask-for-approval never
+  -- --no-daemon --sandbox workspace-write --ask-for-approval never
 herdr agent prompt pruefer "<auftrag mit pfad der aufgabendatei>" --wait --timeout 1800000
 scripts/pruefgrenze.sh nachher docs/codex-collab/<thema>.md  # Grenze + Ergebnis prüfen
 sed -n '/^## Codex-Findings/,/^## Claude-Antwort/p' docs/codex-collab/<thema>.md
