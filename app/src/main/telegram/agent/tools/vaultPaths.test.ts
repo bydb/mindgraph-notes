@@ -96,3 +96,42 @@ describe('ensureAbsInVaultSafe', () => {
     await expect(ensureAbsInVaultSafe(vault, path.join(vault, 'extern-link', 'geheim.md'))).rejects.toThrow(/Symlink/)
   })
 })
+
+// Codex F03 (Fortbildungs-Review 10.10.2026): `.mindgraph` ist interner App-Speicher
+// (Entwürfe anderer Läufe, Backups, Indizes) — kein Agent-Werkzeug darf dort lesen
+// oder schreiben, auch nicht über einen Symlink oder eine andere Schreibweise.
+describe('resolveInVaultSafe — .mindgraph gesperrt', () => {
+  beforeEach(async () => {
+    await fs.mkdir(path.join(vault, '.mindgraph', 'agent-staging', 'run-1'), { recursive: true })
+    await fs.writeFile(path.join(vault, '.mindgraph', 'agent-staging', 'run-1', 'entwurf.md'), 'intern', 'utf-8')
+  })
+
+  it('direkter Pfad wird abgewiesen', async () => {
+    await expect(resolveInVaultSafe(vault, '.mindgraph/agent-staging/run-1/entwurf.md')).rejects.toThrow(/\.mindgraph/)
+  })
+
+  it('Umweg über ../ wird abgewiesen', async () => {
+    await expect(resolveInVaultSafe(vault, 'ordner/../.mindgraph/agent-staging/run-1/entwurf.md')).rejects.toThrow(/\.mindgraph/)
+  })
+
+  it('andere Schreibweise wird abgewiesen', async () => {
+    await expect(resolveInVaultSafe(vault, '.MindGraph/agent-staging/run-1/entwurf.md')).rejects.toThrow(/\.mindgraph/)
+  })
+
+  it('noch nicht existierende Datei darin (note_create) wird abgewiesen', async () => {
+    await expect(resolveInVaultSafe(vault, '.mindgraph/neu.md')).rejects.toThrow(/\.mindgraph/)
+  })
+
+  it('vault-interner Symlink auf .mindgraph wird abgewiesen', async () => {
+    await fs.symlink(path.join(vault, '.mindgraph'), path.join(vault, 'harmlos'))
+    await expect(resolveInVaultSafe(vault, 'harmlos/agent-staging/run-1/entwurf.md')).rejects.toThrow(/\.mindgraph/)
+  })
+
+  it('normale Notizen und andere Punkt-Ordner bleiben erreichbar', async () => {
+    await fs.mkdir(path.join(vault, '.trash'), { recursive: true })
+    await fs.writeFile(path.join(vault, '.trash', 'alt.md'), 'alt', 'utf-8')
+    expect(await resolveInVaultSafe(vault, 'notiz.md')).toBe(path.join(vaultReal, 'notiz.md'))
+    expect(await resolveInVaultSafe(vault, '.trash/alt.md')).toBe(path.join(vaultReal, '.trash', 'alt.md'))
+    expect(await resolveInVaultSafe(vault, 'ordner/mindgraph-notizen.md')).toBe(path.join(vaultReal, 'ordner', 'mindgraph-notizen.md'))
+  })
+})

@@ -51,9 +51,31 @@ export async function resolveInVaultSafe(vaultRoot: string, relativePath: string
   const rootReal = await fs.realpath(path.resolve(vaultRoot))
   const resolved = path.resolve(rootReal, relativePath)
   assertContained(resolved, rootReal, '')
+  assertNotAppInternal(resolved, rootReal)
   const real = await canonicalizeDeepestExisting(resolved)
   assertContained(real, rootReal, ' (Symlink)')
+  assertNotAppInternal(real, rootReal)
   return real
+}
+
+/**
+ * `.mindgraph` ist interner App-Speicher (Entwürfe anderer Agent-Läufe, Backups,
+ * Indizes): Pfade, die das MODELL wählt, dürfen nicht dorthin — vorher konnte
+ * note_read dort Markdown lesen (Codex F03, 10.10.2026). Geprüft wird vor UND nach
+ * der Symlink-Auflösung, ohne Groß-/Kleinschreibung (macOS-Dateisysteme sind meist
+ * case-insensitiv: `.MindGraph` ist derselbe Ordner).
+ *
+ * Grenzen (Codex F27/F28, bewusst): Hardlinks erkennt realpath nicht, und gegen
+ * einen gleichzeitigen Pfadtausch durch einen anderen lokalen Prozess schützt eine
+ * Prüfung vor dem Zugriff nicht — beides setzt Schreibzugriff auf den Rechner voraus.
+ * Einzelanhänge und Zielordner wählt der NUTZER, nicht das Modell; sie laufen über
+ * assertSafePath und sind hier nicht gemeint.
+ */
+function assertNotAppInternal(candidate: string, rootReal: string): void {
+  const segments = path.relative(rootReal, candidate).split(path.sep)
+  if (segments.some(seg => seg.toLowerCase() === '.mindgraph')) {
+    throw new Error('Pfad liegt im internen App-Ordner .mindgraph und ist für Werkzeuge gesperrt.')
+  }
 }
 
 /**

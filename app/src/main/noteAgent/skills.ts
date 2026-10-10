@@ -204,28 +204,16 @@ function parseRowFilters(raw: unknown): RowFilter[] | string {
   return out
 }
 
-// Vault-relative Pfadauflösung mit Traversal-Schutz — gleiche Logik wie
-// resolveInVault in telegram/agent/tools/notes.ts (dort nicht exportiert).
-function resolveInVault(vaultRoot: string, relativePath: string): string {
-  if (path.isAbsolute(relativePath)) {
-    throw new Error('Absoluter Pfad nicht erlaubt — bitte Vault-relativen Pfad nutzen.')
-  }
-  const resolved = path.resolve(vaultRoot, relativePath)
-  const rootResolved = path.resolve(vaultRoot)
-  if (resolved !== rootResolved && !resolved.startsWith(rootResolved + path.sep)) {
-    throw new Error('Pfad liegt außerhalb des Vaults.')
-  }
-  return resolved
-}
-
 const MAX_FORM_TEMPLATE_BYTES = 10 * 1024 * 1024
 const MAX_PPTX_TEMPLATE_BYTES = 50 * 1024 * 1024
 
 /**
  * Liest eine Binärdatei aus dem Vault für write_pptx/inspect_pptx_template:
  * symlink-sicher (realpath gegen den realen Vault-Root, Codex F10), nie aus
- * .mindgraph, und Größe/Art an der tatsächlich geöffneten Datei geprüft —
- * O_NOFOLLOW schließt einen zwischen Prüfung und Öffnen untergeschobenen Link aus.
+ * .mindgraph, und Größe/Art an der tatsächlich geöffneten Datei geprüft.
+ * O_NOFOLLOW verhindert nur, dass die ZIELDATEI selbst zwischen Prüfung und Öffnen
+ * gegen einen Symlink getauscht wird — einen getauschten Elternordner fängt es nicht
+ * (Codex F30). Das setzt einen gleichzeitig schreibenden lokalen Prozess voraus.
  */
 async function readVaultBinary(vaultPath: string, relPath: string, maxBytes: number): Promise<Buffer> {
   const rel = relPath.replace(/\\/g, '/').replace(/^\.\//, '')
@@ -943,11 +931,8 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         }
         let templateBytes: Buffer
         try {
-          const abs = resolveInVault(ctx.run.vaultPath, templateRel)
-          const st = await fs.stat(abs)
-          if (!st.isFile()) return err(`Vorlage "${templateRel}" ist keine Datei`)
-          if (st.size > MAX_FORM_TEMPLATE_BYTES) return err(`Vorlage ist zu groß (${Math.round(st.size / 1024 / 1024)} MB, max. 10 MB)`)
-          templateBytes = await fs.readFile(abs)
+          // Symlink-sicher und nie aus .mindgraph (Codex F25); Grenzen siehe readVaultBinary.
+          templateBytes = await readVaultBinary(ctx.run.vaultPath, templateRel, MAX_FORM_TEMPLATE_BYTES)
         } catch (e) {
           return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
         }
@@ -1049,11 +1034,8 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
 
       let templateBytes: Buffer
       try {
-        const abs = resolveInVault(ctx.run.vaultPath, templateRel)
-        const st = await fs.stat(abs)
-        if (!st.isFile()) return err(`Vorlage "${templateRel}" ist keine Datei`)
-        if (st.size > MAX_FORM_TEMPLATE_BYTES) return err(`Vorlage ist zu groß (${Math.round(st.size / 1024 / 1024)} MB, max. 10 MB)`)
-        templateBytes = await fs.readFile(abs)
+        // Symlink-sicher und nie aus .mindgraph (Codex F25); Grenzen siehe readVaultBinary.
+        templateBytes = await readVaultBinary(ctx.run.vaultPath, templateRel, MAX_FORM_TEMPLATE_BYTES)
       } catch (e) {
         return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
       }
