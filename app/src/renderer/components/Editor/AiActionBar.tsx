@@ -8,7 +8,7 @@ import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel, type AgentPreviewResponse } from '../Agent/AgentRunPanel'
 import { ShellAccessToggle } from '../Agent/ShellAccessToggle'
 import { ComputerAccessToggle } from '../Agent/ComputerAccessToggle'
-import { useNoteAgentStore, type AgentRunUiState } from '../../stores/noteAgentStore'
+import { useNoteAgentStore, type AcceptOpenTarget, type AgentRunUiState } from '../../stores/noteAgentStore'
 import { HumanIcon } from '../Shared/HumanIcon'
 import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRow'
 import { diffStats, type DiffOp } from '../../utils/blockDiff'
@@ -73,7 +73,7 @@ interface Props {
   agentRun: AgentRunUiState
   onAgentRun: (instruction: string, opts: { webResearch: boolean; shellAccess?: boolean; computerAccess?: boolean; instructionMs?: number }) => void | Promise<void>
   onAgentCancel: () => void
-  onAgentAccept: (resultId: string, openAfter?: boolean) => void
+  onAgentAccept: (resultId: string, openAfter?: AcceptOpenTarget) => void
   onAgentDiscard: (resultId: string) => void
   // Vorschau der Staging-Datei vor Übernehmen/Verwerfen (read-only).
   onAgentPreview: (resultId: string) => Promise<AgentPreviewResponse>

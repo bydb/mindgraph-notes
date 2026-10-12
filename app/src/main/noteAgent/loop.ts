@@ -211,7 +211,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const attachments = getContextAttachmentInfos(run.senderId, run.attachmentIds)
 
   // Skill-Angebot nach Kontextlage filtern (Plan Entscheidung 4).
-  const allowed = new Set(['note_read', 'note_search', 'list_target_folder', 'write_xlsx', 'write_docx', 'write_note', 'write_html', 'write_edumap', 'inspect_pptx_template', 'write_pptx'])
+  const allowed = new Set(['note_read', 'note_search', 'list_target_folder', 'write_xlsx', 'write_docx', 'write_note', 'write_html', 'write_edumap', 'write_excalidraw', 'inspect_pptx_template', 'write_pptx'])
   if (run.shell && !run.web) {
     allowed.add('shell_execute')
     allowed.add('shell_stage_file')
@@ -250,10 +250,10 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // und die Recherche-Tools freischalten. write_html bleibt bewusst drin: der Skill
   // „Wissenschaftliche Webseite" verlangt es, und ohne das Tool lief write_note ↔ Fehler
   // ↔ write_note in eine Schleife (real mit kimi-k3 beobachtet). write_edumap fällt weg
-  // (eine Map hat keinen Platz für den Quellenblock); write_pptx bleibt — dort hängt
+  // (eine Map hat keinen Platz für den Quellenblock, ebenso write_excalidraw); write_pptx bleibt — dort hängt
   // die App eine Quellenfolie an (shared/pptxTemplate.ts, sources).
   if (run.web) {
-    for (const w of ['write_xlsx', 'write_docx', 'fill_docx_form', 'write_edumap']) allowed.delete(w)
+    for (const w of ['write_xlsx', 'write_docx', 'fill_docx_form', 'write_edumap', 'write_excalidraw']) allowed.delete(w)
     allowed.add('web_search')
     allowed.add('web_fetch')
   }
@@ -549,6 +549,10 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
     case 'write_pptx': {
       const n = Array.isArray(args.slides) ? args.slides.length : 0
       return `${pick('file_name')}${n ? ` (${n} Folien)` : ''}`
+    }
+    case 'write_excalidraw': {
+      const n = Array.isArray(args.branches) ? args.branches.length : 0
+      return `${pick('file_name')}${n ? ` (${n} Äste)` : ''}`
     }
     case 'inspect_pptx_template': return pick('template').split('/').pop() ?? ''
     case 'write_html':

@@ -64,6 +64,10 @@ describe('deriveActivityType', () => {
     expect(deriveActivityType(['note_read', 'write_note'])).toBe('summary')
   })
 
+  it('zählt einen reinen Mindmap-Lauf als Dokument, nicht als other (Excalidraw F09)', () => {
+    expect(deriveActivityType(['note_read', 'write_excalidraw'])).toBe('document')
+  })
+
   it('fällt auf other zurück statt zu raten', () => {
     expect(deriveActivityType(['note_search'])).toBe('other')
     expect(deriveActivityType([])).toBe('other')

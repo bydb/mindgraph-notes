@@ -47,15 +47,17 @@ const SUBMIT_KEYS = HAS_MAC_TOOLS ? '\u2318\u21A9' : 'Ctrl+Enter'
 // Verwaltung: ein Ordner (collect_table gibt es nur mit Ordner-Anhang). Beschaffung: zwei
 // Angebote. Arbeitsblatt: Web — die Arbeitsblatt-Skill bricht ohne web_search/web_fetch
 // ab. Wissensrecherche und Überblick brauchen nichts außer dem Vault — beide tragen im
-// Starter-Vault (Thema „Projekte“ kommt in allen vier vor, Codex F09).
-type ExampleIcon = 'table' | 'compare' | 'projects' | 'school' | 'links'
+// Starter-Vault (Thema „Projekte“ kommt in allen vier vor, Codex F09). Mindmap ebenso: sie
+// braucht nur Vault-Notizen; das Excalidraw-Plugin ist zum Ansehen nötig, nicht zum Erzeugen.
+type ExampleIcon = 'table' | 'compare' | 'projects' | 'school' | 'links' | 'mindmap'
 
 const EXAMPLES: Array<{ icon: ExampleIcon; title: TranslationKey; text: TranslationKey; docs: TranslationKey; result: TranslationKey; need: AgentExampleNeed }> = [
   { icon: 'table', title: 'agentCard.ex1Title', text: 'agentCard.ex1', docs: 'agentCard.ex1Docs', result: 'agentCard.ex1Result', need: 'folder' },
   { icon: 'compare', title: 'agentCard.ex2Title', text: 'agentCard.ex2', docs: 'agentCard.ex2Docs', result: 'agentCard.ex2Result', need: 'files2' },
   { icon: 'projects', title: 'agentCard.ex3Title', text: 'agentCard.ex3', docs: 'agentCard.ex3Docs', result: 'agentCard.ex3Result', need: 'none' },
   { icon: 'school', title: 'agentCard.ex4Title', text: 'agentCard.ex4', docs: 'agentCard.ex4Docs', result: 'agentCard.ex4Result', need: 'web' },
-  { icon: 'links', title: 'agentCard.ex5Title', text: 'agentCard.ex5', docs: 'agentCard.ex5Docs', result: 'agentCard.ex5Result', need: 'none' }
+  { icon: 'links', title: 'agentCard.ex5Title', text: 'agentCard.ex5', docs: 'agentCard.ex5Docs', result: 'agentCard.ex5Result', need: 'none' },
+  { icon: 'mindmap', title: 'agentCard.ex6Title', text: 'agentCard.ex6', docs: 'agentCard.ex6Docs', result: 'agentCard.ex6Result', need: 'none' }
 ]
 
 /** Kleine Symbole der Beispielkarten — Strichzeichnung wie die übrigen App-Icons. */
@@ -66,6 +68,7 @@ function ExampleGlyph({ icon }: { icon: ExampleIcon }) {
     case 'compare': return <svg {...common}><path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3 3 0 0 0 6 0z"/><path d="M19 7l-3 7a3 3 0 0 0 6 0z"/></svg>
     case 'projects': return <svg {...common}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M8 13h8M8 16h5"/></svg>
     case 'school': return <svg {...common}><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11v5c3 2 9 2 12 0v-5"/></svg>
+    case 'mindmap': return <svg {...common}><rect x="8.5" y="10" width="7" height="4" rx="1.5"/><rect x="2" y="3" width="5" height="3" rx="1"/><rect x="17" y="3" width="5" height="3" rx="1"/><rect x="17" y="18" width="5" height="3" rx="1"/><path d="M8.5 11L6 6M15.5 11L18 6M15.5 13l2.5 5"/></svg>
     case 'links': return <svg {...common}><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="8" r="2.5"/><circle cx="10" cy="18" r="2.5"/><path d="M8.3 7l7.3.7M7 8.3l2.2 7.4M16.3 10l-4.6 6"/></svg>
   }
 }

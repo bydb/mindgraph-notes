@@ -22240,6 +22240,9 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-bar-agent-preview-loading,
 .ai-bar-agent-preview-binary { font-size: 11px; color: var(--text-muted); }
 .ai-bar-agent-preview-truncated { font-size: 10px; color: var(--text-muted); margin-top: 4px; }
+.ai-bar-agent-preview-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.ai-bar-agent-card-hint { font-size: 11px; color: var(--text-muted); line-height: 1.4; }
+.ai-bar-agent-embed-line { user-select: all; font-size: 11px; color: var(--text-primary); }
 .ai-bar-agent-card-actions .ai-bar-agent-preview-btn { margin-right: auto; }
 
 /* Review-Phase: Provenienz-Kopf (Human → KI) + Block-Diff */

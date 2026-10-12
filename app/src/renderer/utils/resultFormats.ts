@@ -17,3 +17,26 @@ export function needsExternalApp(fileName: string): boolean {
   const lower = fileName.trim().toLowerCase()
   return FORMATS_NEEDING_EXTERNAL_APP.some(ext => lower.endsWith(ext))
 }
+
+// Formate, die ein Renderer-Plugin in der App öffnet (Excalidraw-Mindmap aus write_excalidraw).
+// „Übernehmen und öffnen" führt hier in den Plugin-Tab, nie ins Systemprogramm — und ohne
+// aktives Plugin bekommt die Karte einen Hinweis statt eines Knopfs (Codex F05).
+export const PLUGIN_RESULT_FORMATS = ['.excalidraw']
+
+export function isPluginResultFormat(fileName: string): boolean {
+  const lower = fileName.trim().toLowerCase()
+  return PLUGIN_RESULT_FORMATS.some(ext => lower.endsWith(ext))
+}
+
+export interface PluginEditorClaim {
+  pluginId: string
+  editorId: string
+  /** Endung mit Punkt, klein geschrieben (`.excalidraw`). */
+  extension: string
+}
+
+/** Das aktive Plugin, das die Endung des Dateinamens beansprucht — oder null. */
+export function findPluginEditorClaim(fileName: string, claims: readonly PluginEditorClaim[]): PluginEditorClaim | null {
+  const lower = fileName.trim().toLowerCase()
+  return claims.find(c => c.extension && lower.endsWith(c.extension)) ?? null
+}

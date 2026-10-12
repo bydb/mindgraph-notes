@@ -24,6 +24,8 @@ import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from 
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
 import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
 import { buildEdumap, EdumapInputError, EDUMAP_COLORS, EDUMAP_LIMITS, type EdumapColumnInput } from '../../shared/edumap'
+import { IGNORED_DIRECTORY_NAMES } from '../../shared/ignoredDirectories'
+import { buildExcalidrawMindmap, MindmapInputError, MINDMAP_LIMITS, resolveWikilinkInPaths, type MindmapBranchInput } from '../../shared/excalidrawMindmap'
 import { buildPptxFromTemplate, inspectPptxTemplate, describePptxTemplate, PptxInputError, PPTX_LIMITS, LAYOUT_KINDS, type PptxSlideInput, type PptxSource } from '../../shared/pptxTemplate'
 import { resolveInVaultSafe } from '../telegram/agent/tools/vaultPaths'
 import { webSearch } from '../webResearch/providers'
@@ -237,6 +239,37 @@ const MIN_TABLES_FOR_COLLECT_GUARD = 8
 // Ab so vielen lesbaren Nicht-Tabellen nennt das Manifest folder_digest als Weg (F19).
 const MIN_FILES_FOR_DIGEST_HINT = 15
 
+// Alle Notizpfade (vault-relativ, mit `.md`) für die Link-Prüfung von write_excalidraw.
+// Dieselbe Grenze wie der Dateibaum der App (Codex F13): versteckte Namen (`.mindgraph`,
+// `.obsidian` …), die ausgeblendeten Ordner aus IGNORED_DIRECTORY_NAMES und Symlinks bleiben
+// außen vor — ein Link dorthin wäre im Editor nicht klickbar.
+const MAX_LINK_SCAN_FILES = 50_000
+
+async function listVaultMarkdownPaths(vaultPath: string): Promise<string[]> {
+  const out: string[] = []
+  const walk = async (dirAbs: string, dirRel: string): Promise<void> => {
+    let entries: import('fs').Dirent[]
+    try {
+      entries = await fs.readdir(dirAbs, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue
+      const rel = dirRel ? `${dirRel}/${entry.name}` : entry.name
+      if (entry.isDirectory()) {
+        if (!IGNORED_DIRECTORY_NAMES.has(entry.name)) await walk(path.join(dirAbs, entry.name), rel)
+      }
+      else if (entry.isFile() && /\.md$/i.test(entry.name)) {
+        out.push(rel)
+        if (out.length > MAX_LINK_SCAN_FILES) throw new Error(`mehr als ${MAX_LINK_SCAN_FILES} Notizen im Vault`)
+      }
+    }
+  }
+  await walk(vaultPath, '')
+  return out
+}
+
 function requireString(args: Record<string, unknown>, key: string): string | null {
   const v = args[key]
   return typeof v === 'string' && v.trim() ? v.trim() : null
@@ -309,7 +342,7 @@ export function repairImageSrcAttributes(html: string, ctx: NoteAgentContext): s
 async function registerStagedResult(
   ctx: NoteAgentContext,
   fileName: string,
-  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pptx',
+  kind: 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pptx' | 'excalidraw',
   data: Buffer | string,
   summary: string
 ): Promise<ToolResult> {
@@ -1227,6 +1260,102 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     }
   })
 
+  // Mindmap als Excalidraw-Datei (Skill „Mindmap"). Wie write_edumap liefert das Modell nur
+  // die Gliederung; Szene, Layout, Schrift und Farben baut shared/excalidrawMindmap.ts.
+  // Plan + Codex-Review: docs/codex-collab/excalidraw-mindmap.md
+  registry.register({
+    name: 'write_excalidraw',
+    description:
+      `Erzeugt eine Mindmap als Excalidraw-Zeichnung (.excalidraw) im MindGraph-Stil — Layout, Schrift und Farben setzt die App. Parameter: file_name (Endung .excalidraw), title (Text der Mitte, kurz), branches (Äste, ${MINDMAP_LIMITS.minBranches}–${MINDMAP_LIMITS.maxBranches}; jeder Ast: text, optional kind, optional link, optional children = Blätter mit text, optional kind, optional link; höchstens ${MINDMAP_LIMITS.maxLeavesPerBranch} Blätter je Ast, ${MINDMAP_LIMITS.maxNodes} Knoten insgesamt). Texte sind Stichworte, keine Sätze (Mitte höchstens ${MINDMAP_LIMITS.maxCenterChars} Zeichen, Knoten ${MINDMAP_LIMITS.maxNodeChars}, höchstens ${MINDMAP_LIMITS.maxLines} Zeilen). Nur lateinische Schrift — keine Emojis, kein Markdown. kind färbt einen Knoten: "problem", "solution" oder "info" — nur setzen, wenn der Inhalt es trägt. link: nur "[[Ordner/Notiz]]" auf eine Notiz, die es im Vault gibt (Pfad wie bei note_read, ohne .md); keine URLs, keine Abschnitte. Optional style: "klar" (Standard) oder "skizze" (Handzeichnungs-Optik). Die Zeichnung lässt sich in eine Notiz einbetten — schreibe dafür KEINE eigene Notiz. Die genaue Einbettungszeile zeigt die Ergebniskarte nach dem Übernehmen (der Dateiname kann sich dabei ändern); erwähne in der Abschlussnachricht nur, dass es sie gibt.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        file_name: { type: 'string' },
+        title: { type: 'string', description: 'Text des Mittelknotens' },
+        branches: {
+          type: 'array',
+          description: 'Äste der Mindmap in Lesereihenfolge',
+          items: {
+            type: 'object',
+            properties: {
+              text: { type: 'string' },
+              kind: { type: 'string', enum: ['problem', 'solution', 'info'] },
+              link: { type: 'string', description: '[[Ordner/Notiz]] einer existierenden Notiz' },
+              children: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    text: { type: 'string' },
+                    kind: { type: 'string', enum: ['problem', 'solution', 'info'] },
+                    link: { type: 'string' }
+                  },
+                  required: ['text']
+                }
+              }
+            },
+            required: ['text']
+          }
+        },
+        style: { type: 'string', enum: ['klar', 'skizze'] }
+      },
+      required: ['file_name', 'title', 'branches']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const rawName = requireString(args, 'file_name')
+      const title = requireString(args, 'title')
+      if (!rawName) return err('Parameter "file_name" fehlt')
+      if (!title) return err('Parameter "title" fehlt')
+      // Manche Modelle liefern verschachtelte Arrays als JSON-String.
+      let branches: unknown = args.branches
+      if (typeof branches === 'string') {
+        try {
+          branches = JSON.parse(branches)
+        } catch {
+          return err('Parameter "branches" ist kein gültiges JSON-Array. Übergib die Äste als Liste von Objekten mit text und children.')
+        }
+      }
+      if (!Array.isArray(branches)) {
+        console.warn('[note-agent] write_excalidraw abgelehnt (branches fehlt) — angekommen:', describeArgs(args))
+        return err(`Parameter "branches" fehlt oder ist keine Liste. Angekommen ist: ${describeArgs(args)}.`)
+      }
+      // Links nur auf existierende Notizen, eindeutig aufgelöst (Codex F02). Den Vault nur
+      // durchsuchen, wenn überhaupt ein Link vorkommt.
+      const hasLink = (branches as MindmapBranchInput[]).some(b =>
+        (typeof b?.link === 'string' && b.link.trim()) ||
+        (Array.isArray(b?.children) && b.children.some(c => typeof c?.link === 'string' && c.link.trim())))
+      let mdPaths: string[] = []
+      if (hasLink) {
+        try {
+          mdPaths = await listVaultMarkdownPaths(ctx.run.vaultPath)
+        } catch (e) {
+          return err(`Links konnten nicht geprüft werden: ${e instanceof Error ? e.message : String(e)}. Lass die Links weg.`)
+        }
+      }
+      try {
+        const built = buildExcalidrawMindmap(
+          { title, branches: branches as MindmapBranchInput[], style: typeof args.style === 'string' ? args.style : undefined },
+          { now: Date.now(), resolveLink: target => resolveWikilinkInPaths(target, mdPaths) }
+        )
+        const fileName = sanitizeOutputFileName(rawName, '.excalidraw')
+        const links = built.linkCount > 0 ? `, ${built.linkCount} Links` : ''
+        return registerStagedResult(
+          ctx,
+          fileName,
+          'excalidraw',
+          built.json,
+          `Mindmap, ${built.branchCount} Äste, ${built.leafCount} Blätter${links}`
+        )
+      } catch (e) {
+        if (e instanceof MindmapInputError) {
+          return err(`Die Mindmap wurde nicht erzeugt: ${e.issues.join('; ')}. Überarbeite die Gliederung und rufe write_excalidraw erneut mit der VOLLSTÄNDIGEN Mindmap auf.`)
+        }
+        return err(e instanceof Error ? e.message : String(e))
+      }
+    }
+  })
+
   // PowerPoint nach Vorlage (Skill „Präsentation nach Vorlage"). Wie write_docx mit
   // Briefkopf: das Modell liefert nur eine Folienliste, shared/pptxTemplate legt die
   // Folien auf den echten Layouts der Vorlage an — Master, Logo, Schriften bleiben.
@@ -1498,6 +1627,13 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           isToolAvailable(ctx, 'write_html')
             ? 'write_note schreibt ausschließlich Markdown. Für eine HTML-Seite das Werkzeug write_html benutzen (Parameter: title, body_html) — nur dann bekommt die Seite die Formel-Darstellung und das Layout.'
             : 'write_note schreibt ausschließlich Markdown, und HTML-Seiten sind in diesem Lauf nicht verfügbar. Gib der Datei die Endung .md und schreibe das Ergebnis als Markdown-Notiz.'
+        )
+      }
+      if (/\.excalidraw$/i.test(rawName)) {
+        return err(
+          isToolAvailable(ctx, 'write_excalidraw')
+            ? 'write_note schreibt ausschließlich Markdown. Für eine Mindmap das Werkzeug write_excalidraw benutzen (Parameter: title, branches) — die App baut daraus die Excalidraw-Zeichnung.'
+            : 'write_note schreibt ausschließlich Markdown, und Excalidraw-Zeichnungen sind in diesem Lauf nicht verfügbar. Gib der Datei die Endung .md.'
         )
       }
       if (/\.json$/i.test(rawName) && isToolAvailable(ctx, 'write_edumap')) {

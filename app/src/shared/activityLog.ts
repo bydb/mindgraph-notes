@@ -103,7 +103,7 @@ export const MAX_SKILL_REFERENCE_MINUTES = 2400
 const MAX_SKILL_LABEL_CHARS = 120
 
 /** Formate, die der Agent als Ergebnis anbieten kann (Spiegel von AgentResultEntry['kind']). */
-export type ResultFormat = 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pdf' | 'pptx'
+export type ResultFormat = 'md' | 'xlsx' | 'docx' | 'txt' | 'csv' | 'html' | 'json' | 'png' | 'jpg' | 'pdf' | 'pptx' | 'excalidraw'
 
 export type ActivityEvent =
   | {
@@ -450,7 +450,7 @@ export function deriveActivityType(tools: Iterable<string>): ActivityType {
   // Shell-Lauf ohne strukturierte Tabellenverarbeitung: eigene Art, kein Raten der Aufgabe.
   if (used.has('shell_execute') || used.has('shell_stage_file')) return 'shell'
   if (used.has('web_search') || used.has('web_fetch')) return 'web-research'
-  if (used.has('write_docx') || used.has('fill_docx_form') || used.has('write_html') || used.has('write_edumap') || used.has('write_pptx')) return 'document'
+  if (used.has('write_docx') || used.has('fill_docx_form') || used.has('write_html') || used.has('write_edumap') || used.has('write_pptx') || used.has('write_excalidraw')) return 'document'
   // Ordner-Auswertung (folder_digest) ist Zusammenfassen — aber erst NACH Tabellen, Shell,
   // Web und Dokument-Writern: Digest + write_xlsx bleibt table-merge, Digest + write_docx document.
   if (used.has('folder_digest') || used.has('write_note')) return 'summary'

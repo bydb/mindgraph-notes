@@ -8,11 +8,11 @@
 import { useUIStore } from '../../stores/uiStore'
 import { computerStepLabel } from '../../../shared/computerControl'
 import { useEffect, useRef, useState } from 'react'
-import { needsExternalApp } from '../../utils/resultFormats'
+import { findPluginEditorClaim, isPluginResultFormat, needsExternalApp, type PluginEditorClaim } from '../../utils/resultFormats'
 import { useTranslation } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { SkillReferencePrompt } from './SkillReferencePrompt'
-import type { AgentRunUiState } from '../../stores/noteAgentStore'
+import type { AcceptOpenTarget, AgentRunUiState } from '../../stores/noteAgentStore'
 
 export interface AgentPreviewResponse {
   success: boolean
@@ -26,7 +26,7 @@ export interface AgentPreviewResponse {
 interface Props {
   run: AgentRunUiState
   onCancel: () => void
-  onAccept: (resultId: string, openAfter?: boolean) => void
+  onAccept: (resultId: string, openAfter?: AcceptOpenTarget) => void
   onDiscard: (resultId: string) => void
   onPreview: (resultId: string) => Promise<AgentPreviewResponse>
   onDismiss: () => void
@@ -69,6 +69,40 @@ function useElapsedLabel(startedAt: number | null, running: boolean): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+/**
+ * Aktive Plugin-Datei-Editoren (Endung → Plugin), nur geladen, wenn eine Karte ein Plugin-Format
+ * trägt. Folgt Aktivieren/Abschalten von Plugins, damit Knopf und Hinweis nicht veralten.
+ */
+function usePluginEditorClaims(needed: boolean): PluginEditorClaim[] {
+  const [claims, setClaims] = useState<PluginEditorClaim[]>([])
+  useEffect(() => {
+    if (!needed) return
+    let cancelled = false
+    const load = async (): Promise<void> => {
+      try {
+        const res = await window.electronAPI.pluginRenderers()
+        if (cancelled) return
+        setClaims(res.ok
+          ? res.data.flatMap(d => d.fileEditors.flatMap(fe => fe.extensions.map(ext => ({
+            pluginId: d.pluginId,
+            editorId: fe.editorId,
+            extension: ext.toLowerCase()
+          }))))
+          : [])
+      } catch {
+        if (!cancelled) setClaims([])
+      }
+    }
+    void load()
+    const off = window.electronAPI.onPluginRenderersChanged(() => { void load() })
+    return () => {
+      cancelled = true
+      off()
+    }
+  }, [needed])
+  return claims
+}
+
 export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, onDismiss, onRemember, onContinue }: Props) {
   const { t } = useTranslation()
   const en = useUIStore(st => st.language) === 'en'
@@ -76,6 +110,8 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
   // Ein Lauf mit lokalem 27B-Modell dauert real zehn Minuten. Ohne Uhr sieht das
   // wie ein Hänger aus; mit Uhr sieht man, dass etwas passiert und wie lange schon.
   const elapsed = useElapsedLabel(run.startedAt, run.phase === 'running')
+
+  const pluginClaims = usePluginEditorClaims(run.results.some(r => isPluginResultFormat(r.suggestedName)))
 
   // Antworten und weitermachen: nur nach einem erfolgreichen Lauf ohne Webrecherche (dort gilt
   // „genau ein Ergebnis“). Offene Karten zuerst entscheiden — der Folgelauf ersetzt die Anzeige.
@@ -252,6 +288,9 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
                     <span className="ai-bar-agent-preview-binary">{t('aiBar.agent.previewBinary')}</span>
                   ) : (
                     <>
+                      {isPluginResultFormat(r.suggestedName) && (
+                        <div className="ai-bar-agent-preview-label">{t('aiBar.agent.previewSource')}</div>
+                      )}
                       <pre>{previews[r.resultId].text}</pre>
                       {previews[r.resultId].truncated && (
                         <div className="ai-bar-agent-preview-truncated">{t('aiBar.agent.previewTruncated')}</div>
@@ -271,12 +310,30 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
                       {t('aiBar.agent.acceptAndOpen')}
                     </button>
                   )}
+                  {(() => {
+                    const claim = isPluginResultFormat(r.suggestedName) ? findPluginEditorClaim(r.suggestedName, pluginClaims) : null
+                    return claim ? (
+                      <button type="button" className="ai-bar-cancel" onClick={() => onAccept(r.resultId, { pluginId: claim.pluginId, editorId: claim.editorId })}>
+                        {t('aiBar.agent.acceptAndOpenInApp')}
+                      </button>
+                    ) : null
+                  })()}
                   <button type="button" className="ai-bar-send" onClick={() => onAccept(r.resultId)}>{t('aiBar.agent.accept')}</button>
                 </div>
               ) : (
                 <div className="ai-bar-agent-card-state">
                   {r.state === 'accepted' ? `${t('aiBar.agent.accepted')}: ${r.finalName || r.suggestedName}` : t('aiBar.agent.discardedState')}
                 </div>
+              )}
+              {/* Einbettungszeile erst nach dem Übernehmen, aus dem echten Pfad: der Name kann sich
+                  dabei ändern (Codex F14), und der volle Pfad trifft auch bei Namensdoppeln. */}
+              {r.state === 'accepted' && r.finalRelPath && isPluginResultFormat(r.finalRelPath) && (
+                <div className="ai-bar-agent-card-hint">
+                  {t('aiBar.agent.embedLine')} <code className="ai-bar-agent-embed-line">{`![[${r.finalRelPath}]]`}</code>
+                </div>
+              )}
+              {r.state === 'pending' && isPluginResultFormat(r.suggestedName) && !findPluginEditorClaim(r.suggestedName, pluginClaims) && (
+                <div className="ai-bar-agent-card-hint">{t('aiBar.agent.excalidrawNoPlugin')}</div>
               )}
               {r.error && <div className="ai-bar-context-error">{r.error}</div>}
             </div>

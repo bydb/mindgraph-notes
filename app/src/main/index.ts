@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor, protocol } from 'electron'
+import { IGNORED_DIRECTORY_NAMES } from '../shared/ignoredDirectories'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { existsSync } from 'fs'
@@ -2046,11 +2047,7 @@ ipcMain.handle('create-note', async (_event, filePath: string) => {
 
 // Verzeichnis rekursiv lesen
 // Supported image extensions for file tree display
-const IGNORED_DIRECTORY_NAMES = new Set([
-  'node_modules', '.git', '.svn', '.hg', 'dist', 'build', 'out', 'target',
-  '.next', '.nuxt', '.turbo', '.cache', '__pycache__', '.pytest_cache',
-  '.venv', 'venv', 'env', '.idea', '.vscode'
-])
+// IGNORED_DIRECTORY_NAMES: shared/ignoredDirectories.ts (auch von der Link-Prüfung genutzt)
 
 
 /** Aufgelöste Datei-Editor-Claims aktiver Renderer-Plugins (ADR plugin-renderer-host §7/§8). Kollidierende
@@ -5171,7 +5168,7 @@ ipcMain.handle('note-agent-preview-result', async (event, runId: string, resultI
   if (!entry) return { success: false, error: 'Ergebnis nicht (mehr) verfügbar' }
   try {
     const real = await assertInsideRunStaging(run, entry.stagingPath)
-    const textKinds = new Set(['md', 'txt', 'csv', 'html', 'json'])
+    const textKinds = new Set(['md', 'txt', 'csv', 'html', 'json', 'excalidraw'])
     if (!textKinds.has(entry.kind)) {
       const stat = await fs.stat(real)
       return { success: true, kind: entry.kind, binary: true, sizeBytes: stat.size }

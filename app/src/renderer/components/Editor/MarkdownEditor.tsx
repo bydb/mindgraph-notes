@@ -72,7 +72,7 @@ import { isBrainNote, brainNoteLabel } from '../../utils/brainNote'
 import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
-import { useNoteAgentStore, EMPTY_AGENT_SCOPE } from '../../stores/noteAgentStore'
+import { useNoteAgentStore, EMPTY_AGENT_SCOPE, type AcceptOpenTarget } from '../../stores/noteAgentStore'
 
 
 const markdownCodeLanguages = [
@@ -2091,7 +2091,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     if (effectiveNoteId) useNoteAgentStore.getState().cancelRun(effectiveNoteId)
   }, [effectiveNoteId])
 
-  const agentResultAccept = useCallback(async (resultId: string, openAfter?: boolean) => {
+  const agentResultAccept = useCallback(async (resultId: string, openAfter?: AcceptOpenTarget) => {
     if (effectiveNoteId) await useNoteAgentStore.getState().acceptResult(effectiveNoteId, resultId, openAfter)
   }, [effectiveNoteId])
 

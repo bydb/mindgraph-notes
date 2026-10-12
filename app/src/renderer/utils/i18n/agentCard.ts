@@ -31,6 +31,10 @@ export const de = {
   'agentCard.ex5': 'Verschaffe dir einen Überblick über meine Notizen: Welche Themen kommen vor, welche Notizen gehören zusammen, und wo fehlen Verknüpfungen? Schreib das als Notiz mit Links zu den Notizen, die du gelesen hast.',
   'agentCard.ex5Docs': 'Vault',
   'agentCard.ex5Result': 'Übersichtsnotiz',
+  'agentCard.ex6Title': 'Mindmap zeichnen',
+  'agentCard.ex6': 'Zeichne eine Mindmap zu einem Projekt aus meinen Notizen: Ziele, Beteiligte, offene Fragen und nächste Schritte, je zwei bis vier Stichworte. Verlinke die Äste mit den Notizen, aus denen sie stammen. Wenn eine Notiz angehängt ist, nimm sie als Grundlage.',
+  'agentCard.ex6Docs': 'Vault',
+  'agentCard.ex6Result': 'Mindmap',
 
   'agentCard.rowDocs': 'Unterlagen',
   'agentCard.docsHelp': 'Optional – passende Notizen aus deinem Vault kann der Agent zusätzlich lesen.',
@@ -150,6 +154,10 @@ export const en: Record<keyof typeof de, string> = {
   'agentCard.ex5': 'Get an overview of my notes: which topics come up, which notes belong together, and where are links missing? Write it up as a note with links to the notes you read.',
   'agentCard.ex5Docs': 'Vault',
   'agentCard.ex5Result': 'Overview note',
+  'agentCard.ex6Title': 'Draw a mind map',
+  'agentCard.ex6': 'Draw a mind map of a project from my notes: goals, people involved, open questions and next steps, two to four keywords each. Link the branches to the notes they come from. If a note is attached, use it as the basis.',
+  'agentCard.ex6Docs': 'Vault',
+  'agentCard.ex6Result': 'Mind map',
 
   'agentCard.rowDocs': 'Documents',
   'agentCard.docsHelp': 'Optional – the agent can also read matching notes from your vault.',

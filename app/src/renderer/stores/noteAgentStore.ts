@@ -12,9 +12,14 @@
 import type { AgentRoute } from '../../shared/agentRoute'
 import { dropComposeMeasurement } from '../utils/activeTimeTracker'
 import { create } from 'zustand'
+import { useNotesStore } from './notesStore'
 import { createActiveMeasurement, type ActiveMeasurement } from '../utils/activeTimeTracker'
 import type { NoteAgentAttachment } from '../../shared/types'
 import type { CloudProviderId } from '../../shared/llmBackend'
+
+/** Wohin „Übernehmen und öffnen" führt: `true` = Standardprogramm des Systems, sonst der
+ *  Plugin-Editor, der die Endung beansprucht (Excalidraw-Mindmap, Codex F05). */
+export type AcceptOpenTarget = boolean | { pluginId: string; editorId: string }
 
 export interface AgentUiStep {
   seq: number
@@ -30,6 +35,9 @@ export interface AgentUiResult {
   sources: string[]
   state: 'pending' | 'accepted' | 'discarded'
   finalName?: string
+  /** Vault-relativer Pfad nach dem Übernehmen — für die Einbettungszeile von Plugin-Formaten
+   *  (der Name kann sich beim Übernehmen ändern, Codex F14). */
+  finalRelPath?: string
   error?: string
 }
 
@@ -182,10 +190,11 @@ interface NoteAgentStoreState {
   /** Antwort auf die letzte Nachricht des Laufs — startet einen Folgelauf mit dessen Verlauf. */
   continueRun: (scopeId: string, answer: string) => Promise<boolean>
   cancelRun: (scopeId: string) => void
-  /** `openAfter`: nach dem Übernehmen die Datei im Standardprogramm öffnen (DOCX, XLSX …
-   *  Formate, die die App selbst nicht anzeigt). Geöffnet wird die ECHTE Datei im Vault,
-   *  nicht die Wegwerf-Kopie, die `computer_open` während des Laufs benutzt. */
-  acceptResult: (scopeId: string, resultId: string, openAfter?: boolean) => Promise<void>
+  /** `openAfter`: nach dem Übernehmen die Datei öffnen — `true` im Standardprogramm (DOCX,
+   *  XLSX … Formate, die die App selbst nicht anzeigt), ein Plugin-Ziel im Plugin-Tab der App
+   *  (z. B. Excalidraw). Geöffnet wird die ECHTE Datei im Vault, nicht die Wegwerf-Kopie, die
+   *  `computer_open` während des Laufs benutzt. */
+  acceptResult: (scopeId: string, resultId: string, openAfter?: AcceptOpenTarget) => Promise<void>
   discardResult: (scopeId: string, resultId: string) => Promise<void>
   previewResult: (scopeId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; error?: string }>
   dismissRun: (scopeId: string) => void
@@ -443,30 +452,53 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
     const weitereOffen = hatOffeneKarten(run.results, resultId)
     const res = await window.electronAPI.noteAgentAcceptResult(run.runId, resultId, timings)
     settleTimings(run.runId, timings, !!res.success, weitereOffen)
+    const markResult = (patch: Partial<AgentUiResult>): void => {
+      set(s => withScope(s, scopeId, sc => ({
+        ...sc,
+        run: { ...sc.run, results: sc.run.results.map(r => r.resultId === resultId ? { ...r, ...patch } : r) }
+      })))
+    }
+    if (!res.success) {
+      markResult({ error: res.error })
+      return
+    }
+    // Erst verbuchen, dann öffnen (Codex F16): Die Datei liegt im Vault und das Main-Ergebnis ist
+    // verbraucht — scheitert danach das Öffnen, darf die Karte nicht offen bleiben, sonst meldet ein
+    // zweiter Klick nur „nicht (mehr) verfügbar".
+    markResult({ state: 'accepted', finalName: res.fileName, finalRelPath: res.relPath, error: undefined })
+    if (!openAfter) return
+    let openError: string | undefined
+    if (!res.absPath && !res.relPath) {
+      // Kommt vor, wenn der Main-Prozess älter ist als der Renderer (Dev-Neustart fehlt).
+      // Still nichts tun sähe aus wie ein kaputter Knopf — die Übernahme selbst hat geklappt.
+      openError = 'Übernommen, aber nicht geöffnet: Die App hat den Dateipfad nicht zurückgegeben. Nach einem Neustart der App geht es wieder.'
+    } else if (typeof openAfter === 'object') {
+      // Plugin-Format: im Tab der App öffnen, nicht im Systemprogramm. Der vault-relative Pfad
+      // kommt vom Main (Codex F15) — ein kanonischer absoluter Pfad scheiterte bei einem Vault
+      // hinter einem Symlink an der Pfadprüfung des Plugin-Hosts.
+      try {
+        if (!res.relPath) throw new Error('kein Vault-Pfad')
+        const { vaultPath, setFileTree } = useNotesStore.getState()
+        if (vaultPath) {
+          try {
+            setFileTree(await window.electronAPI.readDirectory(vaultPath))
+          } catch {
+            /* Dateibaum aktualisiert der Watcher ohnehin — Öffnen geht trotzdem */
+          }
+        }
+        // Dynamisch: tabStore importiert diesen Store — ein statischer Import wäre ein Zyklus.
+        const { useTabStore } = await import('./tabStore')
+        useTabStore.getState().openPluginEditorTab(openAfter.pluginId, res.relPath, openAfter.editorId, res.fileName ?? res.relPath.split('/').pop() ?? '')
+      } catch (e) {
+        openError = `Übernommen, aber nicht geöffnet: ${e instanceof Error ? e.message : String(e)}`
+      }
+    } else if (res.absPath) {
+      const opened = await window.electronAPI.openPath(res.absPath)
+      if (!opened.success) openError = opened.error || 'Übernommen, aber das Öffnen im Standardprogramm ist fehlgeschlagen.'
+    }
     // Ein gescheitertes Öffnen darf die geglückte Übernahme nicht als Fehler erscheinen
     // lassen — die Datei liegt dann trotzdem im Vault. Deshalb eigener Fehlertext.
-    let openError: string | undefined
-    if (openAfter && res.success) {
-      if (!res.absPath) {
-        // Kommt vor, wenn der Main-Prozess älter ist als der Renderer (Dev-Neustart fehlt).
-        // Still nichts tun sähe aus wie ein kaputter Knopf — die Übernahme selbst hat geklappt.
-        openError = 'Übernommen, aber nicht geöffnet: Die App hat den Dateipfad nicht zurückgegeben. Nach einem Neustart der App geht es wieder.'
-      } else {
-        const opened = await window.electronAPI.openPath(res.absPath)
-        if (!opened.success) openError = opened.error || 'Übernommen, aber das Öffnen im Standardprogramm ist fehlgeschlagen.'
-      }
-    }
-    set(s => withScope(s, scopeId, sc => ({
-      ...sc,
-      run: {
-        ...sc.run,
-        results: sc.run.results.map(r => r.resultId === resultId
-          ? (res.success
-            ? { ...r, state: 'accepted' as const, finalName: res.fileName, error: openError }
-            : { ...r, error: res.error })
-          : r)
-      }
-    })))
+    if (openError) markResult({ error: openError })
   },
 
   discardResult: async (scopeId, resultId) => {
