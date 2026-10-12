@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.37-beta] - 2026-10-12
+
+**Der Petrol Agent zeichnet jetzt Mindmaps.** Bitte ihn um eine Mindmap zu einem Thema, einem Projekt oder einer Notiz: Er gliedert den Inhalt, die App zeichnet daraus eine Excalidraw-Zeichnung im Stil von MindGraph – Thema in der Mitte, Äste mit Stichworten, auf Wunsch mit Links zu deinen Notizen. Ein Klick auf „Übernehmen und in MindGraph öffnen“ zeigt die Zeichnung im Excalidraw-Tab, wo du sie weiterbearbeiten kannst.
+
+### Hintergrund
+
+- **Zum Ausprobieren:** Im Agent-Tab steht die neue Beispielkarte „Mindmap zeichnen“. Der passende Skill „Mindmap erstellen“ kommt mit der App und steht im Skill-Katalog.
+- **Zwei Stile:** „klar“ mit sauberen Linien oder „Skizze“ in Handzeichnungs-Optik. Knoten können in den Farben der Notiz-Kategorien erscheinen (Problem, Lösung, Info).
+- **Übersichtlich statt überladen:** höchstens 8 Äste, 6 Stichworte je Ast und 40 Knoten. Längere Gliederungen lehnt die App ab und lässt den Agenten kürzen, statt still abzuschneiden.
+- **Grenzen:** Mindmaps verwenden lateinische Schrift; Emojis und andere Schriften lehnt die App ab, damit kein Text aus seinem Kasten läuft. Links zeigen nur auf Notizen, die es eindeutig gibt. Zum Ansehen in MindGraph braucht es das Excalidraw-Plugin; ohne Plugin lässt sich die Datei auf excalidraw.com öffnen. Verschiebst du einen Ast, bleiben seine Stichworte stehen.
+- **Einbetten:** Nach dem Übernehmen zeigt die Ergebniskarte die Zeile, mit der du die Mindmap in eine Notiz einbettest.
+- **Sicherheit:** Der Agent kann den internen App-Ordner `.mindgraph` weder lesen noch als Zielordner nutzen, und Word-Vorlagen werden so gelesen, dass eine Verknüpfung im Vault keine Datei von außerhalb hineinholt.
+
 ## [0.11.36-beta] - 2026-10-08
 
 **Excalidraw-Zeichnungen werden jetzt synchronisiert, und Links in Zeichnungen öffnen Notizen und Webseiten.** Eine Skizze, die du am Laptop anlegst, ist damit auch auf deinen anderen Geräten. Ein Klick auf das Link-Symbol an einem Element öffnet die verlinkte Notiz, Zeichnung oder Webseite.
