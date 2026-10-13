@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [0.11.38-beta] - 2026-10-13
+
+**Du siehst jetzt direkt am Auftrag, welche Dateien der Petrol Agent lesen kann.** Neben „+ Kontext“ steht ein kleiner Info-Knopf. Ein Klick zeigt die lesbaren Formate – PDF, Word, Excel, PowerPoint, CSV, Text, Markdown, HTML und ganze Ordner – und was nicht geht. So weißt du vor dem Start, ob der Agent deine Unterlagen überhaupt sehen kann.
+
+### Hintergrund
+
+- **Wo:** im Agent-Tab, in der Macher-Leiste unter einer Notiz und im Notiz-Chat – überall dort, wo du Kontext anhängst.
+- **Nicht lesbar:** alte Office-Formate (`.doc`, `.ppt`), Bilder und eingescannte PDFs ohne Textebene. Ein gescanntes PDF vorher mit Texterkennung speichern, sonst sieht der Agent darin nichts.
+- **Grenzen:** bis 20 MB je Datei, bei PDFs die ersten 50 Seiten, bei Excel bis zu 5 Blätter mit je 200 Zeilen auf einmal. Sehr lange Inhalte werden nach etwa 15.000 Zeichen gekürzt; der Agent bekommt dazu einen Hinweis.
+
 ## [0.11.37-beta] - 2026-10-12
 
 **Der Petrol Agent zeichnet jetzt Mindmaps.** Bitte ihn um eine Mindmap zu einem Thema, einem Projekt oder einer Notiz: Er gliedert den Inhalt, die App zeichnet daraus eine Excalidraw-Zeichnung im Stil von MindGraph – Thema in der Mitte, Äste mit Stichworten, auf Wunsch mit Links zu deinen Notizen. Ein Klick auf „Übernehmen und in MindGraph öffnen“ zeigt die Zeichnung im Excalidraw-Tab, wo du sie weiterbearbeiten kannst.
