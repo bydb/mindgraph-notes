@@ -22020,6 +22020,36 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .ai-bar-context-picker > .ai-bar-context-search,
 .ai-bar-context-picker > .ai-bar-context-oschooser { flex: 0 0 auto; }
 .ai-bar-context-picker > .ai-bar-context-results { flex: 1 1 auto; min-height: 60px; }
+/* Info-Knopf neben „+ Kontext“: welche Dateiformate der Agent lesen kann. */
+.ai-bar-context-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+}
+.ai-bar-context-info-btn:hover,
+.ai-bar-context-info-btn.active { color: var(--accent-color); background: var(--accent-subtle); }
+.ai-bar-context-formats { width: 340px; gap: 8px; padding: 12px 14px; overflow-y: auto; }
+.ai-bar-context-formats-title { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.ai-bar-context-formats-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.ai-bar-context-formats-note { margin: 0; font-size: 11.5px; line-height: 1.45; color: var(--text-muted); }
 .ai-bar-context-search {
   width: 100%;
   padding: 6px 9px;

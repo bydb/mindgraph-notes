@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from '../../utils/translations'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
@@ -36,6 +36,81 @@ const PlusGlyph = () => (
     <path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" />
   </svg>
 )
+
+const InfoGlyph = () => (
+  <svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true" style={{ flexShrink: 0 }}>
+    <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.3" fill="none" />
+    <path d="M8 7.2v4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    <circle cx="8" cy="4.9" r="0.85" fill="currentColor" />
+  </svg>
+)
+
+// Welche Dateien der Agent lesen kann. Spiegelt EXT_TO_KIND und die Grenzen in
+// main/noteAgent/contextFiles.ts — wer dort ein Format oder Limit ändert, zieht
+// die Texte (aiBar.context.formats*) nach.
+const FORMAT_KEYS = [
+  'aiBar.context.formatsPdf',
+  'aiBar.context.formatsWord',
+  'aiBar.context.formatsExcel',
+  'aiBar.context.formatsPptx',
+  'aiBar.context.formatsText',
+  'aiBar.context.formatsHtml',
+  'aiBar.context.formatsFolder'
+] as const
+
+function ContextFormatsInfo() {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [layout, setLayout] = useState<PickerLayout>({ placement: 'above', maxHeight: 300 })
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey, true)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey, true)
+    }
+  }, [open])
+
+  return (
+    <div className="ai-bar-context-picker-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className={`ai-bar-context-info-btn ${open ? 'active' : ''}`}
+        onClick={() => {
+          if (!open) setLayout(measurePlacement(wrapRef.current))
+          setOpen(o => !o)
+        }}
+        title={t('aiBar.context.formatsInfo')}
+        aria-label={t('aiBar.context.formatsInfo')}
+        aria-expanded={open}
+      >
+        <InfoGlyph />
+      </button>
+      {open && (
+        <div
+          className={`ai-bar-context-picker ai-bar-context-formats ${layout.placement === 'below' ? 'is-below' : ''}`}
+          style={{ ['--picker-max-height' as string]: `${layout.maxHeight}px` }}
+          role="dialog"
+          aria-label={t('aiBar.context.formatsTitle')}
+        >
+          <div className="ai-bar-context-formats-title">{t('aiBar.context.formatsTitle')}</div>
+          <ul className="ai-bar-context-formats-list">
+            {FORMAT_KEYS.map(k => <li key={k}>{t(k)}</li>)}
+          </ul>
+          <p className="ai-bar-context-formats-note">{t('aiBar.context.formatsNot')}</p>
+          <p className="ai-bar-context-formats-note">{t('aiBar.context.formatsLimits')}</p>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected, extra }: Props) {
   const { t } = useTranslation()
@@ -123,6 +198,7 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
             </div>
           )}
         </div>
+        <ContextFormatsInfo />
         {attachments.map(a => (
           <span key={a.id} className="ai-bar-chip ai-bar-context-chip">
             <span className="ai-bar-context-chip-name" title={a.name}>
