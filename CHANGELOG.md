@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.0] - 2026-10-19
+
+**MindGraph Notes 1.0 ist da – die erste stabile Version.** Deine Notizen bleiben Markdown-Dateien auf deinem Rechner, der Petrol Agent erledigt Aufträge mit deinen Unterlagen, und gespeichert wird erst, was du freigibst. Ab jetzt tragen Versionen kein „Beta“ mehr; Updates meldet die App wie gewohnt selbst.
+
+### Hintergrund
+
+- **Update von einer Beta:** Die App erkennt 1.0.0 als neuere Version. Auf dem Mac lädt sie das Update selbst, unter Windows und Linux zeigt sie wie bisher den Download an.
+- **Diagramme im Präsentationsmodus:** Mermaid-Diagramme wurden bei eingeschaltetem Präsentationsmodus riesig und mit winzigen Kästchen gezeichnet. Jetzt haben sie wieder die richtige Größe, und Übergangseffekte bleiben trotzdem aus.
+- **Formeln:** Die Formeldarstellung (KaTeX) ist auf dem aktuellen Stand – im Editor, in Karteikarten, in Diagrammen und in HTML-Seiten, die der Agent erstellt.
+- **Mailversand und -empfang:** Aktualisierte Mail-Bausteine schließen Lücken, über die eine präparierte E-Mail die App beim Abrufen hätte einfrieren können.
+
 ## [0.11.38-beta] - 2026-10-13
 
 **Du siehst jetzt direkt am Auftrag, welche Dateien der Petrol Agent lesen kann.** Neben „+ Kontext“ steht ein kleiner Info-Knopf. Ein Klick zeigt die lesbaren Formate – PDF, Word, Excel, PowerPoint, CSV, Text, Markdown, HTML und ganze Ordner – und was nicht geht. So weißt du vor dem Start, ob der Agent deine Unterlagen überhaupt sehen kann.
