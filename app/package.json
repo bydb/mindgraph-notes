@@ -169,7 +169,7 @@
     "html-to-image": "^1.11.13",
     "imapflow": "^1.2.9",
     "jszip": "^3.10.1",
-    "katex": "^0.16.27",
+    "katex": "^0.18.11",
     "linkedom": "^0.18.13",
     "mailparser": "^3.9.38",
     "mammoth": "^1.11.0",
@@ -194,6 +194,7 @@
     "zustand": "^5.0.10"
   },
   "overrides": {
+    "katex": "$katex",
     "brace-expansion": "^5.0.8",
     "adm-zip": "^0.6.1",
     "sharp": "^0.35.3"
