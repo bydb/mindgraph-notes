@@ -106,9 +106,32 @@ jobs:
               --wait --timeout 30m 2>&1) || true
             echo "$OUT"
             if echo "$OUT" | grep -q "status: Accepted"; then
-              echo "Stapling..."
-              xcrun stapler staple "$DMG_FILE"
-              xcrun stapler validate "$DMG_FILE"
+              # Staple und Validate holen das Ticket aus Apples CloudKit. Direkt nach
+              # "Accepted" riss die Verbindung dorthin real ab ("network connection was
+              # lost", Error 68) — beim x64-Build von 1.0.0 dreimal in Folge, arm64 lief
+              # durch. Deshalb je bis zu 5 Versuche mit Pause.
+              stapled=0
+              for s in 1 2 3 4 5; do
+                if xcrun stapler staple "$DMG_FILE"; then stapled=1; break; fi
+                echo "::warning::Stapling-Versuch $s fehlgeschlagen, neuer Versuch in 60 s"
+                sleep 60
+              done
+              if [ "$stapled" != 1 ]; then
+                echo "::error::Notarisiert, aber Ticket ließ sich nicht anheften — Release wird abgebrochen."
+                exit 1
+              fi
+              # Validate ist nur die Online-Gegenprobe des schon angehefteten Tickets.
+              # Scheitert sie auch nach 5 Versuchen, ist das DMG trotzdem notarisiert und
+              # gestapelt → sichtbare Warnung statt abgebrochenem Release.
+              validated=0
+              for v in 1 2 3 4 5; do
+                if xcrun stapler validate "$DMG_FILE"; then validated=1; break; fi
+                echo "::warning::Validate-Versuch $v fehlgeschlagen, neuer Versuch in 60 s"
+                sleep 60
+              done
+              if [ "$validated" != 1 ]; then
+                echo "::warning::stapler validate scheiterte 5x (Netz zu Apple). DMG ist notarisiert und gestapelt — Release läuft weiter."
+              fi
               echo "Notarisierung + Stapling erfolgreich."
               exit 0
             fi
