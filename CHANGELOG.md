@@ -3610,7 +3610,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - **Settings-Hinweistexte**: Labels und Beschreibungen in den Einstellungen werden nicht mehr ohne Zeilenumbruch zusammengeschoben (`.settings-hint` CSS Fix)
 - **Sidebar**: Such-Icon in der Übersicht ergänzt
 
-## [1.0.27-alpha] - 2026-02-13
+## [1.0.27-alpha-alt] - 2026-02-13
 
 ### Security Fixes
 - **Registrierungs-Gate fuer Sync**: Client wartet jetzt auf Server-Bestaetigung (`registered`) bevor Sync-Operationen starten. Zuvor konnte ein geloeschtes Vault weiterhin Dateien hochladen.
@@ -3623,7 +3623,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 ### Improvements
 - Admin API: Neue Endpoints `GET /admin/vaults` und `DELETE /admin/vaults/:id`
 
-## [1.0.26-alpha] - 2026-02-13
+## [1.0.26-alpha-alt] - 2026-02-13
 
 ### Features
 - **E2E-verschlüsselte Vault-Synchronisation**: Vollständig verschlüsselte Synchronisation über WebSocket-Relay-Server mit AES-256-GCM-Verschlüsselung
@@ -3642,7 +3642,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - Sync-Lock verhindert konkurrierende Operationen
 - Automatische Wiederverbindung bei Vault-Wechsel
 
-## [1.0.23-beta] - 2026-02-09
+## [1.0.23-beta-alt] - 2026-02-09
 
 ### Features
 - **Anki Import (.apkg)**: Karteikarten aus Anki-Decks importieren mit Medien-Extraktion (Bilder, Audio). Unterstützt Basic, Reversed und Cloze-Karten
@@ -3657,7 +3657,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - **Link-Zählung im FileTree**: Zeigt jetzt nur ausgehende Wikilinks (konsistent mit dem Dokumentinhalt)
 - **Dateinamen mit Leerzeichen**: Bilder mit Leerzeichen im Dateinamen werden jetzt korrekt in Markdown eingefügt (Leerzeichen → Bindestrich)
 
-## [1.0.22-beta] - 2026-02-08
+## [1.0.22-beta-alt] - 2026-02-08
 
 ### Security
 - **DOMPurify HTML-Sanitization**: Alle `dangerouslySetInnerHTML`- und `innerHTML`-Ausgaben werden jetzt mit DOMPurify sanitized — verhindert XSS über bösartige Markdown-Dateien, SVGs oder AI-Antworten
@@ -3670,7 +3670,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 ### Fixes
 - **Preview-Bilder bei Panel-Wechsel**: Geladene Bilder werden jetzt gecacht und direkt in den HTML-String eingebettet — SVGs/Bilder verschwinden nicht mehr beim Öffnen von Karteikarten oder anderen Panels
 
-## [1.0.21-beta] - 2026-02-08
+## [1.0.21-beta-alt] - 2026-02-08
 
 ### Features
 - **Standard-Ansicht Preview**: Notizen öffnen jetzt standardmäßig in der Preview-Ansicht statt im Editor. Einstellbar unter Settings → Editor → Standard-Ansicht.
@@ -3679,7 +3679,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - **Bilder/SVGs in Preview zuverlässig**: Eingebettete Bilder (SVG, PNG etc.), Wikilink-Embeds und PDFs werden jetzt zuverlässig beim ersten Laden und nach Panel-Wechseln (z.B. Karteikarten) angezeigt
 - **Live-Preview Bild-Caching**: Bilder im Live-Preview-Modus werden gecacht, um wiederholte IPC-Aufrufe zu vermeiden und Flickern zu reduzieren
 
-## [1.0.20-beta] - 2026-02-07
+## [1.0.20-beta-alt] - 2026-02-07
 
 ### Features
 - **Karteikarten Statistik-Dashboard**: Neuer "Statistik"-Tab im Karteikarten-Panel
@@ -3693,7 +3693,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 ### Fixes
 - **SVG-Bildansicht**: SVG-Dateien werden jetzt korrekt in der Bildansicht dargestellt (inline-Rendering statt base64 Data-URL, behebt Darstellungsprobleme bei SVGs ohne explizite width/height)
 
-## [1.0.19-beta] - 2026-02-06
+## [1.0.19-beta-alt] - 2026-02-06
 
 ### Features
 - **Akzentfarben**: 6 neue Farben (Rosé, Koralle, Malve, Mint, Limette, Gold) → 12 Akzentfarben gesamt
@@ -3707,20 +3707,20 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 ### UI
 - **Farb-Picker**: Flex-Wrap für Akzent- und Hintergrundfarben (mehrzeilige Darstellung)
 
-## [1.0.18] - 2026-02-06
+## [1.0.18-alt] - 2026-02-06
 
 ### Fixes
 - **Windows Installer**: Installation jetzt nach `C:\Program Files\` statt ins User-Verzeichnis (NSIS `perMachine`)
 - **Windows Taskbar**: Taskleisten-Pin bleibt nach Updates erhalten (stabiler Installationspfad)
 - **Windows Installer UX**: Installations-Dialog mit Ordnerauswahl statt One-Click-Install
 
-## [1.0.17] - 2026-02-06
+## [1.0.17-alt] - 2026-02-06
 
 ### Fixes
 - **Vault-Persistierung**: Vault wird nach App-Neustart wieder korrekt geladen (Race Condition zwischen Settings-Laden und Vault-Loading behoben)
 - **Upgrade-Pfad**: Bestehende User sehen beim Update kein unnötiges Onboarding mehr
 
-## [1.0.16] - 2026-02-05
+## [1.0.16-alt] - 2026-02-05
 
 ### Features
 - **Onboarding**: Willkommen-Screen mit Setup-Wizard beim ersten Start
@@ -3734,24 +3734,24 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - **Canvas**: Hierarchisches Layout stürzt nicht mehr ab bei zyklischen Verlinkungen (A→B→C→A)
 - **Canvas Performance**: Layout-Algorithmus optimiert (Map-Lookups statt indexOf, niedrigere Fallback-Schwellen, 3s Timeout)
 
-## [1.0.15] - 2026-02-05
+## [1.0.15-alt] - 2026-02-05
 
 ### Fixes
 - **Windows**: Dateien werden nicht mehr doppelt im Canvas angezeigt beim Erstellen neuer Notizen (Pfad-Normalisierung für Windows Backslashes)
 
-## [1.0.14] - 2026-02-03
+## [1.0.14-alt] - 2026-02-03
 
 ### Features
 - **Windows-Support**: MindGraph Notes ist jetzt auch für Windows verfügbar (Installer + Portable)
 - **Terminal**: Plattformübergreifende Terminal-Unterstützung (PowerShell auf Windows, zsh auf macOS/Linux)
 
-## [1.0.13] - 2026-02-03
+## [1.0.13-alt] - 2026-02-03
 
 ### Fixes
 - **FileTree**: Beim Umbenennen von Dateien wird die ursprüngliche Dateiendung beibehalten (jpg, png, pdf.md, etc.) statt immer .md anzuhängen
 - **Editor**: Race-Condition beim Notizwechsel behoben - der Editor zeigt jetzt zuverlässig den Content der ausgewählten Notiz
 
-## [1.0.12] - 2026-02-03
+## [1.0.12-alt] - 2026-02-03
 
 ### Features
 - **FileTree**: Rechtsklick auf Ordner → "Im Canvas anzeigen" öffnet Canvas mit diesem Ordner gefiltert
@@ -3761,7 +3761,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - **Canvas Performance**: Große Vaults (3000+ Notizen) werden jetzt schnell im Canvas angezeigt durch gecachte Ordner-Counts
 - **Sidebar-Panels**: Klick auf Panel-Button öffnet dieses Panel und schließt andere automatisch
 
-## [1.0.11] - 2026-02-02
+## [1.0.11-alt] - 2026-02-02
 
 ### Features
 - **Tag-Autocomplete**: Im Properties Panel werden beim Tags-Feld alle existierenden Vault-Tags als Vorschläge angezeigt
@@ -3771,7 +3771,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - `#` Präfix wird automatisch von Tags entfernt (Anzeige und Speicherung)
 - Komma-Eingabe zum Hinzufügen neuer Tags funktioniert jetzt korrekt
 
-## [1.0.10] - 2026-02-02
+## [1.0.10-alt] - 2026-02-02
 
 ### Features
 - **Dataview Query System**: Abfragen von Notizen nach Metadaten
@@ -3802,7 +3802,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - Neue Utils: `metadataExtractor.ts`, `dataview/` (Parser, Executor, Renderer)
 - CodeMirror-Extension für Dataview-Block-Rendering
 
-## [1.0.9] - 2026-02-01
+## [1.0.9-alt] - 2026-02-01
 
 ### Features
 - **Karteikarten & Quiz-System**: Lerne aus deinen Notizen mit Spaced Repetition
@@ -3824,7 +3824,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - IPC-Handler für Quiz-Generierung und Flashcard-Persistenz
 - Pro-Vault Speicherung in `.mindgraph/flashcards.json`
 
-## [1.0.8] - 2026-01-31
+## [1.0.8-alt] - 2026-01-31
 
 ### Features
 - **Update-Checker**: Automatische Prüfung auf neue Versionen via GitHub Releases API
@@ -3842,7 +3842,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - UIStore erweitert um `lastSeenVersion`, `updateAvailable`, `whatsNewOpen`
 - CHANGELOG.md wird in App-Resources für Produktion inkludiert
 
-## [1.0.7] - 2026-01-31
+## [1.0.7-alt] - 2026-01-31
 
 ### Features
 - **Verschieben nach...**: Neue Kontextmenü-Option im Dateibaum
@@ -3865,7 +3865,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 ### Fixes
 - NotesChat: Scroll-Bug behoben (Fenster scrollte bei LLM-Streaming weg)
 
-## [1.0.6] - 2026-01-30
+## [1.0.6-alt] - 2026-01-30
 
 ### Features
 - **LanguageTool Integration**: Integrierte Grammatik- und Rechtschreibprüfung
@@ -3882,7 +3882,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - IPC-Handler für lokale und API-basierte Grammatikprüfung
 - Persistente Speicherung von ignorierten Regeln im uiStore
 
-## [1.0.5] - 2026-01-29
+## [1.0.5-alt] - 2026-01-29
 
 ### Features
 - **Docling PDF-Extraktion**: Automatische Text-, Tabellen- und Bildextraktion aus PDFs
@@ -3895,7 +3895,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - IPC-Handler für Docling-API-Kommunikation
 - PDF-Extraktion UI im PDF Viewer
 
-## [1.0.4] - 2026-01-29
+## [1.0.4-alt] - 2026-01-29
 
 ### Features
 - **Smart Connections**: KI-basierte ähnliche Notizen mit konfigurierbaren Gewichtungen
@@ -3910,7 +3910,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - Smart Connections Panel zeigt detaillierte Scores
 - Performance-Optimierungen für große Vaults
 
-## [1.0.3] - 2026-01-29
+## [1.0.3-alt] - 2026-01-29
 
 ### Features
 - **Vollständige Internationalisierung (i18n)**: Deutsche und englische Übersetzungen für alle UI-Komponenten
@@ -3922,7 +3922,7 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 - `tRef` Pattern im Terminal für sprachreaktive Übersetzungen in Callbacks
 - Marker-basierte Übersetzung für Main-Process-Nachrichten
 
-## [1.0.2] - 2026-01-28
+## [1.0.2-alt] - 2026-01-28
 
 ### Features
 - **Panel-Übersetzungen**: SmartConnections, TagsPanel, OverduePanel vollständig übersetzt
@@ -3931,13 +3931,13 @@ Großes Redesign- und KI-Release: hellere Oberfläche, echte Hersteller-Logos un
 ### Fixes
 - Fehlende Übersetzungen auf der Website nachgetragen
 
-## [1.0.1] - 2026-01-28
+## [1.0.1-alt] - 2026-01-28
 
 ### Features
 - **Sidebar-Übersetzungen**: FileTree, Bookmarks, Sidebar-Komponenten übersetzt
 - **Editor-Übersetzungen**: AI-Menüs, Backlinks, WikilinkAutocomplete lokalisiert
 
-## [1.0.0] - 2026-01-27
+## [1.0.0-alt] - 2026-01-27
 
 ### Major Release
 - **Erster stabiler Release** mit vollständiger Feature-Parität
