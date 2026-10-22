@@ -703,6 +703,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       // Ein Skill, der write_pptx verlangt, erwartet eine PowerPoint-Datei — entsteht am
       // Ende keine, sagt loop.ts das ausdrücklich (sonst sieht man nur eine .md).
       if (body.includes('write_pptx')) ctx.run.expectedPptxSkill = skill.name
+      if (body.includes('write_excalidraw')) ctx.run.expectedMindmapSkill = skill.name
       // references/assets sichtbar machen (Stufe 3) — gelesen wird per read_skill_file.
       const files = await listSkillFiles(ctx.run.vaultPath, skill.folderName, !!ctx.run.shell)
       const filesNote = files.length

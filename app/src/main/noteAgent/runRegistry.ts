@@ -94,6 +94,8 @@ export interface AgentRun {
   // Name eines geladenen Skills, der eine PowerPoint-Datei verlangt (write_pptx im Text).
   // Entsteht keine .pptx, hängt loop.ts einen sichtbaren Hinweis an die Abschlussnachricht.
   expectedPptxSkill?: string
+  // Dasselbe für einen Skill, der write_excalidraw verlangt (Mindmap).
+  expectedMindmapSkill?: string
   // Aktive Zeit, die der Nutzer mit dem Formulieren des Auftrags verbracht hat
   // (Renderer-Messung, nur bei Fenster im Vordergrund). Undefiniert, wenn nicht gemessen.
   instructionMs?: number

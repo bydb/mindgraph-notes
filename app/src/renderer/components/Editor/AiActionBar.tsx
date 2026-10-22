@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../shared/webResearch'
+import { asksForMindmap } from '../../../shared/mindmapIntent'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { ModelPicker } from '../Shared/ModelPicker'
 import { AgentRunPanel, type AgentPreviewResponse } from '../Agent/AgentRunPanel'
@@ -413,6 +414,10 @@ export function AiActionBar({ scopeId, open, onOpenChange, phase, proposal, onGe
             ? t('aiBar.web.notConfigured')
             : cloudSelected ? t('aiBar.web.cloudFlowHint') : t('aiBar.web.flowHint')}
         </div>
+      )}
+      {/* Mindmap gibt es im Web-Lauf nicht (write_excalidraw fehlt) — vor dem Start sagen. */}
+      {agentMode && webResearchArmed && webConfigured && asksForMindmap(instruction) && (
+        <div className="ai-bar-cloud-hint">{t('agentCard.mindmapNoWeb')}</div>
       )}
 
       {/* Agent-Lauf: Protokoll, Ergebnis-Karten, Merken — geteilt mit dem Agent-Tab */}

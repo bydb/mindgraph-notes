@@ -33,6 +33,7 @@ import { isCloudModel } from '../../../shared/modelCompatibility'
 import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../shared/webResearch'
 import { DEFAULT_COMPUTER_CONTROL, activeComputerVerbs, computerVerbLabel } from '../../../shared/computerControl'
 import { NOTE_AGENT_CLOUD_CONSENT_VERSION, type AgentRoute } from '../../../shared/agentRoute'
+import { asksForMindmap } from '../../../shared/mindmapIntent'
 
 interface Props {
   /** Tab-ID — zugleich der Bereich im noteAgentStore. */
@@ -451,6 +452,9 @@ export function AgentView({ tabId }: Props) {
   const docsHint: TranslationKey = exampleNeed === 'folder' ? 'agentCard.docsNeededFolder' : 'agentCard.docsNeededFiles'
   const webMissing = exampleNeed === 'web' && !webOn
   const webHint: TranslationKey = webState === 'modOff' ? 'agentCard.webNeededModule' : webState === 'setup' ? 'agentCard.webNeededSetup' : 'agentCard.webNeeded'
+  // Mindmap + Web geht nicht (write_excalidraw fehlt im Web-Lauf) — vor dem Start sagen,
+  // nicht erst nach einem verbrauchten Lauf (real 21.10.2026). Nur Hinweis, keine Sperre.
+  const mindmapWithWeb = !busy && webOn && asksForMindmap(instruction)
   const webButton: TranslationKey = webState === 'modOff' ? 'agentCard.btnWebModule' : webState === 'setup' ? 'agentCard.btnWebSetup' : 'agentCard.btnWeb'
   // Offene Ergebnis-Karten zuerst entscheiden: ein neuer Lauf ersetzt die Karten, die
   // Dateien blieben ohne Knopf zum Übernehmen im Zwischenspeicher (Codex F35).
@@ -782,6 +786,7 @@ export function AgentView({ tabId }: Props) {
                 )}
               </div>
               {webMissing && <span className={firstGap === 'web' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(webHint)}</span>}
+              {mindmapWithWeb && <span className="agent-card-help">{t('agentCard.mindmapNoWeb')}</span>}
               {lockedReason && <span id={lockedReasonId} className="agent-card-muted">{lockedReason}</span>}
               {actsNow && (
                 <div className="agent-card-acts">

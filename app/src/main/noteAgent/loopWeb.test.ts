@@ -163,6 +163,54 @@ describe('Hinweis, wenn ein PowerPoint-Skill keine .pptx ergibt', () => {
   })
 })
 
+// 21.10.2026: Mindmap-Auftrag mit eingeschaltetem Globus ergab eine Markdown-Notiz, den Grund
+// nannte nur das Modell. Die App sagt ihn selbst — auch ohne geladenen Skill.
+describe('Hinweis, wenn eine Mindmap verlangt war und keine entstanden ist', () => {
+  const finish = (agentRun: AgentRun) =>
+    runNoteAgentLoop({ run: agentRun, noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {} })
+
+  it('nennt die Webrecherche als Grund, wenn der Web-Lauf eine Notiz schrieb', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun(makeWeb({ wrote: true }))
+    agentRun.instruction = 'Erstelle eine Mindmap zu Hochtouren'
+    agentRun.results.set('r1', { kind: 'md' } as never)
+    const res = await finish(agentRun)
+    expect(res.text).toContain('verlangt eine Mindmap')
+    expect(res.text).toContain('ohne Web')
+  })
+
+  it('nennt den Skill und das Modell als Grund außerhalb der Webrecherche', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun()
+    agentRun.expectedMindmapSkill = 'Mindmap'
+    agentRun.results.set('r1', { kind: 'md' } as never)
+    const res = await finish(agentRun)
+    expect(res.text).toContain('„Mindmap“ verlangt eine Mindmap')
+    expect(res.text).toContain('anderes Modell')
+  })
+
+  it('prüft bei einer Fortsetzung nur den Nachtrag, nicht den alten Auftrag (Codex F01)', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun()
+    agentRun.instruction = 'Erstelle eine Mindmap zu Hochtouren\n\nNachtrag: Ja, häng noch eine kurze Notiz an'
+    agentRun.results.set('r1', { kind: 'md' } as never)
+    const res = await runNoteAgentLoop({
+      run: agentRun, noteContent: '', agentMemory: '', chatOptions: {} as never, onStep: () => {},
+      continuation: { priorMessages: [], answer: 'Ja, häng noch eine kurze Notiz an' }
+    })
+    expect(res.text).toBe('fertig')
+  })
+
+  it('schweigt, wenn die Mindmap entstanden ist', async () => {
+    mockChat.mockResolvedValue(noToolCalls)
+    const agentRun = makeRun()
+    agentRun.instruction = 'Mindmap zu meinen Projekten'
+    agentRun.expectedMindmapSkill = 'Mindmap'
+    agentRun.results.set('r1', { kind: 'excalidraw' } as never)
+    expect((await finish(agentRun)).text).toBe('fertig')
+  })
+})
+
 describe('Hinweis auch bei Abbruch ohne Ergebnis (Codex F32)', () => {
   it('hängt den PowerPoint-Hinweis an die Fehlermeldung eines Web-Laufs ohne Write', async () => {
     mockChat.mockResolvedValue(noToolCalls)

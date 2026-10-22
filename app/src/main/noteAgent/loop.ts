@@ -3,6 +3,7 @@
 // und ohne Text-Fallback für Tool-Calls: das Capability-Gate lässt nur Modelle mit
 // nativen Tool-Calls in den Loop (Plan F07 — Capability sauber getrennt von Qualität).
 
+import { asksForMindmap } from '../../shared/mindmapIntent'
 import { describeShellGuardrails } from '../../shared/shellGuardrails'
 import { computerVerbLabel, COMPUTER_TOOL_BY_VERB } from '../../shared/computerControl'
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
@@ -263,7 +264,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Punkt 1 (01.10.2026): Ein PowerPoint-Skill war geladen, aber am Ende liegt keine .pptx
   // vor — real passiert in einem Web-Lauf, als write_pptx dort noch gesperrt war; man sah
   // nur eine .md ohne Erklärung. Der Hinweis steht deterministisch in der Abschlussnachricht.
-  const formatHint = (): string => {
+  const pptxHint = (): string => {
     if (!run.expectedPptxSkill) return ''
     if (Array.from(run.results.values()).some(r => r.kind === 'pptx')) return ''
     const why = !allowed.has('write_pptx')
@@ -273,6 +274,29 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         : 'Der Lauf hat keine Präsentation erzeugt. Starte den Auftrag erneut oder wähle ein anderes Modell.'
     return `Der Skill „${run.expectedPptxSkill}“ verlangt eine PowerPoint-Datei, es ist aber keine entstanden. ${why}`
   }
+  // Dasselbe für Mindmaps (21.10.2026): Auftrag „Mindmap“ mit eingeschaltetem Globus ergab
+  // eine Markdown-Notiz, den Grund nannte nur das Modell. Ausgelöst vom geladenen Skill ODER
+  // vom Auftragstext — im Web-Lauf lädt das Modell den Mindmap-Skill nicht unbedingt.
+  const mindmapHint = (): string => {
+    // Fortsetzung: run.instruction enthält den alten Auftrag samt Nachtrag (main/index.ts),
+    // der neue Lauf aber nur die Ergebnisse SEINES Laufs. Hatte der erste Lauf die Mindmap
+    // schon erzeugt oder wählt der Nachtrag sie ab, wäre der Hinweis falsch (Codex F01).
+    // Deshalb zählt hier nur, was der Nutzer jetzt geschrieben hat.
+    const requestText = params.continuation ? params.continuation.answer : run.instruction
+    const wanted = run.expectedMindmapSkill || asksForMindmap(requestText)
+    if (!wanted) return ''
+    if (Array.from(run.results.values()).some(r => r.kind === 'excalidraw')) return ''
+    const subject = run.expectedMindmapSkill
+      ? `Der Skill „${run.expectedMindmapSkill}“ verlangt eine Mindmap (Excalidraw-Datei), es ist aber keine entstanden.`
+      : 'Der Auftrag verlangt eine Mindmap, es ist aber keine Excalidraw-Datei entstanden.'
+    const why = run.web
+      ? 'Mit eingeschalteter Webrecherche gibt es das Mindmap-Werkzeug nicht, weil eine Karte keinen Platz für die Quellenangaben hat. Starte den Auftrag ohne Web. Wenn du Inhalte aus dem Netz brauchst: erst mit Web eine Notiz recherchieren lassen, dann daraus ohne Web die Mindmap.'
+      : !allowed.has('write_excalidraw')
+        ? 'In diesem Lauf stand das Mindmap-Werkzeug nicht zur Verfügung.'
+        : 'Das Modell hat das Mindmap-Werkzeug nicht erfolgreich aufgerufen. Starte den Auftrag erneut oder wähle ein anderes Modell.'
+    return `${subject} ${why}`
+  }
+  const formatHint = (): string => [pptxHint(), mindmapHint()].filter(Boolean).join(' ')
   const withFormatHint = (text: string): string => {
     const hint = formatHint()
     return hint ? `${text}\n\n**Hinweis:** ${hint}`.trim() : text
