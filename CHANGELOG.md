@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.0.1] - 2026-10-22
+
+**Notizbücher vom reMarkable kommen jetzt vollständig an.** Bisher blieb ein importiertes Notizbuch auf dem Stand des ersten Imports – Seiten, die du danach geschrieben hast, fehlten im PDF. Jetzt lädt jeder Import und jedes Öffnen den aktuellen Stand vom Gerät, und die App zeigt dir, wie viele Seiten angekommen sind.
+
+### Hintergrund
+
+- **Was passiert beim erneuten Import:** Die PDF wird ersetzt, sobald sich das Notizbuch geändert hat, und die Importnotiz wird aktualisiert statt neu angelegt. Was du selbst in die Notiz geschrieben hast, bleibt stehen. Die vorherige PDF landet als Sicherung im Backup-Ordner des Vaults.
+- **Kontrolle:** Die Meldung nennt die Seitenzahl, bei einer Aktualisierung auch die alte („68 Seiten, vorher 42“). So kannst du mit dem Gerät vergleichen. Eine abgebrochene oder unlesbare Übertragung wird abgelehnt statt gespeichert.
+- **Große Notizbücher:** Das Gerät erzeugt die PDF erst auf Anfrage. Die App wartet dafür jetzt bis zu fünf Minuten statt einer.
+- **Grenze:** Hast du die Texterkennung (Docling) eingeschaltet, wird der erkannte Text beim Aktualisieren nicht neu erzeugt. Die App weist darauf hin.
+- **Mindmap und Webrecherche:** Eine Mindmap entsteht nicht, solange die Webrecherche eingeschaltet ist. Der Petrol Agent sagt das jetzt vor dem Start und nach dem Lauf, statt still eine Textnotiz anzulegen.
+
 ## [1.0.0] - 2026-10-19
 
 **MindGraph Notes 1.0 ist da – die erste stabile Version.** Deine Notizen bleiben Markdown-Dateien auf deinem Rechner, der Petrol Agent erledigt Aufträge mit deinen Unterlagen, und gespeichert wird erst, was du freigibst. Ab jetzt tragen Versionen kein „Beta“ mehr; Updates meldet die App wie gewohnt selbst.
