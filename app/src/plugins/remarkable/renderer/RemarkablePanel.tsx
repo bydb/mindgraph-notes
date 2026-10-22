@@ -17,6 +17,8 @@ import { useTranslation } from '../../../renderer/utils/translations'
 import { useUIStore, REMARKABLE_DEFAULTS } from '../../../renderer/stores/uiStore'
 import { usePluginConfig } from '../../../renderer/plugins/config'
 import { createNoteFromFile, useNotesStore } from '../../../renderer/stores/notesStore'
+import { hasExtractedSection, importIdOf, isImportCandidate, sourcePdfOf, updateImportNote } from '../importNote'
+import type { Note } from '../../../shared/types'
 import { invokePlugin } from '../../../renderer/plugins/client'
 import remarkableLogo from '../../../renderer/assets/remarkable-logo.png'
 
@@ -30,6 +32,7 @@ export const RemarkablePanel: React.FC = () => {
   const addNote = useNotesStore((s) => s.addNote)
   const selectNote = useNotesStore((s) => s.selectNote)
   const selectPdf = useNotesStore((s) => s.selectPdf)
+  const bumpPdfRevision = useNotesStore((s) => s.bumpPdfRevision)
   const selectedPdfPath = useNotesStore((s) => s.selectedPdfPath)
   const selectedNoteId = useNotesStore((s) => s.selectedNoteId)
   const [isLoading, setIsLoading] = useState(false)
@@ -166,6 +169,57 @@ export const RemarkablePanel: React.FC = () => {
     }
   }, [folderStack, loadDocuments, t])
 
+  // Sucht die Importnotiz eines Notizbuchs. Nach einem App-Start sind Notizen aus dem Cache
+  // noch ohne Inhalt (`content: ''`) — die Suche nur im geladenen Inhalt fand sie dann nicht,
+  // und ein erneuter Import überschrieb die Notiz. Deshalb Kandidaten von der Platte lesen.
+  // Erkannt wird nur über `remarkable_id` im Frontmatter (importNote.ts).
+  const findExistingImport = useCallback(async (
+    doc: ReMarkableDocumentSummary
+  ): Promise<{ note: Note; content: string } | null> => {
+    if (!vaultPath) return null
+    for (const note of notes.filter((n) => isImportCandidate(n, doc.id))) {
+      try {
+        const content: string = await window.electronAPI.readFile(`${vaultPath}/${note.path}`)
+        if (importIdOf(content) === doc.id) return { note, content }
+      } catch {
+        // Datei weg oder unlesbar — nächster Kandidat
+      }
+    }
+    return null
+  }, [notes, vaultPath])
+
+  // Bringt eine vorhandene Importnotiz auf den Stand des frischen Downloads. Liefert den
+  // aktuellen Inhalt und ob die Notiz aktualisiert werden konnte.
+  const updateExistingImport = useCallback(async (
+    existing: { note: Note; content: string },
+    doc: ReMarkableDocumentSummary,
+    result: ReMarkableDownloadResult
+  ): Promise<{ content: string; ok: boolean }> => {
+    if (!vaultPath || !result.relativePdfPath) return { content: existing.content, ok: false }
+    const outcome = updateImportNote(existing.content, {
+      modifiedClient: doc.modifiedClient,
+      importedAt: new Date().toISOString(),
+      relativePdfPath: result.relativePdfPath,
+      pageCount: result.pageCount,
+      changed: result.changed
+    })
+    if (outcome.status === 'no-frontmatter') return { content: existing.content, ok: false }
+    if (outcome.status === 'updated') {
+      await window.electronAPI.writeFile(`${vaultPath}/${existing.note.path}`, outcome.content)
+      addNote(await createNoteFromFile(`${vaultPath}/${existing.note.path}`, existing.note.path, outcome.content))
+    }
+    return { content: outcome.content, ok: true }
+  }, [addNote, vaultPath])
+
+  const downloadInfo = useCallback((result: ReMarkableDownloadResult): string | null => {
+    if (typeof result.pageCount !== 'number') return null
+    if (result.changed === false) return t('sidebar.remarkable.pdfUnchanged', { pages: String(result.pageCount) })
+    if (result.alreadyExists && typeof result.previousPageCount === 'number') {
+      return t('sidebar.remarkable.pdfUpdated', { pages: String(result.pageCount), previous: String(result.previousPageCount) })
+    }
+    return t('sidebar.remarkable.pdfPages', { pages: String(result.pageCount) })
+  }, [t])
+
   const importDocument = useCallback(async (doc: ReMarkableDocumentSummary) => {
     if (!vaultPath) {
       setError(t('sidebar.remarkable.noVault'))
@@ -177,12 +231,31 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(null)
 
     try {
-      const remarkableMarker = `remarkable_id: "${doc.id}"`
-      const existingNote = notes.find((note) => note.content.includes(remarkableMarker))
-      if (existingNote) {
-        const hasExtractedContent =
-          existingNote.content.includes('## Extrahierter Inhalt') ||
-          existingNote.content.includes('## Extracted Content')
+      const existing = await findExistingImport(doc)
+      if (existing) {
+        // Bereits importiert: trotzdem frisch vom Gerät laden. Früher wurde nur die alte
+        // Notiz geöffnet, und neue Seiten kamen nie an.
+        setInfo(t('sidebar.remarkable.openingPdf'))
+        const sourcePdf = sourcePdfOf(existing.content)
+        const refreshed = await invokePlugin<ReMarkableDownloadResult>('remarkable', 'remarkable.download', {
+          id: doc.id,
+          name: doc.name,
+          ...(sourcePdf ? { existingPath: sourcePdf } : {})
+        })
+        if (!refreshed.success || !refreshed.relativePdfPath) {
+          throw new Error(refreshed.error || t('sidebar.remarkable.downloadError'))
+        }
+        const updated = await updateExistingImport(existing, doc, refreshed)
+        if (refreshed.changed !== false) bumpPdfRevision()
+        const existingNote = { ...existing.note, content: updated.content }
+        const hasExtractedContent = hasExtractedSection(existingNote.content)
+        // Texterkennung wird beim Aktualisieren nicht neu erzeugt (zurückgestellt, Codex F09) —
+        // dann wenigstens sagen, dass sie den alten Stand zeigt.
+        const refreshedInfo = [
+          downloadInfo(refreshed),
+          updated.ok ? null : t('sidebar.remarkable.noteNotUpdated'),
+          refreshed.changed !== false && hasExtractedContent ? t('sidebar.remarkable.extractOutdated') : null
+        ].filter(Boolean).join(' · ') || null
 
         if (docling.enabled && !hasExtractedContent) {
           const sourcePdfMatch = existingNote.content.match(/sourcePdf:\s*"([^"]+)"/)
@@ -220,7 +293,7 @@ export const RemarkablePanel: React.FC = () => {
         }
 
         selectNote(existingNote.id)
-        setInfo(t('sidebar.remarkable.openedExisting'))
+        setInfo(refreshedInfo ?? t('sidebar.remarkable.openedExisting'))
         return
       }
 
@@ -266,13 +339,20 @@ export const RemarkablePanel: React.FC = () => {
       const fileName = `${safeName}-${doc.id.slice(0, 8)}.md`
       const filePath = `${importFolderFullPath}/${fileName}`
       const relativePath = `${importFolderRelative}/${fileName}`
+      // Liegt dort schon eine Datei, die nicht als Import erkannt wurde (z. B. Frontmatter
+      // gelöscht), nicht überschreiben — die PDF ist aktualisiert, die Notiz bleibt (Codex F10).
+      const occupied = await window.electronAPI.readFile(filePath).then(() => true, () => false)
+      if (occupied) {
+        bumpPdfRevision()
+        throw new Error(t('sidebar.remarkable.noteOccupied', { file: relativePath }))
+      }
       const importedAt = new Date().toISOString()
 
       const extractedSection = extractedContent
         ? `\n## ${t('docling.extractedContentHeader')}\n\n${extractedContent}\n`
         : ''
 
-      const content = `---\nremarkable_id: "${doc.id}"\nremarkable_name: "${doc.name.replace(/"/g, '\\"')}"\nremarkable_type: "${doc.type}"\nremarkable_parent: "${doc.parent}"\nremarkable_modified: "${doc.modifiedClient}"\nremarkable_imported_at: "${importedAt}"\nsourcePdf: "${downloadResult.relativePdfPath}"\n---\n\n# ${doc.name}\n\n![[${downloadResult.relativePdfPath}]]\n\n> Imported from reMarkable via USB.${extractedContent ? ' OCR extraction completed.' : ' OCR and handwritten text extraction pending.'}${extractedSection}`
+      const content = `---\nremarkable_id: "${doc.id}"\nremarkable_name: "${doc.name.replace(/"/g, '\\"')}"\nremarkable_type: "${doc.type}"\nremarkable_parent: "${doc.parent}"\nremarkable_modified: "${doc.modifiedClient}"\nremarkable_imported_at: "${importedAt}"\n${typeof downloadResult.pageCount === 'number' ? `remarkable_pages: ${downloadResult.pageCount}\n` : ''}sourcePdf: "${downloadResult.relativePdfPath}"\n---\n\n# ${doc.name}\n\n![[${downloadResult.relativePdfPath}]]\n\n> Imported from reMarkable via USB.${extractedContent ? ' OCR extraction completed.' : ' OCR and handwritten text extraction pending.'}${extractedSection}`
 
       await window.electronAPI.writeFile(filePath, content)
 
@@ -282,19 +362,21 @@ export const RemarkablePanel: React.FC = () => {
       const note = await createNoteFromFile(filePath, relativePath, content)
       addNote(note)
       selectNote(note.id)
+      const pagesInfo = downloadInfo(downloadResult)
+      const suffix = pagesInfo ? ` · ${pagesInfo}` : ''
       if (extractedContent) {
-        setInfo(t('sidebar.remarkable.importedWithExtraction'))
+        setInfo(t('sidebar.remarkable.importedWithExtraction') + suffix)
       } else if (docling.enabled && extractionFailed) {
-        setInfo(t('sidebar.remarkable.importedExtractionFailed'))
+        setInfo(t('sidebar.remarkable.importedExtractionFailed') + suffix)
       } else {
-        setInfo(t('sidebar.remarkable.imported'))
+        setInfo(t('sidebar.remarkable.imported') + suffix)
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('sidebar.remarkable.importError'))
     } finally {
       setImportingDocumentId(null)
     }
-  }, [addNote, docling.enabled, docling.ocrEnabled, docling.ocrLanguages, docling.url, notes, selectNote, setFileTree, t, vaultPath])
+  }, [addNote, bumpPdfRevision, docling.enabled, docling.ocrEnabled, docling.ocrLanguages, docling.url, downloadInfo, findExistingImport, selectNote, setFileTree, t, updateExistingImport, vaultPath])
 
   const handleItemDoubleClick = useCallback(async (doc: ReMarkableDocumentSummary) => {
     if (doc.type === 'CollectionType') {
@@ -313,24 +395,29 @@ export const RemarkablePanel: React.FC = () => {
     setInfo(t('sidebar.remarkable.openingPdf'))
 
     try {
+      const existing = await findExistingImport(doc)
+      const sourcePdf = existing ? sourcePdfOf(existing.content) : undefined
       const downloadResult = await invokePlugin<ReMarkableDownloadResult>('remarkable', 'remarkable.download', {
         id: doc.id,
-        name: doc.name
+        name: doc.name,
+        ...(sourcePdf ? { existingPath: sourcePdf } : {})
       })
       if (!downloadResult.success || !downloadResult.relativePdfPath) {
         throw new Error(downloadResult.error || t('sidebar.remarkable.downloadError'))
       }
+      if (existing) await updateExistingImport(existing, doc, downloadResult)
+      if (downloadResult.changed !== false) bumpPdfRevision()
 
       const tree = await window.electronAPI.readDirectory(vaultPath)
       setFileTree(tree)
       selectPdf(downloadResult.relativePdfPath)
-      setInfo(t('sidebar.remarkable.openedPdf'))
+      setInfo(downloadInfo(downloadResult) ?? t('sidebar.remarkable.openedPdf'))
     } catch (err) {
       setError(err instanceof Error ? err.message : t('sidebar.remarkable.openPdfError'))
     } finally {
       setOpeningDocumentId(null)
     }
-  }, [selectPdf, setFileTree, t, vaultPath])
+  }, [bumpPdfRevision, downloadInfo, findExistingImport, selectPdf, setFileTree, t, updateExistingImport, vaultPath])
 
   const exportSelectedPdfToRemarkable = useCallback(async () => {
     if (!vaultPath) {

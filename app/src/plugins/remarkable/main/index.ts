@@ -8,6 +8,7 @@
 import { definePluginMain } from '@mindgraph/plugin-api'
 import { ReMarkableService } from '../service'
 import { extractReflowedHtml } from '../pdfReflow'
+import { countPdfPages, isReusablePdfPath, pdfStructureProblem, sameBytes } from '../pdfCheck'
 import { REMARKABLE_CAPABILITIES, manifest } from '../manifest'
 
 const REMARKABLE_BOOK_CSS = `
@@ -50,6 +51,18 @@ function sanitizeFileName(name: string): string {
   const trimmed = name.trim().replace(/\s+/g, ' ')
   const sanitized = trimmed.replace(/[^a-zA-Z0-9\-_. ]/g, '').replace(/ /g, '-')
   return sanitized || 'remarkable-note'
+}
+
+/** Je Notizbuch nur ein Download zur Zeit (Doppelklick, Import + Öffnen parallel — Codex F11). */
+const downloadsInFlight = new Map<string, Promise<unknown>>()
+function serializedPerDocument<T>(id: string, run: () => Promise<T>): Promise<T> {
+  const previous = downloadsInFlight.get(id) ?? Promise.resolve()
+  const next = previous.catch(() => undefined).then(run)
+  downloadsInFlight.set(id, next)
+  void next.finally(() => {
+    if (downloadsInFlight.get(id) === next) downloadsInFlight.delete(id)
+  }).catch(() => undefined)
+  return next
 }
 
 function msg(error: unknown): string {
@@ -98,21 +111,45 @@ export default definePluginMain(
       }
     })
 
+    // Lädt das Notizbuch IMMER frisch vom Gerät und ersetzt die PDF im Vault, sobald sich die
+    // Bytes unterscheiden. Früher gewann die erste Fassung für immer (`if (!alreadyExists)`),
+    // und jede später geschriebene Seite fehlte. Die alte Fassung sichert der Host vor dem
+    // Ersetzen nach .mindgraph/backups/.
     actions.register('remarkable.download', async (p) => {
-      const { id, name } = p as { id: string; name: string }
-      try {
-        const bytes = await service.downloadUsbDocumentPdf(id)
-        const fileName = `${sanitizeFileName(name)}-${id.slice(0, 8)}.pdf`
-        const relativePdfPath = `reMarkable/pdf/${fileName}`
-        const alreadyExists = await host.vault.exists(relativePdfPath)
-        if (!alreadyExists) {
-          await host.vault.writeBytes(relativePdfPath, bytes)
+      const { id, name, existingPath } = p as { id: string; name: string; existingPath?: string }
+      return serializedPerDocument(id, async () => {
+        try {
+          const bytes = await service.downloadUsbDocumentPdf(id)
+          const problem = pdfStructureProblem(bytes)
+          if (problem) return { success: false, error: problem }
+          let pageCount: number
+          try {
+            pageCount = await countPdfPages(bytes)
+          } catch (error) {
+            return { success: false, error: `Das PDF vom Gerät lässt sich nicht öffnen: ${msg(error)}` }
+          }
+
+          const relativePdfPath = isReusablePdfPath(existingPath)
+            ? existingPath
+            : `reMarkable/pdf/${sanitizeFileName(name)}-${id.slice(0, 8)}.pdf`
+          const alreadyExists = await host.vault.exists(relativePdfPath)
+          let changed = true
+          let previousPageCount: number | undefined
+          if (alreadyExists) {
+            const previous = await host.vault.readBytes(relativePdfPath)
+            if (sameBytes(previous, bytes)) {
+              changed = false
+            } else {
+              previousPageCount = await countPdfPages(previous).catch(() => undefined)
+            }
+          }
+          if (changed) await host.vault.writeBytes(relativePdfPath, bytes)
+          return { success: true, relativePdfPath, alreadyExists, changed, pageCount, previousPageCount }
+        } catch (error) {
+          console.error('[reMarkable] Failed to download document:', { id, name, error })
+          return { success: false, error: msg(error) }
         }
-        return { success: true, relativePdfPath, alreadyExists }
-      } catch (error) {
-        console.error('[reMarkable] Failed to download document:', { id, name, error })
-        return { success: false, error: msg(error) }
-      }
+      })
     })
 
     actions.register('remarkable.upload', async (p) => {

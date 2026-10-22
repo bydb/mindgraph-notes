@@ -15,9 +15,11 @@ interface PDFViewerProps {
   filePath: string  // Absoluter Pfad zur PDF-Datei
   fileName: string  // Dateiname für Anzeige
   relativePath?: string  // Relativer Pfad zur Vault-Root
+  /** Neu laden, wenn die Datei unter gleichem Pfad ersetzt wurde (notesStore.pdfRevision) */
+  revision?: number
 }
 
-export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relativePath }) => {
+export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relativePath, revision }) => {
   const [numPages, setNumPages] = useState<number>(0)
   const [currentPage, setCurrentPage] = useState<number>(1)
   const [scale, setScale] = useState<number>(1.0)
@@ -61,7 +63,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
     }
 
     loadPdf()
-  }, [filePath])
+  }, [filePath, revision])
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages)

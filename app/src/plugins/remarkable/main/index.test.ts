@@ -4,6 +4,7 @@ import { manifest } from '../manifest'
 import { PluginRegistry } from '../../../main/plugins/registry'
 import { createHostFactory, type HostServices } from '../../../main/plugins/host'
 import { validateManifest, validateManifestSemantics, validateAgainst } from '@mindgraph/plugin-api/validation'
+import { makeTestPdf } from '../testPdf'
 
 function buildRegistry(over: Partial<HostServices> = {}) {
   const vault = new Map<string, Uint8Array>()
@@ -20,7 +21,7 @@ function buildRegistry(over: Partial<HostServices> = {}) {
     httpFetch: async () => new Response('x'),
     httpFetchBasicAuth: async () => ({ statusCode: 200, text: '{}' }),
     deviceRequest: async () => ({ statusCode: 200, text: '[]' }),
-    deviceDownload: async () => ({ ok: true, statusCode: 200, bytes: new Uint8Array([1, 2, 3]) }),
+    deviceDownload: async () => ({ ok: true, statusCode: 200, bytes: makeTestPdf(2) }),
     deviceUpload: async () => ({ statusCode: 200, body: '' }),
     listUsbDevices: async () => [],
     pdfHtmlToPdf: async () => new Uint8Array([9, 9]),
@@ -60,17 +61,82 @@ describe('reMarkable-Plugin — Vertikale durch Registry + Host', () => {
     })
   })
 
-  it('download schreibt Geräte-Bytes binär in den Vault', async () => {
+  type DownloadRes = {
+    success: boolean
+    relativePdfPath?: string
+    alreadyExists?: boolean
+    changed?: boolean
+    pageCount?: number
+    previousPageCount?: number
+    error?: string
+  }
+  const download = (registry: PluginRegistry, extra: Record<string, unknown> = {}) =>
+    registry.invoke('remarkable', 'remarkable.download', { id: 'abcdef1234', name: 'Mein Heft', ...extra }) as Promise<DownloadRes>
+
+  it('download schreibt Geräte-Bytes binär in den Vault und meldet die Seitenzahl', async () => {
     const { registry, vault } = buildRegistry()
     await registry.activate('remarkable')
-    const res = (await registry.invoke('remarkable', 'remarkable.download', {
-      id: 'abcdef1234',
-      name: 'Mein Heft',
-    })) as { success: boolean; relativePdfPath: string; alreadyExists: boolean }
-    expect(res.success).toBe(true)
-    expect(res.relativePdfPath).toBe('reMarkable/pdf/Mein-Heft-abcdef12.pdf')
-    expect(res.alreadyExists).toBe(false)
-    expect(vault.get('reMarkable/pdf/Mein-Heft-abcdef12.pdf')).toEqual(new Uint8Array([1, 2, 3]))
+    const res = await download(registry)
+    expect(res).toMatchObject({
+      success: true,
+      relativePdfPath: 'reMarkable/pdf/Mein-Heft-abcdef12.pdf',
+      alreadyExists: false,
+      changed: true,
+      pageCount: 2,
+    })
+    expect(vault.get('reMarkable/pdf/Mein-Heft-abcdef12.pdf')).toEqual(makeTestPdf(2))
+  })
+
+  // Regression: früher gewann die erste Fassung für immer, neue Seiten kamen nie an.
+  it('download ersetzt eine vorhandene ältere Fassung', async () => {
+    let pages = 2
+    const { registry, vault } = buildRegistry({
+      deviceDownload: async () => ({ ok: true, statusCode: 200, bytes: makeTestPdf(pages) }),
+    })
+    await registry.activate('remarkable')
+    await download(registry)
+    pages = 30
+    const res = await download(registry)
+    expect(res).toMatchObject({ success: true, alreadyExists: true, changed: true, pageCount: 30, previousPageCount: 2 })
+    expect(vault.get('reMarkable/pdf/Mein-Heft-abcdef12.pdf')).toEqual(makeTestPdf(30))
+  })
+
+  it('download meldet unveränderte Bytes und schreibt nicht', async () => {
+    let writes = 0
+    const store = new Map<string, Uint8Array>()
+    const { registry } = buildRegistry({
+      readVaultBytes: async (rel) => store.get(rel) ?? new Uint8Array(),
+      vaultExists: async (rel) => store.has(rel),
+      writeVaultBytes: async (rel, bytes) => { writes++; store.set(rel, bytes) },
+    })
+    await registry.activate('remarkable')
+    await download(registry)
+    const res = await download(registry)
+    expect(res).toMatchObject({ success: true, alreadyExists: true, changed: false, pageCount: 2 })
+    expect(writes).toBe(1)
+  })
+
+  it('download übernimmt den PDF-Pfad der Importnotiz, aber nur einen sicheren', async () => {
+    const { registry, vault } = buildRegistry()
+    await registry.activate('remarkable')
+    const kept = await download(registry, { existingPath: 'Archiv/Altes Heft-abcdef12.pdf' })
+    expect(kept.relativePdfPath).toBe('Archiv/Altes Heft-abcdef12.pdf')
+    expect(vault.has('Archiv/Altes Heft-abcdef12.pdf')).toBe(true)
+    for (const bad of ['../draussen.pdf', '.mindgraph/x.pdf', '/abs/x.pdf', 'notiz.md']) {
+      expect((await download(registry, { existingPath: bad })).relativePdfPath).toBe('reMarkable/pdf/Mein-Heft-abcdef12.pdf')
+    }
+  })
+
+  it('download lehnt ein abgeschnittenes PDF ab und lässt den Vault unberührt', async () => {
+    const full = makeTestPdf(30)
+    const { registry, vault } = buildRegistry({
+      deviceDownload: async () => ({ ok: true, statusCode: 200, bytes: full.slice(0, Math.floor(full.length / 2)) }),
+    })
+    await registry.activate('remarkable')
+    const res = await download(registry)
+    expect(res.success).toBe(false)
+    expect(res.error).toMatch(/unvollständig/)
+    expect(vault.size).toBe(0)
   })
 
   it('optimize liest Vault-Bytes, routet durch host.pdf, schreibt das Ergebnis', async () => {

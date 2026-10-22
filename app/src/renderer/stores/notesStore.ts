@@ -15,6 +15,9 @@ interface NotesState {
   noteSelectionNonce: number
   secondarySelectedNoteId: string | null  // Für Text-Split View
   selectedPdfPath: string | null  // Relativer Pfad zum ausgewählten PDF
+  /** Zählt hoch, wenn eine PDF auf der Platte ersetzt wurde — der PDFViewer lädt dann neu,
+   *  auch wenn der Pfad gleich bleibt (reMarkable-Notizbücher behalten ihren Pfad). */
+  pdfRevision: number
   selectedImagePath: string | null  // Relativer Pfad zum ausgewählten Bild
   selectedOfficePath: string | null  // Relativer Pfad zur ausgewählten Office-Datei
   selectedOfficeType: 'excel' | 'word' | 'powerpoint' | null
@@ -45,6 +48,7 @@ interface NotesState {
   selectNote: (id: string | null, addToHistory?: boolean) => void
   selectSecondaryNote: (id: string | null) => void  // Für Text-Split View
   selectPdf: (path: string | null) => void
+  bumpPdfRevision: () => void
   selectImage: (path: string | null) => void
   selectOffice: (path: string | null, type: 'excel' | 'word' | 'powerpoint' | null) => void
   setLoading: (loading: boolean) => void
@@ -77,6 +81,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   noteSelectionNonce: 0,
   secondarySelectedNoteId: null,
   selectedPdfPath: null,
+  pdfRevision: 0,
   selectedImagePath: null,
   selectedOfficePath: null,
   selectedOfficeType: null,
@@ -243,6 +248,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   }),
 
   selectSecondaryNote: (id) => set({ secondarySelectedNoteId: id }),
+
+  bumpPdfRevision: () => set((state) => ({ pdfRevision: state.pdfRevision + 1 })),
 
   selectPdf: (path) => set({ selectedPdfPath: path, selectedNoteId: null, selectedImagePath: null, selectedOfficePath: null, selectedOfficeType: null }),
 

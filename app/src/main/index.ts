@@ -21,6 +21,7 @@ import { attachWindowRecovery, initWindowRecovery } from './windowRecovery'
 import { initDisplayDiagnostics, getDisplayHealth } from './displayDiagnostics'
 import { bundledResourcesDir } from './bundledResources'
 import { trashPath, VAULT_TRASH_DIR, type TrashDestination } from './fileTrash'
+import { backupTimestamp, writeBinaryFileSafe } from './binaryWrite'
 import { buildZettelContent, buildZettelFileName, extractFrontmatterTags, sanitizeZettelEmojis, sanitizeZettelTag } from '../shared/zettel'
 import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textChunking'
 import { checkTtsLength } from '../shared/ttsLimits'
@@ -776,15 +777,17 @@ function buildPluginHostServices(): HostServices {
       const vp = requireVault('plugin:vault.write')
       await writeFileSafe(validatePath(vp, relPath), content)
     },
+    // Binärpfade lösen Symlinks auf wie writeFileSafe für Markdown (Codex F12): ein Ordner-
+    // Symlink im Vault darf Lesen/Schreiben nicht nach außerhalb umlenken.
     readVaultBytes: async (relPath) => {
       const vp = requireVault('plugin:vault.readBytes')
-      return new Uint8Array(await fs.readFile(validatePath(vp, relPath)))
+      const safe = await assertSafePath(validatePath(vp, relPath), 'plugin:vault.readBytes')
+      return new Uint8Array(await fs.readFile(safe))
     },
     writeVaultBytes: async (relPath, bytes) => {
       const vp = requireVault('plugin:vault.writeBytes')
-      const target = validatePath(vp, relPath)
-      await fs.mkdir(path.dirname(target), { recursive: true })
-      await fs.writeFile(target, Buffer.from(bytes))
+      const safe = await assertSafePath(validatePath(vp, relPath), 'plugin:vault.writeBytes')
+      await writeBinaryFileSafe(findApprovedRootForPath(safe) ?? vp, safe, bytes)
     },
     vaultExists: async (relPath) => {
       const vp = requireVault('plugin:vault.exists')
@@ -1439,20 +1442,6 @@ function registerHtmlPreviewProtocol(): void {
   })
 }
 
-function backupTimestamp(date = new Date()): string {
-  const pad = (value: number, length = 2) => String(value).padStart(length, '0')
-  return [
-    date.getFullYear(),
-    pad(date.getMonth() + 1),
-    pad(date.getDate()),
-    '-',
-    pad(date.getHours()),
-    pad(date.getMinutes()),
-    pad(date.getSeconds()),
-    '-',
-    pad(date.getMilliseconds(), 3)
-  ].join('')
-}
 
 async function backupMarkdownBeforeWrite(filePath: string, nextContent: string): Promise<void> {
   if (path.extname(filePath).toLowerCase() !== '.md') return

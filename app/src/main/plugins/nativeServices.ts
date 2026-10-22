@@ -74,13 +74,32 @@ export function deviceDownload(
         return
       }
 
+      const header = (name: string): string | undefined => {
+        const v = response.headers[name]
+        return Array.isArray(v) ? v[0] : v
+      }
+      // Bei komprimierter Antwort liefert electron.net entpackte Daten, Content-Length zählt aber
+      // die gepackten Bytes (Codex F14) — dann nicht vergleichen, sonst scheitert JEDER Download.
+      // Vollständigkeit prüft danach ohnehin der PDF-Check im Plugin.
+      const encoding = (header('content-encoding') ?? '').trim().toLowerCase()
+      const expectedLength = encoding === '' || encoding === 'identity' ? Number(header('content-length')) : NaN
       const chunks: Buffer[] = []
       response.on('data', (chunk) => {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
       })
+      response.on('aborted', () => {
+        clearTimeout(timeout)
+        reject(new Error('reMarkable download aborted'))
+      })
       response.on('end', () => {
         clearTimeout(timeout)
-        resolve({ ok: true, statusCode, bytes: new Uint8Array(Buffer.concat(chunks)) })
+        const body = Buffer.concat(chunks)
+        // Angekündigte Länge nicht erreicht = abgeschnittene Übertragung, nie als Erfolg melden.
+        if (Number.isFinite(expectedLength) && expectedLength > 0 && body.length < expectedLength) {
+          reject(new Error(`reMarkable download incomplete (${body.length} of ${expectedLength} bytes)`))
+          return
+        }
+        resolve({ ok: true, statusCode, bytes: new Uint8Array(body) })
       })
       response.on('error', (error) => {
         clearTimeout(timeout)

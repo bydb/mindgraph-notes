@@ -688,6 +688,11 @@ export interface ReMarkableDownloadResult {
   success: boolean;
   relativePdfPath?: string;
   alreadyExists?: boolean;
+  /** false = Gerät lieferte exakt dieselben Bytes, nichts geschrieben */
+  changed?: boolean;
+  pageCount?: number;
+  /** Seitenzahl der ersetzten Fassung (nur wenn ersetzt und lesbar) */
+  previousPageCount?: number;
   error?: string;
 }
 

@@ -77,12 +77,12 @@ export const manifest: PluginManifest = {
     {
       id: 'remarkable.download',
       label: 'Dokument importieren',
-      requiredCapabilities: ['device.usb', 'vault.write'],
+      requiredCapabilities: ['device.usb', 'vault.read', 'vault.write'],
       isWrite: true,
       inputSchema: {
         type: 'object',
         required: ['id', 'name'],
-        properties: { id: { type: 'string' }, name: { type: 'string' } },
+        properties: { id: { type: 'string' }, name: { type: 'string' }, existingPath: { type: 'string' } },
         additionalProperties: false,
       },
       outputSchema: successEnvelope,

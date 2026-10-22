@@ -17,6 +17,9 @@ interface RawReMarkableDocument {
   ModifiedClient?: string
 }
 
+/** 5 Minuten. Vorher 60 s — knapp für Notizbücher mit vielen Seiten. */
+const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000
+
 export class USBTransport implements ReMarkableTransport {
   private baseUrl = 'http://10.11.99.1'
 
@@ -93,10 +96,13 @@ export class USBTransport implements ReMarkableTransport {
     ]
 
     let lastStatus: number | null = null
+    let lastError: string | null = null
 
     for (const endpoint of endpoints) {
       try {
-        const result = await this.device.download(endpoint, 60000)
+        // Das Gerät erzeugt die PDF erst auf Anfrage; bei großen Notizbüchern dauert das.
+        // Der Wert gilt für Erzeugen UND Übertragen zusammen.
+        const result = await this.device.download(endpoint, DOWNLOAD_TIMEOUT_MS)
         if (result.ok && result.bytes) {
           return result.bytes
         }
@@ -107,13 +113,14 @@ export class USBTransport implements ReMarkableTransport {
         if (error instanceof Error && error.message.includes('timed out')) {
           throw error
         }
+        lastError = error instanceof Error ? error.message : null
       }
     }
 
     throw new Error(
       lastStatus
         ? `reMarkable download failed (HTTP ${lastStatus})`
-        : 'reMarkable download endpoint not reachable'
+        : lastError || 'reMarkable download endpoint not reachable'
     )
   }
 

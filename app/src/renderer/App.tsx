@@ -138,7 +138,7 @@ const ViewModeButton: React.FC<{
 
 const App: React.FC = () => {
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders, taskIncludedFolders } = useUIStore()
-  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId, noteSelectionNonce } = useNotesStore()
+  const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId, noteSelectionNonce, pdfRevision } = useNotesStore()
   const { tabs, activeTabId } = useTabStore()
   const activeTab = tabs.find(t => t.id === activeTabId)
   const { t, language } = useTranslation()
@@ -1633,7 +1633,7 @@ const App: React.FC = () => {
                     editorId={activeTab.editorId}
                   />
                 ) : selectedPdfPath && vaultPath ? (
-                  <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} />
+                  <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} revision={pdfRevision} />
                 ) : selectedImagePath && vaultPath ? (
                   <ImageViewer filePath={`${vaultPath}/${selectedImagePath}`} fileName={selectedImagePath.split('/').pop() || selectedImagePath} />
                 ) : selectedOfficePath && selectedOfficeType && vaultPath ? (
