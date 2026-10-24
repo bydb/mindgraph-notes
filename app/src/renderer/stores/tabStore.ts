@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { useNoteAgentStore } from './noteAgentStore'
+import { usePetrolChatStore } from './petrolChatStore'
 
 export type TabType =
   | 'editor'
@@ -330,6 +331,7 @@ export const useTabStore = create<TabState>()((set, get) => ({
     // tun: dort bleibt der Lauf im Store und läuft weiter.)
     if (closedTab.type === 'agent') {
       useNoteAgentStore.getState().disposeScope(tabId)
+      usePetrolChatStore.getState().dispose(tabId)
     }
 
     // Determine new active tab

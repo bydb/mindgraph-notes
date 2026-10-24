@@ -43,3 +43,11 @@ export function agentDefaultModel(ollama: {
 }): string {
   return (ollama.moduleModelOverrides?.['note-agent'] || ollama.selectedModel || '').trim()
 }
+
+/** Womit ein neuer Agent-Tab öffnet (docs/codex-collab/chat-und-agent.md): Chat oder Auftrag. */
+export type AgentTabMode = 'chat' | 'task'
+
+/** Unbekannte Werte sind `task` — das Verhalten vor Einführung des Chats. */
+export function normalizeAgentTabMode(raw: unknown): AgentTabMode {
+  return raw === 'chat' ? 'chat' : 'task'
+}

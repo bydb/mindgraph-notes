@@ -2,6 +2,7 @@ import type { Language } from '../stores/uiStore'
 import * as settingsPagesI18n from './i18n/settingsPages'
 import * as helpGuideI18n from './i18n/helpGuide'
 import * as agentCardI18n from './i18n/agentCard'
+import * as petrolChatI18n from './i18n/petrolChat'
 import * as workFocusI18n from './i18n/workFocus'
 
 type TranslationKey = keyof typeof translations.de
@@ -11,6 +12,7 @@ const translations = {
     ...settingsPagesI18n.de,
     ...helpGuideI18n.de,
     ...agentCardI18n.de,
+    ...petrolChatI18n.de,
     ...workFocusI18n.de,
     // ── Einstellungen · Redesign 09/2026: geteilte Bausteine, Integrationen, KI-Tab, Modul-Tab ──
     'settings.ui.saved': 'Gespeichert',
@@ -3406,6 +3408,7 @@ const translations = {
     ...settingsPagesI18n.en,
     ...helpGuideI18n.en,
     ...agentCardI18n.en,
+    ...petrolChatI18n.en,
     ...workFocusI18n.en,
     // ── Settings · Redesign 09/2026: shared building blocks, integrations, AI tab, modules tab ──
     'settings.ui.saved': 'Saved',

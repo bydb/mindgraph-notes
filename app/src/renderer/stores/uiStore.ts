@@ -1,5 +1,5 @@
 import { DEFAULT_SHELL_GUARDRAILS, type ShellGuardrails } from '../../shared/shellGuardrails'
-import { normalizeWorkFocus, type WorkFocus } from '../../shared/workFocus'
+import { normalizeWorkFocus, normalizeAgentTabMode, type WorkFocus, type AgentTabMode } from '../../shared/workFocus'
 import { DEFAULT_COMPUTER_CONTROL, type ComputerControlSettings } from '../../shared/computerControl'
 import { create } from 'zustand'
 import { MAX_SKILL_REFERENCE_MINUTES, isSkillId, type ValuedType, type ReferenceMinutes, type ReferenceSources, type ReferenceSource, type SkillReferences } from '../../shared/activityLog'
@@ -842,6 +842,8 @@ interface UIState {
   userProfile: UserProfile
   /** Schwerpunkt: Startansicht + hervorgehobener Knopf (shared/workFocus.ts). Schaltet nichts aus. */
   workFocus: WorkFocus
+  /** Womit ein neuer Agent-Tab öffnet: Chat oder Auftrag (docs/codex-collab/chat-und-agent.md). */
+  agentTabDefaultMode: AgentTabMode
 
   // Actions
   setViewMode: (mode: ViewMode) => void
@@ -946,6 +948,7 @@ interface UIState {
   setUserProfile: (profile: UserProfile) => void
   applyProfileDefaults: (profile: UserProfile) => void
   setWorkFocus: (focus: WorkFocus) => void
+  setAgentTabDefaultMode: (mode: AgentTabMode) => void
   /** Onboarding erneut öffnen (⇧⌘O und Hilfe). Schwerpunkt bleibt — der Schritt wählt ihn vor. */
   restartOnboarding: () => void
 
@@ -1242,6 +1245,7 @@ const defaultState = {
   // User Profile
   userProfile: null as UserProfile,
   workFocus: 'notes' as WorkFocus,
+  agentTabDefaultMode: 'chat' as AgentTabMode,
 
   // Transport (Quick Capture)
   transport: {
@@ -1315,6 +1319,7 @@ const persistedKeys = [
   'onboardingCompleted',
   'userProfile',
   'workFocus',
+  'agentTabDefaultMode',
   'slashCommandDateFormat',
   'slashCommandTimeFormat',
   'showFormattingToolbar',
@@ -1511,6 +1516,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setPresentationHintDismissed: (dismissed) => set({ presentationHintDismissed: dismissed }),
   setUserProfile: (profile) => set({ userProfile: profile }),
   setWorkFocus: (focus) => set({ workFocus: normalizeWorkFocus(focus) }),
+  setAgentTabDefaultMode: (mode) => set({ agentTabDefaultMode: normalizeAgentTabMode(mode) }),
   restartOnboarding: () => set({ onboardingCompleted: false, userProfile: null, onboardingOpen: true }),
   setTransport: (settings) => set((state) => ({
     transport: { ...state.transport, ...settings }
@@ -1875,6 +1881,12 @@ export async function initializeUISettings(): Promise<void> {
       }
       // Unbekannte Schwerpunkt-IDs (alt, künftig, von Hand editiert) → 'notes' (Codex F13).
       validSettings.workFocus = normalizeWorkFocus(validSettings.workFocus)
+      // Chat im Agent-Tab (Stufe 1): Neue Installationen starten im Chat. Wer schon
+      // Einstellungen hat, kennt den Agent-Tab als Auftragskarte — für ihn ändert sich
+      // nichts ungefragt (Nutzerentscheidung 23.10.2026). Der Umschalter steht trotzdem da.
+      validSettings.agentTabDefaultMode = 'agentTabDefaultMode' in savedSettings
+        ? normalizeAgentTabMode(validSettings.agentTabDefaultMode)
+        : 'task'
       // A-pre Schritt 3: Legacy Top-Level-Configs der Vertikalen → generische pluginConfig.<id>.
       const legacyPresent = LEGACY_PLUGIN_CONFIG_IDS.filter(
         (id) => { const v = (savedSettings as Record<string, unknown>)[id]; return v != null && typeof v === 'object' }

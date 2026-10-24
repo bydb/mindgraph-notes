@@ -770,6 +770,8 @@ export interface ElectronAPI {
   readFilesBatch: (basePath: string, relativePaths: string[]) => Promise<Record<string, string | null>>;
   readFileBinary: (filePath: string) => Promise<string>;  // Returns Base64
   writeFile: (filePath: string, content: string) => Promise<void>;
+  /** Neue Datei anlegen, nie überschreiben; `exists` = Name inzwischen vergeben. */
+  writeFileNew: (filePath: string, content: string) => Promise<{ success: boolean; exists?: boolean; error?: string }>;
   appendAnnotation: (vaultPath: string, relPath: string, block: string, headerIfNew: string) => Promise<{ success: boolean; relPath: string }>;
   deleteAnnotation: (vaultPath: string, relPath: string, annoId: string) => Promise<{ success: boolean; removed: boolean }>;
   deleteFile: (filePath: string) => Promise<boolean>;
@@ -1022,7 +1024,7 @@ export interface ElectronAPI {
   }>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[]) => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
@@ -1031,6 +1033,8 @@ export interface ElectronAPI {
   onOllamaChatDone: (callback: () => void) => void;
   onOllamaEmailChatChunk: (callback: (chunk: string) => void) => void;
   onOllamaEmailChatDone: (callback: () => void) => void;
+  onPetrolChatChunk: (callback: (chunk: { requestId: string; delta: string }) => void) => void;
+  petrolChatAbort: (requestId: string) => Promise<boolean>;
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)
   projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) => Promise<RagIndexStatus>;
@@ -1080,7 +1084,7 @@ export interface ElectronAPI {
     customPrompt?: string;
     timestamp?: string;
   }>;
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill', port?: number, contextAttachmentIds?: string[]) => Promise<{
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'petrol', port?: number, contextAttachmentIds?: string[], requestId?: string) => Promise<{
     success: boolean;
     response?: string;
     error?: string;

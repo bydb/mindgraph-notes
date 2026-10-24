@@ -166,6 +166,7 @@ import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData }
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
+import { PETROL_CHAT_SYSTEM_PROMPT } from './llm/petrolChatPrompt'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
@@ -2203,7 +2204,7 @@ function healCorruptedMarkdown(content: string): { healed: string; changed: bool
 // Einzige abgesicherte Schreibgrenze für .md/Dateien: assertSafePath +
 // Empty-Write-Block + Auto-Heal + Backup. Wird vom write-file-IPC-Handler UND
 // vom Workflow-Runner genutzt (Decision #3 — kein zweiter Schreibpfad).
-async function writeFileSafe(filePath: string, content: string): Promise<void> {
+async function writeFileSafe(filePath: string, content: string, opts: { exclusive?: boolean } = {}): Promise<void> {
   const safe = await assertSafePath(filePath, 'write-file')
   const isMarkdown = path.extname(safe).toLowerCase() === '.md'
 
@@ -2229,6 +2230,27 @@ async function writeFileSafe(filePath: string, content: string): Promise<void> {
     }
   }
 
+  // Neuanlage (`exclusive`): `wx` scheitert mit EEXIST, wenn die Datei inzwischen existiert —
+  // „nie überschreiben“ wird damit am Dateisystem erzwungen, nicht nur vorher geprüft.
+  if (opts.exclusive) {
+    // Erst exklusiv öffnen (gehört damit sicher diesem Versuch), dann schreiben. Scheitert das
+    // Schreiben (Platte voll …), wird genau diese halbe Datei wieder entfernt (Codex F29) —
+    // sonst bliebe ein Torso unter dem endgültigen Namen, und ein zweiter Versuch legte „(2)“ an.
+    const handle = await fs.open(safe, 'wx')
+    try {
+      await handle.writeFile(finalContent, 'utf-8')
+      await handle.close()
+    } catch (error) {
+      // Nur löschen, wenn unter dem Namen noch GENAU diese Datei liegt (Codex F32) — sonst
+      // träfe das Aufräumen eine Datei, die inzwischen ein anderer Vorgang angelegt hat.
+      const own = await handle.stat().catch(() => null)
+      await handle.close().catch(() => {})
+      const now = await fs.lstat(safe).catch(() => null)
+      if (own && now && own.ino === now.ino && own.dev === now.dev) await fs.unlink(safe).catch(() => {})
+      throw error
+    }
+    return
+  }
   await backupMarkdownBeforeWrite(safe, finalContent)
   await fs.writeFile(safe, finalContent, 'utf-8')
 }
@@ -2239,6 +2261,19 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)
     throw error
+  }
+})
+
+// Neue Datei anlegen, nie überschreiben (Petrol-Chat „Als Notiz speichern“, Codex F16).
+// `exists: true` heißt: der Name ist inzwischen vergeben, der Renderer nimmt den nächsten.
+ipcMain.handle('write-file-new', async (_event, filePath: string, content: string) => {
+  try {
+    await writeFileSafe(filePath, content, { exclusive: true })
+    return { success: true }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return { success: false, exists: true }
+    console.error('Fehler beim Anlegen der Datei:', error)
+    return { success: false, error: error instanceof Error ? error.message : String(error) }
   }
 })
 
@@ -6340,13 +6375,75 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
 })
 
 // Chat mit Kontext (für Notes Chat)
-ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[]) => {
+// Petrol-Chat (Agent-Tab): jede Anfrage trägt eine Kennung. Textstücke gehen mit dieser
+// Kennung raus, damit Reste einer gestoppten Antwort nie in der nächsten landen (Codex
+// F13), und „Stopp“ bricht den Aufruf wirklich ab (F14) — Ollama beendet die Erzeugung,
+// sobald die Verbindung zu ist; Cloud und LM Studio hängen am selben Signal.
+//
+// Registriert wird SYNCHRON beim Eintritt in den Handler, vor dem ersten await. IPC-Aufrufe
+// eines Renderers kommen in Reihenfolge an — ein „Stopp“ direkt nach dem Senden findet die
+// Anfrage also immer schon vor, eine Vorab-Liste ist nicht nötig. Schlüssel ist Absender +
+// Kennung (Codex F25): ein anderes Fenster kann fremde Anfragen weder stoppen noch
+// überschreiben, und eine doppelte Kennung wird abgelehnt statt still ersetzt.
+const petrolChatAborts = new Map<string, AbortController>()
+
+type PetrolRequest = { key: string; requestId: string; controller: AbortController }
+
+function claimPetrolRequest(senderId: number, chatMode: string, requestId: unknown): PetrolRequest | null | 'duplicate' {
+  if (chatMode !== 'petrol' || typeof requestId !== 'string' || !requestId || requestId.length > 100) return null
+  const key = `${senderId}:${requestId}`
+  if (petrolChatAborts.has(key)) return 'duplicate'
+  const controller = new AbortController()
+  petrolChatAborts.set(key, controller)
+  return { key, requestId, controller }
+}
+/** Hängt einen Transport-Controller an den Abbruch der Anfrage. */
+function linkPetrolAbort(req: PetrolRequest | null, controller: AbortController): void {
+  if (!req) return
+  if (req.controller.signal.aborted) controller.abort()
+  else req.controller.signal.addEventListener('abort', () => controller.abort(), { once: true })
+}
+function releasePetrolRequest(req: PetrolRequest | null): void {
+  if (req && petrolChatAborts.get(req.key) === req.controller) petrolChatAborts.delete(req.key)
+}
+
+ipcMain.handle('petrol-chat-abort', (event, requestId: unknown) => {
+  if (!isTrustedSender(event)) return false
+  if (typeof requestId !== 'string' || !requestId) return false
+  const key = `${event.sender.id}:${requestId}`
+  const controller = petrolChatAborts.get(key)
+  if (!controller) return false
+  controller.abort()
+  petrolChatAborts.delete(key)
+  return true
+})
+
+/** Streaming-Kanäle je Chat-Fläche — preload hält pro Kanal nur EINEN Listener. */
+function chatStreamChannel(chatMode: string, kind: 'chunk' | 'done'): string {
+  if (chatMode === 'email') return `ollama-email-chat-${kind}`
+  if (chatMode === 'petrol') return `petrol-chat-${kind}`
+  return `ollama-chat-${kind}`
+}
+
+ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
-  // Email-Chat streamt auf eigenen Channels — Notes-Chat und Email-Chat können
-  // gleichzeitig gemountet sein, und preload erlaubt nur einen Listener pro Channel
-  const chunkChannel = chatMode === 'email' ? 'ollama-email-chat-chunk' : 'ollama-chat-chunk'
-  const doneChannel = chatMode === 'email' ? 'ollama-email-chat-done' : 'ollama-chat-done'
+  // Email-Chat und Petrol-Chat (Agent-Tab) streamen auf eigenen Channels — alle drei
+  // können gleichzeitig gemountet sein, und preload erlaubt nur einen Listener pro Channel
+  const chunkChannel = chatStreamChannel(chatMode, 'chunk')
+  const doneChannel = chatStreamChannel(chatMode, 'done')
+  // Petrol-Chat sieht keine Notizen und keine Anhänge (Zusage in der Statuszeile):
+  // Kontext und Anhänge werden hier verworfen, egal was der Renderer schickt.
+  if (chatMode === 'petrol') {
+    context = ''
+    contextAttachmentIds = undefined
+  }
+  const claimed = claimPetrolRequest(event.sender.id, chatMode, requestId)
+  if (claimed === 'duplicate') return { success: false, error: 'Diese Anfrage läuft bereits.' }
+  const petrolReq = claimed
+  const sendChunk = (delta: string) => event.sender.send(chunkChannel, petrolReq ? { requestId: petrolReq.requestId, delta } : delta)
+  // Vor dem try deklariert, damit der Timer auf JEDEM Ausgang aufgeräumt wird (Codex F24).
+  let timeout: ReturnType<typeof setTimeout> | undefined
 
   try {
     // Kontext-Dateien (Notiz-Agent Phase 1): Main-seitig lesen und dem Notizen-Kontext
@@ -6421,7 +6518,8 @@ ${context}
 Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte Antwort des Nutzers.`
 
     let promptContent = directPrompt
-    if (chatMode === 'socratic') promptContent = socraticPrompt
+    if (chatMode === 'petrol') promptContent = PETROL_CHAT_SYSTEM_PROMPT
+    else if (chatMode === 'socratic') promptContent = socraticPrompt
     else if (chatMode === 'grill') promptContent = grillPrompt
     else if (chatMode === 'email') promptContent = emailPrompt
 
@@ -6452,11 +6550,12 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       }
       const controllerC = new AbortController()
       const timeoutC = setTimeout(() => controllerC.abort(), 300000)
+      linkPetrolAbort(petrolReq, controllerC)
       try {
         const full = await streamCloudChat(
           allMessages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant', content: m.content })),
           { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controllerC.signal, telemetryModule: chatMode === 'email' ? 'mail-summary' : 'chat' },
-          (delta) => event.sender.send(chunkChannel, delta)
+          sendChunk
         )
         event.sender.send(doneChannel)
         return { success: true, response: full }
@@ -6469,7 +6568,8 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
     }
 
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 300000) // 5 min timeout
+    timeout = setTimeout(() => controller.abort(), 300000) // 5 min timeout
+    linkPetrolAbort(petrolReq, controller)
 
     const streamStartedAt = Date.now()
     const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
@@ -6523,7 +6623,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
             if (firstTokenMs === undefined) firstTokenMs = Date.now() - streamStartedAt
             fullResponse += json.message.content
             // Sende Chunk an Renderer
-            event.sender.send(chunkChannel, json.message.content)
+            sendChunk(json.message.content)
           }
           if (json.done) {
             recordLlmRun(fromOllamaResponse(json, {
@@ -6542,7 +6642,6 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       }
     }
 
-    clearTimeout(timeout)
     return {
       success: true,
       response: fullResponse
@@ -6555,6 +6654,9 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       success: false,
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'
     }
+  } finally {
+    if (timeout) clearTimeout(timeout)
+    releasePetrolRequest(petrolReq)
   }
 },
 // Wie bei email-analyze: ein Cloud-Lauf darf den lokalen Vault-Indexer nicht anhalten
@@ -6921,15 +7023,28 @@ ipcMain.handle('lmstudio-generate', async (event, request: LMStudioRequest) => {
 })
 
 // Chat mit Kontext (für Notes Chat) - LM Studio Version
-ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[]) => {
+ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string) => {
   console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
+  const chunkChannel = chatStreamChannel(chatMode, 'chunk')
+  const doneChannel = chatStreamChannel(chatMode, 'done')
+  if (chatMode === 'petrol') {
+    context = ''
+    contextAttachmentIds = undefined
+  }
+  const claimed = claimPetrolRequest(event.sender.id, chatMode, requestId)
+  if (claimed === 'duplicate') return { success: false, error: 'Diese Anfrage läuft bereits.' }
+  const petrolReq = claimed
+  const sendChunk = (delta: string) => event.sender.send(chunkChannel, petrolReq ? { requestId: petrolReq.requestId, delta } : delta)
+  // Bisher ohne Abbruchsignal; für den Petrol-Chat hängt „Stopp“ daran (Codex F14).
+  const controller = new AbortController()
+  linkPetrolAbort(petrolReq, controller)
 
   try {
     // Kontext-Dateien (Notiz-Agent Phase 1) — gleiche Injektion wie im Ollama-Chat.
     const lastUserMessage = [...messages].reverse().find(m => m.role === 'user')?.content || ''
     const ctxResult = await buildNoteAgentContextSection(event.sender.id, contextAttachmentIds, lastUserMessage)
     if ('error' in ctxResult) {
-      event.sender.send('ollama-chat-done')
+      event.sender.send(doneChannel)
       return { success: false, error: ctxResult.error }
     }
     if (ctxResult.section) {
@@ -6977,7 +7092,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 
     const systemMessage = {
       role: 'system',
-      content: chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
+      content: chatMode === 'petrol' ? PETROL_CHAT_SYSTEM_PROMPT : chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
     }
 
     const allMessages = [systemMessage, ...messages]
@@ -6990,7 +7105,8 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
         model,
         messages: allMessages,
         stream: true
-      })
+      }),
+      signal: controller.signal
     })
 
     if (!response.ok) {
@@ -7030,10 +7146,10 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
           if (content) {
             fullResponse += content
             // Sende Chunk an Renderer (verwende gleichen Event-Namen wie Ollama)
-            event.sender.send('ollama-chat-chunk', content)
+            sendChunk(content)
           }
           if (json.choices?.[0]?.finish_reason === 'stop') {
-            event.sender.send('ollama-chat-done')
+            event.sender.send(doneChannel)
           }
         } catch {
           // Ignoriere ungültige JSON-Zeilen
@@ -7047,10 +7163,13 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
     }
   } catch (error) {
     console.error('[LM Studio] Chat error:', error)
+    event.sender.send(doneChannel)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unbekannter Fehler'
     }
+  } finally {
+    releasePetrolRequest(petrolReq)
   }
 })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { chatHistoryForModel, type HistoryMessage } from './chatHistory'
+import { chatHistoryForModel, completedTurns, type HistoryMessage } from './chatHistory'
 
 const VAULT_TEXT = 'Vertraulicher Notizinhalt aus dem Vault'
 
@@ -35,5 +35,40 @@ describe('Verlauf für das Modell (Privacy, F22/F38)', () => {
   it('gibt nur Rolle und Inhalt weiter, keine Zitate oder Vault-Pfade', () => {
     const msgs = [{ role: 'assistant' as const, content: 'x', vaultPath: '/v', citations: { hits: [] } }]
     expect(Object.keys(chatHistoryForModel(msgs)[0])).toEqual(['role', 'content'])
+  })
+})
+
+describe('completedTurns (Petrol-Chat, Codex F27)', () => {
+  it('lässt abgebrochene Antworten samt Frage weg', () => {
+    const msgs = [
+      { role: 'user' as const, content: 'Frage 1' },
+      { role: 'assistant' as const, content: 'Antwort 1' },
+      { role: 'user' as const, content: 'Lange Geschichte' },
+      { role: 'assistant' as const, content: 'Es war einm', stopped: true },
+      { role: 'user' as const, content: 'Frage 3' }
+    ]
+    expect(completedTurns(msgs).map(m => m.content)).toEqual(['Frage 1', 'Antwort 1', 'Frage 3'])
+  })
+  it('lässt Fehler samt Frage weg', () => {
+    const msgs = [
+      { role: 'user' as const, content: 'Frage 1' },
+      { role: 'assistant' as const, content: 'Ollama nicht erreichbar', error: true }
+    ]
+    expect(completedTurns(msgs)).toEqual([])
+  })
+  it('lässt eine vor dem ersten Wort gestoppte Frage weg (F31)', () => {
+    const msgs = [
+      { role: 'user' as const, content: 'Frage 1' },
+      { role: 'assistant' as const, content: 'Antwort 1' },
+      { role: 'user' as const, content: 'Gestoppt', stopped: true }
+    ]
+    expect(completedTurns(msgs).map(m => m.content)).toEqual(['Frage 1', 'Antwort 1'])
+  })
+  it('behält normale Wechsel unverändert', () => {
+    const msgs = [
+      { role: 'user' as const, content: 'a' },
+      { role: 'assistant' as const, content: 'b' }
+    ]
+    expect(completedTurns(msgs)).toEqual(msgs)
   })
 })

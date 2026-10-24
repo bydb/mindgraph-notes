@@ -13,6 +13,8 @@ import { PageHeader, SectionTitle, Card, Row, Details, Toggle, Segmented, Select
 export const GeneralSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const workFocus = useUIStore(s => s.workFocus)
   const setWorkFocus = useUIStore(s => s.setWorkFocus)
+  const agentTabDefaultMode = useUIStore(s => s.agentTabDefaultMode)
+  const setAgentTabDefaultMode = useUIStore(s => s.setAgentTabDefaultMode)
   const theme = useUIStore(s => s.theme)
   const setTheme = useUIStore(s => s.setTheme)
   const accentColor = useUIStore(s => s.accentColor)
@@ -55,6 +57,17 @@ export const GeneralSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
             value={workFocus}
             onChange={setWorkFocus}
             ariaLabel={t('settings.general.workFocus')}
+          />
+        </Row>
+        <Row label={t('settings.general.agentTabMode')} hint={t('settings.general.agentTabModeHint')}>
+          <Segmented
+            options={[
+              { value: 'chat' as const, label: t('settings.general.agentTabMode.chat') },
+              { value: 'task' as const, label: t('settings.general.agentTabMode.task') }
+            ]}
+            value={agentTabDefaultMode}
+            onChange={setAgentTabDefaultMode}
+            ariaLabel={t('settings.general.agentTabMode')}
           />
         </Row>
       </Card>

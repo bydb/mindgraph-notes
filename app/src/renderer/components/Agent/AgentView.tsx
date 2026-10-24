@@ -24,6 +24,8 @@ import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRo
 import { ModelPicker } from '../Shared/ModelPicker'
 import { MindGraphLogo } from '../Shared/MindGraphLogo'
 import { AgentRunPanel } from './AgentRunPanel'
+import { PetrolChat } from './PetrolChat'
+import { usePetrolChatStore } from '../../stores/petrolChatStore'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
 import { useIsModuleEnabled, isModuleAvailable } from '../../utils/modules'
@@ -159,6 +161,16 @@ export function AgentView({ tabId }: Props) {
 
   const scope = useNoteAgentStore(s => s.scopes[tabId] ?? EMPTY_AGENT_SCOPE)
   const run = scope.run
+  // Chat | Auftrag (docs/codex-collab/chat-und-agent.md, Stufe 1). Ohne gemerkte Wahl
+  // gilt die Einstellung „Agent-Tab öffnet mit“.
+  const defaultTabMode = useUIStore(s => s.agentTabDefaultMode)
+  const tabMode = usePetrolChatStore(s => s.scopes[tabId]?.mode) ?? defaultTabMode
+  const setTabMode = (mode: 'chat' | 'task') => usePetrolChatStore.getState().setMode(tabId, mode)
+  // Die Startansicht beim ersten Öffnen festhalten: eine spätere Änderung der Einstellung
+  // gilt für neue Tabs, ein offener Tab springt nicht um.
+  useEffect(() => {
+    if (!usePetrolChatStore.getState().scopes[tabId]) usePetrolChatStore.getState().setMode(tabId, useUIStore.getState().agentTabDefaultMode)
+  }, [tabId])
 
   // Auftragsentwurf und gewähltes Beispiel liegen im Store (überleben den Tab-Wechsel).
   // Solange der Text dem Beispiel entspricht, gelten dessen Voraussetzungen; wer
@@ -564,20 +576,54 @@ export function AgentView({ tabId }: Props) {
     if (computerVerbs.includes('mail_draft')) ops.push(t('agentCard.opMailDraft'))
   }
 
+  const head = (
+    <div className="agent-card-head">
+      <span className="agent-card-logo" aria-hidden="true">
+        {customLogo
+          ? <img src={customLogo} width="30" height="30" alt="" />
+          : <MindGraphLogo size={30} />}
+      </span>
+      <div className="agent-card-head-text">
+        {/* Ein Titel für beide Ansichten, der Modus steht im Umschalter; der Untertitel ist
+            einzeilig, damit der Kopf beim Umschalten nicht springt (Optikprüfung F01/F02). */}
+        <h2 className="agent-view-title">{t('agentTab.title')}</h2>
+        <p className="agent-card-tagline" title={t(tabMode === 'chat' ? 'petrolChat.tagline' : 'agentCard.tagline')}>
+          {t(tabMode === 'chat' ? 'petrolChat.tagline' : 'agentCard.tagline')}
+        </p>
+      </div>
+      <div className="agent-mode-switch" role="radiogroup" aria-label={t('petrolChat.modeLabel')}>
+        {(['chat', 'task'] as const).map(m => (
+          <button
+            key={m}
+            type="button"
+            role="radio"
+            aria-checked={tabMode === m}
+            className={tabMode === m ? 'is-on' : ''}
+            data-label={t(m === 'chat' ? 'petrolChat.modeChat' : 'petrolChat.modeTask')}
+            onClick={() => setTabMode(m)}
+          >
+            {t(m === 'chat' ? 'petrolChat.modeChat' : 'petrolChat.modeTask')}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
+  if (tabMode === 'chat') {
+    return (
+      <div className="agent-view is-chat">
+        <div className="agent-view-inner is-chat">
+          {head}
+          <PetrolChat tabId={tabId} onSwitchToTask={() => setTabMode('task')} />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="agent-view">
       <div className={`agent-view-inner ${run.phase === 'idle' && !starting ? 'is-idle' : ''}`}>
-        <div className="agent-card-head">
-          <span className="agent-card-logo" aria-hidden="true">
-            {customLogo
-              ? <img src={customLogo} width="30" height="30" alt="" />
-              : <MindGraphLogo size={30} />}
-          </span>
-          <div className="agent-card-head-text">
-            <h2 className="agent-view-title">{t('agentTab.title')}</h2>
-            <p className="agent-card-tagline">{t('agentCard.tagline')}</p>
-          </div>
-        </div>
+        {head}
 
         <div className="agent-card">
           {/* Zwei Spalten auf breiten Fenstern: links Auftrag + Beispiele, rechts die

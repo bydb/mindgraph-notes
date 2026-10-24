@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   readFilesBatch: (basePath: string, relativePaths: string[]) => ipcRenderer.invoke('read-files-batch', basePath, relativePaths),
   readFileBinary: (filePath: string) => ipcRenderer.invoke('read-file-binary', filePath),
   writeFile: (filePath: string, content: string) => ipcRenderer.invoke('write-file', filePath, content),
+  writeFileNew: (filePath: string, content: string) => ipcRenderer.invoke('write-file-new', filePath, content),
   appendAnnotation: (vaultPath: string, relPath: string, block: string, headerIfNew: string) =>
     ipcRenderer.invoke('append-annotation', vaultPath, relPath, block, headerIfNew),
   deleteAnnotation: (vaultPath: string, relPath: string, annoId: string) =>
@@ -358,8 +359,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[]) =>
-    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds),
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string) =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds, requestId),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
     ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))
@@ -378,6 +379,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('ollama-email-chat-done')
     ipcRenderer.on('ollama-email-chat-done', () => callback())
   },
+  // Petrol-Chat im Agent-Tab: eigener Kanal, sonst meldet er den Notiz-Chat still ab.
+  // Das Ende erkennt der Renderer am aufgelösten invoke, nicht an einem done-Event.
+  // Stücke tragen die Anfrage-Kennung (Codex F13); Abbruch beendet den Aufruf im Main (F14).
+  onPetrolChatChunk: (callback: (chunk: { requestId: string; delta: string }) => void) => {
+    ipcRenderer.removeAllListeners('petrol-chat-chunk')
+    ipcRenderer.on('petrol-chat-chunk', (_event, chunk) => callback(chunk))
+  },
+  petrolChatAbort: (requestId: string) => ipcRenderer.invoke('petrol-chat-abort', requestId) as Promise<boolean>,
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)
   projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) =>
@@ -451,8 +460,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     port?: number
     contextAttachmentIds?: string[]
   }) => ipcRenderer.invoke('lmstudio-generate', request),
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' = 'direct', port?: number, contextAttachmentIds?: string[]) =>
-    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds),
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port?: number, contextAttachmentIds?: string[], requestId?: string) =>
+    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds, requestId),
   lmstudioEmbeddings: (model: string, text: string, port?: number) =>
     ipcRenderer.invoke('lmstudio-embeddings', model, text, port),
   lmstudioEmbeddingModels: (port?: number) => ipcRenderer.invoke('lmstudio-embedding-models', port),

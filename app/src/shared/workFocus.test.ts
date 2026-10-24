@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeWorkFocus, shouldOpenAgentOnStart, isStartDecisionDue, agentDefaultModel } from './workFocus'
+import { normalizeWorkFocus, normalizeAgentTabMode, shouldOpenAgentOnStart, isStartDecisionDue, agentDefaultModel } from './workFocus'
 
 describe('normalizeWorkFocus', () => {
   it('lässt gültige Werte durch', () => {
@@ -41,5 +41,17 @@ describe('agentDefaultModel', () => {
     expect(agentDefaultModel({ selectedModel: '' })).toBe('')
     expect(agentDefaultModel({ selectedModel: '   ' })).toBe('')
     expect(agentDefaultModel({})).toBe('')
+  })
+})
+
+describe('normalizeAgentTabMode', () => {
+  it('kennt Chat und Auftrag', () => {
+    expect(normalizeAgentTabMode('chat')).toBe('chat')
+    expect(normalizeAgentTabMode('task')).toBe('task')
+  })
+  it('fällt bei Unbekanntem auf den Auftrag zurück (Verhalten vor dem Chat)', () => {
+    expect(normalizeAgentTabMode(undefined)).toBe('task')
+    expect(normalizeAgentTabMode('agent')).toBe('task')
+    expect(normalizeAgentTabMode(1)).toBe('task')
   })
 })
