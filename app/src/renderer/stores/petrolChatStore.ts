@@ -38,6 +38,10 @@ export interface PetrolChatMessage {
   origin?: 'web'
   /** Nur Frage: die Suchwörter, die tatsächlich gesendet wurden. */
   webQuery?: string
+  /** Frage zu eingefrorenen Auszügen, ohne neue Suche. */
+  followUp?: boolean
+  /** Kennung der Auszüge, an die diese Frage gebunden wurde — für „Erneut senden“. */
+  followUpSnapshotId?: string
   /** Nur Antwort: Ergebnis aus dem Main (Quellen, Prüfbericht, Provenienz). */
   web?: WebChatResult
   /** Nur Antwort ohne Websuche: so viele frühere Webfragen gingen als Thema mit (Weg 1). */
@@ -86,6 +90,8 @@ export interface PetrolChatScope {
   webArmed: boolean
   /** Suchwörter im Feld; null = noch nicht bearbeitet (Vorschlag = Frage). */
   webQuery: string | null
+  /** Nachfrage zu einer fertigen Webantwort; null = nicht gewählt. Der Renderer kennt nur die Kennung. */
+  followUp: { snapshotId: string } | null
   webProgress: PetrolWebProgressState | null
 }
 
@@ -97,6 +103,8 @@ export interface PetrolSendOptions {
   run: PetrolActiveRun
   /** Gesetzt = Websuche mit genau diesen Suchwörtern. */
   web?: { query: string }
+  /** Gesetzt = Nachfrage aus eingefrorenen Auszügen, ohne neue Suche. */
+  followUp?: { snapshotId: string }
 }
 
 interface PetrolChatState {
@@ -108,6 +116,8 @@ interface PetrolChatState {
   setDraft: (id: string, text: string) => void
   setModel: (id: string, patch: Partial<Pick<PetrolChatScope, 'localModel' | 'cloudProvider'>>) => void
   setWeb: (id: string, patch: Partial<Pick<PetrolChatScope, 'webArmed' | 'webQuery'>>) => void
+  /** „Hiermit weiterfragen“: Kennung setzen oder aufheben. Schaltet den Globus aus. */
+  setFollowUp: (id: string, snapshotId: string | null) => void
   /** Prüfergebnis des Weges nachtragen, wenn beim Senden noch „wird geprüft“ galt (Codex F28). */
   resolveActiveRoute: (id: string, routeKey: string, routeText: string, routeKind: PetrolActiveRun['routeKind']) => void
   send: (id: string, text: string, opts: PetrolSendOptions) => Promise<void>
@@ -128,6 +138,7 @@ function freshScope(): PetrolChatScope {
     cloudProvider: null,
     webArmed: false,
     webQuery: null,
+    followUp: null,
     webProgress: null
   }
 }
@@ -142,6 +153,11 @@ function abortCurrent(): void {
   const id = currentRequest
   currentRequest = null
   if (id) void window.electronAPI.petrolChatAbort(id).catch(() => { /* Main schon fertig */ })
+}
+
+/** Gesprächsbereich im Main vergessen: „Neues Gespräch“ und Tab schließen. */
+function dropSnapshots(id: string): void {
+  void window.electronAPI.petrolChatSnapshotsDrop?.(id).catch(() => { /* Main schon weg */ })
 }
 
 export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
@@ -184,7 +200,11 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
     setMode: (id, mode) => patch(id, { mode }),
     setDraft: (id, text) => patch(id, { draft: text }),
     setModel: (id, p) => patch(id, p),
-    setWeb: (id, p) => patch(id, p),
+    setWeb: (id, p) => patch(id, { ...p, ...(p.webArmed ? { followUp: null } : {}) }),
+    setFollowUp: (id, snapshotId) => patch(id, {
+      followUp: snapshotId ? { snapshotId } : null,
+      ...(snapshotId ? { webArmed: false, webQuery: null } : {})
+    }),
     resolveActiveRoute: (id, routeKey, routeText, routeKind) => {
       const active = get().scopes[id]?.active
       if (!active || active.routeKind !== 'checking' || active.routeKey !== routeKey) return
@@ -200,11 +220,12 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       const before = get().scope(id).messages
       const history = chatHistoryForModel(completedTurns(before))
       const web = opts.web
+      const follow = opts.followUp
       // Thema früherer Webfragen (Weg 1): nur eigene Fragen erfolgreicher Webwechsel.
       const webTopics = webTopicQuestions(before)
-      // Frage nach einer alten Antwort/Quelle ohne Globus: feste Antwort, kein Modellaufruf.
-      // Beide Nachrichten tragen origin 'web' und bleiben damit aus Verlauf und Themen draußen.
-      if (!web && webTopics.length > 0 && asksAboutOldWebSources(question, { topics: webTopics.map(q => q.text), lastAnswerWasWeb: lastVisibleAnswerIsWeb(before) })) {
+      // Frage nach einer alten Antwort/Quelle ohne Globus und ohne ausdrückliche Nachfrage:
+      // feste Antwort, kein Modellaufruf. Beide Nachrichten tragen origin 'web'.
+      if (!web && !follow && webTopics.length > 0 && asksAboutOldWebSources(question, { topics: webTopics.map(q => q.text), lastAnswerWasWeb: lastVisibleAnswerIsWeb(before) })) {
         currentRequest = null
         patch(id, {
           messages: [...before,
@@ -215,31 +236,37 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         return
       }
       patch(id, {
-        messages: [...before, web
-          ? { role: 'user', content: question, origin: 'web', webQuery: web.query, at: Date.now() }
-          : { role: 'user', content: question, at: Date.now() }],
+        messages: [...before, follow
+          ? { role: 'user', content: question, origin: 'web', followUp: true, followUpSnapshotId: follow.snapshotId, at: Date.now() }
+          : web
+            ? { role: 'user', content: question, origin: 'web', webQuery: web.query, at: Date.now() }
+            : { role: 'user', content: question, at: Date.now() }],
         streaming: '',
-        active: !web && webTopics.length ? { ...opts.run, webTopics: webTopics.length } : opts.run,
+        active: !web && !follow && webTopics.length ? { ...opts.run, webTopics: webTopics.length } : opts.run,
         draft: '',
-        // Globus nach jedem Senden aus; das Suchfeld startet beim nächsten Mal neu.
+        // Globus nach jedem Senden aus; das Suchfeld und die Nachfrage starten beim nächsten Mal neu.
         webArmed: false,
         webQuery: null,
-        webProgress: web ? { phase: 'search', hosts: [] } : null
+        followUp: null,
+        webProgress: follow ? { phase: 'model', hosts: [] } : web ? { phase: 'search', hosts: [] } : null
       })
       set({ activeScope: id })
-      if (web) {
+      if (web || follow) {
         let wres: Awaited<ReturnType<typeof window.electronAPI.petrolChatWeb>>
         try {
           wres = await window.electronAPI.petrolChatWeb({
             requestId: req,
             question,
-            query: web.query,
+            query: follow ? '' : web!.query,
+            scopeId: id,
+            ...(follow ? { snapshotId: follow.snapshotId } : {}),
             history,
             model: opts.model,
             backend: opts.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
             lmStudioPort: opts.lmStudioPort,
             cloud: opts.cloud ? { model: opts.cloud.model, provider: opts.cloud.provider === 'llmbase' ? 'llmbase' : 'openrouter' } : null,
-            webTopics
+            // Themenfragen sind keine Sachbasis. Bei der Nachfrage bleiben sie draußen (F03).
+            ...(follow ? {} : { webTopics })
           })
         } catch (e) {
           wres = { success: false, error: e instanceof Error ? e.message : String(e) }
@@ -312,11 +339,13 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
 
     clear: id => {
       if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
-      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: false, webQuery: null })
+      dropSnapshots(id)
+      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: false, webQuery: null, followUp: null })
     },
 
     dispose: id => {
       if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
+      dropSnapshots(id)
       set(s => {
         const scopes = { ...s.scopes }
         delete scopes[id]

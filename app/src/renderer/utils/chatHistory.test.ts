@@ -100,6 +100,16 @@ describe('Thema früherer Webfragen (chat-webthema-im-verlauf, Weg 1)', () => {
     expect(webTopicQuestions(msgs)).toEqual([{ text: 'Rutherford 8. Klasse', clipped: false }])
   })
 
+  it('eine Nachfrage („Hiermit weiterfragen“) ist kein eigenes Thema (Prüfung 24.10.2026)', () => {
+    const msgs: WebTopicMessage[] = [
+      { role: 'user', content: 'Was verlangt das BFSG?', origin: 'web' },
+      { role: 'assistant', content: 'Antwort [1]', origin: 'web', web: ok },
+      { role: 'user', content: 'Und für Vereine?', origin: 'web', followUp: true },
+      { role: 'assistant', content: 'Antwort [1]', origin: 'web', web: ok }
+    ]
+    expect(webTopicQuestions(msgs)).toEqual([{ text: 'Was verlangt das BFSG?', clipped: false }])
+  })
+
   it('höchstens drei, die neuesten, mit Kürzungsmarke', () => {
     const msgs: WebTopicMessage[] = []
     for (let i = 0; i < 5; i++) {

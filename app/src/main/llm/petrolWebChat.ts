@@ -13,6 +13,8 @@ import type { WebResearchConfig, WebSearchHit } from '../../shared/webResearch'
 import {
   candidatesFromHits,
   runFetchQueue,
+  splitSkippedHits,
+  type WebSkippedHit,
   WEB_CHAT_NET_DEADLINE_MS,
   type QueueEntry,
   type WebChatCandidate,
@@ -35,6 +37,8 @@ export interface WebGatherResult {
   searchOk: boolean
   searchError?: string
   candidates: WebChatCandidate[]
+  /** Treffer, die nicht abgerufen wurden, weil sie keine Sachquelle sind (Übersetzer, Social/Video). */
+  skipped: WebSkippedHit[]
   entries: QueueEntry[]
   contactedHosts: string[]
   stoppedBy: 'timeout' | 'stopped' | null
@@ -61,6 +65,7 @@ export async function gatherWebSources(
     searchTriggered: false,
     searchOk: false,
     candidates: [],
+    skipped: [],
     entries: [],
     contactedHosts: [],
     stoppedBy: null
@@ -94,7 +99,9 @@ export async function gatherWebSources(
       return result
     }
     result.searchOk = true
-    result.candidates = candidatesFromHits(hits)
+    const split = splitSkippedHits(hits)
+    result.skipped = split.skipped
+    result.candidates = candidatesFromHits(split.kept)
     let started = 0
     result.entries = await runFetchQueue(result.candidates, (c) => deps.fetchPage(c.url, net.signal), {
       stopReason,

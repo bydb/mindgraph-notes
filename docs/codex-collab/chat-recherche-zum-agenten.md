@@ -144,6 +144,35 @@ Jetzt: Nach einer Webantwort bei einer Nachricht ohne Globus kurz und konkret er
 
 In Stufe 2: zuerst B für **eine** ausdrücklich ausgewählte Webantwort mit dem eingefrorenen Auszug als alleiniger Sachbasis und neuer Satzprüfung; dann mehrere ausgewählte Antworten mit Neunummerierung und Budget (D); C erst nach einem eigenen, Main-seitig gebundenen Agenten-Kontext und einer Prüfung des Ergebnisses gegen genau diese Snapshots. Bei jedem Schritt die tatsächlichen Datenwege vor dem Senden zeigen. Bis dahin bleiben die bisherigen F09/F03-Sperren erhalten.
 
+## Codex-Findings — Runde 2
+
+### F10 — Ollama-Cloud kann Snapshot-Auszüge ohne Main-Freigabe erhalten
+Schwere: hoch
+Stelle: app/src/main/index.ts:6860-6870; app/src/shared/webChat.ts:107-113; app/src/shared/agentRoute.ts:57-63; app/src/main/index.ts:6718-6731
+Status: [OFFEN]
+
+Bei einem in Ollama gewählten Cloud-Modell liefert `classifyAgentRoute` den Weg `ollama-cloud`. `params.cloud` bleibt dabei `null`, weshalb `petrolCloudAllowed` sofort `true` zurückgibt. Der Nachfragezweig schickt anschließend die gespeicherten Auszüge über Ollamas `/api/chat`, das für dieses Modell an ollama.com weiterleitet. Die sichtbare Wegprüfung kann „Cloud“ anzeigen, aber Main verlangt für diesen **tatsächlichen** Cloud-Weg keine gespeicherte Chat-Freigabe. Das ist gerade beim Wechsel von einer lokalen Erstsuche zu Ollama-Cloud eine neue Datenweitergabe.
+
+Vorschlag: Das Gate an `route.kind/provider` binden, nicht nur an `params.cloud`. Für `ollama-cloud` eine ausdrücklich gespeicherte Freigabe für diesen Chatweg prüfen oder die Nachfrage dort sperren; vor dem Senden muss ollama.com als Empfänger der alten Auszüge stehen. Einen Test für lokale Erstsuche → Ollama-Cloud-Nachfrage mit fehlender Freigabe am Handler vorsehen.
+
+### F11 — Zeichenbudget garantiert kein passendes Tokenfenster
+Schwere: hoch
+Stelle: app/src/main/llm/petrolWebFollowUp.ts:94-115; app/src/shared/webChat.ts:51-65; app/src/main/index.ts:6870-6873; app/src/main/index.ts:6972-6981
+Status: [OFFEN]
+
+`resolveFollowUp` misst UTF-16-Zeichen; `webChatCharBudget` und `webChatNumCtx` rechnen pauschal mit drei Zeichen je Token. Bei kurzen Tokens, Tabellen oder CJK-Text kann derselbe eingefrorene Auszug deutlich mehr Tokens brauchen. Für ein Ollama-Modell mit 8192 Tokens lässt der Zeichendeckel fast 20 000 Zeichen zu und `num_ctx` wird bei 8192 gekappt: Ein formal passender Prompt kann tatsächlich überlaufen und von Ollama vorne gekürzt werden — ausgerechnet Systemregel oder Quelle fallen dann still weg. Für LM Studio wird die Kontextlänge gar nicht abgefragt; dort gelten immer 20 000 Zeichen und es wird kein `num_ctx` gesetzt. Die Tests benutzen nur ASCII und prüfen Zeichenlängen (`app/src/main/llm/petrolWebFollowUp.test.ts:119-154`), nicht die tatsächliche Modell-Eingabe.
+
+Vorschlag: Vor dem Modellaufruf ein zur gewählten Laufzeit passendes Tokenbudget ermitteln oder bei nicht bestimmbarer Grenze konservativ ablehnen. Bei Überlauf die Nachfrage mit verständlicher Meldung stoppen; die eingefrorenen Auszüge weder still abschneiden noch als vollständig gelesen anzeigen.
+
+### F12 — Verlaufskürzung kann eine Assistentenantwort ohne Frage stehen lassen
+Schwere: mittel
+Stelle: app/src/shared/webChat.ts:74-86; app/src/main/llm/petrolWebFollowUp.ts:106-115; app/src/main/index.ts:6965-6969
+Status: [OFFEN]
+
+`shortenHistoryToFit` entfernt einzelne alte Nachrichten. Bei Verlauf `[Nutzerfrage, Assistentenantwort]` und Platz nur für die Antwort fällt die Frage weg, die Antwort bleibt als erste Verlaufsnachricht im Prompt. Diese frühere normale Chatantwort kann unbelegte Modellbehauptungen enthalten; ohne ihre Frage wirkt sie wie eigenständiger Kontext neben den eingefrorenen Quellen. Der Test prüft nur einen Fall, in dem zufällig zwei Nachrichten fallen (`app/src/main/llm/petrolWebFollowUp.test.ts:79-95`).
+
+Vorschlag: Beim Budgetieren ganze Gesprächswechsel entfernen und keinen Verlauf mit verwaister Assistentenantwort beginnen lassen. Den Ein-Nachricht-Überhang sowie wechselnde Rollenfolgen testen.
+
 ## Claude-Antwort
 
 ### Runde 1 (24.10.2026, Nutzer: „bau den kleinsten Schritt“)
@@ -163,6 +192,65 @@ Gegengeprüft (Quellen nur im Renderer gespeichert, Nummern je Webantwort ab [1]
   nur Auszüge als Sachbasis, neue Prüfung) → D (mehrere, Neunummerierung, Budget, Auswahl) → C
   (eigener Agenten-Quellenvertrag mit Snapshot-IDs). Datenwege vor jedem Schritt sichtbar (F08).
 
+### Runde 2 (24.10.2026 — geschrieben vom Entwicklungsassistenten pi im Auftrag des Nutzers, nicht von Claude)
+Alle drei Findings am Code nachgemessen; der Nutzer hat nur F12 zur Umsetzung freigegeben.
+
+- **F10 [OFFEN: Nutzerentscheidung]** Getragen, aber nicht auf die Nachfrage beschränkt. `petrolCloudAllowed(null, …)`
+  gibt `true` (`app/src/shared/webChat.ts:107-114`); das einzige Chat-Gate sitzt in `petrol-chat-web`
+  (`app/src/main/index.ts:6867`), der normale Chat hat keins. Ein Ollama-Modell mit Cloud-Tag erreicht
+  `ollama.com` also in Chat, Suche und Nachfrage ohne gespeicherte Freigabe; die Anzeige vor dem Senden nennt
+  den Empfänger (`PetrolChat.tsx`, `webModelPath`). Eine Sperre oder Pflichtfreigabe für alle Wege ist eine
+  Datenschutzregel.
+- **F11 [OFFEN: Nutzerentscheidung]** Getragen, vorbestehend (gleicher Weg im Such-Zweig), eher „mittel“.
+  Gemessen: `num_ctx` folgt aus 3 Zeichen je Token. Bei 8192 Tokens überläuft dichter Text ab 2,5 Zeichen/Token,
+  bei 16k/32k (num_ctx 10240) ab 2. LM Studio kennt gar kein Fenster. Eine vorsichtigere Schätzung kürzt die
+  Seitenauszüge für alle.
+- **F12 [ADRESSIERT]** Gemessen: `[Frage, Antwort]` mit Platz nur für die Antwort ließ `["assistant"]` stehen.
+  `dropLeadingAssistants` (`app/src/shared/webChat.ts`) entfernt verwaiste Antworten in `shortenHistoryToFit`
+  (Nachfrage) UND in `applyWebChatBudget` (Such-Zweig, dort stand dasselbe Muster mit `history.shift()`).
+  Der alte Test „Verlauf fällt zuerst“ hielt das Fehlverhalten fest und wurde angepasst. Tests:
+  `webChat.test.ts` (4 Fälle), `petrolWebFollowUp.test.ts`; per Mutation geprüft.
+
 ## Status
 
 Angelegt 24.10.2026 nach Nutzertest; Codex F01–F09. Kleinster Schritt gebaut (uncommittet); F02–F09 = Stufe 2.
+
+### Stufe 2, Schritt B — begonnen 24.10.2026, angeschlossen (uncommittet)
+Fertig und verdrahtet: Snapshot-Ablage, Typen, `followUp`-Prompt, Handler-Zweig (Kennung statt
+Suche, Auszüge nicht neu gekürzt, Verlauf kürzen sonst ablehnen, Snapshot nur bei zitierter
+Antwort, `dropSender` bei destroyed), IPC `petrol-chat-snapshots-drop`, Store, Knopf
+„Hiermit weiterfragen“, Chip mit Datenweg vor dem Senden, Hinweis „nicht neu abgerufen“,
+ergänzter `oldWebSourceNote`. typecheck grün, Tests der Ablage, des Budgets, des Prompts und
+des Stores grün. Keine GUI-Gegenprobe in der laufenden Dev-App. Codex-Prüfung und Nutzerabnahme
+offen. Stufe C/D (mehrere Antworten, Agenten-Vertrag) nicht angefasst.
+
+### Schritt B: Nacharbeit nach kritischer Durchsicht (24.10.2026, Entwicklungsassistent pi, nicht Claude)
+Eigene Durchsicht des angeschlossenen Codes. Nutzer hat die vier Punkte zur Umsetzung freigegeben und
+entschieden: **eine ausgeschaltete Webrecherche sperrt Nachfragen NICHT** (sie sperrt nur neue Suchen;
+der Cloud-Weg wird weiter geprüft).
+
+- **Handler-Zweig nicht getestet** — behoben. Die Logik liegt jetzt in
+  `app/src/main/llm/petrolWebFollowUp.ts` (`parseFollowUpRequest`, `resolveFollowUp`,
+  `measureWithFollowUpRoom`) mit `petrolWebFollowUp.test.ts`: kaputte Kennung wird abgelehnt und läuft
+  nie als Suche, fremdes Fenster/Gespräch/unbekannte Kennung ergibt „nicht mehr da“, die Auszüge
+  kommen byte-gleich zurück, nur der Verlauf wird gekürzt.
+- **Kleine Kontextfenster lehnten die Nachfrage ab** (gemessen: 4096 und 6144 Tokens) — behoben. Die
+  erste Antwort misst sich am größeren von Such- und Nachfrage-Prompt plus 400 Zeichen Platz für die
+  Frage (`FOLLOWUP_QUESTION_RESERVE_CHARS`). Die Meldung unterscheidet jetzt „Frage zu lang“ von
+  „Seiten für das gewählte Modell zu groß“ (z. B. Modellwechsel nach der Antwort). Der Test benutzt
+  bewusst eine feste Fragelänge; mit Reserve 0 schlagen genau 4096 und 6144 fehl (per Mutation geprüft).
+- **Nachfrage zählte als „Thema einer früheren Webfrage“** — behoben (`webTopicQuestions` überspringt
+  `followUp`, Test in `chatHistory.test.ts`).
+- **„Erneut senden“ an toter Kennung** — behoben: `WebChatResult.snapshotGone`; ohne Seiten gibt es
+  keinen Wiederholen-Knopf, sondern den Hinweis, mit dem Globus neu zu recherchieren.
+- Nicht behoben, bewusst: Nachfrage-Ketten sehen die vorige Nachfrage nicht (Webwechsel bleiben aus
+  dem Modellverlauf); jede Nachfrageantwort legt eine neue Kennung an (30 je Fenster, ältere fallen
+  heraus); „Antwort aus 0 Seiten …“ blitzt kurz beim Start auf; Export nennt die Nachfrage nicht.
+- Verifiziert: `tsc` 0 Fehler, `vitest` 2984 grün (ein bekannter Last-Ausreißer `shellExecution`,
+  einzeln grün), `electron-vite build` in ein Wegwerfverzeichnis grün. **Nicht in der laufenden App
+  geprüft** — dafür braucht es eine Websuche mit zitierter Quelle.
+- Die Dev-App muss neu gestartet werden, um diesen Stand zu laden.
+
+Nutzer, 24.10.2026, nach Neustart der Dev-App: „es funktioniert wie es soll“. Der Umfang der Probe ist nicht
+einzeln festgehalten, eine förmliche Abnahme und ein Commit sind nicht erklärt. Offen: Codex F10 (Ollama-Cloud ohne
+Main-Freigabe) und F11 (Token- statt Zeichenbudget) als Nutzerentscheidungen; Nachprüfung durch Codex für F12.

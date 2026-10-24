@@ -390,6 +390,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Websuche im Petrol-Chat (Stufe 1b): Suche, Abrufe und Modell in EINER Anfrage mit
   // derselben Kennung. Fortschritt auf eigenem Kanal, Textstücke auf petrol-chat-chunk.
   petrolChatWeb: (params: unknown) => ipcRenderer.invoke('petrol-chat-web', params),
+  petrolChatSnapshotsDrop: (scopeId: string) => ipcRenderer.invoke('petrol-chat-snapshots-drop', scopeId) as Promise<boolean>,
   onPetrolChatProgress: (callback: (p: unknown) => void) => {
     ipcRenderer.removeAllListeners('petrol-chat-progress')
     ipcRenderer.on('petrol-chat-progress', (_event, p) => callback(p))

@@ -65,6 +65,43 @@ export function webChatNumCtx(promptChars: number, contextTokens: number | null)
   return contextTokens && contextTokens > 0 ? Math.min(want, contextTokens) : want
 }
 
+/**
+ * Nachfrage aus eingefrorenen Auszügen (Stufe 2, Schritt B): die Auszüge werden nicht
+ * noch einmal gekürzt. Passt Systemtext + Frage + Verlauf nicht ins Budget, fallen die
+ * ältesten Verlaufsnachrichten weg. Passt der feste Teil allein nicht, ist das null —
+ * dann ablehnen, nicht still kürzen.
+ */
+export function shortenHistoryToFit<T extends { content: string; role?: string }>(
+  history: readonly T[],
+  fixedChars: number,
+  budget: number
+): { history: T[]; dropped: number } | null {
+  if (fixedChars > budget) return null
+  const kept = [...history]
+  let dropped = 0
+  while (kept.length > 0 && fixedChars + kept.reduce((n, m) => n + m.content.length, 0) > budget) {
+    kept.shift()
+    dropped++
+  }
+  // Nie mit einer Antwort ohne ihre Frage beginnen (Codex F12, 24.10.2026).
+  dropped += dropLeadingAssistants(kept)
+  return { history: kept, dropped }
+}
+
+/**
+ * Entfernt führende Assistentenantworten, deren Frage schon herausgekürzt wurde. Eine verwaiste
+ * Antwort stünde als eigenständiger Kontext neben den Quellen — samt allem Unbelegten darin.
+ * Verändert `messages` und gibt die Zahl der entfernten Nachrichten zurück.
+ */
+export function dropLeadingAssistants(messages: Array<{ role?: string }>): number {
+  let n = 0
+  while (messages.length > 0 && messages[0].role === 'assistant') {
+    messages.shift()
+    n++
+  }
+  return n
+}
+
 /** Kontextlänge aus der Antwort von Ollamas `/api/show` (`model_info.<arch>.context_length`). */
 export function contextLengthFromShow(json: unknown): number | null {
   const info = (json as { model_info?: Record<string, unknown> } | null)?.model_info
@@ -163,13 +200,31 @@ export interface WebChatResult {
   unfetchedHits?: WebUnfetchedHit[]
   provenance: WebChatProvenance
   error?: string
+  /**
+   * Nur fertige Antwort mit mindestens einer zitierten Quelle: Kennung der im Main eingefrorenen
+   * Auszüge, für „Hiermit weiterfragen“ (chat-recherche-zum-agenten.md, Stufe 2 Schritt B).
+   */
+  snapshotId?: string
+  /** Gesetzt = Nachfrage aus eingefrorenen Auszügen, ohne neue Suche und ohne neue Abrufe. */
+  basis?: { kind: 'snapshot' }
+  /** Ältere Verlaufsnachrichten, die nicht mitgingen, damit die Auszüge vollständig bleiben. */
+  historyDropped?: number
+  /** Nachfrage scheiterte, weil die eingefrorenen Auszüge nicht mehr da sind — Wiederholen ist zwecklos. */
+  snapshotGone?: boolean
+  /** Treffer, die gar nicht erst abgerufen wurden, weil sie keine Sachquelle sind (`splitSkippedHits`). */
+  skipped?: WebSkippedHit[]
 }
 
 /** Renderer → Main. Keine URLs, kein Anbieter, kein Schlüssel (F01). */
 export interface PetrolWebRequest {
   requestId: string
   question: string
+  /** Suchwörter; leer bei einer Nachfrage aus eingefrorenen Auszügen (`snapshotId`). */
   query: string
+  /** Gesprächsbereich (Tab) — bindet die eingefrorenen Auszüge an dieses Gespräch (F02). */
+  scopeId?: string
+  /** Gesetzt = keine Suche, Antwort nur aus diesen im Main eingefrorenen Auszügen. */
+  snapshotId?: string
   history: Array<{ role: 'user' | 'assistant'; content: string }>
   model: string
   backend: 'ollama' | 'lmstudio'
@@ -211,6 +266,113 @@ export function followUpQuery(previousQuery: string, question: string): string {
   const q = question.replace(/\s+/g, ' ').trim()
   if (!q || prev.toLowerCase() === q.toLowerCase()) return prev
   return prev ? `${prev} ${q}` : q
+}
+
+// ── Suchwörter: Gesprächssatz statt Stichwörter ──────────────────────────────
+
+// Interjektionen, die ALLEIN am Satzanfang nichts über das Thema sagen. Nur mit folgendem
+// Satzzeichen gewertet: „Gut Hohenhaus Öffnungszeiten“ und „Ja-Stimmen 2025“ sind Suchen.
+const CHATTY_INTERJECTION = /^(?:okay|ok|also|hm+|ähm|äh|naja|na ja|na dann|na gut|gut|ja|nein|doch|genau|super|danke|hallo|hi|hey|moin|alles klar|well|hello|thanks|thank you)\s*[,!.…;:?]/
+// Interjektion + gesprächige Fortsetzung, auch ohne Satzzeichen: „Okay schauen wir mal“.
+const CHATTY_INTERJECTION_THEN = /^(?:okay|ok|also|naja|na ja|na dann|na gut|gut|ja|nein|hm+|ähm|äh|well|so)\s*,?\s*(?:schau(?:en)? (?:wir|mal)|mal sehen|lass(?:t)? uns|und (?:jetzt|dann|nun)|was (?:nun|jetzt))\b/
+// Wendungen, die an Petrol gerichtet sind, nicht an eine Suchmaschine.
+const CHATTY_PHRASE = /^(?:mal sehen|schau(?:en)? wir|lass(?:t)? uns|sag mal|kannst du|könntest du|weißt du|hast du|ich (?:möchte|will|würde|wollte|brauche|suche)|can you|could you|would you|let'?s|tell me|i (?:want|would like|need))\b/
+// Eindeutig gesprächige Formeln, auch mitten in den ersten Wörtern („Na dann, schauen wir mal“).
+const CHATTY_ANYWHERE = /\b(?:schau(?:en)? wir mal|mal sehen|wie geht'?s|wie gehts|wie geht es (?:dir|euch|ihnen))\b/
+// Nur Füllwörter, höchstens zwei.
+const CHATTY_ONLY = new Set(['okay', 'ok', 'ja', 'nein', 'doch', 'genau', 'super', 'gut', 'danke', 'dir', 'hallo', 'hi', 'hey', 'moin', 'hm', 'ähm', 'äh', 'naja'])
+// Längere Nachrichten sind keine „Suchwörter“ mehr; dafür gilt die Längenwarnung.
+const CHATTY_MAX_WORDS = 25
+
+/**
+ * Klingt der Text nach einem Satz an Petrol statt nach Suchwörtern? Nur eine Warnung — gesendet wird
+ * trotzdem, und nichts wird umgeschrieben. Anlass (24.10.2026): „Okay, schauen wir mal“ lieferte
+ * Übersetzer-, Wörterbuch- und Videoseiten, weil die Suche den Satz wörtlich nimmt. Bewusst eng
+ * gefasst: lieber eine Warnung zu wenig als eine, die bei echten Suchen stört. Bekannte Grenze: ein
+ * Titel mit Interjektion und Komma („Hallo, Welt C Programm“) warnt fälschlich; steht im Rest eine
+ * Zahl („Okay, Boomer Film 2019“), gilt es als Suche.
+ */
+export function looksConversational(query: string): boolean {
+  const q = query.trim().toLowerCase().replace(/^[\s"'„“‚‘.…–—-]+/, '')
+  if (!q) return false
+  const words = q.split(/\s+/).filter(Boolean)
+  if (words.length > CHATTY_MAX_WORDS) return false
+  if (words.length <= 2 && words.every(w => CHATTY_ONLY.has(w.replace(/[,!.…;:?]+$/, '')))) return true
+  if (CHATTY_PHRASE.test(q) || CHATTY_INTERJECTION_THEN.test(q)) return true
+  if (CHATTY_ANYWHERE.test(words.slice(0, 6).join(' '))) return true
+  const m = CHATTY_INTERJECTION.exec(q)
+  return !!m && !/\d/.test(q.slice(m[0].length))
+}
+
+// ── Treffer, die keine Sachquelle sind ───────────────────────────────────────
+
+export type WebSkipCategory = 'translator' | 'social'
+
+export interface WebSkippedHit {
+  host: string
+  category: WebSkipCategory
+  /** Wie viele Treffer dieses Hosts übersprungen wurden. */
+  count: number
+}
+
+// Übersetzer, Wörterbücher und Social/Video-Seiten liefern für eine Sachfrage keinen
+// belegbaren Text (Wortpaare, Beispielsätze, leere Hüllseiten) — und der Wortvergleich der
+// Prüfung hielte sie trotzdem für „Quelle“. Gilt NUR für Treffer der Chat-Suche; der Agent und
+// Adressen, die der Nutzer selbst nennt, sind nicht betroffen. Bewusst kurz und benannt.
+const SKIP_DOMAINS: ReadonlyArray<{ category: WebSkipCategory; domains: readonly string[]; patterns?: readonly RegExp[] }> = [
+  {
+    category: 'translator',
+    domains: ['reverso.net', 'deepl.com', 'dict.cc', 'leo.org', 'dictionary.cambridge.org', 'translate.com'],
+    patterns: [/^translate\.(?:google|yandex)\.[a-z.]+$/, /(?:^|\.)linguee\.[a-z]{2,3}$/]
+  },
+  {
+    category: 'social',
+    // YouTube bewusst NICHT hier (Nutzerentscheidung 24.10.2026): Kanäle von Behörden und Hochschulen sind
+    // für den Nutzer Quellen. Abrufbar sind dort nur Titel und Beschreibung — die Prüfung vergleicht Wörter.
+    domains: ['tiktok.com', 'instagram.com', 'facebook.com', 'x.com', 'twitter.com'],
+    patterns: [/(?:^|\.)pinterest\.[a-z.]+$/]
+  }
+]
+
+function hostIn(host: string, domain: string): boolean {
+  return host === domain || host.endsWith(`.${domain}`)
+}
+
+/** Kategorie, falls der Host übersprungen wird, sonst null. */
+export function skipCategoryForHost(host: string): WebSkipCategory | null {
+  const h = host.toLowerCase().replace(/\.+$/, '')
+  for (const rule of SKIP_DOMAINS) {
+    if (rule.domains.some(d => hostIn(h, d)) || rule.patterns?.some(re => re.test(h))) return rule.category
+  }
+  return null
+}
+
+/**
+ * Trennt Treffer in „abrufen“ und „überspringen“. Wird VOR der Kappung auf acht Kandidaten
+ * angewendet, damit übersprungene Treffer keinen Platz belegen. Die übersprungenen Hosts bleiben
+ * sichtbar (Anzeige „Übersprungen: …“) — nichts verschwindet still.
+ */
+export function splitSkippedHits<T extends { url: string }>(hits: readonly T[]): { kept: T[]; skipped: WebSkippedHit[] } {
+  const kept: T[] = []
+  const skipped: WebSkippedHit[] = []
+  const byHost = new Map<string, WebSkippedHit>()
+  for (const h of hits) {
+    const url = normalizeWebUrl(h.url)
+    const host = url ? hostnameFromUrl(url) : null
+    const category = host ? skipCategoryForHost(host) : null
+    if (host && category) {
+      const known = byHost.get(host)
+      if (known) known.count++
+      else {
+        const entry: WebSkippedHit = { host, category, count: 1 }
+        byHost.set(host, entry)
+        skipped.push(entry)
+      }
+    } else {
+      kept.push(h)
+    }
+  }
+  return { kept, skipped }
 }
 
 // ── Treffer → Kandidaten ─────────────────────────────────────────────────────
@@ -360,6 +522,7 @@ export function applyWebChatBudget(input: BudgetInput): BudgetResult {
   const history = [...input.history]
   while (history.length > 0 && historyChars(history) > historyMax) history.shift()
   while (history.length > 0 && total - fixed - historyChars(history) < sourcesMin) history.shift()
+  dropLeadingAssistants(history) // keine Antwort ohne ihre Frage (Codex F12)
 
   const budget = Math.max(0, Math.min(sourcesMax, total - fixed - historyChars(history)))
   const K = input.pages.length

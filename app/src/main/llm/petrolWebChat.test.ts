@@ -57,3 +57,35 @@ describe('gatherWebSources: Stopp und Frist (F02, F03)', () => {
     expect(r.searchOk).toBe(false)
   })
 })
+
+describe('gatherWebSources: übersprungene Treffer (Sperrliste)', () => {
+  const mixed = [
+    { title: 'Okay, schauen wir mal - Translation', url: 'https://context.reverso.net/a', snippet: '' },
+    { title: 'Yandex Translate', url: 'https://translate.yandex.com/', snippet: '' },
+    { title: 'BFSG', url: 'https://www.bundesregierung.de/bfsg', snippet: '' },
+    { title: 'TikTok', url: 'https://www.tiktok.com/@x/video/1', snippet: '' },
+    { title: 'Gesetz', url: 'https://www.gesetze-im-internet.de/bfsg/', snippet: '' }
+  ]
+
+  it('ruft übersprungene Hosts nie ab, meldet sie aber', async () => {
+    const fetched: string[] = []
+    const deps: WebGatherDeps = { search: async () => mixed, fetchPage: async (u) => { fetched.push(u); return okPage(u) } }
+    const r = await gatherWebSources('q', deps, { signal: new AbortController().signal })
+    expect(fetched.sort()).toEqual(['https://www.bundesregierung.de/bfsg', 'https://www.gesetze-im-internet.de/bfsg/'])
+    expect(r.contactedHosts).toEqual(expect.not.arrayContaining(['context.reverso.net', 'translate.yandex.com', 'www.tiktok.com']))
+    expect(r.skipped.map(s => s.host)).toEqual(['context.reverso.net', 'translate.yandex.com', 'www.tiktok.com'])
+    expect(r.candidates.map(c => c.host)).toEqual(['www.bundesregierung.de', 'www.gesetze-im-internet.de'])
+  })
+
+  it('besteht die Suche nur aus übersprungenen Treffern, wird nichts abgerufen und es bleibt sichtbar warum', async () => {
+    let fetches = 0
+    const onlyJunk = mixed.filter((h) => /reverso|yandex|tiktok/.test(h.url))
+    const deps: WebGatherDeps = { search: async () => onlyJunk, fetchPage: async (u) => { fetches++; return okPage(u) } }
+    const r = await gatherWebSources('q', deps, { signal: new AbortController().signal })
+    expect(fetches).toBe(0)
+    expect(r.searchOk).toBe(true)
+    expect(r.candidates).toEqual([])
+    expect(r.entries).toEqual([])
+    expect(r.skipped.length).toBe(3)
+  })
+})

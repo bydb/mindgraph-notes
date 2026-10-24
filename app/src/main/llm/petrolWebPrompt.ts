@@ -25,10 +25,18 @@ export function prepareWebExcerpt(text: string, sanitize: (text: string) => stri
   return escapeDelimiters(sanitize(text))
 }
 
-export function buildPetrolWebSystemPrompt(sources: readonly WebSource[], today: string, sanitize: (text: string) => string, topics: readonly WebTopicQuestion[] = []): string {
+/**
+ * `followUp`: Nachfrage zu einer früheren Recherche (Stufe 2, Schritt B). Dieselben Regeln, nur
+ * die Einleitung sagt ehrlich, dass nicht neu gesucht wurde und die Seiten älter sein können.
+ * Die frühere Antwort steht bewusst NICHT im Prompt (Codex F03): sie ist Modelltext, keine Quelle.
+ */
+export function buildPetrolWebSystemPrompt(sources: readonly WebSource[], today: string, sanitize: (text: string) => string, topics: readonly WebTopicQuestion[] = [], followUp = false): string {
   const K = sources.length
   const context = sources.map((s) => `${webSourceHeader(s, sanitize)}\n${s.excerpt}`).join('\n\n---\n\n')
-  return `Du bist Petrol, der Gesprächspartner in der Notiz-App MindGraph Notes. Für die aktuelle Frage hat die App im Web gesucht und ${K} ${K === 1 ? 'Seite' : 'Seiten'} abgerufen. Die Auszüge stehen unten, nummeriert von 1 bis ${K}. Heute ist der ${today}.
+  const intro = followUp
+    ? `Die aktuelle Frage ist eine Nachfrage zu einer früheren Websuche in diesem Gespräch. Die App hat dafür NICHT neu gesucht, sondern gibt dir die ${K} ${K === 1 ? 'Seite' : 'Seiten'}, die damals abgerufen wurden — das Abrufdatum steht an jeder Seite. Deine frühere Antwort siehst du absichtlich nicht; stütze dich nur auf die Auszüge.`
+    : `Für die aktuelle Frage hat die App im Web gesucht und ${K} ${K === 1 ? 'Seite' : 'Seiten'} abgerufen.`
+  return `Du bist Petrol, der Gesprächspartner in der Notiz-App MindGraph Notes. ${intro} Die Auszüge stehen unten, nummeriert von 1 bis ${K}. Heute ist der ${today}.
 
 SO ANTWORTEST DU:
 - Ausschließlich aus diesen Auszügen. Dein eigenes Wissen ergänzt nichts — auch nicht, wenn du dir sicher bist.

@@ -28,6 +28,18 @@ describe('Petrol-Web-Prompt: Seiten sind untrusted (F05)', () => {
     expect(prompt).toMatch(/Ausschließlich aus diesen Auszügen/)
   })
 
+  it('eine Nachfrage sagt, dass nicht neu gesucht wurde, und enthält die frühere Antwort nicht (F03)', () => {
+    const sources: WebSource[] = [{
+      n: 1, title: 'BFSG', url: 'https://a.example/', host: 'a.example',
+      fetchedAt: '2026-10-24T10:00:00.000Z', excerpt: 'Der Auszug bleibt vollständig.', originalChars: 30, truncated: false
+    }]
+    const prompt = buildPetrolWebSystemPrompt(sources, '2026-10-24', id, [], true)
+    expect(prompt).toContain('NICHT neu gesucht')
+    expect(prompt).toContain('frühere Antwort siehst du absichtlich nicht')
+    expect(prompt).toContain('Der Auszug bleibt vollständig.')
+    expect(buildPetrolWebSystemPrompt(sources, '2026-10-24', id)).not.toContain('NICHT neu gesucht')
+  })
+
   it('der FERTIGE Prompt bleibt in der Grenze, auch wenn lange Titel die Schätzung sprengen (F17)', () => {
     const page = 'Wort '.repeat(4000)
     const entries = [0, 1, 2].map((i) => ({

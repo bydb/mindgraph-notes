@@ -53,6 +53,8 @@ export function completedTurns<T extends TurnMessage>(messages: readonly T[]): T
 /** Nachricht des Petrol-Chats, soweit für Themenfragen relevant. */
 export interface WebTopicMessage extends TurnMessage {
   web?: { kind: string; report?: { usedSources: number[] } }
+  /** Frage zu eingefrorenen Auszügen („Hiermit weiterfragen“): kein eigenes Thema. */
+  followUp?: boolean
 }
 
 export const WEB_TOPIC_LIMIT = 3
@@ -69,7 +71,9 @@ export function webTopicQuestions<T extends WebTopicMessage>(messages: readonly 
   for (let i = 0; i < messages.length - 1; i++) {
     const q = messages[i]
     const a = messages[i + 1]
-    if (q.role !== 'user' || q.origin !== 'web' || q.stopped) continue
+    // Eine Nachfrage („Und für Vereine?“) trägt ohne ihre Seiten kein Thema und ginge sonst als
+    // „frühere Webfrage“ an spätere Nachrichten, bei Cloud auch ins Netz.
+    if (q.role !== 'user' || q.origin !== 'web' || q.stopped || q.followUp) continue
     if (a.role !== 'assistant' || a.origin !== 'web' || a.stopped || a.error) continue
     if (a.web?.kind !== 'answer' || !(a.web.report?.usedSources?.length)) continue
     const text = q.content.replace(/\s+/g, ' ').trim()

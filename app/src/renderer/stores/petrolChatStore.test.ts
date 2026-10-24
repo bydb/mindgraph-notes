@@ -6,12 +6,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 let chunkCb: ((c: { requestId: string; delta: string }) => void) | null = null
 const ollamaChat = vi.fn((..._a: unknown[]) => new Promise<{ success: boolean; response?: string }>(() => { /* läuft, bis gestoppt */ }))
+const petrolChatWeb = vi.fn((..._a: unknown[]) => new Promise(() => { /* läuft */ }))
+const petrolChatSnapshotsDrop = vi.fn(async () => true)
 
 vi.stubGlobal('window', {
   electronAPI: {
     ollamaChat: (...a: unknown[]) => ollamaChat(...a),
     lmstudioChat: () => new Promise(() => {}),
-    petrolChatWeb: () => new Promise(() => {}),
+    petrolChatWeb,
+    petrolChatSnapshotsDrop,
     petrolChatAbort: async () => {},
     onPetrolChatChunk: (cb: typeof chunkCb) => { chunkCb = cb; return () => {} },
     onPetrolChatProgress: () => () => {}
@@ -40,6 +43,8 @@ const last = (): Msg => { const m = usePetrolChatStore.getState().scope(ID).mess
 
 beforeEach(() => {
   ollamaChat.mockClear()
+  petrolChatWeb.mockClear()
+  petrolChatSnapshotsDrop.mockClear()
   if (usePetrolChatStore.getState().activeScope) usePetrolChatStore.getState().stop(ID)
 })
 
@@ -79,5 +84,39 @@ describe('Petrol-Chat: Themenbrücke im Store', () => {
     await usePetrolChatStore.getState().send(ID, 'Was stand in der 1. Quelle?', OPTS)
     expect(ollamaChat).not.toHaveBeenCalled()
     expect(last().appNote).toBe('old-web-source')
+  })
+})
+
+
+describe('Petrol-Chat: Nachfrage aus eingefrorenen Auszügen', () => {
+  const SNAP = 'a'.repeat(32)
+
+  it('schickt nur die Kennung und den Gesprächsbereich, keine Suchwörter', async () => {
+    seed([{ role: 'user', content: 'normal', at: 1 }, { role: 'assistant', content: 'antwort', at: 2 }, ...webExchange])
+    void usePetrolChatStore.getState().send(ID, 'Was gilt für Medienzentren?', { ...OPTS, followUp: { snapshotId: SNAP } })
+    await Promise.resolve()
+    expect(petrolChatWeb).toHaveBeenCalledTimes(1)
+    expect(ollamaChat).not.toHaveBeenCalled()
+    const arg = petrolChatWeb.mock.calls[0][0] as { snapshotId?: string; scopeId?: string; query?: string; webTopics?: unknown; history: { content: string }[] }
+    expect(arg.snapshotId).toBe(SNAP)
+    expect(arg.scopeId).toBe(ID)
+    expect(arg.query).toBe('')
+    expect(arg.webTopics).toBeUndefined()
+    expect(arg.history.map(m => m.content)).toEqual(['normal', 'antwort'])
+    expect(last().role).toBe('user')
+    expect(last().followUpSnapshotId).toBe(SNAP)
+  })
+
+  it('„Was stand in Quelle 1?“ geht mit gewählter Nachfrage an den Main, nicht in die feste Absage', async () => {
+    seed(webExchange)
+    void usePetrolChatStore.getState().send(ID, 'Was stand in Quelle 1?', { ...OPTS, followUp: { snapshotId: SNAP } })
+    await Promise.resolve()
+    expect(petrolChatWeb).toHaveBeenCalledTimes(1)
+    expect(last().appNote).toBeUndefined()
+  })
+
+  it('Neues Gespräch verwirft die Snapshots dieses Bereichs', () => {
+    usePetrolChatStore.getState().clear(ID)
+    expect(petrolChatSnapshotsDrop).toHaveBeenCalledWith(ID)
   })
 })

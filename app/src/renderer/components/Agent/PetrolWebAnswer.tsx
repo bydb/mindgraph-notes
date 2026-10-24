@@ -11,7 +11,7 @@ import { sanitizeHtml } from '../../utils/sanitize'
 import { createWebAnswerMarkdown, markWebAnswer, sentenceFlags, type WebAnswerEnv, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
 import type { CitationEnv } from '../../utils/citationMarkdown'
 import type { CitationReport, SentenceCheck } from '../../../shared/rag/citations'
-import type { SentenceExtra, WebChatProvenance, WebFetchFailReason, WebFetchFailure, WebSource, WebUnfetchedHit } from '../../../shared/webChat'
+import type { SentenceExtra, WebChatProvenance, WebFetchFailReason, WebFetchFailure, WebSkippedHit, WebSource, WebUnfetchedHit } from '../../../shared/webChat'
 
 const md = createWebAnswerMarkdown()
 
@@ -205,6 +205,16 @@ export function WebUnfetchedHits({ hits, failures }: { hits: WebUnfetchedHit[]; 
       )}
     </div>
   )
+}
+
+/** Treffer, die nicht abgerufen wurden, weil sie keine Sachquelle sind — sichtbar, nie still. */
+export function WebSkippedLine({ skipped }: { skipped: WebSkippedHit[] | undefined }) {
+  const { t } = useTranslation()
+  if (!skipped || skipped.length === 0) return null
+  const kinds = [...new Set(skipped.map(s => t(s.category === 'translator' ? 'petrolChat.webSkipTranslator' : 'petrolChat.webSkipSocial')))].join(', ')
+  const n = skipped.reduce((sum, s) => sum + (s.count || 1), 0)
+  const hosts = skipped.map(s => ((s.count || 1) > 1 ? `${s.host} (${s.count}×)` : s.host)).join(', ')
+  return <div className="petrol-web-muted">{t('petrolChat.webSkipped', { n, kinds, hosts })}</div>
 }
 
 /** Datenweg dieses Laufs aus Main-Provenienz (F11): Suchanbieter, Hosts, Modellweg. */

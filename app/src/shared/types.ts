@@ -1036,6 +1036,7 @@ export interface ElectronAPI {
   onPetrolChatChunk: (callback: (chunk: { requestId: string; delta: string }) => void) => void;
   petrolChatAbort: (requestId: string) => Promise<boolean>;
   petrolChatWeb: (params: import('./webChat').PetrolWebRequest) => Promise<{ success: boolean; result?: import('./webChat').WebChatResult; error?: string }>;
+  petrolChatSnapshotsDrop: (scopeId: string) => Promise<boolean>;
   onPetrolChatProgress: (callback: (p: import('./webChat').PetrolWebProgress) => void) => void;
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)

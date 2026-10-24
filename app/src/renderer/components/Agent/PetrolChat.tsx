@@ -28,14 +28,28 @@ import { VAULT_CHAT_ANSWER_TYPE } from '../../../shared/rag/indexPolicy'
 import type { AgentRoute } from '../../../shared/agentRoute'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META } from '../../../shared/webResearch'
-import { followUpQuery, lastSentWebQuery, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX } from '../../../shared/webChat'
+import { followUpQuery, lastSentWebQuery, looksConversational, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
-import { WebAnswerText, WebCheck, WebProvenanceLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
+import { WebAnswerText, WebCheck, WebProvenanceLine, WebSkippedLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 
 interface Props {
   tabId: string
   /** Wechselt den Tab auf „Auftrag“ (Umschalter liegt in der AgentView). */
   onSwitchToTask: () => void
+}
+
+function fetchedSpan(sources: readonly { fetchedAt: string }[]): string {
+  const days = [...new Set(sources.map(s => (s.fetchedAt || '').slice(0, 10)).filter(Boolean))].sort()
+  if (days.length === 0) return ''
+  if (days.length === 1) return days[0]
+  return `${days[0]}–${days[days.length - 1]}`
+}
+
+function modelRouteLine(t: (key: TranslationKey, vars?: Record<string, string | number>) => string, p: WebChatProvenance): string {
+  if (p.route === 'local') return t('petrolChat.webProvModelLocal')
+  if (p.route === 'cloud') return t('petrolChat.webProvModelCloud', { provider: p.routeLabel })
+  if (p.route) return t('petrolChat.webProvModelUnverified', { provider: p.routeLabel })
+  return ''
 }
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
@@ -110,6 +124,12 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // werden die damals gesendeten Suchwörter vor die neue Frage gesetzt — ohne Modell, sichtbar
   // im Feld. Eine alte Webantwort oder ihre Quellen wandern dabei nie mit (F09).
   const previousWebQuery = lastSentWebQuery(messages)
+  const followUpId = scope?.followUp?.snapshotId ?? null
+  const followUpMsg = followUpId
+    ? [...messages].reverse().find(m => m.role === 'assistant' && m.web?.snapshotId === followUpId)
+    : undefined
+  const followUpSources = followUpMsg?.web?.sources ?? []
+  const followUpActive = !!followUpId && !webOn
   // Thema früherer Webfragen, das bei der nächsten Nachricht mitgeht (Weg 1) — gleiche Auswahl wie im Store.
   const webTopicCount = webTopicQuestions(messages).length
   const takePreviousQuery = () => {
@@ -123,6 +143,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     : null
   // Lange Suchwörter: Hinweis, keine Sperre (Nutzertest: lange Suche → Spam-Treffer).
   const webQueryLong = webOn && !webQueryProblem && webQueryLen > WEB_CHAT_QUERY_SOFT_MAX
+  // Gesprächssatz statt Stichwörter: nur Warnung, gesendet wird trotzdem (Nutzertest 24.10.2026).
+  const webQueryChatty = webOn && !webQueryProblem && looksConversational(webQueryNorm)
   const webProgress = busy ? scope?.webProgress ?? null : null
 
   // Modelle des aktiven Backends (Ollama bzw. LM Studio), wie im Notiz-Chat.
@@ -213,6 +235,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   ].filter(Boolean)
   // Senden mit Globus wartet auf die Wegprüfung; scheitert sie, ist Senden erlaubt.
   const webWaitsForRoute = webOn && !routeSettled
+  const followUpMissing = followUpActive && !followUpMsg
+  const followUpWaits = followUpActive && !routeSettled
 
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
@@ -231,12 +255,15 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
 
   // `text` gesetzt = „Erneut senden“ einer gescheiterten Frage; der laufende Entwurf bleibt dann
   // stehen (der Store leert den Entwurf beim Senden synchron, deshalb danach zurücklegen).
-  const send = (text?: string) => {
+  const send = (text?: string, snapshotId?: string) => {
     const question = text ?? draft
     if (!question.trim() || busy || busyElsewhere || !hasModel) return
     // „Erneut senden“ geht immer ohne Web — eine neue Suche braucht den Globus (bewusst).
+    // Eine Nachfrage geht nur mit, wenn sie ausdrücklich gewählt ist oder am Wiederholen hängt.
     const withWeb = text === undefined && webOn
+    const followId = withWeb ? undefined : snapshotId ?? (text === undefined ? followUpId ?? undefined : undefined)
     if (withWeb && (webQueryProblem || webWaitsForRoute)) return
+    if (followId && (followUpWaits || (text === undefined && followUpMissing))) return
     const keep = text !== undefined ? draft : ''
     stickToBottom.current = true
     void chat().send(tabId, question, {
@@ -245,7 +272,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       lmStudioPort: ollama.lmStudioPort,
       cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null,
       run: { label: activeCloudRoute ? activeCloudRoute.label : model, routeText: selectedRouteText, routeKind: selectedRouteKind, routeKey },
-      web: withWeb ? { query: webQueryNorm } : undefined
+      web: withWeb ? { query: webQueryNorm } : undefined,
+      followUp: followId ? { snapshotId: followId } : undefined
     })
     if (keep) chat().setDraft(tabId, keep)
   }
@@ -416,6 +444,17 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       {!(msg.origin === 'web' && msg.stopped) && <div className="petrol-turn-actions">
         {msg.content.trim() && <button type="button" className="agent-card-btn" onClick={() => void copy(msg)}>{copiedAt === msg.at ? t('petrolChat.copied') : t('petrolChat.copy')}</button>}
         {vaultPath && msg.content.trim() && <button type="button" className="agent-card-btn" onClick={() => void saveAsNote(msg)}>{savedAt === msg.at ? t('petrolChat.saved') : t('petrolChat.saveNote')}</button>}
+        {msg.web?.snapshotId && msg.web.kind === 'answer' && !msg.stopped && (
+          <button
+            type="button"
+            className="agent-card-btn"
+            aria-pressed={followUpId === msg.web.snapshotId}
+            onClick={() => {
+              chat().setFollowUp(tabId, followUpId === msg.web?.snapshotId ? null : msg.web!.snapshotId!)
+              inputRef.current?.focus()
+            }}
+          >{t('petrolChat.askWithSources')}</button>
+        )}
         {msg.origin !== 'web' ? (
           <button type="button" className="agent-card-btn is-accent" aria-expanded={makeFor === msg.at} onClick={() => setMakeFor(makeFor === msg.at ? null : msg.at)}>{t('petrolChat.makeTask')}</button>
         ) : (
@@ -481,7 +520,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                         <span className="petrol-turn-webq">{t('petrolChat.webQueryLabel')}: {turn.question.webQuery}</span>
                       )}
                     </span>
-                    {turn.question.origin === 'web' && turn.question.webQuery && <span className="petrol-turn-webbadge">{t('petrolChat.webBadge')}</span>}
+                    {turn.question.followUp
+                      ? <span className="petrol-turn-webbadge">{t('petrolChat.followUpBadge')}</span>
+                      : turn.question.origin === 'web' && turn.question.webQuery && <span className="petrol-turn-webbadge">{t('petrolChat.webBadge')}</span>}
                     {turn.question.stopped && <span className="petrol-turn-flag">{t('petrolChat.stopped')}</span>}
                   </div>
                 )}
@@ -491,18 +532,24 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                   <>
                     <div className="petrol-turn-error">
                       <span>{turn.answer.content ? t('petrolChat.error', { error: turn.answer.content }) : t('petrolChat.errorEmpty')}</span>
-                      {turn.question && (
-                        <button type="button" className="agent-card-btn" onClick={() => send(turn.question!.content)} disabled={busy || busyElsewhere || !hasModel}>
+                      {/* Sind die Seiten weg, scheitert jede Wiederholung gleich — dann kein Knopf. */}
+                      {turn.question && !turn.answer.web?.snapshotGone && (
+                        <button type="button" className="agent-card-btn" onClick={() => send(turn.question!.content, turn.question!.followUpSnapshotId)} disabled={busy || busyElsewhere || !hasModel}>
                           {t('petrolChat.retry')}
                         </button>
                       )}
                     </div>
-                    {turn.answer.web && <div className="petrol-web-block"><WebProvenanceLine p={turn.answer.web.provenance} /></div>}
+                    {turn.answer.web?.snapshotGone && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
+                    {turn.answer.web?.basis?.kind === 'snapshot' && (
+                      <div className="petrol-web-muted">{t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) })}</div>
+                    )}
+                    {turn.answer.web && <div className="petrol-web-block"><WebSkippedLine skipped={turn.answer.web.skipped} /><WebProvenanceLine p={turn.answer.web.provenance} /></div>}
                   </>
                 ) : turn.answer?.web?.kind === 'nothing-readable' ? (
                   <>
                   <div className="petrol-web-block">
                     <WebUnfetchedHits hits={turn.answer.web.unfetchedHits ?? []} failures={turn.answer.web.failures} />
+                    <WebSkippedLine skipped={turn.answer.web.skipped} />
                     <WebProvenanceLine p={turn.answer.web.provenance} />
                   </div>
                   {answerFoot(turn.answer)}
@@ -523,8 +570,14 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                           anchor={`petrol-src-${turn.answer.at}`}
                         />
                       )}
-                      {turn.answer.web && <WebProvenanceLine p={turn.answer.web.provenance} />}
-                      <div className="petrol-web-muted">{t('petrolChat.webFollowUp')}</div>
+                      {turn.answer.web?.basis?.kind === 'snapshot' ? (
+                        <div className="petrol-web-muted petrol-web-prov">{[t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) }), modelRouteLine(t, turn.answer.web.provenance)].filter(Boolean).join(' · ')}</div>
+                      ) : turn.answer.web ? <WebProvenanceLine p={turn.answer.web.provenance} /> : null}
+                      <WebSkippedLine skipped={turn.answer.web?.skipped} />
+                      {!!turn.answer.web?.historyDropped && (
+                        <div className="petrol-web-muted">{t('petrolChat.historyDropped', { n: turn.answer.web.historyDropped })}</div>
+                      )}
+                      <div className="petrol-web-muted">{turn.answer.web?.snapshotId ? t('petrolChat.webFollowUpChoice') : t('petrolChat.webFollowUp')}</div>
                     </div>
                     {answerFoot(turn.answer)}
                   </>
@@ -538,6 +591,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     {streaming
                       ? <WebAnswerText answer={streaming} anchor={`petrol-live-${tabId}`} />
                       : <div className="petrol-turn-a"><div className="petrol-msg-wait" aria-label={t('petrolChat.waiting')}><span /><span /><span /></div></div>}
+                    {turn.question?.followUp && <div className="petrol-web-muted">{t('petrolChat.followUpNoSearch')}</div>}
                     {webProgress.sources && webProgress.sources.length > 0 && (
                       <div className="petrol-web-block">
                         <WebSourceList sources={webProgress.sources} used={null} failures={webProgress.failures ?? []} notFetched={webProgress.notFetched ?? 0} anchor={`petrol-live-${tabId}`} />
@@ -604,7 +658,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
             </button>
           ) : (
-            <button type="button" className="petrol-chat-send" onClick={() => send()} disabled={!draft.trim() || busyElsewhere || !hasModel || (webOn && (!!webQueryProblem || webWaitsForRoute))} aria-label={webWaitsForRoute ? t('petrolChat.webSendChecking') : t('petrolChat.send')} title={webWaitsForRoute ? t('petrolChat.webSendChecking') : t('petrolChat.send')}>
+            <button type="button" className="petrol-chat-send" onClick={() => send()} disabled={!draft.trim() || busyElsewhere || !hasModel || (webOn && (!!webQueryProblem || webWaitsForRoute)) || followUpWaits || followUpMissing} aria-label={webWaitsForRoute || followUpWaits ? t('petrolChat.webSendChecking') : t('petrolChat.send')} title={webWaitsForRoute || followUpWaits ? t('petrolChat.webSendChecking') : t('petrolChat.send')}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
             </button>
           )}
@@ -621,6 +675,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               <button type="button" className="agent-card-link-btn" title={previousWebQuery} onClick={takePreviousQuery}>{t('petrolChat.webQueryTakePrevious')}</button>
             )}
             {webQueryLong && <span className="petrol-web-line-warn">{t('petrolChat.webQueryLongHint')}</span>}
+            {webQueryChatty && <span className="petrol-web-line-warn">{t('petrolChat.webQueryChattyHint')}</span>}
           </div>
         )}
         {webOn && !busy && webQueryOpen && (
@@ -640,6 +695,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             </label>
             {webQueryProblem && <div className="petrol-chat-note is-error">{webQueryProblem}</div>}
             {webQueryLong && <div className="petrol-chat-note is-warn">{t('petrolChat.webQueryLongHint')}</div>}
+            {webQueryChatty && <div className="petrol-chat-note is-warn">{t('petrolChat.webQueryChattyHint')}</div>}
             <div className="petrol-web-paths">
               {[t('petrolChat.webPathSearch', { provider: webProvider }), ...webPathParts].join(' · ')}
               {previousWebQuery && webQuery.indexOf(previousWebQuery) !== 0 && (
@@ -650,7 +706,21 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         )}
         {/* Nach Webantworten ohne Globus: ehrlich sagen, dass sie nicht mitgelesen werden
             (Codex, chat-recherche-zum-agenten.md F01) — nur solange eine Nachricht getippt wird. */}
-        {!webOn && !busy && previousWebQuery && draft.trim() && (
+        {followUpActive && !busy && (
+          <div className="petrol-chat-note" role="status">
+            {followUpMissing
+              ? t('petrolChat.followUpGone')
+              : t('petrolChat.followUpChip', {
+                n: followUpSources.length,
+                chars: followUpSources.reduce((n, s) => n + s.excerpt.length, 0),
+                hosts: [...new Set(followUpSources.map(s => s.host))].join(', '),
+                date: fetchedSpan(followUpSources)
+              })}
+            <div className="petrol-web-paths">{webModelPath}. {t('petrolChat.followUpNoSearch')}</div>
+            <button type="button" className="agent-card-link-btn" onClick={() => chat().setFollowUp(tabId, null)}>{t('petrolChat.followUpDismiss')}</button>
+          </div>
+        )}
+        {!webOn && !followUpActive && !busy && previousWebQuery && draft.trim() && (
           <div className="petrol-chat-note">
             {webTopicCount > 0
               ? t('petrolChat.webTopicsGoAlong', { n: webTopicCount, route: topicRouteText })

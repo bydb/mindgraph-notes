@@ -14,6 +14,10 @@ import {
   followUpQuery,
   lastSentWebQuery,
   isGapStatement,
+  shortenHistoryToFit,
+  looksConversational,
+  skipCategoryForHost,
+  splitSkippedHits,
   type QueueEntry,
   type WebChatCandidate,
   type WebFetchOutcome
@@ -125,8 +129,9 @@ describe('Budget (F17)', () => {
       { role: 'user' as const, content: 'c'.repeat(500) }
     ]
     const r = applyWebChatBudget({ systemChars: 3000, questionChars: 100, history, pages: ['x'.repeat(8000), 'y'.repeat(8000), 'z'.repeat(1000)] })
-    expect(r.history.map((m) => m.content[0])).toEqual(['b', 'c'])
-    const total = 3000 + 100 + 3500 + r.excerpts.reduce((n, e) => n + e.text.length, 0)
+    // „a“ (Frage) fällt zuerst; „b“ ist dann eine Antwort ohne Frage und fällt mit (Codex F12).
+    expect(r.history.map((m) => m.content[0])).toEqual(['c'])
+    const total = 3000 + 100 + 500 + r.excerpts.reduce((n, e) => n + e.text.length, 0)
     expect(total).toBeLessThanOrEqual(20000)
     expect(r.excerpts[2]).toEqual({ text: 'z'.repeat(1000), cut: false })
     // Ungenutzter Anteil der kurzen Seite geht an die langen.
@@ -277,5 +282,162 @@ describe('Benannte Lücke statt Fehlalarm (Nutzertest 24.10.2026)', () => {
     const report = analyzeCitations(answer, ['Der Beitrag beträgt 18 Euro.'])
     const ex = sentenceExtras(answer, report, ['Der Beitrag beträgt 18 Euro.'])
     expect(ex.map((x) => !!x.gap)).toEqual([false, true])
+  })
+})
+
+
+describe('Verlauf kürzen, Auszüge nicht (Stufe 2 Schritt B)', () => {
+  it('wirft die ältesten Nachrichten ab und lässt den Inhalt der übrigen unangetastet', () => {
+    const history = [
+      { role: 'user' as const, content: 'aaaa' },
+      { role: 'assistant' as const, content: 'bbbb' },
+      { role: 'user' as const, content: 'cccc' }
+    ]
+    const fit = shortenHistoryToFit(history, 10, 14)
+    expect(fit).toEqual({ history: [{ role: 'user', content: 'cccc' }], dropped: 2 })
+    expect(history[0].content).toBe('aaaa')
+  })
+
+  it('lehnt ab, wenn der feste Teil allein nicht passt — nichts wird gekürzt', () => {
+    const page = 'Auszug bleibt ganz'
+    expect(shortenHistoryToFit([{ role: 'user', content: page }], page.length + 1, page.length)).toBeNull()
+  })
+
+  it('behält den Verlauf, wenn er ins Budget passt', () => {
+    const history = [{ role: 'user' as const, content: 'hallo' }]
+    expect(shortenHistoryToFit(history, 5, 10)).toEqual({ history, dropped: 0 })
+  })
+})
+
+
+describe('Gesprächssatz statt Suchwörter (Nutzertest 24.10.2026)', () => {
+  it('warnt bei Sätzen an Petrol', () => {
+    for (const q of [
+      'Okay, schauen wir mal',
+      'ok, mal sehen',
+      'Hallo, wie geht es dir?',
+      'Danke!',
+      'ok',
+      'Ja, genau',
+      'Mal sehen, was es zum BFSG gibt',
+      'Kannst du mir das BFSG erklären',
+      'Ich möchte wissen, was das BFSG verlangt',
+      '  „Okay, und jetzt?“',
+      // Codex F01: Varianten des beobachteten Falls, die vorher still blieben
+      'Okay schauen wir mal',
+      'Na dann, schauen wir mal',
+      // nur die Fortsetzungsregel greift (kein Satzzeichen, keine feste Formel)
+      'Okay und jetzt',
+      'Naja was nun',
+      'Ja und dann',
+      'Wie geht es dir?',
+      'Can you look this up?',
+      'Okay, ' + 'wort '.repeat(14)
+    ]) expect(looksConversational(q), q).toBe(true)
+  })
+
+  it('warnt NICHT bei echten Suchen, auch wenn sie wie ein Füllwort beginnen', () => {
+    for (const q of [
+      'BFSG Medienzentren Pflichten',
+      'Was verlangt das BFSG von Volkshochschulen?',
+      'Gut Hohenhaus Öffnungszeiten',
+      'Ja-Stimmen Bundestag 2025',
+      'Hi-Fi Anlage Test 2026',
+      'Also sprach Zarathustra Zitat Nietzsche',
+      'Rundfunkbeitrag 2026 Höhe',
+      'Hallo Welt Programm C Beispiel',
+      // Codex F01: Zahl im Rest = konkrete Suche
+      'Okay, Boomer Film 2019',
+      'Wie geht es Pflanzen im Winter',
+      'Please Please Me Beatles Album',
+      '',
+      '   '
+    ]) expect(looksConversational(q), q).toBe(false)
+  })
+
+  it('sehr lange Texte bekommen keine Gesprächs-Warnung (dafür gibt es die Längenwarnung)', () => {
+    expect(looksConversational('Okay, ' + 'Wort '.repeat(30))).toBe(false)
+  })
+})
+
+describe('Treffer, die keine Sachquelle sind (Sperrliste)', () => {
+  it('erkennt Übersetzer, Wörterbücher und Social/Video — samt Subdomains und Ländervarianten', () => {
+    expect(skipCategoryForHost('context.reverso.net')).toBe('translator')
+    expect(skipCategoryForHost('translate.yandex.com')).toBe('translator')
+    expect(skipCategoryForHost('translate.yandex.ru')).toBe('translator')
+    expect(skipCategoryForHost('translate.google.de')).toBe('translator')
+    expect(skipCategoryForHost('www.deepl.com')).toBe('translator')
+    expect(skipCategoryForHost('dictionary.cambridge.org')).toBe('translator')
+    expect(skipCategoryForHost('www.linguee.de')).toBe('translator')
+    expect(skipCategoryForHost('www.tiktok.com')).toBe('social')
+    expect(skipCategoryForHost('m.twitter.com')).toBe('social')
+    expect(skipCategoryForHost('l.instagram.com')).toBe('social')
+    expect(skipCategoryForHost('www.pinterest.de')).toBe('social')
+    expect(skipCategoryForHost('WWW.TikTok.com.')).toBe('social')
+  })
+
+  it('lässt ähnlich klingende, aber echte Quellen durch (keine Teilstring-Treffer)', () => {
+    // YouTube ist bewusst frei (Nutzerentscheidung 24.10.2026).
+    for (const h of ['www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.cambridge.org', 'netflix.com', 'flix.com', 'maxx.com', 'nottiktok.com', 'yandex.com', 'www.bundesregierung.de', 'de.wikipedia.org', 'translate.example.org', 'www.leo-bw.de', 'dictionary.com']) {
+      expect(skipCategoryForHost(h), h).toBeNull()
+    }
+  })
+
+  it('trennt Treffer und merkt sich übersprungene Hosts je einmal', () => {
+    const hits = [
+      { url: 'https://context.reverso.net/uebersetzung/a', title: 'A' },
+      { url: 'https://www.bundesregierung.de/bfsg', title: 'B' },
+      { url: 'https://context.reverso.net/uebersetzung/b', title: 'C' },
+      { url: 'https://www.tiktok.com/@x/video/1', title: 'D' },
+      { url: 'not a url', title: 'E' },
+      { url: 'https://www.gesetze-im-internet.de/bfsg/', title: 'F' }
+    ]
+    const r = splitSkippedHits(hits)
+    expect(r.kept.map(h => h.title)).toEqual(['B', 'E', 'F'])
+    expect(r.skipped).toEqual([
+      { host: 'context.reverso.net', category: 'translator', count: 2 },
+      { host: 'www.tiktok.com', category: 'social', count: 1 }
+    ])
+  })
+
+  it('übersprungene Treffer belegen keinen der acht Plätze', () => {
+    const skippedHits = Array.from({ length: 5 }, (_, i) => ({ title: `S${i}`, url: `https://www.tiktok.com/v/${i}`, snippet: '' }))
+    const goodHits = Array.from({ length: 8 }, (_, i) => ({ title: `G${i}`, url: `https://h${i}.example/`, snippet: '' }))
+    const { kept } = splitSkippedHits([...skippedHits, ...goodHits])
+    expect(candidatesFromHits(kept).length).toBe(8)
+  })
+})
+
+
+describe('Verlauf kürzen: keine Antwort ohne ihre Frage (Codex F12)', () => {
+  const u = (c: string) => ({ role: 'user' as const, content: c })
+  const a = (c: string) => ({ role: 'assistant' as const, content: c })
+
+  it('shortenHistoryToFit: fällt die Frage weg, fällt auch ihre Antwort', () => {
+    // Platz nur für die Antwort: vorher blieb [Antwort] stehen.
+    const r = shortenHistoryToFit([u('F'.repeat(100)), a('A'.repeat(100))], 50, 160)
+    expect(r).toEqual({ history: [], dropped: 2 })
+  })
+
+  it('shortenHistoryToFit: behält vollständige Wechsel und zählt die entfernten Nachrichten', () => {
+    const h = [u('1'.repeat(40)), a('2'.repeat(40)), u('3'.repeat(40)), a('4'.repeat(40))]
+    const r = shortenHistoryToFit(h, 0, 90)
+    expect(r?.history.map(m => m.role)).toEqual(['user', 'assistant'])
+    expect(r?.history[0].content).toBe('3'.repeat(40))
+    expect(r?.dropped).toBe(2)
+  })
+
+  it('shortenHistoryToFit: ein Verlauf, der schon mit einer Antwort beginnt, wird bereinigt', () => {
+    const r = shortenHistoryToFit([a('verwaist'), u('Frage'), a('Antwort')], 0, 10_000)
+    expect(r?.history.map(m => m.content)).toEqual(['Frage', 'Antwort'])
+    expect(r?.dropped).toBe(1)
+  })
+
+  it('Such-Zweig (applyWebChatBudget) hat dieselbe Regel', () => {
+    const history = [u('F'.repeat(2000)), a('A'.repeat(2000)), u('G'.repeat(500)), a('B'.repeat(500))]
+    // historyMax 2600: die erste Frage fällt, ihre Antwort darf nicht übrig bleiben.
+    const r = applyWebChatBudget({ systemChars: 1000, questionChars: 100, history, pages: ['p'.repeat(3000)], historyMax: 2600 })
+    expect(r.history[0]?.role).not.toBe('assistant')
+    expect(r.history.map(m => m.role)).toEqual(['user', 'assistant'])
   })
 })
