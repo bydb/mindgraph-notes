@@ -139,6 +139,8 @@ Das Gate erkennt „Was stand in Quelle 1?“, aber etwa „Fass deine letzte We
 
 Vorschlag: Das Gate auf eindeutige Verweise auf frühere Antwort/Recherche/Quelle ausweiten und `[n]` nur im Quellenkontext sperren. Grenzfälle mit Tests für indirekte Rückfragen, aktuelle Quellen und fachliche `[n]`-Notation belegen; bei unklarer Referenz lieber eine gezielte Rückfrage als ein erfundener Quelleninhalt.
 
+Code-Nachpruefung Runde 3: [OFFEN] Die neuen Muster erfassen die bisherigen Beispiele, bleiben aber löchrig. `asksAboutOldWebSources` liefert für „Was stand in der Webantwort?“, „Was stand in der 1. Quelle?“, „Was steht in Quelle eins?“, „What was on the page you showed me?“ und „Summarize the webpage you found earlier“ jeweils `false` (`app/src/renderer/utils/chatHistory.ts:108-123`); nach einer Webantwort gehen sie damit zum Modell. `math` unterdrückt **alle** `[n]` im Satz, auch bei „Was ist [3] + 4 und was stand in [1]?“. Umgekehrt genügt ein einziges Inhaltswort: Nach einer normalen Antwort zu Rutherford wird „Erkläre deine letzte Antwort über Rutherford“ gesperrt, obwohl diese Antwort im Modellverlauf steht (`app/src/renderer/utils/chatHistory.ts:118-121`). `chatHistory.test.ts:124-165` testet diese Mischfälle nicht.
+
 ### F09 — Herkunftshinweis fehlt beim Kopieren und Speichern
 Schwere: mittel
 Stelle: app/src/renderer/components/Agent/PetrolChat.tsx:273-287; app/src/renderer/components/Agent/PetrolChat.tsx:315-318; app/src/renderer/components/Agent/PetrolChat.tsx:406-410
@@ -147,6 +149,17 @@ Status: [OFFEN]
 Der dauerhafte Hinweis „Thema aus früherer Webfrage · ohne Websuche, aus Modellwissen“ steht nur in der Chat-Fußzeile. `exportText` gibt für solche normalen Antworten allein `msg.content` zurück; Kopie und gespeicherte Notiz verlieren die Einschränkung. Unter einer zuvor belegten Webantwort kann so eine unbelegte Fortsetzung als selbstständiger, scheinbar gleichwertiger Text weitergegeben werden. `ki-typ` kennzeichnet KI, aber nicht das Fehlen der damaligen Webquellen.
 
 Vorschlag: Bei `webTopicsUsed` den knappen Herkunftshinweis in Kopie und Notizinhalt aufnehmen, ohne eine Quellenprüfung zu behaupten.
+
+Code-Nachpruefung Runde 3: [OFFEN] Für fertige normale Antworten ist F09 behoben: `exportText` hängt den lokalisierten Hinweis an und wird von Kopie und Notiz genutzt (`app/src/renderer/components/Agent/PetrolChat.tsx:273-289,317-320`). Bei „Stopp“ nach dem ersten Textstück erzeugt der Store aber eine normale, weiter kopier- und speicherbare Antwort **ohne** `webTopicsUsed` (`app/src/renderer/stores/petrolChatStore.ts:299-305`; `app/src/renderer/components/Agent/PetrolChat.tsx:416-418`). Ihr bereits unter Themenkontext entstandener Teiltext verliert daher den Hinweis in Anzeige, Kopie und Notiz. `abgebrochen` allein erklärt die fehlenden Webbelege nicht.
+
+### F10 — Letzte sichtbare Antwort und Gate-Kontext laufen auseinander
+Schwere: mittel
+Stelle: app/src/renderer/stores/petrolChatStore.ts:199-207; app/src/renderer/stores/petrolChatStore.ts:209-213; app/src/renderer/stores/petrolChatStore.ts:299-305; app/src/renderer/utils/chatHistory.ts:39-50
+Status: [OFFEN]
+
+`lastAnswerWasWeb` sucht die letzte *fertige Modellantwort* nach `completedTurns` und überspringt App-Hinweise. Nach Webantwort → gestoppter normaler Teilantwort oder Webantwort → fester App-Antwort gilt deshalb weiterhin die ältere Webantwort als „letzte“. Fragt der Nutzer dann „Erkläre deine letzte Antwort“, wird er zur alten Websuche geschickt, obwohl sich die letzte **sichtbare** Antwort auf den gestoppten Text bzw. den App-Hinweis bezieht. Die Kontextbedingung behauptet damit eine falsche Referenz; die Tests rufen nur den reinen Erkenner mit vorgegebenem Boolean auf (`app/src/renderer/utils/chatHistory.test.ts:143-150`).
+
+Vorschlag: Für deiktische Ausdrücke wie „letzte Antwort“ die letzte sichtbare Antwort separat bestimmen; Stopp, Fehler und App-Hinweis nicht still auf eine ältere Webantwort zurückfallen lassen. Die Store-Sequenzen mit Web → Stopp/App-Hinweis → Folgefrage testen.
 
 ## Urteil und Bauvorgaben
 
@@ -181,3 +194,45 @@ Petrol fragt direkt zum Streuversuch; „Was stand in Quelle 3?“ → feste App
 ## Status
 
 Angelegt 24.10.2026; Codex F01–F07; gebaut (uncommittet), Abnahme durch Nutzer offen.
+
+### Runde 2 (24.10.2026): F08/F09 umgesetzt
+- **F08** [UMGESETZT] `asksAboutOldWebSources(text, { topics, lastAnswerWasWeb })` in
+  `app/src/renderer/utils/chatHistory.ts`. Immer gesperrt: Quelle/Fußnote/source + Nummer, frei
+  stehende Zitiermarke `[n]` (nicht als Index `a[3]`, nicht neben Rechenzeichen oder Wörtern wie
+  Matrix/Intervall), „deine/letzte Webantwort|Webrecherche|Websuche“, „was stand in der
+  Quelle/Seite/dem Artikel“, Quellen-Nomen + Rückbezug auf eigenes Tun („hattest du … benutzt“,
+  „vorhin“). Allgemeiner Rückbezug („was hast du gesagt“, „deine letzte Antwort“) nur, wenn die
+  letzte fertige Antwort eine Webantwort war ODER ein Inhaltswort (≥ 5 Zeichen) einer früheren
+  Webfrage vorkommt — sonst meint er eine normale Antwort, die das Modell im Verlauf hat.
+  „Was steht in der Verfassung …“ sperrt nicht mehr (vorher Fehlalarm). Die feste Antwort nennt
+  jetzt auch den Weg bei Fehlalarm („ohne Bezug auf die frühere Antwort neu formulieren“).
+  Tests: 9 eindeutige, 4 kontextabhängige, 9 harmlose Fälle (`chatHistory.test.ts`).
+- **F09** [UMGESETZT] `exportText` hängt bei `webTopicsUsed` einen Hinweis an Kopie und Notiz
+  (`petrolChat.topicOnlyExport`): ohne Websuche, aus Modellwissen, Quellen der früheren Webfrage
+  nicht gesehen. Behauptet keine Prüfung.
+- typecheck grün, Tests 2934/2934 (im ersten Gesamtlauf der bekannte Last-Ausreißer).
+
+
+### Runde 3 (24.10.2026): Antwort auf die Nachprüfung (Nutzerfreigabe: alle drei)
+Alle drei Befunde selbst nachgemessen (die fünf Lücken und der Mischfall lieferten `false`, der
+Rutherford-Fall `true`; F09-Stopp-Pfad und F10-Rückfall am Code bestätigt).
+- **F08** [ADRESSIERT] `app/src/renderer/utils/chatHistory.ts` (`asksAboutOldWebSources`):
+  Nummer hinter dem Wort auch als Zahlwort („Quelle eins“), Ordnungszahl davor („1. Quelle“,
+  „zweite Quelle“, „first source“ — bewusst ohne „Seite“, sonst trifft „erste Seite der Bibel“),
+  Websuche-Ergebnisse mit jedem Artikel („in der Webantwort“), „websuche“ nur mit Rückbezug,
+  englisch „page/webpage you showed/found“. `[n]` wird je Marke geprüft (`hasCitationMarker`),
+  ein Rechenzeichen an einer Marke entwertet nicht mehr die anderen. „Deine letzte Antwort“ folgt
+  allein der letzten sichtbaren Antwort; der Wortabgleich mit Webfragen gilt nur noch für
+  „was hast du zu X gesagt“. Die Doku der Funktion sagt jetzt offen, dass Muster nie lückenlos
+  sind und die Themenbrücke die zweite Schranke ist.
+- **F10** [ADRESSIERT] `lastVisibleAnswerIsWeb` (pur, getestet): letzte sichtbare Antwort,
+  `origin: 'web'` = Webantwort, gestopptes Web-Bruchstück, feste App-Antwort. Store nutzt sie
+  statt `completedTurns`-Suche.
+- **F09** [ADRESSIERT] `PetrolActiveRun.webTopics` wird beim Senden ohne Globus eingefroren;
+  `stop` gibt einem normalen Bruchstück `webTopicsUsed` mit — Fußzeile, Kopie und Notiz zeigen
+  den Hinweis dann wie bei fertigen Antworten.
+- Tests: `chatHistory.test.ts` (Runde-3-Lücken, Mischfall, Bücher-/Zählfragen ohne Fehlalarm,
+  fünf Verlaufsfolgen), neu `app/src/renderer/stores/petrolChatStore.test.ts` (Stopp mit
+  Themenkontext, Web → gestoppte normale Antwort, Web → App-Antwort, „1. Quelle“ im Store).
+  typecheck grün; Gesamtlauf 2945/2946, Ausfall = bekannter `shellExecution`-Last-Ausreißer,
+  einzeln grün. Nicht in der laufenden App geprüft.

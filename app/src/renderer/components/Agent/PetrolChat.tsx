@@ -271,7 +271,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   }
   // Webantworten mit Fußnoten aus eingefrorener Liste + gespeichertem Bericht (F13).
   const exportText = (msg: PetrolChatMessage): string => {
-    if (!msg.web?.report || !msg.web.answer) return msg.content
+    // Antwort mit Thema aus früherer Webfrage (Codex F09): die Einschränkung reist mit, sonst
+    // wirkt der Text in Kopie oder Notiz wie eine belegte Fortsetzung der Webantwort.
+    if (!msg.web?.report || !msg.web.answer) return msg.webTopicsUsed ? `${msg.content}\n\n> ${t('petrolChat.topicOnlyExport')}` : msg.content
     const fid = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
     const { report, extras } = msg.web
     return withWebFootnotes(msg.web.answer, msg.web.sources, report, fid, {

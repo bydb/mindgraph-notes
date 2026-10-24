@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { asksAboutOldWebSources, chatHistoryForModel, completedTurns, webTopicQuestions, type HistoryMessage, type WebTopicMessage } from './chatHistory'
+import { asksAboutOldWebSources, chatHistoryForModel, completedTurns, lastVisibleAnswerIsWeb, webTopicQuestions, type HistoryMessage, type WebTopicMessage } from './chatHistory'
 
 const VAULT_TEXT = 'Vertraulicher Notizinhalt aus dem Vault'
 
@@ -116,8 +116,99 @@ describe('Thema früherer Webfragen (chat-webthema-im-verlauf, Weg 1)', () => {
     expect(asksAboutOldWebSources('Was stand in Quelle 1?')).toBe(true)
     expect(asksAboutOldWebSources('Erklär mir [3] genauer')).toBe(true)
     expect(asksAboutOldWebSources('Was stand auf der Seite?')).toBe(true)
-    expect(asksAboutOldWebSources('Wie war das in deiner letzten Antwort?')).toBe(true)
+    expect(asksAboutOldWebSources('Wie war das in deiner letzten Antwort?', { topics: [], lastAnswerWasWeb: true })).toBe(true)
     expect(asksAboutOldWebSources('Frag mich mal ab')).toBe(false)
     expect(asksAboutOldWebSources('Welche Quellen gibt es zum Thema allgemein?')).toBe(false)
+  })
+
+  describe('Grenzfälle (Codex F08)', () => {
+    const none = { topics: [], lastAnswerWasWeb: false }
+    const rutherford = { topics: ['Wer war Ernest Rutherford und was hat er entdeckt?'], lastAnswerWasWeb: false }
+    const afterWeb = { topics: ['Wie hoch ist der Mitgliedsbeitrag?'], lastAnswerWasWeb: true }
+
+    it('eindeutige Verweise auf alte Webantworten und Quellen zählen immer', () => {
+      for (const q of [
+        'Fass deine letzte Webantwort zusammen',
+        'Welche Seite hattest du vorhin benutzt?',
+        'Welche Quellen hast du verwendet?',
+        'Was steht in Fußnote 2?',
+        'Gib mir den Link von vorhin nochmal',
+        'Was stand denn in dem Artikel?',
+        'Which sources did you use?',
+        'Summarize your previous web answer',
+        'Was meinst du mit [2]?'
+      ]) expect(asksAboutOldWebSources(q, none), q).toBe(true)
+    })
+
+    it('allgemeiner Rückbezug zählt nur mit Webbezug', () => {
+      const q = 'Was hast du mir zu Rutherford geantwortet?'
+      expect(asksAboutOldWebSources(q, rutherford)).toBe(true)
+      expect(asksAboutOldWebSources(q, none)).toBe(false)
+      // Letzte Antwort war eine Webantwort: „deine letzte Antwort“ meint sie.
+      expect(asksAboutOldWebSources('Erklär deine letzte Antwort genauer', afterWeb)).toBe(true)
+      // Letzte Antwort war normal (Modell sieht sie im Verlauf), Thema fremd: kein Fehlalarm.
+      expect(asksAboutOldWebSources('Erklär deine letzte Antwort genauer', { ...afterWeb, lastAnswerWasWeb: false })).toBe(false)
+    })
+
+    it('fachliche [n]-Notation und harmlose Fragen sperren nicht', () => {
+      for (const q of [
+        'Berechne a[3] für die Folge',
+        'Was ist [3] + [4]?',
+        'Ist das Intervall [0, 1] abgeschlossen?',
+        'Wie sieht die Matrix [2] aus?',
+        'Was steht in der Verfassung zur Meinungsfreiheit?',
+        'Wie baue ich eine Webseite?',
+        'Wie funktioniert die Websuche?',
+        'Welche Seiten hat ein Würfel?',
+        'Frag mich zu Rutherford ab'
+      ]) expect(asksAboutOldWebSources(q, rutherford), q).toBe(false)
+    })
+  })
+
+  describe('Nachprüfung Runde 3 (Codex F08/F10)', () => {
+    const none = { topics: [], lastAnswerWasWeb: false }
+    const rutherford = { topics: ['Wer war Ernest Rutherford und was hat er entdeckt?'], lastAnswerWasWeb: false }
+
+    it('erkennt die Lücken aus Runde 3', () => {
+      for (const q of [
+        'Was stand in der Webantwort?',
+        'Was stand in der 1. Quelle?',
+        'Was steht in Quelle eins?',
+        'Was sagt die zweite Quelle?',
+        'What was on the page you showed me?',
+        'Summarize the webpage you found earlier',
+        'What did the first source say?',
+        'Was ist [3] + 4 und was stand in [1]?'
+      ]) expect(asksAboutOldWebSources(q, none), q).toBe(true)
+    })
+
+    it('„deine letzte Antwort“ folgt der letzten sichtbaren Antwort, nicht dem Thema', () => {
+      expect(asksAboutOldWebSources('Erkläre deine letzte Antwort über Rutherford', rutherford)).toBe(false)
+      expect(asksAboutOldWebSources('Erkläre deine letzte Antwort über Rutherford', { ...rutherford, lastAnswerWasWeb: true })).toBe(true)
+    })
+
+    it('kein Fehlalarm bei Büchern und Zählfragen', () => {
+      for (const q of [
+        'Was steht auf der ersten Seite der Bibel?',
+        'Wie viele Seiten hast du für das Referat empfohlen?',
+        'Wie viele Quellen brauche ich für eine Hausarbeit?',
+        'Was war an meiner letzten Antwort falsch?'
+      ]) expect(asksAboutOldWebSources(q, rutherford), q).toBe(false)
+    })
+  })
+
+  describe('letzte sichtbare Antwort (Codex F10)', () => {
+    const web: WebTopicMessage[] = [
+      { role: 'user', content: 'Frage', origin: 'web' },
+      { role: 'assistant', content: 'Antwort [1]', origin: 'web', web: { kind: 'answer', report: { usedSources: [1] } } }
+    ]
+    it('Webantwort zuletzt → Web', () => expect(lastVisibleAnswerIsWeb(web)).toBe(true))
+    it('gestoppte normale Antwort danach → nicht Web', () =>
+      expect(lastVisibleAnswerIsWeb([...web, { role: 'user', content: 'mehr' }, { role: 'assistant', content: 'Teil', stopped: true }])).toBe(false))
+    it('feste App-Antwort danach → Web', () =>
+      expect(lastVisibleAnswerIsWeb([...web, { role: 'user', content: 'Quelle 1?', origin: 'web' }, { role: 'assistant', content: '', origin: 'web' }])).toBe(true))
+    it('gestopptes Web-Bruchstück → Web', () =>
+      expect(lastVisibleAnswerIsWeb([{ role: 'user', content: 'F', origin: 'web' }, { role: 'assistant', content: 'Teil', origin: 'web', stopped: true }])).toBe(true))
+    it('leerer Verlauf → nicht Web', () => expect(lastVisibleAnswerIsWeb([])).toBe(false))
   })
 })

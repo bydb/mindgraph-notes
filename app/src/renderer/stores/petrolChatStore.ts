@@ -22,7 +22,7 @@ import { create } from 'zustand'
 import type { AgentTabMode } from '../../shared/workFocus'
 import type { CloudProviderId } from '../../shared/llmBackend'
 import type { WebChatResult, WebFetchFailure, WebSource } from '../../shared/webChat'
-import { asksAboutOldWebSources, chatHistoryForModel, completedTurns, webTopicQuestions } from '../utils/chatHistory'
+import { asksAboutOldWebSources, chatHistoryForModel, completedTurns, lastVisibleAnswerIsWeb, webTopicQuestions } from '../utils/chatHistory'
 import { useUIStore } from './uiStore'
 
 export interface PetrolChatMessage {
@@ -68,6 +68,8 @@ export interface PetrolActiveRun {
   routeKind: 'local' | 'cloud' | 'unverified' | 'checking'
   /** Backend|Modell|Cloud der Anfrage — damit ein spätes Prüfergebnis nur DIESEN Weg nachträgt. */
   routeKey: string
+  /** Nur Anfrage ohne Websuche: so viele frühere Webfragen gingen als Thema mit (für Stopp, Codex F09). */
+  webTopics?: number
 }
 
 export interface PetrolChatScope {
@@ -202,7 +204,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       const webTopics = webTopicQuestions(before)
       // Frage nach einer alten Antwort/Quelle ohne Globus: feste Antwort, kein Modellaufruf.
       // Beide Nachrichten tragen origin 'web' und bleiben damit aus Verlauf und Themen draußen.
-      if (!web && webTopics.length > 0 && asksAboutOldWebSources(question)) {
+      if (!web && webTopics.length > 0 && asksAboutOldWebSources(question, { topics: webTopics.map(q => q.text), lastAnswerWasWeb: lastVisibleAnswerIsWeb(before) })) {
         currentRequest = null
         patch(id, {
           messages: [...before,
@@ -217,7 +219,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
           ? { role: 'user', content: question, origin: 'web', webQuery: web.query, at: Date.now() }
           : { role: 'user', content: question, at: Date.now() }],
         streaming: '',
-        active: opts.run,
+        active: !web && webTopics.length ? { ...opts.run, webTopics: webTopics.length } : opts.run,
         draft: '',
         // Globus nach jedem Senden aus; das Suchfeld startet beim nächsten Mal neu.
         webArmed: false,
@@ -293,7 +295,8 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       // Prüfung, aber nachvollziehbar, woraus es stammt.
       const webMark: Partial<PetrolChatMessage> = last?.origin === 'web'
         ? { origin: 'web', webPartial: sc.webProgress?.sources ? { sources: sc.webProgress.sources, failures: sc.webProgress.failures ?? [], notFetched: sc.webProgress.notFetched ?? 0 } : undefined }
-        : {}
+        // Normale Anfrage mit Themenkontext: das Bruchstück behält den Hinweis (Codex F09).
+        : sc.active?.webTopics ? { webTopicsUsed: sc.active.webTopics } : {}
       patch(id, {
         streaming: null,
         active: null,
