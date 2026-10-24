@@ -489,8 +489,19 @@ export function AgentView({ tabId }: Props) {
   // war doppelt (Nutzer, 04.10.2026). Lücken ohne eigene Zeile nennt weiter der Knopf.
   const gapShownInCard = firstGap === 'docs' || firstGap === 'target' || firstGap === 'web' || firstGap === 'model'
 
+  // Übergabe aus dem Chat (docs/codex-collab/chat-daraus-erstellen.md, F04): Befugnisse
+  // wirken sofort und dürfen nicht still aus einem früheren Auftrag mitlaufen — bei jeder
+  // neuen Übergabe aus. Ablage und Unterlagen bleiben, werden aber im Hinweis genannt.
+  const handover = scope.chatHandover ?? null
+  useEffect(() => {
+    if (!handover) return
+    setShellArmed(false)
+    setComputerArmed(false)
+  }, [handover?.at])
+
   const submit = async () => {
     if (!canRun || !vaultPath) return
+    store().setChatHandover(tabId, null)
     let cloud: { model: string; provider: CloudProviderId } | null = null
     let cloudLabel: string | null = null
     if (activeCloudRoute) {
@@ -629,6 +640,20 @@ export function AgentView({ tabId }: Props) {
           {/* Zwei Spalten auf breiten Fenstern: links Auftrag + Beispiele, rechts die
               Bedingungen des Laufs. Schmal liegen beide untereinander. */}
           <div className="agent-card-main">
+          {/* Übergabe aus dem Chat: was jetzt zu tun ist und was übernommen wurde (F02/F04/F05). */}
+          {handover && run.phase === 'idle' && (
+            <div className="agent-card-handover" role="status">
+              <div className="agent-card-handover-text">
+                <strong>{t('petrolChat.handoverTitle')}</strong>
+                <span>{t(handover.kind === 'research' ? 'petrolChat.handoverResearchSteps' : 'petrolChat.handoverSteps')}</span>
+                {scope.targetFolder && <span>{t('petrolChat.handoverTarget', { folder: scope.targetFolder })}</span>}
+                {scope.attachments.length > 0 && <span>{t('petrolChat.handoverDocs', { n: scope.attachments.length })}</span>}
+                <span>{t(handover.kind === 'research' ? 'petrolChat.handoverResearchReset' : 'petrolChat.handoverReset')}</span>
+                {handover.clipped && <span>{t('petrolChat.handoverClipped', { max: 6000 })}</span>}
+              </div>
+              <button type="button" className="agent-card-link-btn" onClick={() => store().setChatHandover(tabId, null)}>{t('petrolChat.handoverDismiss')}</button>
+            </div>
+          )}
           {/* Auftrag */}
           <div className={`agent-card-task ${hasTask ? '' : 'is-missing'}`}>
             <div className="agent-card-task-top">

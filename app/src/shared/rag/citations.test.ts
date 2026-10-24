@@ -92,6 +92,16 @@ describe('analyzeCitations', () => {
     expect(r2.sentences.map((s) => s.status)).toEqual(['uncited', 'cited-low'])
   })
 
+  it('Ordnungszahl nach Artikel und Aktenzeichen trennen keinen Satz (Websuche, real 24.10.2026)', () => {
+    const src = ['Für 2027 sieht der 25. KEF-Bericht einen Beitrag von 18,64 Euro vor. Verfassungsbeschwerde (Az. 1 BvR 2524/24) erhoben.']
+    const r = analyzeCitations('Für 2027 sieht der 25. KEF-Bericht einen Beitrag von 18,64 Euro vor. [1] ZDF hat Verfassungsbeschwerde erhoben (Az. 1 BvR 2524/24). [1]', src)
+    expect(r.sentences.map((s) => s.status)).toEqual(['cited-high', 'cited-high'])
+    // Im 3. Quartal: ebenfalls Ordnungszahl.
+    expect(analyzeCitations('Im 3. Quartal stieg der Wert. [1]', ['Im 3. Quartal stieg der Wert.']).sentences.length).toBe(1)
+    // „auf diese Art.“ am Satzende trennt weiterhin, weil keine Zahl folgt.
+    expect(analyzeCitations('Es geht auf diese Art. Danach ist Schluss. [1]', ['x']).sentences.length).toBe(2)
+  })
+
   it('kurze wörtliche Zitate werden geprüft (F26)', () => {
     const r = analyzeCitations('Er sagte „Nein". [1]', sources)
     expect(r.sentences[0].quotes).toEqual([{ text: 'Nein', found: false }])

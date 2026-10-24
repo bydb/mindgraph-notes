@@ -1024,7 +1024,7 @@ export interface ElectronAPI {
   }>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string) => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
@@ -1035,6 +1035,8 @@ export interface ElectronAPI {
   onOllamaEmailChatDone: (callback: () => void) => void;
   onPetrolChatChunk: (callback: (chunk: { requestId: string; delta: string }) => void) => void;
   petrolChatAbort: (requestId: string) => Promise<boolean>;
+  petrolChatWeb: (params: import('./webChat').PetrolWebRequest) => Promise<{ success: boolean; result?: import('./webChat').WebChatResult; error?: string }>;
+  onPetrolChatProgress: (callback: (p: import('./webChat').PetrolWebProgress) => void) => void;
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)
   projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) => Promise<RagIndexStatus>;
@@ -1084,7 +1086,7 @@ export interface ElectronAPI {
     customPrompt?: string;
     timestamp?: string;
   }>;
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'petrol', port?: number, contextAttachmentIds?: string[], requestId?: string) => Promise<{
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'petrol', port?: number, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) => Promise<{
     success: boolean;
     response?: string;
     error?: string;

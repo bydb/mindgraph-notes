@@ -359,8 +359,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string) =>
-    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds, requestId),
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds, requestId, webTopics),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
     ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))
@@ -387,6 +387,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('petrol-chat-chunk', (_event, chunk) => callback(chunk))
   },
   petrolChatAbort: (requestId: string) => ipcRenderer.invoke('petrol-chat-abort', requestId) as Promise<boolean>,
+  // Websuche im Petrol-Chat (Stufe 1b): Suche, Abrufe und Modell in EINER Anfrage mit
+  // derselben Kennung. Fortschritt auf eigenem Kanal, Textstücke auf petrol-chat-chunk.
+  petrolChatWeb: (params: unknown) => ipcRenderer.invoke('petrol-chat-web', params),
+  onPetrolChatProgress: (callback: (p: unknown) => void) => {
+    ipcRenderer.removeAllListeners('petrol-chat-progress')
+    ipcRenderer.on('petrol-chat-progress', (_event, p) => callback(p))
+  },
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)
   projectRagStatus: (vaultPath: string, projectFolderRel: string, embedModel: string) =>
@@ -460,8 +467,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     port?: number
     contextAttachmentIds?: string[]
   }) => ipcRenderer.invoke('lmstudio-generate', request),
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port?: number, contextAttachmentIds?: string[], requestId?: string) =>
-    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds, requestId),
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port?: number, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) =>
+    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds, requestId, webTopics),
   lmstudioEmbeddings: (model: string, text: string, port?: number) =>
     ipcRenderer.invoke('lmstudio-embeddings', model, text, port),
   lmstudioEmbeddingModels: (port?: number) => ipcRenderer.invoke('lmstudio-embedding-models', port),

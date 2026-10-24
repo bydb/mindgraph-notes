@@ -21,6 +21,8 @@ export interface FetchExtractResult {
   markdown: string
   truncated: boolean
   originalChars: number
+  /** Der Body selbst wurde an der Bytegrenze gekappt — die Seite ist nur zum Teil da. */
+  bodyTruncated: boolean
 }
 
 // Trägt bei HTTP-Fehlern die tatsächliche finale URL + Redirect-Kette, damit der Aufrufer
@@ -54,11 +56,11 @@ export function buildTurndown(): TurndownService {
   return td
 }
 
-function truncate(markdown: string): { text: string; truncated: boolean; originalChars: number } {
+function truncate(markdown: string, marker: boolean): { text: string; truncated: boolean; originalChars: number } {
   const originalChars = markdown.length
   if (originalChars <= WEB_PAGE_CONTEXT_MAX_CHARS) return { text: markdown, truncated: false, originalChars }
   return {
-    text: markdown.slice(0, WEB_PAGE_CONTEXT_MAX_CHARS) + `\n\n[gekürzt — Original ${originalChars} Zeichen]`,
+    text: markdown.slice(0, WEB_PAGE_CONTEXT_MAX_CHARS) + (marker ? `\n\n[gekürzt — Original ${originalChars} Zeichen]` : ''),
     truncated: true,
     originalChars
   }
@@ -69,7 +71,18 @@ function truncate(markdown: string): { text: string; truncated: boolean; origina
  * Fetch-/SSRF-Fehler; der Aufrufer (web_fetch-Tool) fängt das und protokolliert einen
  * fehlgeschlagenen Record.
  */
-export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal }): Promise<FetchExtractResult> {
+/**
+ * `markTruncation: false` (Petrol-Chat): kein Kürzungsvermerk im Text — der Chat zeigt
+ * „gekürzt“ selbst an, und der Vermerk wäre sonst App-Text innerhalb der Seitendaten.
+ */
+export class PageTooLargeError extends Error {
+  constructor(url: string) {
+    super(`Seite zu groß (über ${WEB_FETCH_MAX_BYTES} Bytes): ${url}`)
+    this.name = 'PageTooLargeError'
+  }
+}
+
+export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal; markTruncation?: boolean; rejectTruncatedBody?: boolean }): Promise<FetchExtractResult> {
   const res = await safeFetch(url, {
     signal: opts?.signal,
     timeoutMs: WEB_FETCH_TIMEOUT_MS,
@@ -82,6 +95,10 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
   if (res.status < 200 || res.status >= 300) {
     throw new FetchExtractError(`Seite antwortete mit HTTP ${res.status}: ${res.finalUrl}`, { finalUrl: res.finalUrl, redirectChain: res.redirectChain })
   }
+
+  // Eine an der Bytegrenze gekappte Seite wird nie halb aufbereitet (Petrol-Chat, F03):
+  // abgeschnittenes HTML liefert Bruchstücke, die wie vollständiger Inhalt aussehen.
+  if (opts?.rejectTruncatedBody && res.truncated) throw new PageTooLargeError(res.finalUrl)
 
   const fetchedAt = new Date().toISOString()
   const isPlain = res.contentType.includes('text/plain')
@@ -101,7 +118,7 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     markdown = buildTurndown().turndown(parsed.content || '')
   }
 
-  const trimmed = truncate(markdown.trim())
+  const trimmed = truncate(markdown.trim(), opts?.markTruncation !== false)
   const record: WebFetchRecord = {
     requestedUrl: url,
     finalUrl: res.finalUrl,
@@ -110,5 +127,5 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     fetchedAt,
     status: 'ok'
   }
-  return { record, markdown: trimmed.text, truncated: trimmed.truncated || res.truncated, originalChars: trimmed.originalChars }
+  return { record, markdown: trimmed.text, truncated: trimmed.truncated || res.truncated, originalChars: trimmed.originalChars, bodyTruncated: res.truncated }
 }

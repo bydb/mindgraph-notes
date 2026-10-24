@@ -288,7 +288,14 @@ const MONTHS = /^(jan(uar|\.)?|feb(ruar|\.)?|m[äa]rz?|apr(il|\.)?|mai|jun[ie]?|
 // real am „bzw.“ zerschnitten, die erste Hälfte stand dann als „ohne Quellenangabe“ da,
 // 25.09.2026). Bewusst ohne „usw.“/„etc.“: die schließen oft wirklich einen Satz, und zwei
 // verschmolzene Sätze würden einen unbelegten unter dem Zitat des anderen verstecken (F26).
-const ABBREVIATION_BEFORE_DOT = /(?:^|[^\p{L}])(?:bzw|bzgl|ca|ggf|evtl|vgl|bspw|inkl|zzgl|sog|Nr|Dr|Prof|Hr|Fr|Abs|Kap|[zdousZDOUS]\.\s?[\p{L}]|[zdou])$/u
+const ABBREVIATION_BEFORE_DOT = /(?:^|[^\p{L}])(?:bzw|bzgl|ca|ggf|evtl|vgl|bspw|inkl|zzgl|sog|Nr|Dr|Prof|Hr|Fr|Abs|Kap|Mio|Mrd|Hrsg|Anm|Tel|vs|ff|Jh|[zdousZDOUS]\.\s?[\p{L}]|[zdou])$/u
+// Abkürzungen, die auch ganze Wörter sein können („auf diese Art.“): nur vor einer Zahl
+// („Az. 1 BvR 2524/24“, „Art. 5 GG“, „Rn. 12“) gelten sie als Abkürzung (Petrol-Websuche,
+// real 24.10.2026: das Aktenzeichen zerschnitt einen Satz).
+const ABBREVIATION_BEFORE_NUMBER = /(?:^|[^\p{L}])(?:Az|Art|Rn|Rz|Ziff|lit|Bd|Aufl|Bl|Sp)$/u
+// Ordnungszahl nach Artikel/Präposition („der 25. KEF-Bericht“, „im 3. Quartal“): dort endet
+// kein Satz. Ohne dieses Wort davor bleibt es beim Trennen („Das Budget beträgt 10. Die …“, F26).
+const ORDINAL_LEAD = /(?:^|[^\p{L}])(?:der|die|das|dem|den|des|ein|eine|einem|einen|einer|eines|am|im|vom|zum|zur|beim|ab|bis|seit|je|jeder|jede|jedes|jeden|jedem|the)\s+\d{1,4}$/iu
 
 /** Sätze innerhalb eines Segments: Schluss-Interpunktion + Leerraum + Großbuchstabe/Ziffer/Zitatzeichen/Klammer. */
 function sentences(text: string, seg: [number, number]): Array<[number, number]> {
@@ -306,6 +313,8 @@ function sentences(text: string, seg: [number, number]): Array<[number, number]>
     const before = s.slice(0, m.index)
     const after = s.slice(cut)
     if (s[m.index] === '.' && ABBREVIATION_BEFORE_DOT.test(before)) continue
+    if (s[m.index] === '.' && ABBREVIATION_BEFORE_NUMBER.test(before) && /^\p{N}/u.test(after)) continue
+    if (s[m.index] === '.' && ORDINAL_LEAD.test(before) && /^\p{L}/u.test(after)) continue
     if (s[m.index] === '.' && /\p{N}$/u.test(before)) {
       const nextWord = (after.match(/^([\p{L}.]+)/u)?.[1] ?? '').replace(/\.$/, '')
       if (nextWord && (MONTHS.test(nextWord) || MONTHS.test(`${nextWord}.`))) continue

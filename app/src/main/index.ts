@@ -7,7 +7,7 @@ import type { FileEntry, SecretStorageResult, SyncRestoreResult } from '../share
 import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
 import { webSearch as webResearchSearch } from './webResearch/providers'
 import { originNeedsPrivateApproval as webResearchNeedsApproval } from './webResearch/egress'
-import { isWebResearchConfigComplete, normalizeWebUrl, extractUrlsFromInstruction, KEY_PROVIDERS, type WebSearchProviderId } from '../shared/webResearch'
+import { isWebResearchConfigComplete, normalizeWebUrl, extractUrlsFromInstruction, KEY_PROVIDERS, normalizeQuery, isQueryTooLong, sanitizeSourceTitle, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META, type WebSearchProviderId } from '../shared/webResearch'
 import {
   HTML_PREVIEW_SCHEME,
   previewPathnameToFsPath,
@@ -166,7 +166,11 @@ import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData }
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
-import { PETROL_CHAT_SYSTEM_PROMPT } from './llm/petrolChatPrompt'
+import { PETROL_CHAT_SYSTEM_PROMPT, sanitizeWebTopics, webTopicsBlock } from './llm/petrolChatPrompt'
+import { buildPetrolWebSystemPrompt, prepareWebExcerpt } from './llm/petrolWebPrompt'
+import { gatherWebSources, defaultWebGatherDeps } from './llm/petrolWebChat'
+import type { CloudProviderSettings } from '../shared/llmBackend'
+import { freezeWebSourcesToFit, petrolCloudAllowed, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, type WebChatProvenance, type WebChatResult, type PetrolWebRequest } from '../shared/webChat'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../shared/looseJson'
@@ -6425,7 +6429,7 @@ function chatStreamChannel(chatMode: string, kind: 'chunk' | 'done'): string {
   return `ollama-chat-${kind}`
 }
 
-ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string) => {
+ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat und Petrol-Chat (Agent-Tab) streamen auf eigenen Channels — alle drei
@@ -6518,7 +6522,8 @@ ${context}
 Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte Antwort des Nutzers.`
 
     let promptContent = directPrompt
-    if (chatMode === 'petrol') promptContent = PETROL_CHAT_SYSTEM_PROMPT
+    // Thema früherer Webfragen: nur Nutzerfragen, vom Main geprüft und als Zitat gerahmt.
+    if (chatMode === 'petrol') promptContent = PETROL_CHAT_SYSTEM_PROMPT + webTopicsBlock(sanitizeWebTopics(webTopics, sanitizeUntrustedText), false)
     else if (chatMode === 'socratic') promptContent = socraticPrompt
     else if (chatMode === 'grill') promptContent = grillPrompt
     else if (chatMode === 'email') promptContent = emailPrompt
@@ -6664,6 +6669,262 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 // dort auf lokal zurückgezwungen (Personendaten), ein dort gesetztes Cloud-Modell wird
 // also nie benutzt und der Lauf zählt weiterhin als lokal.
 (_event, _model, _messages, _context, chatMode, cloud) => !(cloud?.model && chatMode !== 'email')))
+
+// ── Websuche im Petrol-Chat (Stufe 1b, docs/codex-collab/chat-websuche.md) ─────────────
+// Eigener IPC statt Agenten-Loop: die App sucht mit den Suchwörtern, die der Nutzer im Feld
+// gesehen hat, ruft nur Treffer dieses Laufs ab und gibt die Auszüge mit eigenem Systemtext
+// ans Modell. Ziel: geringe Halluzination — antworten nur aus abgerufenen Seiten, Prüfung je
+// Satz (Wortvergleich, kein Faktencheck). Der Renderer liefert keine URLs, keinen Anbieter
+// und keinen Schlüssel; Modul, Anbieter und Schlüssel liest der Main selbst (F01).
+type PetrolWebParams = PetrolWebRequest
+
+const PETROL_WEB_QUESTION_MAX = 8000
+
+/** Kontextlänge des lokalen Ollama-Modells (Token) oder null, wenn nicht ermittelbar. */
+async function ollamaContextLength(model: string): Promise<number | null> {
+  try {
+    const res = await fetch(`${OLLAMA_API_URL}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+      signal: AbortSignal.timeout(5000)
+    })
+    return res.ok ? contextLengthFromShow(await res.json()) : null
+  } catch {
+    return null
+  }
+}
+
+function localDateString(d = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+/** Streamt die Modellphase über den gewählten Weg; `onDelta` bekommt jedes Textstück. */
+async function streamPetrolWebModel(
+  params: PetrolWebParams,
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  signal: AbortSignal,
+  onDelta: (delta: string) => void,
+  numCtx?: number
+): Promise<string> {
+  const controller = new AbortController()
+  const onAbort = () => controller.abort()
+  if (signal.aborted) controller.abort()
+  else signal.addEventListener('abort', onAbort, { once: true })
+  const timeout = setTimeout(() => controller.abort(), 300000)
+  try {
+    if (params.cloud?.model) {
+      const cloudResolved = await resolveCloudChatOptions(params.cloud)
+      if (!cloudResolved) throw new Error('Cloud ist gewählt, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).')
+      return await streamCloudChat(messages, { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controller.signal, telemetryModule: 'chat' }, onDelta)
+    }
+    const isLmStudio = params.backend === 'lmstudio'
+    const url = isLmStudio ? `${getLMStudioUrl(params.lmStudioPort)}/v1/chat/completions` : `${OLLAMA_API_URL}/api/chat`
+    const startedAt = Date.now()
+    let firstTokenMs: number | undefined
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: params.model, messages, stream: true, ...(!isLmStudio && numCtx ? { options: { num_ctx: numCtx } } : {}) }),
+      signal: controller.signal
+    })
+    if (!response.ok || !response.body) throw new Error(`${isLmStudio ? 'LM Studio' : 'Ollama'} API Fehler: ${response.status}`)
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+    let full = ''
+    let buffer = ''
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+      for (const line of lines) {
+        const t = line.trim()
+        if (!t) continue
+        try {
+          if (isLmStudio) {
+            if (!t.startsWith('data: ') || t === 'data: [DONE]') continue
+            const delta = JSON.parse(t.slice(6))?.choices?.[0]?.delta?.content
+            if (delta) { full += delta; onDelta(delta) }
+          } else {
+            const json = JSON.parse(t)
+            if (json.message?.content) {
+              if (firstTokenMs === undefined) firstTokenMs = Date.now() - startedAt
+              full += json.message.content
+              onDelta(json.message.content)
+            }
+            if (json.done) {
+              recordLlmRun(fromOllamaResponse(json, { module: 'chat', model: params.model, wallMs: Date.now() - startedAt, at: startedAt, firstTokenMs, hiddenThinking: !!json.message?.thinking }))
+            }
+          }
+        } catch {
+          // ungültige Zeile ignorieren
+        }
+      }
+    }
+    return full
+  } finally {
+    clearTimeout(timeout)
+    signal.removeEventListener('abort', onAbort)
+  }
+}
+
+ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  // Synchron vor dem ersten await registrieren (F02): ein „Stopp“ direkt nach dem Senden
+  // findet die Anfrage schon vor. Dasselbe Signal trägt Suche, Abrufe und Modell.
+  const claimed = claimPetrolRequest(event.sender.id, 'petrol', params?.requestId)
+  if (claimed === 'duplicate') return { success: false, error: 'Diese Anfrage läuft bereits.' }
+  if (!claimed) return { success: false, error: 'Anfrage ohne Kennung.' }
+  const req = claimed
+  const onDestroyed = () => req.controller.abort()
+  event.sender.once('destroyed', onDestroyed)
+  const send = (channel: string, payload: Record<string, unknown>) => {
+    if (!event.sender.isDestroyed()) event.sender.send(channel, { requestId: req.requestId, ...payload })
+  }
+  const phaseMs: Record<string, number> = {}
+  let phaseStart = Date.now()
+  const markPhase = (name: string) => { phaseMs[name] = Date.now() - phaseStart; phaseStart = Date.now() }
+  const provenance: WebChatProvenance = { searchProvider: null, searchOk: false, fetchAttempts: 0, fetchOk: 0, contactedHosts: [], route: null, routeLabel: '' }
+  const finish = (result: Omit<WebChatResult, 'provenance'>) => {
+    // Inhaltsarme Telemetriezeile (F14): keine Frage, keine Suchwörter, keine URLs.
+    console.log(`[PetrolWeb] ${result.kind} · Suche ${provenance.searchProvider ?? '-'} ${provenance.searchOk ? 'ok' : 'nein'} · Abrufe ${provenance.fetchOk}/${provenance.fetchAttempts} · Modellweg ${provenance.route ?? '-'} · Phasen ${JSON.stringify(phaseMs)}`)
+    return { success: true, result: { ...result, provenance } as WebChatResult }
+  }
+  try {
+    const question = typeof params.question === 'string' ? params.question.trim() : ''
+    if (!question || question.length > PETROL_WEB_QUESTION_MAX) return { success: false, error: 'Die Frage ist leer oder zu lang.' }
+    const query = normalizeQuery(typeof params.query === 'string' ? params.query : '')
+    if (!query) return { success: false, error: 'Die Suchwörter sind leer.' }
+    if (isQueryTooLong(query)) return { success: false, error: `Die Suchwörter sind länger als ${WEB_QUERY_MAX_CHARS} Zeichen. Bitte kürzen.` }
+    const history = (Array.isArray(params.history) ? params.history : [])
+      .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-20)
+      .map(m => ({ role: m.role, content: m.content }))
+
+    // Modul und Anbieter liest der Main selbst — ein noch angezeigter Globus reicht nicht.
+    const ui = await loadUISettings()
+    if (ui.webResearchEnabled !== true) return { success: false, error: 'Die Webrecherche ist ausgeschaltet (Einstellungen → Module).' }
+    const webConfig = await loadWebResearchConfig()
+    if (!isWebResearchConfigComplete(webConfig)) return { success: false, error: 'Die Webrecherche ist nicht eingerichtet (Einstellungen → KI & Modelle → Webrecherche).' }
+    const apiKey = KEY_PROVIDERS.includes(webConfig.provider) ? await loadProviderKey(webConfig.provider) : null
+    if (KEY_PROVIDERS.includes(webConfig.provider) && !apiKey) return { success: false, error: 'Für die Webrecherche ist kein API-Key hinterlegt (Einstellungen → KI & Modelle → Webrecherche).' }
+
+    // Modellweg neu einstufen — die Provenienz der Antwort nennt den tatsächlichen Weg (F11).
+    const backend = params.cloud?.model ? (params.cloud.provider === 'llmbase' ? 'llmbase' : 'openrouter') : (params.backend === 'lmstudio' ? 'lmstudio' : 'ollama')
+    const route = await classifyAgentRoute(backend, params.cloud?.model ?? params.model ?? '')
+    provenance.route = route.kind
+    provenance.routeLabel = route.providerLabel
+    // Cloud nur mit der gespeicherten Freigabe für den Chat und genau dem dort gewählten
+    // Modell (F24) — geprüft VOR der Suche, damit keine Suche umsonst bezahlt wird.
+    if (!petrolCloudAllowed(params.cloud, (ui.ollama as { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } | undefined))) {
+      return { success: false, error: `${route.providerLabel} ist für den Chat nicht (mehr) freigegeben oder das Modell wurde geändert (Einstellungen → KI → Cloud-Anbieter).` }
+    }
+    const usesLocalOllama = backend === 'ollama' && route.provider !== 'ollama-cloud'
+    // Kontextfenster des lokalen Modells kennen (F17): Budget und num_ctx richten sich danach.
+    const contextTokens = usesLocalOllama ? await ollamaContextLength(params.model) : null
+    const charBudget = webChatCharBudget(contextTokens)
+    if (req.controller.signal.aborted) return finish({ kind: 'stopped', sources: [], failures: [], notFetched: 0 })
+
+    provenance.searchProvider = WEB_SEARCH_PROVIDER_META[webConfig.provider].label
+    const gathered = await gatherWebSources(query, defaultWebGatherDeps(webConfig, apiKey), {
+      signal: req.controller.signal,
+      onPhase: (phase, detail) => send('petrol-chat-progress', { phase, started: detail.started ?? 0, host: detail.host ?? null })
+    })
+    markPhase('net')
+    provenance.searchOk = gathered.searchOk
+    provenance.fetchAttempts = gathered.entries.length
+    provenance.fetchOk = gathered.entries.filter(e => e.outcome.ok).length
+    provenance.contactedHosts = gathered.contactedHosts
+    if (!gathered.searchTriggered) provenance.searchProvider = null
+    if (gathered.stoppedBy === 'stopped') {
+      provenance.endedIn = gathered.stoppedIn
+      return finish({ kind: 'stopped', sources: [], failures: [], notFetched: 0 })
+    }
+    if (gathered.stoppedBy === 'timeout' && gathered.stoppedIn === 'search') {
+      provenance.endedIn = 'search'
+      return finish({ kind: 'error', error: 'Der Suchanbieter hat nicht innerhalb von etwa 25 Sekunden geantwortet.', sources: [], failures: [], notFetched: 0 })
+    }
+    if (gathered.searchError) {
+      provenance.endedIn = 'search'
+      return finish({ kind: 'error', error: gathered.searchError, sources: [], failures: [], notFetched: 0 })
+    }
+
+    // Erst kürzen, dann einfrieren (F19): der Auszug ist exakt der Text im Prompt.
+    const today = localDateString()
+    // Themenfragen zählen im Budget mit (Codex F05) — sie stehen im fertigen Systemtext.
+    const webTopics = sanitizeWebTopics(params.webTopics, sanitizeUntrustedText)
+    const systemChars = buildPetrolWebSystemPrompt([], today, sanitizeUntrustedText, webTopics).length + 200 * WEB_CHAT_MAX_SOURCES
+    const prepare = (t: string) => prepareWebExcerpt(t, sanitizeUntrustedText)
+    // Die Kopfzeilen sind in systemChars nur geschätzt: den fertigen Prompt messen und, falls
+    // er über der Grenze liegt, die Quellen um genau den Überhang kürzer einfrieren (F17).
+    const frozen = freezeWebSourcesToFit(
+      gathered.entries,
+      { systemChars, questionChars: question.length, history, total: charBudget },
+      prepare,
+      f => buildPetrolWebSystemPrompt(f.sources, today, sanitizeUntrustedText, webTopics).length + f.history.reduce((n, m) => n + m.content.length, 0) + question.length
+    )
+    const attempted = new Set(gathered.entries.map(e => e.candidate.index))
+    const notFetched = gathered.candidates.filter(c => !attempted.has(c.index)).length
+
+    if (frozen.sources.length === 0) {
+      // K = 0: kein Modellaufruf (E2.5). Treffer nur als „nicht abgerufen, nicht geprüft“.
+      return finish({
+        kind: 'nothing-readable',
+        sources: [],
+        failures: frozen.failures,
+        notFetched,
+        unfetchedHits: gathered.candidates.map(c => ({ title: sanitizeSourceTitle(c.title) || c.host, host: c.host, url: c.url }))
+      })
+    }
+
+    // Quellen gehen VOR der Modellphase an die Anzeige — wird gestoppt, bleibt sichtbar,
+    // woraus das Bruchstück stammt.
+    send('petrol-chat-progress', { phase: 'model', sources: frozen.sources, failures: frozen.failures, notFetched })
+    const systemPrompt = buildPetrolWebSystemPrompt(frozen.sources, today, sanitizeUntrustedText, webTopics)
+    const messages = [
+      { role: 'system' as const, content: systemPrompt },
+      ...frozen.history,
+      { role: 'user' as const, content: question }
+    ]
+    const sendChunk = (delta: string) => send('petrol-chat-chunk', { delta })
+    const totalChars = messages.reduce((n, m) => n + m.content.length, 0)
+    // Bei Ollama immer setzen (auch Ollama-Cloud läuft über den lokalen Dienst): ohne num_ctx
+    // schnitte Ollama einen zu langen Prompt still vorne ab.
+    const numCtx = backend === 'ollama' ? webChatNumCtx(totalChars, contextTokens) : undefined
+    // Ollama-Vordergrund NUR für die lokale Modellphase (F04) — nicht für Netz, Cloud, LM Studio.
+    let full: string
+    try {
+      full = usesLocalOllama
+        ? await withOllamaActivity('petrol-web-chat', () => streamPetrolWebModel(params, messages, req.controller.signal, sendChunk, numCtx))
+        : await streamPetrolWebModel(params, messages, req.controller.signal, sendChunk, numCtx)
+    } catch (err) {
+      markPhase('model')
+      provenance.endedIn = 'model'
+      if (req.controller.signal.aborted) return finish({ kind: 'stopped', sources: frozen.sources, failures: frozen.failures, notFetched })
+      return finish({ kind: 'error', error: err instanceof Error ? err.message : String(err), sources: frozen.sources, failures: frozen.failures, notFetched })
+    }
+    markPhase('model')
+    if (req.controller.signal.aborted) {
+      provenance.endedIn = 'model'
+      return finish({ kind: 'stopped', sources: frozen.sources, failures: frozen.failures, notFetched })
+    }
+    // Prüfer, Anzeige und Export arbeiten auf demselben normalisierten Text (wie Vault-Chat).
+    const answer = full.replace(/\r\n?/g, '\n').replace(/[\uE000-\uF8FF]/g, '')
+    if (!answer.trim()) return finish({ kind: 'error', error: '', sources: frozen.sources, failures: frozen.failures, notFetched })
+    const excerpts = frozen.sources.map(s => s.excerpt)
+    const report = analyzeCitations(answer, excerpts, { sourceTitles: frozen.sources.map(s => s.title) })
+    const extras = sentenceExtras(answer, report, excerpts)
+    return finish({ kind: 'answer', answer, report, extras, sources: frozen.sources, failures: frozen.failures, notFetched })
+  } catch (err) {
+    if (req.controller.signal.aborted) return finish({ kind: 'stopped', sources: [], failures: [], notFetched: 0 })
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    releasePetrolRequest(req)
+    if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', onDestroyed)
+  }
+})
 
 // Holt verfügbare Embedding-Modelle
 ipcMain.handle('ollama-embedding-models', async () => {
@@ -7023,7 +7284,7 @@ ipcMain.handle('lmstudio-generate', async (event, request: LMStudioRequest) => {
 })
 
 // Chat mit Kontext (für Notes Chat) - LM Studio Version
-ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string) => {
+ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown) => {
   console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
   const chunkChannel = chatStreamChannel(chatMode, 'chunk')
   const doneChannel = chatStreamChannel(chatMode, 'done')
@@ -7092,7 +7353,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 
     const systemMessage = {
       role: 'system',
-      content: chatMode === 'petrol' ? PETROL_CHAT_SYSTEM_PROMPT : chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
+      content: chatMode === 'petrol' ? PETROL_CHAT_SYSTEM_PROMPT + webTopicsBlock(sanitizeWebTopics(webTopics, sanitizeUntrustedText), false) : chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
     }
 
     const allMessages = [systemMessage, ...messages]

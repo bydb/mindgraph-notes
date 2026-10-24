@@ -8,6 +8,21 @@ F04/F09). Codex hat in Runde 2 (F20–F23) die Richtung bestätigt und vier Korr
 verlangt. Dies ist der **Entwurf für Stufe 1b**: eine ausdrücklich eingeschaltete
 Webantwort pro Nachricht. Konzept, noch kein Code. Bitte adversarial prüfen.
 
+## Ziel (Nutzer, 24.10.2026) — Maßstab für Bau und Prüfung
+
+**Geringe Halluzination.** Die Websuche soll bessere Antworten liefern als das Modell allein,
+indem es aus tatsächlich abgerufenen Seiten antwortet statt aus dem Gedächtnis. Jede
+Entscheidung im Bau und jeder Prüfbefund wird daran gemessen:
+
+- Lieber „steht nicht in den Seiten“ als eine plausible, erfundene Antwort.
+- Keine Quelle, keine Nummer, kein Link, den die App nicht selbst abgerufen hat.
+- Die Anzeige darf nie stärker klingen als die Prüfung (Wortvergleich, kein Faktencheck).
+- Was das Modell nicht gesehen hat (gekürzt, nicht abgerufen, alte Webantwort), darf weder
+  ins Modell zurückfließen noch als „gefunden“ erscheinen.
+
+Codex: Bitte bei der Code-Prüfung ausdrücklich fragen, an welcher Stelle das Modell trotzdem
+erfinden kann oder eine erfundene Aussage glaubwürdiger aussieht als sie ist.
+
 ## Kontext/Anker
 
 - Chat Stufe 1: `app/src/renderer/components/Agent/PetrolChat.tsx`, `app/src/renderer/stores/petrolChatStore.ts`,
@@ -225,6 +240,32 @@ Quellen (von diesem Rechner abgerufen)
 4. Was fehlt an Abbruch/Kennung, wenn Suche, Abrufe und Modell drei Phasen einer Anfrage sind?
 5. Arbeitsbilanz: Webantworten nicht als Agent-Lauf zählen — trotzdem Telemetrie für Suchkosten?
 
+### Runde 4 (24.10.2026): Code-Prüfung der Umsetzung
+
+**Maßstab ist das Ziel oben: geringe Halluzination.** Bitte nicht nur prüfen, ob der Code den
+Entwurf umsetzt, sondern vor allem: An welcher Stelle kann das Modell trotz Websuche erfinden,
+und wo sieht eine erfundene oder schwach gestützte Aussage glaubwürdiger aus, als sie ist
+(Anzeige, Export, Verlauf, Prompt)? Außerdem: Belegen die Tests wirklich F03, F16, F17, F19?
+
+Code (uncommittet, Stand `git rev-parse --short HEAD` plus Arbeitsbaum):
+- Main-IPC `petrol-chat-web` + Modellphase: `app/src/main/index.ts` (Suche nach `petrol-chat-web`
+  und `streamPetrolWebModel`).
+- Suche + Abrufe mit Stopp/Frist: `app/src/main/llm/petrolWebChat.ts` (`gatherWebSources`,
+  `fetchFailReason`, `defaultWebGatherDeps`); gekappte Seiten: `app/src/main/webResearch/fetchExtract.ts`
+  (`rejectTruncatedBody`, `markTruncation`).
+- Prompt: `app/src/main/llm/petrolWebPrompt.ts`.
+- Reine Logik: `app/src/shared/webChat.ts` (Kandidaten, `runFetchQueue`, `applyWebChatBudget`,
+  `freezeWebSources`, `withWebFootnotes`).
+- Renderer: `app/src/renderer/stores/petrolChatStore.ts` (Web-Zweig in `send`, `stop`),
+  `app/src/renderer/utils/chatHistory.ts` (`origin: 'web'`), `app/src/renderer/components/Agent/PetrolChat.tsx`
+  (Globus, Suchwörter, Datenwege, Senden-Sperre), `PetrolWebAnswer.tsx` (Anzeige),
+  `app/src/renderer/utils/webAnswerMarkdown.ts` (Marken, keine Links).
+- Tests: `app/src/shared/webChat.test.ts`, `app/src/main/llm/petrolWebChat.test.ts`,
+  `app/src/main/llm/petrolWebPrompt.test.ts`, `app/src/renderer/utils/webAnswerMarkdown.test.ts`,
+  `app/src/renderer/utils/chatHistory.test.ts`.
+
+Bewusste Abweichungen vom Entwurf (bitte mitprüfen, siehe Claude-Antwort Runde 4).
+
 ### Abschluss (24.10.2026)
 Nutzerentscheidung: F03, F16, F17, F19 in Rev. 4 eingearbeitet, **keine weitere Codex-Runde**.
 Ihre Status bleiben formal [OFFEN] bis zur Umsetzung; Prüfung dort über Tests (Warteschlange,
@@ -264,7 +305,7 @@ Vorschlag: Beim Eintritt in den neuen IPC synchron mit `senderId:requestId` regi
 ### F03 — 25 Sekunden sind mit den vorhandenen Einzel-Timeouts keine Gesamtgrenze
 Schwere: mittel
 Stelle: app/src/main/webResearch/providers.ts:45; app/src/main/webResearch/fetchExtract.ts:73; app/src/main/webResearch/egress.ts:241; app/src/main/webResearch/egress.ts:262; app/src/shared/webResearch.ts:86
-Status: [OFFEN]
+Status: [ERLEDIGT]
 
 `webSearch` darf bereits 20 Sekunden warten; jeder Seitenabruf erhält erneut 20 Sekunden, und `safeFetch` setzt die Frist pro Redirect-Hop neu. Drei parallele Abrufe nach einer langsamen Suche passen daher ohne übergeordneten Abbruch nicht in 25 Sekunden. Ein bloßes `Promise.race` würde die verlorenen Netzaufrufe weiterlaufen lassen und könnte nach der Antwort noch Seitendaten oder Fortschritt liefern.
 
@@ -273,6 +314,8 @@ Vorschlag: Eine absolute Deadline für Suche **und** Abrufe festlegen, die alle 
 Nachprüfung Rev. 2: [OFFEN] bleibt. Ein Timer kann `Defuddle.parse()` und `turndown()` im Main-Thread nicht während ihrer synchronen Ausführung unterbrechen (`app/src/main/webResearch/fetchExtract.ts:96-104`). „Danach messen und nachsteuern“ erfüllt die zugesagte **harte** 25-Sekunden-Grenze nicht. Entweder diese Arbeit abbrechbar auslagern oder die Grenze ehrlich als Netzwerkfrist plus gesondertes Extraktionslimit benennen.
 
 Nachprüfung Rev. 3: [OFFEN] bleibt. Die Umbenennung in „Netzfrist“ macht die Anzeige ehrlicher, aber der Fristtimer läuft im selben Main-Thread wie `Defuddle.parse()` und `turndown()` (`app/src/main/webResearch/fetchExtract.ts:96-101`). Eine lange synchrone Aufbereitung verzögert auch den **Netz**-Timer; „hart“ ist damit weiterhin keine garantierbare Grenze. Außerdem kappt `safeFetch` den Body bereits auf `maxBytes` (`app/src/main/webResearch/egress.ts:200-204`): Eine Prüfung nur auf „HTML über 1,5 MB“ sieht den Überlauf nicht; dafür muss `res.truncated` ausgewertet werden (`app/src/main/webResearch/fetchExtract.ts:113`). Frist als bestmögliche Netzgrenze benennen oder Aufbereitung aus dem Main-Thread auslagern, und gekappte HTML-Antworten ausdrücklich verwerfen.
+
+Code-Nachprüfung Runde 4: [ERLEDIGT] im freigegebenen Sinn einer **bestmöglichen** Netzfrist, nicht einer harten Laufzeitgarantie. Ein Signal und ein 25-s-Timer umfassen Suche und Abrufe (`app/src/main/llm/petrolWebChat.ts:50-58`, `:76-115`); an der Bytegrenze gekappte Bodies werden vor der Extraktion verworfen (`app/src/main/webResearch/fetchExtract.ts:99-101`). Der Test `app/src/main/llm/petrolWebChat.test.ts:23-39` beweist den Signalabbruch offener Abrufe mit injiziertem Timer, weder eine reale 25-s-Frist noch das Verhalten während synchroner HTML-Aufbereitung. Diese Einschränkung ist im Code ausdrücklich als bestmöglich benannt (`app/src/shared/webChat.ts:23-24`, `app/src/main/llm/petrolWebChat.ts:5-8`).
 
 ### F04 — Ollama-Vordergrund erst während lokaler Erzeugung melden
 Schwere: mittel
@@ -401,13 +444,15 @@ Vorschlag: In Webantworten nur die von der App erzeugten Quellenlinks als Quelle
 ### F16 — Das Nachziehen braucht eine definierte Abruf-Warteschlange
 Schwere: mittel
 Stelle: app/src/shared/webResearch.ts:81; app/src/main/webResearch/fetchExtract.ts:72; app/src/main/webResearch/egress.ts:241
-Status: [OFFEN]
+Status: [ERLEDIGT]
 
 Rev. 2 startet drei Abrufe parallel und zieht bei Fehlern Kandidaten 4–8 nach, sagt aber zugleich `Promise.allSettled` und höchstens fünf Versuche zu. Werden Ersatzabrufe unmittelbar bei jedem Fehler gestartet, können mehrere gleichzeitige Abschlüsse mehr als drei laufende Abrufe oder mehr als fünf Starts auslösen, wenn Zähler und freie Plätze erst nach einem `await` geprüft werden. Wartet der Code dagegen jeweils auf `allSettled` des ganzen Dreierblocks, kann eine langsame Seite die Ersatzsuche bis zum Ende der 25 Sekunden verhindern. Die bestehenden Funktionen nehmen zwar ein Abbruchsignal an, steuern aber keine gemeinsame Warteschlange.
 
 Vorschlag: Im Main einen festen Laufzustand mit atomar **vor dem Start** erhöhtem Versuchszähler, maximal drei gleichzeitig offenen Abrufen, maximal fünf Versuchen und einer gemeinsamen Deadline festlegen. Nach jedem Settling einen freien Platz nur solange nachfüllen, wie Frist und Budget reichen; am Ende alle gestarteten Promises abwarten und erst dann die Quellenliste einfrieren. Gleichzeitige Fehler, langsame erste Seite und Stopp beim Nachziehen testen.
 
 Nachprüfung Rev. 3: [OFFEN] bleibt. Die synchrone Reservierung löst das Zählerrennen. Die neue Regel „**jeder** abgeschlossene Abruf (Erfolg, Fehler, leer) ruft `startNext()`“ zieht jedoch auch nach drei erfolgreichen Seiten Treffer 4 und 5 nach. Das widerspricht „nächster Kandidat nur bei Fehler oder leer“ und der Grenze von drei verwendeten Seiten; jeder zusätzliche Abruf kontaktiert einen weiteren Host (`app/src/main/webResearch/fetchExtract.ts:72-79`). Nur nachfüllen, wenn `brauchbareSeiten + offeneAbrufe < 3`, und bei drei brauchbaren Seiten keine weiteren Starts zulassen.
+
+Code-Nachprüfung Runde 4: [ERLEDIGT]. `startNext()` reserviert Versuch und offenen Platz synchron vor `fetchOne`, stoppt bei fünf Starts sowie `brauchbar + offen >= 3` (`app/src/shared/webChat.ts:186-200`) und wartet auf alle gestarteten Abrufe (`:202-217`). Die Tests für gleichzeitige Fehler, drei Erfolge ohne Zusatzhost, langsame erste Seite und Stopp beim Nachziehen prüfen diese Zustände gezielt (`app/src/shared/webChat.test.ts:42-109`).
 
 ### F17 — Drei Seiten plus Chatverlauf haben kein gemeinsames Modellbudget
 Schwere: mittel
@@ -419,6 +464,8 @@ Die vorhandene Grenze erlaubt je Seite 8 000 Zeichen. Drei Seiten können also r
 Vorschlag: Vor dem Modellaufruf ein Gesamtbudget für Quellen **und** Verlauf festlegen, an den tatsächlichen Modellweg anpassen und gekürzte Seiten in der UI kenntlich machen. Ganze Quellen nur verwenden, wenn sie innerhalb des Budgets liegen; sonst abschnittsweise kürzen, ohne die Zuordnung `[n]` zu verändern. Einen langen Chat mit drei Maximal-Seiten und kleinem lokalen Kontextfenster prüfen.
 
 Nachprüfung Rev. 3: [OFFEN] bleibt. Die 12 000 Zeichen deckeln nur die Quellen. `HISTORY_LIMIT = 10` zählt Nachrichten, nicht ihre Länge (`app/src/renderer/utils/chatHistory.ts:14-20`); zehn lange Nachrichten plus Frage und Systemtext können den Modellkontext weiterhin sprengen. „Gesamtbudget für das Modell“ braucht eine gemeinsame Grenze für Systemtext, aktuelle Frage, Verlauf und Quellen sowie eine klare Reihenfolge beim Kürzen. Dass das Modell bei Kontextfehler eine Fehlermeldung liefert, ersetzt diese Grenze nicht.
+
+Code-Nachprüfung Runde 4: [OFFEN] für die Zusage eines **Modell**budgets. Die reine Logik begrenzt zwar Verlauf und Auszüge zusammen mit einer Schätzung für Systemtext und Frage auf 20 000 Zeichen (`app/src/shared/webChat.ts:25-30`, `:263-296`; Test `app/src/shared/webChat.test.ts:112-139`). Der Handler schätzt den Systemtext aber als Prompt ohne Quellen plus pauschal 200 Zeichen je Quelle (`app/src/main/index.ts:6828-6852`); der tatsächliche Prompt baut danach Titel und Hosts ein (`app/src/main/llm/petrolWebPrompt.ts:13-16`, `:27-30`). Zudem sendet der lokale Ollama-Pfad diese feste Zeichenzahl ohne Prüfung oder Setzung des verfügbaren Kontextfensters (`app/src/main/index.ts:6703-6712`). Der Test beweist damit nur Arithmetik bei vorgegebenem `systemChars`, nicht dass der gesendete Prompt in das gewählte Modell passt. Vorschlag: endgültigen Prompt und Nachrichten vor dem Versand messen, Token-/Kontextgrenze des konkreten Modellwegs berücksichtigen und bei zu kleinem Fenster Quellen neu kürzen oder ehrlich abbrechen.
 
 ### F18 — Treffer ohne Abruf sind beim Null-Seiten-Fall keine Quellen
 Schwere: niedrig
@@ -434,13 +481,109 @@ Nachprüfung Rev. 3: [ERLEDIGT] auf Entwurfsebene. E2 trennt bei K = 0 Suchtreff
 ### F19 — Kürzen nach dem Einfrieren trennt Prompt und Belegprüfung
 Schwere: hoch
 Stelle: app/src/main/webResearch/fetchExtract.ts:104; app/src/main/webResearch/fetchExtract.ts:113; app/src/shared/rag/citations.ts:338; app/src/shared/rag/citations.ts:341; app/src/shared/rag/citations.ts:385
-Status: [OFFEN]
+Status: [ERLEDIGT]
 
 Rev. 3 friert unter E2 Schritt 4 die `WebSource[]` mit dem abgerufenen Text ein und nennt sie „unveränderlich“ für Prompt, Prüfung, Anzeige und Export. Erst in Schritt 4a werden die Seiten für das 12 000-Zeichen-Budget gekürzt. `analyzeCitations` vergleicht gegen genau die übergebenen Quelltexte. Wenn der Prüfer die zuerst eingefrorenen Volltexte erhält, kann er „hohe Wortübereinstimmung“ oder ein wörtliches Zitat in einem Abschnitt finden, den das Modell nie im Prompt sah. Werden stattdessen die eingefrorenen Texte nachträglich verändert, gilt die versprochene gemeinsame unveränderliche Liste nicht mehr.
 
 Vorschlag: Das Gesamtbudget **vor** dem Einfrieren anwenden. Die endgültigen, modell-sichtbaren Auszüge als kanonische `WebSource[]` für Prompt und `analyzeCitations` festhalten; Originalgröße und Kürzungsstatus getrennt als Metadaten speichern. Eine Antwort mit Zitat nur im abgeschnittenen Teil darf nicht als „wörtlich gefunden“ erscheinen.
 
+Code-Nachprüfung Runde 4: [ERLEDIGT]. `freezeWebSources` bereitet vor, kürzt und speichert erst dann den Auszug (`app/src/shared/webChat.ts:306-341`); Prompt und `analyzeCitations` bekommen denselben `excerpt` (`app/src/main/index.ts:6827-6852`, `:6873-6877`). Der Test mit einem nur im abgeschnittenen Teil stehenden Zitat prüft die Ablehnung (`app/src/shared/webChat.test.ts:154-160`). Das Modellbudget als Ganzes bleibt F17.
+
+### F20 — Ungeprüfte Überschriften können die sichtbare Hauptaussage tragen
+Schwere: hoch
+Stelle: app/src/shared/rag/citations.ts:349-353; app/src/shared/rag/citations.ts:416-423; app/src/renderer/utils/webAnswerMarkdown.ts:23-29; app/src/renderer/components/Agent/PetrolWebAnswer.tsx:89-110
+Status: [OFFEN]
+
+Eine vom Modell erzeugte Markdown-Überschrift wie `## Die Förderung wurde 2026 gestrichen [1]` wird vom Prüfer vollständig als `unchecked` behandelt: Nummer, Wortdeckung und behaupteter Fakt werden nicht geprüft. Das rohe `[1]` bleibt visuell stehen, `summary.sentences` zählt die Überschrift nicht, `sentenceFlags` setzt keine Marke; erst im aufgeklappten Bericht steht „Überschrift, nicht geprüft“. Damit kann die auffälligste, möglicherweise erfundene Aussage über einem scheinbar unauffälligen Prüfbericht stehen. Der Web-Prompt verbietet Überschriften nicht (`app/src/main/llm/petrolWebPrompt.ts:32-40`). Vorschlag: Webantwort-Überschriften wie Aussagen prüfen oder sachliche Überschriften ausdrücklich inline als ungeprüft markieren und in der Kurzbilanz zählen.
+
+### F21 — Hohe Wortübereinstimmung lässt widersprechende Behauptungen unmarkiert
+Schwere: hoch
+Stelle: app/src/shared/rag/citations.ts:100-109; app/src/shared/rag/citations.ts:396-409; app/src/renderer/utils/webAnswerMarkdown.ts:22-29; app/src/renderer/components/Agent/PetrolWebAnswer.tsx:135-145
+Status: [OFFEN]
+
+Der Prüfer vergleicht Wortmengen des ganzen Auszugs mit einem Schwellwert von 0,3; Reihenfolge, Negation und Zuordnung von Zahlen/Namen prüft er nicht. Aus `Der Vertrag wurde geschlossen.` wird etwa `Der Vertrag wurde nicht geschlossen [1].` mit hoher Wortdeckung, obwohl die Aussage ins Gegenteil verkehrt ist. Für `cited-high` setzt die Anzeige keine Marke, zeigt aber die anklickbare Quellennummer und „zitiert“. Der allgemeine Hinweis „kein Faktencheck“ (`app/src/renderer/utils/i18n/petrolChat.ts:91`) mildert die Überinterpretation, verhindert sie an der Aussage nicht. Vorschlag: bei semantisch nicht geprüften Aussagen keinen impliziten grünen Durchgang durch fehlende Marke suggerieren; mindestens Zahlen, Negationen und Gegenbegriffe gesondert als ungeprüft kennzeichnen oder jede zitierte Aussage sichtbar als reinen Wortvergleich markieren.
+
+### F22 — Export verliert die Satzwarnungen und macht schwache Zitate zu Fußnoten
+Schwere: mittel
+Stelle: app/src/shared/webChat.ts:366-378; app/src/renderer/components/Agent/PetrolChat.tsx:244-285; app/src/renderer/components/Agent/PetrolWebAnswer.tsx:84-115
+Status: [OFFEN]
+
+`withWebFootnotes` wandelt **jede gültige Nummer** in eine Quellenfußnote um, auch bei `cited-low` oder nicht gefundenem wörtlichem Zitat. Beim Kopieren und Speichern wird weder der Satzstatus noch die jeweilige Warnung übernommen; nur ein allgemeiner „Wortvergleich, kein Faktencheck“-Satz folgt am Ende. Ein später gelesener Notizsatz mit Fußnote sieht dadurch stärker gestützt aus als derselbe Satz in der Chat-Prüfung. Der Exporttest prüft gültige Nummern, nicht Warnungen (`app/src/shared/webChat.test.ts:169-179`). Vorschlag: die Warnung direkt an betroffene Sätze/Fußnoten schreiben oder schwache/ungültige Zitate im Export ausdrücklich als ungeprüft ausweisen.
+
+### F23 — Gestoppte Web-Bruchstücke bleiben ohne Prüfung weiterverwendbar
+Schwere: mittel
+Stelle: app/src/renderer/stores/petrolChatStore.ts:261-285; app/src/renderer/components/Agent/PetrolChat.tsx:426-445; app/src/renderer/components/Agent/PetrolChat.tsx:244-251; app/src/renderer/components/Agent/PetrolChat.tsx:325-335
+Status: [OFFEN]
+
+Bei Stopp nach dem ersten Token speichert der Store den ungeprüften Teiltext mit Web-Herkunft und Quellen. Die Ansicht sagt zwar, dass keine Satzprüfung stattfand, zeigt darunter aber die abgerufenen Quellen und bietet dieselben Aktionen „Kopieren“, „Als Notiz speichern“ und „Auftrag erstellen“. `exportText` liefert mangels Bericht den bloßen Modelltext; der Auftragsentwurf übernimmt ihn ebenfalls ohne Prüfhinweis. Ein erfundenes Bruchstück kann so dauerhaft im Vault oder Agentenauftrag landen. Vorschlag: diese Aktionen für ungeprüfte Bruchstücke sperren oder den Abbruch-/Prüfstatus zwingend in jeden Ausgabeweg übernehmen.
+
+### F24 — Cloud-Freigabe wird im neuen IPC nur im Renderer geprüft
+Schwere: hoch
+Stelle: app/src/renderer/components/Agent/PetrolChat.tsx:131-135; app/src/shared/llmBackend.ts:114-122; app/src/main/index.ts:6755-6761; app/src/main/index.ts:6788-6800; app/src/main/index.ts:6698-6701
+Status: [OFFEN]
+
+Die normale Modellwahl bietet Cloud nur bei `notes-chat`-Opt-in an, der Main nimmt beim neuen `petrol-chat-web` aber `params.cloud` aus jedem vertrauenswürdigen Top-Frame entgegen. Er prüft Webmodul und Suchschlüssel, nicht die aktuelle Cloud-Freigabe oder das dafür konfigurierte Modell; `resolveCloudChatOptions` verlangt lediglich einen gespeicherten API-Key (`app/src/main/index.ts:11171-11182`). Ein kompromittierter Renderer oder ein veralteter UI-Zustand kann damit Frage, Verlauf und abgerufene Seiten an einen Cloud-Anbieter senden, obwohl das Feature deaktiviert wurde. Vorschlag: vor Suche und spätestens vor Modellversand Main-seitig `notes-chat`-Opt-in und konfigurierte Provider-/Modellbindung erneut prüfen; denselben Gate-Test für deaktivierte Freigabe und geändertes Modell ergänzen.
+
 ## Claude-Antwort
+
+### Runde 5 (24.10.2026): Antwort auf F17, F20–F24 (Nutzer hat alle sechs freigegeben)
+Gegengeprüft am Code, alle tragen; F24 teilweise (gleicher Stand wie `ollama-chat`, beim Web-Chat
+aber mit fremden Seitentexten, deshalb trotzdem umgesetzt). typecheck, test (2920 grün), build grün.
+
+- **F17 [ADRESSIERT]** — schwerer als gemeldet: ohne `num_ctx` schneidet Ollama (Vorgabe oft 4096)
+  einen 20 000-Zeichen-Prompt still vorne ab, also Regeln und Quellen. Jetzt: Kontextlänge des
+  lokalen Modells aus `/api/show` (`contextLengthFromShow`), Zeichenbudget danach
+  (`webChatCharBudget`), `num_ctx` für jeden Ollama-Aufruf gesetzt (`webChatNumCtx`, ≥ 8192, ≤ Modell).
+  Der FERTIGE Prompt wird gemessen und bei Überhang mit kleinerem Quellenbudget neu eingefroren
+  (`freezeWebSourcesToFit`, `app/src/shared/webChat.ts`). Test mit absichtlich zu kleiner
+  Schätzung und langen Titeln: `app/src/main/llm/petrolWebPrompt.test.ts`. Grenze: Cloud und
+  LM Studio ohne bekanntes Fenster behalten 20 000 Zeichen.
+- **F20 [ADRESSIERT]** — Prompt verbietet Überschriften; kommt trotzdem eine, trägt sie die Marke
+  „Überschrift, nicht geprüft“ (`sentenceFlags` → `heading`) und wird in der Kurzbilanz gezählt.
+- **F21 [ADRESSIERT]** — `sentenceExtras` (`app/src/shared/webChat.ts`): Zahlen im Satz, die in keiner
+  zitierten Seite stehen → Marke „Zahl nicht in der Seite: …“; Verneinungswort im Satz → Marke
+  „Verneinung — der Wortvergleich prüft sie nicht“. Läuft im Main, liegt als `extras` am Ergebnis.
+  Bewusst kein Versuch, Verneinungen semantisch zu prüfen.
+- **F22 [ADRESSIERT]** — `withWebFootnotes` schreibt unter die Fußnoten „Hinweise der Prüfung“ mit
+  jedem markierten Satz; Anzeige und Export nutzen dieselbe Beschriftung (`webFlagLabel`).
+- **F23 [ADRESSIERT]** — gestoppte Webantworten ohne Prüfbericht haben keine Knöpfe Kopieren /
+  Als Notiz speichern / Auftrag erstellen.
+- **F24 [ADRESSIERT]** — `petrolCloudAllowed` liest die gespeicherte Freigabe `notes-chat` und das
+  dort gewählte Modell im Main, vor der Suche (keine bezahlte Suche umsonst).
+
+Nach Live-Test (Rundfunkbeitrag, qwen3.8:27b-mlx, Tavily): Satztrennung in `app/src/shared/rag/citations.ts`
+zerschnitt „der 25. KEF-Bericht“ und „(Az. 1 BvR …)“ → zwei falsche „ohne Quellennummer“. Jetzt:
+Ordnungszahl nach Artikel/Präposition und Abkürzungen vor Zahl (Az., Art., Rn. …) trennen nicht;
+„Das Budget beträgt 10. Die …“ trennt weiter (F26). Gilt auch für den Vault-Chat.
+
+Suchwörter kompakt (Nutzer, 24.10.2026: „warum wird das kopiert …“, „noch kleiner“): Solange die
+Suchwörter die Frage sind, ersetzt EINE Zeile die Tastenhilfe: „Websuche: deine Frage an <Anbieter>
+· Seiten von diesem Rechner · <Modellweg>  ändern“ — kein Kasten, keine Zusatzhöhe. Das Feld
+erscheint beim Ändern oder wenn die Frage über 250 Zeichen hat. F08 bleibt gewahrt: gesendet wird exakt der sichtbare Text, nichts wird still gekürzt.
+
+Nebenbei behoben: unsichtbare Private-Use-Zeichen im Quelltext durch `\uE000`-Schreibweise ersetzt.
+
+### Runde 4 (24.10.2026): Umsetzung, Nutzerauftrag „Websuche in den Chat, Ziel geringe Halluzination“
+Gebaut nach Rev. 4. typecheck, test (neue Tests grün; `shellExecution.test.ts` scheiterte einmal im
+Gesamtlauf unter Last, einzeln zweimal grün, ohne Bezug), build grün. Keine GUI-Gegenprobe mit
+echtem Anbieter (Profil ohne Schlüssel). Zusätzlich gegen Halluzination, über den Entwurf hinaus:
+Systemtext nennt das heutige Datum und verlangt Zahlen/Namen nur wörtlich aus Auszügen sowie
+beide Angaben bei Widerspruch.
+
+Abweichungen vom Entwurf:
+- **E3 Unterstrich → Marke am Satzende.** Statt eines Unterstrichs über den Satz steht am Ende
+  jedes nicht getragenen Satzes eine kleine Marke („ohne Quellennummer“, „geringe
+  Wortübereinstimmung“, „ungültige Nummer“, „Zitat nicht wörtlich gefunden“). Grund: ein Satz kann
+  Fett/Kursiv-Grenzen kreuzen, ein Spannen-Element müsste dann falsch verschachtelt werden.
+- **Budget (F17):** zusätzlich zum Verlaufsdeckel 4 000 fällt weiterer Verlauf, wenn sonst weniger
+  als 3 000 Zeichen für Quellen blieben (kleines Fenster). Der Verlauf vom Renderer ist auf 20
+  Nachrichten begrenzt.
+- **Fehlerfall Suche-Zeitlimit:** eigene Meldung statt „nichts Lesbares“.
+- **„Erneut senden“** einer gescheiterten Webfrage läuft ohne Web — neue Suche nur per Globus.
+- **Cloud-Opt-in:** wie beim normalen Petrol-Chat nur über die Modellwahl im Renderer
+  (`cloudRoutesForFeature('notes-chat')`); der Main prüft das Feature-Opt-in nicht erneut
+  (gleicher Stand wie `ollama-chat`).
+
 
 ### Runde 3 (24.10.2026, Nutzer hat alle vier freigegeben)
 F19 erst kürzen, dann einfrieren — modell-sichtbarer Auszug ist kanonisch für Prüfung und
@@ -467,4 +610,4 @@ auslassen, weil sonst der Gesprächsfaden reißt.
 
 ## Status
 
-Rev. 1: Codex F01–F15. Entwurfsprüfung abgeschlossen (24.10.2026). Rev. 4 = Bauplan für Stufe 1b; 15 von 19 Befunden von Codex erledigt, F03/F16/F17/F19 in Rev. 4 eingearbeitet und bei der Umsetzung per Test zu belegen. Kein Code; Bau nur auf Nutzerwunsch.
+Rev. 1: Codex F01–F15. Entwurfsprüfung abgeschlossen (24.10.2026). Rev. 4 = Bauplan für Stufe 1b; 15 von 19 Befunden von Codex erledigt, F03/F16/F17/F19 in Rev. 4 eingearbeitet. **24.10.2026: gebaut (uncommittet), Runde 4 = Code-Prüfung durch Codex mit Maßstab „geringe Halluzination“.**

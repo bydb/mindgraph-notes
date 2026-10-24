@@ -86,6 +86,13 @@ export interface AgentRunUiState {
   followUp?: string
 }
 
+/**
+ * Übergabe aus dem Petrol-Chat. `draft`: Chat-Antwort als ungeprüfter Entwurf
+ * (chat-daraus-erstellen.md). `research`: Webantwort → der Agent recherchiert NEU; alte
+ * Antwort und Quellen werden nicht übernommen (chat-recherche-zum-agenten.md, kleinster Schritt).
+ */
+export interface ChatHandover { at: number; clipped: boolean; kind?: 'draft' | 'research' }
+
 export interface AgentScopeState {
   attachments: NoteAgentAttachment[]
   /**
@@ -107,6 +114,12 @@ export interface AgentScopeState {
   pickedExample?: { text: string; need: AgentExampleNeed } | null
   /** Modellwahl und Web-Schalter des Agent-Tabs — aus demselben Grund wie `draft` hier. */
   prefs?: AgentScopePrefs
+  /**
+   * Entwurf kam per „Notiz mit Petrol ausarbeiten“ aus dem Chat (docs/codex-collab/
+   * chat-daraus-erstellen.md, F02/F04/F05): die Karte zeigt dann einen Übergabe-Hinweis mit
+   * den nächsten Schritten und den übernommenen Einstellungen. `at` wechselt je Übergabe.
+   */
+  chatHandover?: ChatHandover | null
   /** Start vom Main abgelehnt, weil Cloud-Freigabe oder Zustimmung fehlt — die Karte zeigt
    *  dafür eine eigene Zeile statt einer Fehlermeldung unter den Anhängen. */
   startGate?: { code: 'optin' | 'consent'; message: string } | null
@@ -184,6 +197,7 @@ interface NoteAgentStoreState {
   setDraft: (scopeId: string, text: string) => void
   setPickedExample: (scopeId: string, example: { text: string; need: AgentExampleNeed } | null) => void
   setPrefs: (scopeId: string, patch: AgentScopePrefs) => void
+  setChatHandover: (scopeId: string, handover: ChatHandover | null) => void
 
   /** true, wenn der Lauf gestartet ist. */
   startRun: (scopeId: string, params: AgentStartParams) => Promise<boolean>
@@ -375,6 +389,9 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
 
   setPrefs: (scopeId, patch) =>
     set(s => withScope(s, scopeId, sc => ({ ...sc, prefs: { ...sc.prefs, ...patch } }))),
+
+  setChatHandover: (scopeId, handover) =>
+    set(s => withScope(s, scopeId, sc => ({ ...sc, chatHandover: handover }))),
 
   startRun: async (scopeId, params) => {
     get().setAttachError(scopeId, null)

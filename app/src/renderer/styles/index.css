@@ -21459,6 +21459,17 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   .agent-card-main .agent-card-examples-grid > :last-child:nth-child(odd) { grid-column: 2 / span 2; }
 }
 .agent-card-task { display: flex; flex-direction: column; gap: 7px; padding: 13px 16px 10px; }
+/* Übergabe aus dem Chat: nächste Schritte + übernommene Einstellungen, über dem Entwurf. */
+.agent-card-handover {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+  margin: 12px 16px 0; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 25%, var(--bg-primary));
+  background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-primary));
+  font-size: 12.5px; line-height: 1.5; color: var(--text-primary);
+}
+.agent-card-handover-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.agent-card-handover-text span { color: var(--text-secondary); }
+
 /* Leerer Auftrag lädt ein statt zu warnen: weiß; nur der kleine Punkt „Auftrag fehlt“
    markiert die Lücke. Gelb bleibt echten Lücken weiter unten. */
 .agent-card-task.is-missing { background: var(--bg-primary); }
@@ -23286,6 +23297,85 @@ body.presentation-mode *::after {
 .petrol-chat-send.is-stop { background: var(--text-primary); color: var(--bg-primary); }
 .petrol-chat-note { font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
 .petrol-chat-note.is-error { color: var(--color-danger); }
+.petrol-chat-note.is-warn, .petrol-web-line-warn { color: color-mix(in srgb, var(--color-warning) 80%, var(--text-primary)); }
+.petrol-web-line-warn { flex-basis: 100%; }
+
+/* Websuche im Chat (Stufe 1b): Globus, Suchwörter, Datenwege, Quellen, Prüfung je Satz. */
+.petrol-chat-globe {
+  width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-secondary); cursor: pointer;
+}
+.petrol-chat-globe:hover:not(:disabled) { color: var(--text-primary); border-color: var(--accent-color); }
+.petrol-chat-globe:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.petrol-chat-globe.is-on {
+  color: var(--accent-color); border-color: var(--accent-color);
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+}
+.petrol-chat-globe:disabled { opacity: 0.5; cursor: default; }
+.petrol-web-query {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent-color) 25%, var(--bg-primary));
+  background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-primary));
+}
+.petrol-web-query-row { display: flex; align-items: center; gap: 8px; }
+.petrol-web-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 11.5px; line-height: 1.45; color: var(--accent-color); }
+.petrol-web-line .agent-card-link-btn { font-size: 11.5px; }
+.petrol-web-query-label { font-size: 12px; font-weight: 600; color: var(--text-primary); flex-shrink: 0; }
+.petrol-web-query-row input {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--text-primary);
+  padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border-color); background: var(--bg-primary);
+}
+.petrol-web-query-row input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px var(--focus-ring); }
+.petrol-web-query-off {
+  width: 24px; height: 24px; border-radius: 6px; border: none; background: transparent; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--text-secondary); cursor: pointer;
+}
+.petrol-web-query-off:hover { color: var(--text-primary); background: var(--bg-secondary); }
+.petrol-web-paths { font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
+.petrol-turn-webbadge {
+  flex-shrink: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.02em;
+  padding: 1px 6px; border-radius: 999px;
+  color: var(--accent-color); border: 1px solid color-mix(in srgb, var(--accent-color) 35%, var(--bg-primary));
+}
+.petrol-turn-webq { display: block; margin-top: 2px; font-size: 11.5px; font-weight: 400; color: var(--text-secondary); }
+.petrol-web-answer .nc-cite { font-size: 0.72em; color: var(--accent-color); cursor: pointer; margin-left: 1px; }
+.petrol-web-flag {
+  font-size: 10.5px; font-weight: 500; white-space: nowrap;
+  padding: 0 5px; border-radius: 4px;
+  color: color-mix(in srgb, var(--color-warning) 80%, var(--text-primary));
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--bg-primary));
+}
+.petrol-web-flag.is-gap { color: var(--text-secondary); background: var(--bg-secondary); }
+.petrol-web-appnote { color: var(--text-secondary); font-size: 13px; }
+.petrol-web-block { display: flex; flex-direction: column; gap: 8px; padding: 2px 14px 10px; }
+.petrol-web-muted { font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
+.petrol-web-check { font-size: 12px; color: var(--text-secondary); }
+.petrol-web-check-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.petrol-web-check-list { margin: 6px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.petrol-web-check-list li { line-height: 1.45; }
+.petrol-web-check-list li.is-weak .petrol-web-check-status { color: color-mix(in srgb, var(--color-warning) 80%, var(--text-primary)); }
+.petrol-web-check-text { color: var(--text-primary); }
+.petrol-web-check-status { display: block; font-size: 11px; }
+.petrol-web-sources { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+.petrol-web-sources ol, .petrol-web-sources ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.petrol-web-sources li {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 12.5px;
+  padding: 2px 4px; border-radius: 6px; transition: background-color 0.3s;
+}
+.petrol-web-sources li.is-flash { background: color-mix(in srgb, var(--accent-color) 14%, var(--bg-primary)); }
+.petrol-web-sources li.is-unused .petrol-web-src-link { color: var(--text-secondary); }
+.petrol-web-src-n { font-variant-numeric: tabular-nums; color: var(--text-secondary); flex-shrink: 0; }
+.petrol-web-src-link {
+  border: none; background: none; padding: 0; font: inherit; text-align: left; cursor: pointer;
+  color: var(--accent-color); min-width: 0; overflow-wrap: anywhere;
+}
+.petrol-web-src-link:hover { text-decoration: underline; }
+.petrol-web-src-link:focus-visible { outline: none; border-radius: 3px; box-shadow: 0 0 0 3px var(--focus-ring); }
+.petrol-web-src-host, .petrol-web-src-tags { font-size: 11.5px; color: var(--text-secondary); }
+.petrol-web-nothing { font-size: 13px; color: var(--text-primary); padding: 4px 0; }
+.petrol-web-sources.is-unchecked { border-top: none; padding-top: 10px; }
 
 @container (max-width: 560px) {
   .petrol-chat-list { padding: 10px; }
