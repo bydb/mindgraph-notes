@@ -115,7 +115,7 @@ describe('Werkzeug-Allowlist im Web-Lauf', () => {
   const toolNames = (callIndex = 0) =>
     (mockChat.mock.calls[callIndex][1] as Array<{ name: string }>).map(t => t.name)
 
-  it('bietet write_note, write_html und write_pptx an, aber keine Word-/Excel-Formate', async () => {
+  it('bietet write_note, write_html, write_pptx und write_xlsx an, aber keine Word-Formate', async () => {
     mockChat.mockResolvedValue(noToolCalls)
     await run(makeWeb({ wrote: true, phase: 'write' }))
     const names = toolNames()
@@ -124,7 +124,8 @@ describe('Werkzeug-Allowlist im Web-Lauf', () => {
     // PowerPoint seit 01.10.2026 auch im Web-Lauf: die App hängt eine Quellenfolie an.
     expect(names).toContain('write_pptx')
     expect(names).toContain('web_search')
-    expect(names).not.toContain('write_xlsx')
+    // Excel seit 25.10.2026 auch im Web-Lauf: die App hängt ein Blatt „Quellen“ an (B2).
+    expect(names).toContain('write_xlsx')
     expect(names).not.toContain('write_docx')
     expect(names).not.toContain('fill_docx_form')
   })

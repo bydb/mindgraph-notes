@@ -454,6 +454,45 @@ export function mergeDeterministicSources(markdown: string, fetches: WebFetchRec
   return `${base}\n\n## Quellen\n\n${lines.join('\n')}\n`
 }
 
+/**
+ * Blatt „Quellen“ für write_xlsx im Web-Lauf (docs/codex-collab/chat-uebergabe-kontext.md, B2):
+ * wie der Quellenblock der Notiz nur erfolgreich abgerufene, deduplizierte Seiten. Die App ist
+ * die Autorität dafür, was gelesen wurde — das Modell schreibt dieses Blatt nicht.
+ */
+export function deterministicSourcesSheet(fetches: WebFetchRecord[]): string[][] {
+  const seen = new Set<string>()
+  const ok = fetches.filter(f => f.status === 'ok' && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
+  if (!ok.length) return [['Hinweis'], ['In diesem Lauf wurde keine Seite erfolgreich abgerufen. Die Werte der Tabelle sind nicht durch Quellen belegt.']]
+  return [['Titel', 'URL', 'Abgerufen am'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10)])]
+}
+
+/**
+ * Links in Tabellenzellen, die auf keine in diesem Lauf abgerufene Seite zeigen (B2). Eine
+ * Tabelle hat keinen Quellenblock, in dem die App eine erfundene URL ersetzen könnte — eine
+ * Spalte „Quelle“ mit nie gelesener Seite sähe genauso belegt aus wie eine echte.
+ */
+export function unfetchedUrlsInCells(cells: readonly (readonly string[])[], fetches: WebFetchRecord[]): string[] {
+  const fetched = new Set<string>()
+  for (const f of fetches) {
+    if (f.status !== 'ok') continue
+    for (const u of [f.finalUrl, f.requestedUrl, ...f.redirectChain]) {
+      const n = normalizeWebUrl(u)
+      if (n) fetched.add(n)
+    }
+  }
+  const out = new Set<string>()
+  for (const row of cells) {
+    for (const cell of row) {
+      for (const raw of cell.match(/https?:\/\/[^\s<>"'`\]}]+/gi) || []) {
+        const url = trimUrlTail(raw)
+        const n = normalizeWebUrl(url)
+        if (!n || !fetched.has(n)) out.add(url)
+      }
+    }
+  }
+  return [...out]
+}
+
 function escapeHtmlText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }

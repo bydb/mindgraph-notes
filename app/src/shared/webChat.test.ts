@@ -7,6 +7,8 @@ import {
   runFetchQueue,
   withWebFootnotes,
   sentenceExtras,
+  searchWordsFromQuestion,
+  offerSearchWords,
   webChatCharBudget,
   webChatNumCtx,
   contextLengthFromShow,
@@ -285,6 +287,38 @@ describe('Benannte Lücke statt Fehlalarm (Nutzertest 24.10.2026)', () => {
   })
 })
 
+describe('Weniger Fehlalarm in der Satzprüfung (Vergleich mit Claude, 25.10.2026)', () => {
+  const page = 'Erlaubt sind höchstens 2000 Watt installierte Leistung. Der Anschluss über eine Mehrfachsteckdose ist nicht zulässig.'
+
+  it('Zahl aus der Frage wird mit Herkunft benannt (bleibt Warnung, Codex F02)', () => {
+    const answer = 'Ein System mit 8 Modulen überschreitet die Grenze von 2000 Watt [1].'
+    const report = analyzeCitations(answer, [page])
+    const ex = sentenceExtras(answer, report, [page], 'Balkonkraftwerk mit 8 Modulen, was kostet das?')
+    expect(ex[0].missingNumbers).toEqual([])
+    expect(ex[0].questionNumbers).toEqual(['8'])
+  })
+
+  it('Suggestivfrage: die Zahl aus der Frage wird ausgewiesen, nicht verschluckt', () => {
+    const src = ['Der Beitrag beträgt 18,36 Euro.']
+    const answer = 'Der Beitrag beträgt 20 Euro [1].'
+    const ex = sentenceExtras(answer, analyzeCitations(answer, src), src, 'Sind es 20 Euro?')
+    expect(ex[0].questionNumbers).toEqual(['20'])
+  })
+
+  it('Zahl, die weder in Seite noch Frage steht, bleibt eine Warnung', () => {
+    const answer = 'Erlaubt sind höchstens 2400 Watt [1].'
+    const ex = sentenceExtras(answer, analyzeCitations(answer, [page]), [page], 'Wie viel Watt?')
+    expect(ex[0].missingNumbers).toEqual(['2400'])
+    expect(ex[0].questionNumbers).toBeUndefined()
+  })
+
+  it('Verneinung bleibt markiert, auch wenn die Seite sie ähnlich enthält (Codex F03)', () => {
+    const src = ['Die Solaranlage mit Speicher ist nicht erlaubt.']
+    const answer = 'Die Solaranlage ohne Speicher ist nicht erlaubt [1].'
+    expect(sentenceExtras(answer, analyzeCitations(answer, src), src)[0].negation).toBe(true)
+  })
+})
+
 
 describe('Verlauf kürzen, Auszüge nicht (Stufe 2 Schritt B)', () => {
   it('wirft die ältesten Nachrichten ab und lässt den Inhalt der übrigen unangetastet', () => {
@@ -439,5 +473,58 @@ describe('Verlauf kürzen: keine Antwort ohne ihre Frage (Codex F12)', () => {
     const r = applyWebChatBudget({ systemChars: 1000, questionChars: 100, history, pages: ['p'.repeat(3000)], historyMax: 2600 })
     expect(r.history[0]?.role).not.toBe('assistant')
     expect(r.history.map(m => m.role)).toEqual(['user', 'assistant'])
+  })
+})
+
+describe('Suchwörter aus der Frage, ohne Modell (Vergleich mit Claude, 25.10.2026)', () => {
+  it('lässt Füllwörter weg, behält Reihenfolge, Zahlen und Fachwörter', () => {
+    expect(searchWordsFromQuestion('Ich will mir selbst ein Balkonkraftwerk mit 8 Modulen installieren was kosten die Module'))
+      .toBe('Balkonkraftwerk mit 8 Modulen installieren kosten Module')
+    expect(searchWordsFromQuestion('Wie viel Elterngeld bekomme ich wenn ich 3000 brutto verdiene?')).toBe('Elterngeld 3000 brutto verdiene')
+  })
+
+  it('ergänzt nie ein Wort: jedes Suchwort stand in der Frage', () => {
+    const q = 'Mein Kühlschrank brummt seit gestern ganz laut, ist das gefährlich oder muss der zum Reparieren?'
+    const words = searchWordsFromQuestion(q).split(' ')
+    for (const w of words) expect(q).toContain(w)
+    expect(words).toEqual(['Kühlschrank', 'brummt', 'seit', 'gestern', 'laut', 'gefährlich', 'oder', 'Reparieren'])
+  })
+
+  it('Verneinungen bleiben erhalten (Codex F05)', () => {
+    expect(searchWordsFromQuestion('Welche Medikamente darf man nicht mit Alkohol nehmen?')).toBe('Medikamente nicht mit Alkohol nehmen')
+    expect(searchWordsFromQuestion('Rente ohne Abschläge mit 63')).toBe('Rente ohne Abschläge mit 63')
+  })
+
+  it('Vergleich, Zeit und Namen bleiben (Codex F01)', () => {
+    expect(searchWordsFromQuestion('Was kostet ein Speicher mit oder ohne Montage?')).toBe('kostet Speicher mit oder ohne Montage')
+    expect(searchWordsFromQuestion('Was gilt bei Kündigung nach der Elternzeit?')).toBe('gilt Kündigung nach Elternzeit')
+    expect(searchWordsFromQuestion('Wie hoch war das Hochwasser an der Oder 2025?')).toBe('hoch Hochwasser Oder 2025')
+  })
+
+  it('englischer Vergleich bleibt erhalten (Codex F05)', () => {
+    expect(offerSearchWords('Can you compare the price with or without storage?')).toBe('compare price with or without storage')
+  })
+
+  it('Gesprächsauftakt fällt als ganze Wendung, Sachwörter bleiben (Codex F07)', () => {
+    expect(searchWordsFromQuestion('Lass uns mal schauen, was eine Wärmepumpe im Altbau kostet')).toBe('Wärmepumpe Altbau kostet')
+    expect(searchWordsFromQuestion('Gut Hohenhaus Öffnungszeiten am Sonntag')).toBe('Gut Hohenhaus Öffnungszeiten Sonntag')
+    expect(offerSearchWords('Okay, schauen wir mal')).toBeNull()
+  })
+
+  it('Angebot nur bei langen Fragen oder Gesprächssätzen (Codex Frage 6, F04)', () => {
+    expect(offerSearchWords('Ich will mir selbst ein Balkonkraftwerk mit 8 Modulen installieren was kosten die Module'))
+      .toBe('Balkonkraftwerk mit 8 Modulen installieren kosten Module')
+    expect(offerSearchWords('Wie hoch ist das Elterngeld 2026?')).toBeNull()
+    expect(offerSearchWords('Okay, schauen wir mal: Elterngeld 2025')).toBe('Elterngeld 2025')
+    expect(offerSearchWords('Rundfunkbeitrag 2026 Höhe')).toBeNull()
+  })
+
+  it('bleibt weniger als zwei Wörter übrig, gilt die Frage unverändert', () => {
+    expect(searchWordsFromQuestion('Okay, schauen wir mal')).toBe('Okay, schauen wir mal')
+    expect(searchWordsFromQuestion('Was ist ein Leitzins?')).toBe('Was ist ein Leitzins?')
+  })
+
+  it('Zahl mit Punkt am Ende bleibt, Satzzeichen fallen weg', () => {
+    expect(searchWordsFromQuestion('Was passiert am 1. Mai 2027?')).toBe('passiert 1. Mai 2027')
   })
 })

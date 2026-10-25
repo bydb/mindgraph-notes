@@ -27,8 +27,9 @@ import { setAiProvenanceInContent } from '../../../shared/aiProvenance'
 import { VAULT_CHAT_ANSWER_TYPE } from '../../../shared/rag/indexPolicy'
 import type { AgentRoute } from '../../../shared/agentRoute'
 import { useIsModuleEnabled } from '../../utils/modules'
+import { buildChatHandover, formatHandoverTranscript } from '../../utils/chatHandover'
 import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META } from '../../../shared/webResearch'
-import { followUpQuery, lastSentWebQuery, looksConversational, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
+import { followUpQuery, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
 import { WebAnswerText, WebCheck, WebProvenanceLine, WebSkippedLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 
@@ -77,7 +78,6 @@ function openSettingsAt(tab: 'ai' | 'modules', anchor: string) {
 const CLOUD_LABELS: Record<string, string> = { openrouter: 'OpenRouter', llmbase: 'LLMBase' }
 
 /** Obergrenze für den Text, der beim Übergang in den Auftragsentwurf wandert. */
-const MAKE_TASK_MAX_CHARS = 6000
 const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0, max)} …` : text)
 
 export function PetrolChat({ tabId, onSwitchToTask }: Props) {
@@ -118,6 +118,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const webOn = !!scope?.webArmed && webModule && webConfigured
   // Vorschlag = die Frage, unverändert (F08). Gesendet wird exakt, was im Feld steht.
   const webQuery = scope?.webQuery ?? draft
+  // Stichwörter nur als Angebot auf Klick, bei langen Fragen und Gesprächssätzen (Codex-Prüfung
+  // chat-suchqualitaet-2.md, Urteil zu Frage 6): die Messung trug keinen Standardwechsel.
+  const keywordOffer = offerSearchWords(draft)
   const webQueryNorm = normalizeQuery(webQuery)
   const webQueryLen = [...webQueryNorm].length
   // Nachfrage nach einer Websuche (Codex-Prüfung chat-suchwoerter-vorschlag.md, F07): auf Klick
@@ -144,7 +147,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // Lange Suchwörter: Hinweis, keine Sperre (Nutzertest: lange Suche → Spam-Treffer).
   const webQueryLong = webOn && !webQueryProblem && webQueryLen > WEB_CHAT_QUERY_SOFT_MAX
   // Gesprächssatz statt Stichwörter: nur Warnung, gesendet wird trotzdem (Nutzertest 24.10.2026).
-  const webQueryChatty = webOn && !webQueryProblem && looksConversational(webQueryNorm)
+  // Aus Stichwörtern verschwindet der Gesprächsanfang — dann zählt die Originalfrage (Codex F04).
+  const webQueryChatty = webOn && !webQueryProblem && (looksConversational(webQueryNorm) || (webQuery === keywordOffer && looksConversational(normalizeQuery(draft))))
   const webProgress = busy ? scope?.webProgress ?? null : null
 
   // Modelle des aktiven Backends (Ollama bzw. LM Studio), wie im Notiz-Chat.
@@ -389,25 +393,39 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // angehängt (F06), und bei Webantworten gibt es den Weg vorerst nicht (F03): die Quellen
   // zu [1], [2] wanderten nicht mit, der Agent könnte sie erfinden.
   const [makeFor, setMakeFor] = useState<number | null>(null)
-  const makeTaskText = (msg: PetrolChatMessage) => {
-    const answer = msg.content.trim()
-    const clipped = answer.length > MAKE_TASK_MAX_CHARS
-    return {
-      clipped,
-      text: t('petrolChat.makeTaskDraft', {
-        question: clip(questionFor(msg).trim(), 1000),
-        answer: clip(answer, MAKE_TASK_MAX_CHARS)
-      }) + (clipped ? `\n\n${t('petrolChat.makeTaskClipped', { max: MAKE_TASK_MAX_CHARS })}` : '')
-    }
+  // Übergabe mit dem ganzen Gespräch bis zu dieser Antwort (utils/chatHandover.ts), aber getrennt
+  // (docs/codex-collab/chat-uebergabe-kontext.md): der AUFTRAG ist nur der Wunsch, den der Nutzer
+  // im Bestätigungsschritt sieht und ändern kann (F02/F03, nie gekürzt); der Verlauf geht als
+  // abgegrenzter Kontext an den Main (F04/F06/F07). Ob Fakten im Web geprüft werden, wählt der
+  // Nutzer dort mit zwei Knöpfen (F05; ein Hinweis auf der Karte wurde real übersehen).
+  const [makeWish, setMakeWish] = useState('')
+  const handoverFor = (msg: PetrolChatMessage) => buildChatHandover(messages, messages.indexOf(msg))
+  const openMake = (msg: PetrolChatMessage) => {
+    if (makeFor === msg.at) { setMakeFor(null); return }
+    setMakeWish(handoverFor(msg).goal)
+    setMakeFor(msg.at)
   }
-  const applyMakeTask = (msg: PetrolChatMessage) => {
+  const applyMakeTask = (msg: PetrolChatMessage, web: boolean) => {
+    const wish = makeWish.trim()
+    if (!wish) return
+    const h = handoverFor(msg)
+    const transcript = formatHandoverTranscript(h, {
+      user: t('petrolChat.handoverUser'),
+      petrol: t('petrolChat.handoverPetrol'),
+      webAnswer: t('petrolChat.handoverWebAnswer'),
+      omitted: t('petrolChat.handoverOmitted'),
+      clippedMark: t('petrolChat.handoverAnswerClipped'),
+      topicOnly: t('petrolChat.handoverTopicOnly'),
+      dropped: (n) => t('petrolChat.handoverDropped', { n })
+    })
     const agent = useNoteAgentStore.getState()
-    const { text, clipped } = makeTaskText(msg)
     agent.setPickedExample(tabId, null)
-    agent.setDraft(tabId, text)
-    // Websuche für den neuen Auftrag aus; Shell/Rechner schaltet die Karte bei der Übergabe ab (F04).
-    agent.setPrefs(tabId, { webArmed: false })
-    agent.setChatHandover(tabId, { at: Date.now(), clipped })
+    agent.setDraft(tabId, wish)
+    agent.setChatContext(tabId, h.turns.length ? transcript + (h.clipped ? `\n\n${t('petrolChat.makeTaskClipped')}` : '') : null)
+    // Websuche nur, wenn der Nutzer hier „mit Faktenprüfung“ wählt; Shell/Rechner schaltet die
+    // Karte bei der Übergabe ab (F04 aus chat-daraus-erstellen.md).
+    agent.setPrefs(tabId, { webArmed: web })
+    agent.setChatHandover(tabId, { at: Date.now(), clipped: h.clipped, web, webTurns: h.webTurns })
     setMakeFor(null)
     onSwitchToTask()
   }
@@ -421,6 +439,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     const agent = useNoteAgentStore.getState()
     agent.setPickedExample(tabId, null)
     agent.setDraft(tabId, t('petrolChat.researchDraft', { question: clip(questionFor(msg).trim(), 1000) }))
+    agent.setChatContext(tabId, null)
     agent.setPrefs(tabId, { webArmed: true })
     agent.setChatHandover(tabId, { at: Date.now(), clipped: false, kind: 'research' })
     setResearchFor(null)
@@ -456,7 +475,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           >{t('petrolChat.askWithSources')}</button>
         )}
         {msg.origin !== 'web' ? (
-          <button type="button" className="agent-card-btn is-accent" aria-expanded={makeFor === msg.at} onClick={() => setMakeFor(makeFor === msg.at ? null : msg.at)}>{t('petrolChat.makeTask')}</button>
+          <button type="button" className="agent-card-btn is-accent" aria-expanded={makeFor === msg.at} onClick={() => openMake(msg)}>{t('petrolChat.makeTask')}</button>
         ) : (
           <button type="button" className="agent-card-btn is-accent" aria-expanded={researchFor === msg.at} onClick={() => setResearchFor(researchFor === msg.at ? null : msg.at)}>{t('petrolChat.research')}</button>
         )}
@@ -473,18 +492,34 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           </div>
         </div>
       )}
-      {makeFor === msg.at && (
-        <div className="petrol-turn-confirm" role="group" aria-label={t('petrolChat.makeTask')}>
-          <span>
-            {t('petrolChat.makeTaskExplain')}
-            {hasTaskDraft && <> <strong>{t('petrolChat.makeTaskExisting')}</strong></>}
-          </span>
-          <div className="petrol-turn-actions">
-            <button type="button" className="agent-card-btn" onClick={() => setMakeFor(null)}>{t('petrolChat.makeTaskCancel')}</button>
-            <button type="button" className="agent-card-btn is-primary" onClick={() => applyMakeTask(msg)}>{t(hasTaskDraft ? 'petrolChat.makeTaskReplace' : 'petrolChat.makeTaskGo')}</button>
+      {makeFor === msg.at && (() => {
+        const wish = makeWish.trim()
+        const webTurns = handoverFor(msg).webTurns
+        return (
+          <div className="petrol-turn-confirm petrol-handover" role="group" aria-label={t('petrolChat.makeTask')}>
+            <span>
+              {t('petrolChat.makeTaskExplain')}
+              {hasTaskDraft && <> <strong>{t('petrolChat.makeTaskExisting')}</strong></>}
+            </span>
+            <label className="petrol-handover-wish">
+              <span>{t('petrolChat.makeWishLabel')}</span>
+              <textarea rows={3} value={makeWish} onChange={e => setMakeWish(e.target.value)} />
+            </label>
+            {wish.length > 0 && wish.length < 25 && <span className="petrol-handover-note">{t('petrolChat.makeWishShort')}</span>}
+            {webTurns > 0 && <span className="petrol-handover-note">{t('petrolChat.makeWebTurns', { n: webTurns })}</span>}
+            {webModule && <span className="petrol-handover-note">{t('petrolChat.makeCheckExplain')}</span>}
+            <div className="petrol-turn-actions">
+              <button type="button" className="agent-card-btn" onClick={() => setMakeFor(null)}>{t('petrolChat.makeTaskCancel')}</button>
+              {webModule && (webConfigured
+                ? <button type="button" className="agent-card-btn is-accent" disabled={!wish} onClick={() => applyMakeTask(msg, true)}>{t('petrolChat.makeGoWeb')}</button>
+                : <button type="button" className="agent-card-btn" onClick={() => openSettingsAt('ai', 'ai-webresearch')}>{t('petrolChat.makeWebSetup')}</button>)}
+              <button type="button" className="agent-card-btn is-primary" disabled={!wish} onClick={() => applyMakeTask(msg, false)}>
+                {t(webModule ? 'petrolChat.makeGoPlain' : (hasTaskDraft ? 'petrolChat.makeTaskReplace' : 'petrolChat.makeTaskGo'))}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 
@@ -671,6 +706,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           <div className="petrol-web-line">
             <span>{[t('petrolChat.webLineSearch', { provider: webProvider }), ...webPathParts].join(' · ')}</span>
             <button type="button" className="agent-card-link-btn" onClick={() => chat().setWeb(tabId, { webQuery: draft })}>{t('petrolChat.webQueryEdit')}</button>
+            {keywordOffer && (
+              <button type="button" className="agent-card-link-btn" title={keywordOffer} onClick={() => chat().setWeb(tabId, { webQuery: keywordOffer })}>{t('petrolChat.webQueryUseKeywords')}</button>
+            )}
             {previousWebQuery && (
               <button type="button" className="agent-card-link-btn" title={previousWebQuery} onClick={takePreviousQuery}>{t('petrolChat.webQueryTakePrevious')}</button>
             )}
@@ -700,6 +738,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               {[t('petrolChat.webPathSearch', { provider: webProvider }), ...webPathParts].join(' · ')}
               {previousWebQuery && webQuery.indexOf(previousWebQuery) !== 0 && (
                 <> <button type="button" className="agent-card-link-btn" title={previousWebQuery} onClick={takePreviousQuery}>{t('petrolChat.webQueryTakePrevious')}</button></>
+              )}
+              {keywordOffer && webQuery !== keywordOffer && (
+                <> <button type="button" className="agent-card-link-btn" title={keywordOffer} onClick={() => chat().setWeb(tabId, { webQuery: keywordOffer })}>{t('petrolChat.webQueryUseKeywords')}</button></>
               )}
             </div>
           </div>

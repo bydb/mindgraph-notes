@@ -60,6 +60,10 @@ export interface AgentRun {
   targetFolderAbs: string
   attachmentIds: string[]
   instruction: string
+  // Chatverlauf aus „Im Auftrag weitermachen“ (docs/codex-collab/chat-uebergabe-kontext.md, A):
+  // nur Kontext, nie Auftrag. Der Main hat ihn bereinigt; loop.ts setzt ihn abgegrenzt hinter
+  // den Auftrag. Formaterkennung und erlaubte Links lesen ausschließlich `instruction`.
+  chatContext?: string
   // Modell dieses Laufs (lokaler Tag oder `<provider>/<modell>` bei Cloud-Routing).
   // Trägt die KI-Provenienz in die übernommenen Ergebnisse (shared/aiProvenance).
   model: string
@@ -174,6 +178,7 @@ export function startRun(params: {
   targetFolderAbs: string
   attachmentIds: string[]
   instruction: string
+  chatContext?: string
   model: string
   instructionMs?: number
   comparisonCaseId?: string
@@ -196,6 +201,7 @@ export function startRun(params: {
     targetFolderAbs: params.targetFolderAbs,
     attachmentIds: params.attachmentIds,
     instruction: params.instruction,
+    ...(params.chatContext ? { chatContext: params.chatContext } : {}),
     model: params.model,
     skills: params.skills ?? [],
     status: 'running',

@@ -91,7 +91,15 @@ export interface AgentRunUiState {
  * (chat-daraus-erstellen.md). `research`: Webantwort → der Agent recherchiert NEU; alte
  * Antwort und Quellen werden nicht übernommen (chat-recherche-zum-agenten.md, kleinster Schritt).
  */
-export interface ChatHandover { at: number; clipped: boolean; kind?: 'draft' | 'research' }
+export interface ChatHandover {
+  at: number
+  clipped: boolean
+  kind?: 'draft' | 'research'
+  /** Bei der Übergabe gewählt: mit Faktenprüfung im Web (chat-uebergabe-kontext.md, B2). */
+  web?: boolean
+  /** So viele Webantworten gingen ohne Inhalt mit (F01). */
+  webTurns?: number
+}
 
 export interface AgentScopeState {
   attachments: NoteAgentAttachment[]
@@ -120,6 +128,11 @@ export interface AgentScopeState {
    * den nächsten Schritten und den übernommenen Einstellungen. `at` wechselt je Übergabe.
    */
   chatHandover?: ChatHandover | null
+  /**
+   * Chatverlauf als Kontext für den nächsten Start (chat-uebergabe-kontext.md, A): getrennt vom
+   * Auftragstext, damit Formaterkennung und erlaubte Links nur den Wunsch lesen (F04/F07).
+   */
+  chatContext?: string | null
   /** Start vom Main abgelehnt, weil Cloud-Freigabe oder Zustimmung fehlt — die Karte zeigt
    *  dafür eine eigene Zeile statt einer Fehlermeldung unter den Anhängen. */
   startGate?: { code: 'optin' | 'consent'; message: string } | null
@@ -163,6 +176,8 @@ export interface AgentStartParams {
   noteId: string
   noteContent: string
   instruction: string
+  /** Chatverlauf als Kontext (nur aus „Im Auftrag weitermachen“). */
+  chatContext?: string
   model: string
   localBackend: 'ollama' | 'lmstudio'
   lmStudioPort?: number
@@ -198,6 +213,7 @@ interface NoteAgentStoreState {
   setPickedExample: (scopeId: string, example: { text: string; need: AgentExampleNeed } | null) => void
   setPrefs: (scopeId: string, patch: AgentScopePrefs) => void
   setChatHandover: (scopeId: string, handover: ChatHandover | null) => void
+  setChatContext: (scopeId: string, context: string | null) => void
 
   /** true, wenn der Lauf gestartet ist. */
   startRun: (scopeId: string, params: AgentStartParams) => Promise<boolean>
@@ -392,6 +408,8 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
 
   setChatHandover: (scopeId, handover) =>
     set(s => withScope(s, scopeId, sc => ({ ...sc, chatHandover: handover }))),
+  setChatContext: (scopeId, context) =>
+    set(s => withScope(s, scopeId, sc => ({ ...sc, chatContext: context }))),
 
   startRun: async (scopeId, params) => {
     get().setAttachError(scopeId, null)
@@ -402,6 +420,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       noteId: params.noteId,
       noteContent: params.noteContent,
       instruction: params.instruction,
+      ...(params.chatContext ? { chatContext: params.chatContext } : {}),
       model: params.model,
       attachmentIds,
       targetFolderRel,

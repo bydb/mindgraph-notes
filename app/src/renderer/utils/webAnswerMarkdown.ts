@@ -18,7 +18,15 @@ import type { CitationReport, SentenceCheck } from '../../shared/rag/citations'
 import type { SentenceExtra } from '../../shared/webChat'
 import { citationMarkdownPlugin } from './citationMarkdown'
 
-export type WebSentenceFlag = 'uncited' | 'low' | 'invalid' | 'quote' | 'heading' | 'number' | 'negation' | 'gap'
+export type WebSentenceFlag = 'uncited' | 'low' | 'invalid' | 'quote' | 'heading' | 'number' | 'questionNumber' | 'negation' | 'gap'
+
+/** Marken ohne Warnfarbe: sie benennen etwas, warnen aber nicht. „Zahl aus deiner Frage“ warnt (Codex F02). */
+export const NEUTRAL_FLAGS: ReadonlySet<WebSentenceFlag> = new Set(['gap'])
+
+/** Trägt der Satz nur neutrale Marken? Dann ohne Warnfarbe anzeigen. */
+export function onlyNeutralFlags(flags: readonly WebSentenceFlag[]): boolean {
+  return flags.length > 0 && flags.every((f) => NEUTRAL_FLAGS.has(f))
+}
 
 /**
  * Welche Marken ein Satz trägt — leer = der Wortvergleich trägt ihn (mehr prüft er nicht).
@@ -34,6 +42,7 @@ export function sentenceFlags(s: SentenceCheck, extra?: SentenceExtra): WebSente
   if (s.status === 'cited-invalid') out.push('invalid')
   if (s.quotes.some((q) => !q.found)) out.push('quote')
   if (extra && extra.missingNumbers.length > 0) out.push('number')
+  if (extra?.questionNumbers?.length) out.push('questionNumber')
   if (extra?.negation) out.push('negation')
   return out
 }
@@ -65,7 +74,7 @@ export function markWebAnswer(answer: string, report: CitationReport, extras?: r
 }
 
 export interface WebAnswerEnv {
-  flags?: { label: (sentenceIndex: number) => string | null; isGap?: (sentenceIndex: number) => boolean }
+  flags?: { label: (sentenceIndex: number) => string | null; isNeutral?: (sentenceIndex: number) => boolean }
 }
 
 const FLAG_RE = /^\[\uE002(\d{1,4})\uE003\]/
@@ -81,15 +90,15 @@ function flagPlugin(md: MarkdownIt): void {
       if (label) {
         const token = state.push('web_flag', 'span', 0)
         token.content = label
-        token.meta = { gap: flags?.isGap?.(Number(m[1])) === true }
+        token.meta = { neutral: flags?.isNeutral?.(Number(m[1])) === true }
       }
     }
     state.pos += m[0].length
     return true
   })
   md.renderer.rules.web_flag = (tokens, idx) => {
-    const gap = tokens[idx].meta?.gap === true
-    return ` <span class="petrol-web-flag${gap ? ' is-gap' : ''}">${md.utils.escapeHtml(tokens[idx].content)}</span>`
+    const neutral = tokens[idx].meta?.neutral === true
+    return ` <span class="petrol-web-flag${neutral ? ' is-neutral' : ''}">${md.utils.escapeHtml(tokens[idx].content)}</span>`
   }
 }
 

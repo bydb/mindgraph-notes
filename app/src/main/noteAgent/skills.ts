@@ -32,7 +32,7 @@ import { webSearch } from '../webResearch/providers'
 import { fetchAndExtract, FetchExtractError } from '../webResearch/fetchExtract'
 import {
   normalizeWebUrl, normalizeQuery, isQueryTooLong, isSearchAllowedInPhase, mergeDeterministicSources, sanitizeSourceTitle,
-  mergeDeterministicSourcesHtml, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
+  mergeDeterministicSourcesHtml, deterministicSourcesSheet, unfetchedUrlsInCells, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
   type WebSearchHit
 } from '../../shared/webResearch'
 import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
@@ -896,14 +896,33 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         rows = (rawRows as unknown[][]).map(r => r.map(cell => String(cell ?? '')))
       }
 
+      // Web-Lauf (B2, chat-uebergabe-kontext.md): genau EIN Write, Links nur auf abgerufene
+      // Seiten, Blatt „Quellen“ von der App — derselbe Vertrag wie Notiz und Quellenfolie.
+      let sourcesSheet: string[][] | null = null
+      if (ctx.run.web) {
+        if (ctx.run.web.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
+        const foreign = unfetchedUrlsInCells([columns, ...rows], ctx.run.web.fetches)
+        if (foreign.length) {
+          return err(`Diese Links zeigen auf Seiten, die du in diesem Lauf nicht per web_fetch gelesen hast: ${foreign.slice(0, 5).join(', ')}. Nimm nur URLs abgerufener Seiten als Quelle; steht ein Wert auf keiner gelesenen Seite, schreib „nicht belegt“. Rufe write_xlsx danach erneut auf.`)
+        }
+        sourcesSheet = deterministicSourcesSheet(ctx.run.web.fetches)
+      }
+
       const fileName = sanitizeOutputFileName(rawName, '.xlsx')
       const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([columns, ...rows]), 'Tabelle1')
       if (extraSheet) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(extraSheet.aoa), extraSheet.name)
+      if (sourcesSheet) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sourcesSheet), 'Quellen')
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
-      const summary = `${rows.length} Zeilen, ${columns.length} Spalten${extraSheet ? `, Blatt „Nicht verwertet" mit ${extraSheet.aoa.length - 1} Einträgen` : ''}`
-      return registerStagedResult(ctx, fileName, 'xlsx', buf, summary)
+      const sourceCount = sourcesSheet && sourcesSheet[0][0] !== 'Hinweis' ? sourcesSheet.length - 1 : 0
+      const summary = `${rows.length} Zeilen, ${columns.length} Spalten${extraSheet ? `, Blatt „Nicht verwertet" mit ${extraSheet.aoa.length - 1} Einträgen` : ''}${sourcesSheet ? `, Blatt „Quellen“ mit ${sourceCount} abgerufenen Seiten` : ''}`
+      const res = await registerStagedResult(ctx, fileName, 'xlsx', buf, summary)
+      if (res.ok && ctx.run.web) {
+        ctx.run.web.wrote = true
+        ctx.run.web.phase = 'write'
+      }
+      return res
     }
   })
 

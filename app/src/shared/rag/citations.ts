@@ -319,6 +319,16 @@ function sentences(text: string, seg: [number, number]): Array<[number, number]>
       const nextWord = (after.match(/^([\p{L}.]+)/u)?.[1] ?? '').replace(/\.$/, '')
       if (nextWord && (MONTHS.test(nextWord) || MONTHS.test(`${nextWord}.`))) continue
     }
+    // „… steht nichts. [1] nennt …“: das Modell macht die Quelle zum Subjekt. Die Nummer vor
+    // einem kleingeschriebenen Wort eröffnet den neuen Satz, statt den alten zu verlängern —
+    // sonst verschmolzen beide, und die Verneinung des ersten hing am Beleg des zweiten
+    // (Vergleich mit Claude, 25.10.2026).
+    if (/\p{Ll}/u.test(after[0] ?? '') && /\[\d{1,3}\]/.test(m[0])) {
+      const punctEnd = m.index + (/^[.!?]["“”»)\]]*/.exec(m[0])?.[0].length ?? 1)
+      out.push([seg[0] + last, seg[0] + punctEnd])
+      last = punctEnd
+      continue
+    }
     // Kleingeschriebener Satzanfang nur nach einer Zahl mit Punkt (Codex-Fall), sonst wie bisher.
     if (/\p{Ll}/u.test(after[0] ?? '') && !/\p{N}$/u.test(before)) continue
     out.push([seg[0] + last, seg[0] + cut])

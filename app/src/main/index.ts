@@ -166,7 +166,8 @@ import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData }
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
-import { PETROL_CHAT_SYSTEM_PROMPT, sanitizeWebTopics, webTopicsBlock } from './llm/petrolChatPrompt'
+import { buildPetrolChatSystemPrompt, sanitizeWebTopics, webTopicsBlock } from './llm/petrolChatPrompt'
+import { sanitizeChatContext } from './noteAgent/chatContext'
 import { buildPetrolWebSystemPrompt, prepareWebExcerpt } from './llm/petrolWebPrompt'
 import { gatherWebSources, defaultWebGatherDeps } from './llm/petrolWebChat'
 import type { CloudProviderSettings } from '../shared/llmBackend'
@@ -4542,6 +4543,8 @@ interface NoteAgentRunParams {
   noteId: string
   noteContent: string
   instruction: string
+  // Chatverlauf aus „Im Auftrag weitermachen“ — nur Kontext, nie Auftrag (chat-uebergabe-kontext.md, A).
+  chatContext?: string
   model: string
   attachmentIds: string[]
   targetFolderRel: string
@@ -4871,6 +4874,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       instruction: continuation
         ? `${continuation.prev.instruction}\n\nNachtrag: ${continuation.answer}`
         : params.instruction.trim(),
+      // Folgelauf: der Verlauf steckt schon im übernommenen Gesprächsprotokoll.
+      chatContext: continuation ? undefined : sanitizeChatContext(params.chatContext),
       model: provenanceModel,
       // Aktive Zeit beim Formulieren (Renderer-Messung, Fenster im Vordergrund).
       instructionMs: typeof params.instructionMs === 'number' ? params.instructionMs : undefined,
@@ -6525,7 +6530,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 
     let promptContent = directPrompt
     // Thema früherer Webfragen: nur Nutzerfragen, vom Main geprüft und als Zitat gerahmt.
-    if (chatMode === 'petrol') promptContent = PETROL_CHAT_SYSTEM_PROMPT + webTopicsBlock(sanitizeWebTopics(webTopics, sanitizeUntrustedText), false)
+    if (chatMode === 'petrol') promptContent = buildPetrolChatSystemPrompt((await loadUISettings()).webResearchEnabled === true) + webTopicsBlock(sanitizeWebTopics(webTopics, sanitizeUntrustedText), false)
     else if (chatMode === 'socratic') promptContent = socraticPrompt
     else if (chatMode === 'grill') promptContent = grillPrompt
     else if (chatMode === 'email') promptContent = emailPrompt
@@ -6585,7 +6590,11 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       body: JSON.stringify({
         model,
         messages: allMessages,
-        stream: true
+        stream: true,
+        // Petrol-Chat für Alltagsfragen: verdecktes Nachdenken aus. Gemessen (25.10.2026,
+        // docs/codex-collab/chat-alltagsfragen-messung.md): qwen3.8:27b erstes Wort 7,3 s → 0,5 s
+        // (Median, 12 Fragen), Antworten nicht schlechter. Modelle ohne Thinking ignorieren das Feld.
+        ...(chatMode === 'petrol' ? { think: false } : {})
       }),
       signal: controller.signal
     })
@@ -6996,7 +7005,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     if (!answer.trim()) return finish({ kind: 'error', error: '', sources, failures, notFetched, ...followUpMark, ...droppedMark })
     const excerpts = sources.map(s => s.excerpt)
     const report = analyzeCitations(answer, excerpts, { sourceTitles: sources.map(s => s.title) })
-    const extras = sentenceExtras(answer, report, excerpts)
+    const extras = sentenceExtras(answer, report, excerpts, question)
     // Nur eine fertige Antwort mit zitierter Quelle wird eingefroren. Die Nachfrage legt
     // eine neue Kennung derselben Auszüge an, damit die nächste Frage an diese Antwort bindet.
     const newSnapshotId = !event.sender.isDestroyed() && scopeId && report.usedSources.length > 0
@@ -7444,7 +7453,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 
     const systemMessage = {
       role: 'system',
-      content: chatMode === 'petrol' ? PETROL_CHAT_SYSTEM_PROMPT + webTopicsBlock(sanitizeWebTopics(webTopics, sanitizeUntrustedText), false) : chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
+      content: chatMode === 'petrol' ? buildPetrolChatSystemPrompt((await loadUISettings()).webResearchEnabled === true) + webTopicsBlock(sanitizeWebTopics(webTopics, sanitizeUntrustedText), false) : chatMode === 'socratic' ? socraticPrompt : chatMode === 'grill' ? grillPrompt : directPrompt
     }
 
     const allMessages = [systemMessage, ...messages]

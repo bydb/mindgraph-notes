@@ -493,6 +493,8 @@ export function AgentView({ tabId }: Props) {
   // wirken sofort und dürfen nicht still aus einem früheren Auftrag mitlaufen — bei jeder
   // neuen Übergabe aus. Ablage und Unterlagen bleiben, werden aber im Hinweis genannt.
   const handover = scope.chatHandover ?? null
+  const chatContext = scope.chatContext ?? null
+  const [showChatContext, setShowChatContext] = useState(false)
   useEffect(() => {
     if (!handover) return
     setShellArmed(false)
@@ -513,12 +515,14 @@ export function AgentView({ tabId }: Props) {
     const computerAccess = computerOn
     setShellArmed(false)
     setComputerArmed(false)
-    try { await store().startRun(tabId, {
+    const context = chatContext ?? undefined
+    try { const ok = await store().startRun(tabId, {
       vaultPath,
       // Der Lauf hat keine Ausgangsnotiz — die Tab-ID ist die Kennung, der Inhalt leer.
       noteId: tabId,
       noteContent: '',
       instruction: instruction.trim(),
+      ...(context ? { chatContext: context } : {}),
       model: effectiveModel,
       localBackend: ollama.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
       lmStudioPort: ollama.lmStudioPort,
@@ -529,7 +533,10 @@ export function AgentView({ tabId }: Props) {
       computerAccess,
       instructionMs: compose.take(),
       comparisonCaseId: comparisonCaseId ?? undefined
-    }) } finally { setStarting(false) }
+    })
+    // Der Verlauf gehört zu genau diesem Start; ein späterer, neu getippter Auftrag startet ohne.
+    if (ok && context) { store().setChatContext(tabId, null); setShowChatContext(false) }
+    } finally { setStarting(false) }
   }
 
   // Wechselt nur, wenn es wirklich ein Modell ohne Cloud-Kennung gibt — sonst sagt die
@@ -648,10 +655,23 @@ export function AgentView({ tabId }: Props) {
                 <span>{t(handover.kind === 'research' ? 'petrolChat.handoverResearchSteps' : 'petrolChat.handoverSteps')}</span>
                 {scope.targetFolder && <span>{t('petrolChat.handoverTarget', { folder: scope.targetFolder })}</span>}
                 {scope.attachments.length > 0 && <span>{t('petrolChat.handoverDocs', { n: scope.attachments.length })}</span>}
-                <span>{t(handover.kind === 'research' ? 'petrolChat.handoverResearchReset' : 'petrolChat.handoverReset')}</span>
-                {handover.clipped && <span>{t('petrolChat.handoverClipped', { max: 6000 })}</span>}
+                <span>{t(handover.kind === 'research' || handover.web ? 'petrolChat.handoverResearchReset' : 'petrolChat.handoverReset')}</span>
+                {handover.clipped && <span>{t('petrolChat.handoverClipped')}</span>}
               </div>
               <button type="button" className="agent-card-link-btn" onClick={() => store().setChatHandover(tabId, null)}>{t('petrolChat.handoverDismiss')}</button>
+            </div>
+          )}
+          {/* Chatverlauf als Kontext (chat-uebergabe-kontext.md, A/F09): sichtbar, abwählbar, mit
+              Empfänger beim Cloud-Weg — bleibt auch nach „Hinweis schließen“, bis gestartet. */}
+          {chatContext && run.phase === 'idle' && (
+            <div className="agent-card-chatcontext">
+              <span>{t('petrolChat.contextAttached')}</span>
+              {cloudSelected && <span className="is-out">{t('petrolChat.contextCloud', { provider: cloudProviderLabel })}</span>}
+              <div className="agent-card-chatcontext-actions">
+                <button type="button" className="agent-card-link-btn" aria-expanded={showChatContext} onClick={() => setShowChatContext(v => !v)}>{t(showChatContext ? 'petrolChat.contextHide' : 'petrolChat.contextShow')}</button>
+                <button type="button" className="agent-card-link-btn" onClick={() => { store().setChatContext(tabId, null); setShowChatContext(false) }}>{t('petrolChat.contextRemove')}</button>
+              </div>
+              {showChatContext && <pre className="agent-card-chatcontext-text">{chatContext}</pre>}
             </div>
           )}
           {/* Auftrag */}

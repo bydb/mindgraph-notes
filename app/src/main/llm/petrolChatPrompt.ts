@@ -20,7 +20,21 @@ SO ANTWORTEST DU:
 WAS DU IN DIESEM CHAT NICHT KANNST:
 - Du siehst keine Notizen, Dateien, E-Mails oder Termine des Nutzers, und du kannst nichts speichern, nichts im Internet nachsehen und nichts am Rechner tun.
 - Behaupte deshalb nie, etwas gelesen, nachgesehen, gespeichert oder verschickt zu haben.
-- Braucht der Nutzer etwas aus seinen Notizen oder Unterlagen, oder soll eine Datei entstehen (Notiz, Tabelle, Folien), sag ihm kurz, dass er dafür oben von „Chat“ auf „Auftrag“ umschalten kann. Dort liest der Agent die Unterlagen und legt das Ergebnis zur Prüfung vor.`
+- Braucht der Nutzer etwas aus seinen Notizen oder Unterlagen, oder soll eine Datei entstehen (Notiz, Tabelle, Folien), sag ihm kurz, dass er dafür oben von „Chat“ auf „Auftrag“ umschalten oder unter deiner Antwort „Im Auftrag weitermachen“ wählen kann. Dort liest der Agent die Unterlagen und legt das Ergebnis zur Prüfung vor. Diesen Hinweis gibst du höchstens in einem kurzen Satz am Ende deiner Antwort, nie als Einleitung; was du im Chat selbst zeigen kannst (etwa eine Tabelle), zeigst du trotzdem.`
+
+// Hinweis auf den Globus (Messung 25.10.2026, docs/codex-collab/chat-alltagsfragen-messung.md):
+// bei „aktueller Leitzins“ schickten alle Modelle den Nutzer zur EZB-Seite oder einer Suchmaschine,
+// statt auf die Websuche im selben Chat. Nur anhängen, wenn der Globus sichtbar ist (Modul
+// `web-research` an) — sonst verweist das Modell auf einen Knopf, den es nicht gibt.
+export const PETROL_CHAT_WEB_HINT = `
+
+WEBSUCHE IN DIESEM CHAT:
+- Neben dem Eingabefeld gibt es einen Globus. Mit ihm sucht die App im Web und du antwortest aus den abgerufenen Seiten.
+- Geht es um Aktuelles (Zinsen, Preise, Nachrichten, Öffnungszeiten, neue Versionen) oder um Fakten, die du nicht sicher weißt, sag das und schlag vor, die Frage mit eingeschaltetem Globus noch einmal zu stellen. Verweise dafür nicht auf eine Suchmaschine oder andere Webseiten.`
+
+export function buildPetrolChatSystemPrompt(webAvailable: boolean): string {
+  return PETROL_CHAT_SYSTEM_PROMPT + (webAvailable ? PETROL_CHAT_WEB_HINT : '')
+}
 
 // ── Thema früherer Webfragen (docs/codex-collab/chat-webthema-im-verlauf.md, Weg 1) ─────────
 // Webwechsel gehen nie in den Modellverlauf (F09). Damit „Frag mich ab“ nach einer Webantwort

@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { createWebAnswerMarkdown, markWebAnswer, sentenceFlags, type WebAnswerEnv, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
+import { createWebAnswerMarkdown, markWebAnswer, onlyNeutralFlags, sentenceFlags, type WebAnswerEnv, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
 import type { CitationEnv } from '../../utils/citationMarkdown'
 import type { CitationReport, SentenceCheck } from '../../../shared/rag/citations'
 import type { SentenceExtra, WebChatProvenance, WebFetchFailReason, WebFetchFailure, WebSkippedHit, WebSource, WebUnfetchedHit } from '../../../shared/webChat'
@@ -22,6 +22,7 @@ const FLAG_KEYS: Record<WebSentenceFlag, TranslationKey> = {
   quote: 'petrolChat.webStatusQuoteMissing',
   heading: 'petrolChat.webStatusHeading',
   number: 'petrolChat.webStatusNumber',
+  questionNumber: 'petrolChat.webStatusQuestionNumber',
   negation: 'petrolChat.webStatusNegation',
   gap: 'petrolChat.webStatusGap'
 }
@@ -38,7 +39,9 @@ export function webFlagLabel(
   const extra = extras?.[k]
   const flags = sentenceFlags(s, extra)
   if (flags.length === 0) return null
-  return flags.map(f => f === 'number' && extra ? t('petrolChat.webStatusNumber', { numbers: extra.missingNumbers.join(', ') }) : t(FLAG_KEYS[f])).join(' · ')
+  return flags.map(f => f === 'number' && extra ? t('petrolChat.webStatusNumber', { numbers: extra.missingNumbers.join(', ') })
+    : f === 'questionNumber' && extra ? t('petrolChat.webStatusQuestionNumber', { numbers: (extra.questionNumbers ?? []).join(', ') })
+    : t(FLAG_KEYS[f])).join(' · ')
 }
 
 export const REASON_KEYS: Record<WebFetchFailReason, TranslationKey> = {
@@ -65,7 +68,7 @@ export function WebAnswerText({ answer, report, extras, anchor }: { answer: stri
       cites: { resolve: () => null },
       flags: {
         label: (k) => webFlagLabel(report, extras, k, t),
-        isGap: (k) => sentenceFlags(report.sentences[k], extras?.[k]).join() === 'gap'
+        isNeutral: (k) => onlyNeutralFlags(sentenceFlags(report.sentences[k], extras?.[k]))
       }
     }
     return sanitizeHtml(md.render(markWebAnswer(answer, report, extras), env))
@@ -110,7 +113,7 @@ export function WebCheck({ answer, report, extras }: { answer: string; report: C
   if (s.low) parts.push(t('petrolChat.webCheckLow', { n: s.low }))
   if (s.invalidRefs) parts.push(t('petrolChat.webCheckInvalid', { n: s.invalidRefs }))
   if (s.quotesNotFound) parts.push(t('petrolChat.webCheckQuotes', { n: s.quotesNotFound }))
-  const numbers = extras?.filter(x => x.missingNumbers.length > 0).length ?? 0
+  const numbers = extras?.filter(x => x.missingNumbers.length > 0 || (x.questionNumbers?.length ?? 0) > 0).length ?? 0
   const negations = extras?.filter(x => x.negation).length ?? 0
   if (numbers) parts.push(t('petrolChat.webCheckNumbers', { n: numbers }))
   if (negations) parts.push(t('petrolChat.webCheckNegations', { n: negations }))
@@ -127,9 +130,11 @@ export function WebCheck({ answer, report, extras }: { answer: string; report: C
           {report.sentences.map((sn, k) => ({ sn, k })).filter(({ sn }) => sn.status !== 'transition').map(({ sn, k }) => {
             const text = answer.slice(sn.start, sn.end).replace(/\s+/g, ' ')
             const extra = extras?.[k]
-            const weak = sentenceFlags(sn, extra).length > 0
+            const flags = sentenceFlags(sn, extra)
+            const weak = flags.length > 0 && !onlyNeutralFlags(flags)
             const extraLabels = [
               extra?.missingNumbers.length ? t('petrolChat.webStatusNumber', { numbers: extra.missingNumbers.join(', ') }) : '',
+              extra?.questionNumbers?.length ? t('petrolChat.webStatusQuestionNumber', { numbers: extra.questionNumbers.join(', ') }) : '',
               extra?.negation ? t('petrolChat.webStatusNegation') : ''
             ].filter(Boolean)
             return (

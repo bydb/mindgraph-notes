@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sanitizeWebTopics, webTopicsBlock } from './petrolChatPrompt'
+import { buildPetrolChatSystemPrompt, PETROL_CHAT_SYSTEM_PROMPT, sanitizeWebTopics, webTopicsBlock } from './petrolChatPrompt'
 import { buildPetrolWebSystemPrompt } from './petrolWebPrompt'
 
 const id = (t: string) => t
@@ -33,5 +33,16 @@ describe('Themenfragen-Block (chat-webthema-im-verlauf, Codex F02/F05)', () => {
   it('kappt auf 500 Zeichen und markiert das', () => {
     const [t] = sanitizeWebTopics([{ text: 'x'.repeat(800), clipped: false }], id)
     expect(t).toEqual({ text: 'x'.repeat(500), clipped: true })
+  })
+})
+
+describe('Hinweis auf den Globus (chat-alltagsfragen-messung)', () => {
+  it('nur wenn die Websuche sichtbar ist', () => {
+    expect(buildPetrolChatSystemPrompt(false)).toBe(PETROL_CHAT_SYSTEM_PROMPT)
+    expect(buildPetrolChatSystemPrompt(false)).not.toMatch(/Globus/)
+    const on = buildPetrolChatSystemPrompt(true)
+    expect(on.startsWith(PETROL_CHAT_SYSTEM_PROMPT)).toBe(true)
+    expect(on).toMatch(/Globus/)
+    expect(on).toMatch(/nicht auf eine Suchmaschine/)
   })
 })

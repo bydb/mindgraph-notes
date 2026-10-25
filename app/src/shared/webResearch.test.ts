@@ -12,6 +12,8 @@ import {
   isQueryTooLong,
   isSearchAllowedInPhase,
   mergeDeterministicSources,
+  deterministicSourcesSheet,
+  unfetchedUrlsInCells,
   mergeDeterministicSourcesHtml,
   sanitizeSourceTitle,
   isWebResearchConfigComplete,
@@ -474,5 +476,30 @@ describe('hostnameFromUrl', () => {
     expect(hostnameFromUrl('https://Example.COM/x')).toBe('example.com')
     expect(hostnameFromUrl('http://[::1]/')).toBe('::1')
     expect(hostnameFromUrl('kaputt')).toBeNull()
+  })
+})
+
+describe('Excel im Web-Lauf (chat-uebergabe-kontext.md, B2)', () => {
+  const rec = (finalUrl: string, status: 'ok' | 'failed' = 'ok', extra: Partial<{ requestedUrl: string; redirectChain: string[]; title: string }> = {}) => ({
+    requestedUrl: extra.requestedUrl ?? finalUrl, finalUrl, redirectChain: extra.redirectChain ?? [], title: extra.title ?? 'Titel', fetchedAt: '2026-10-25T08:00:00Z', status
+  })
+
+  it('Quellenblatt: nur erfolgreich abgerufene Seiten, ohne Dubletten, Titel entschärft', () => {
+    const sheet = deterministicSourcesSheet([rec('https://a.de/x', 'ok', { title: '[Böse](https://evil)\nZeile' }), rec('https://a.de/x'), rec('https://b.de', 'failed')])
+    expect(sheet[0]).toEqual(['Titel', 'URL', 'Abgerufen am'])
+    expect(sheet).toHaveLength(2)
+    expect(sheet[1][1]).toBe('https://a.de/x')
+    expect(sheet[1][0]).not.toMatch(/[[\]\n]/)
+    expect(sheet[1][2]).toBe('2026-10-25')
+  })
+
+  it('Quellenblatt ohne Abruf sagt das offen', () => {
+    expect(deterministicSourcesSheet([rec('https://b.de', 'failed')])[1][0]).toMatch(/keine Seite erfolgreich abgerufen/)
+  })
+
+  it('findet Links auf nicht gelesene Seiten, akzeptiert abgerufene samt Weiterleitung', () => {
+    const fetches = [rec('https://www.ctbuh.org/building/one-wtc', 'ok', { requestedUrl: 'https://ctbuh.org/one-wtc', redirectChain: ['https://ctbuh.org/one-wtc'] }), rec('https://failed.de/p', 'failed')]
+    const cells = [['Gebäude', 'Quelle'], ['One WTC', 'https://www.ctbuh.org/building/one-wtc.'], ['X', 'siehe https://ctbuh.org/one-wtc'], ['Y', 'https://failed.de/p'], ['Z', 'https://erfunden.example/seite']]
+    expect(unfetchedUrlsInCells(cells, fetches)).toEqual(['https://failed.de/p', 'https://erfunden.example/seite'])
   })
 })

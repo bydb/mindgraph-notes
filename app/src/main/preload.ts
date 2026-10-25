@@ -210,6 +210,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     noteId: string
     noteContent: string
     instruction: string
+    /** Chatverlauf aus „Im Auftrag weitermachen“ — nur Kontext, nie Auftrag. */
+    chatContext?: string
     model: string
     attachmentIds: string[]
     targetFolderRel: string

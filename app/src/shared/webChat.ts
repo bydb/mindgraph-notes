@@ -304,6 +304,95 @@ export function looksConversational(query: string): boolean {
   return !!m && !/\d/.test(q.slice(m[0].length))
 }
 
+// ── Suchwörter aus der Frage (ohne Modell) ───────────────────────────────────
+
+// Wörter, die einer Suchmaschine nichts über das Thema sagen: Pronomen, Artikel, Hilfs- und
+// Modalverben, Bindewörter, Fragewörter, Füllwörter, Gesprächsverben. Bewusst NICHT darin:
+// Verneinungen („nicht“, „kein“, „ohne“; Codex F05, chat-suchwoerter-vorschlag.md) und Wörter, die
+// den Fall eingrenzen („mit“, „oder“, „nur“, „nach“, „seit“, „heute“, „gestern“; Codex F01,
+// chat-suchqualitaet-2.md: „Preis mit oder ohne Speicher“ wurde sonst zu „Preis ohne Speicher“).
+const SEARCH_FILLER = new Set([
+  // Pronomen
+  'ich', 'mir', 'mich', 'mein', 'meine', 'meinen', 'meinem', 'meiner', 'meines', 'du', 'dir', 'dich', 'dein', 'deine',
+  'deinen', 'deinem', 'er', 'ihm', 'ihn', 'sie', 'ihr', 'ihnen', 'es', 'wir', 'uns', 'unser', 'unsere', 'unseren',
+  'unserem', 'unserer', 'euch', 'euer', 'eure', 'man', 'selbst', 'selber', 'das', 'dies', 'diese', 'dieser', 'dieses', 'diesen',
+  // Artikel
+  'der', 'die', 'den', 'dem', 'des', 'ein', 'eine', 'einen', 'einem', 'einer', 'eines',
+  // Hilfs- und Modalverben
+  'bin', 'bist', 'ist', 'sind', 'seid', 'sein', 'war', 'waren', 'wäre', 'wären', 'habe', 'hast', 'hat', 'haben', 'hatte',
+  'hätte', 'hätten', 'wird', 'werden', 'würde', 'würden', 'kann', 'kannst', 'können', 'könnte', 'könnten', 'muss',
+  'musst', 'müssen', 'müsste', 'soll', 'sollte', 'sollten', 'will', 'willst', 'wollen', 'möchte', 'möchten', 'darf', 'dürfen',
+  // Bindewörter, Partikeln, Füllwörter
+  'und', 'aber', 'denn', 'doch', 'dass', 'ob', 'wenn', 'als', 'so', 'also', 'mal', 'eigentlich', 'überhaupt',
+  'bitte', 'gerade', 'eben', 'einfach', 'halt', 'ja', 'ganz', 'sehr', 'schon', 'noch', 'auch', 'etwa', 'irgendwie',
+  'gern', 'gerne', 'da', 'dann', 'okay', 'ok', 'hallo', 'naja', 'hm', 'ähm', 'äh',
+  // Fragewörter
+  'was', 'wie', 'wer', 'wo', 'wann', 'warum', 'wieso', 'weshalb', 'welche', 'welcher', 'welches', 'welchen', 'viel', 'viele',
+  // Präpositionen ohne eigene Aussage (über/unter/bis/ohne/gegen bleiben)
+  'zu', 'zum', 'zur', 'für', 'von', 'vom', 'an', 'am', 'im', 'in', 'auf', 'aus', 'bei', 'beim', 'um', 'durch',
+  // Gesprächsverben
+  'weiß', 'weißt', 'wissen', 'sag', 'sage', 'sagen', 'erklär', 'erkläre', 'erklären', 'suche', 'brauche', 'frage', 'fragen',
+  'überlege', 'überlegen', 'gibt', 'geht', 'bekomme', 'bekommen', 'holen', 'beachten',
+  // Englisch
+  // „with“/„or“ bleiben wie „mit“/„oder“ (Codex F05: „with or without storage“ kippte sonst)
+  'i', 'me', 'my', 'you', 'your', 'we', 'our', 'it', 'is', 'are', 'was', 'the', 'a', 'an', 'and', 'of', 'to', 'for',
+  'on', 'what', 'how', 'which', 'who', 'can', 'could', 'would', 'should', 'do', 'does', 'please'
+])
+
+/**
+ * Suchwörter aus der getippten Frage: dieselben Wörter in derselben Reihenfolge, ohne Füllwörter.
+ * Nur ein Angebot auf Klick (`offerSearchWords`), nie der Standard: die Messung vom 25.10.2026
+ * war gemischt (1 besser, 1 schlechter, 3 gleich; chat-suchqualitaet-2.md).
+ * Es wird nur WEGGELASSEN, nie ergänzt oder umgeschrieben — an den Suchanbieter geht damit nichts,
+ * was nicht in der Frage stand (keine neuen Datenwege, F03), und die Zeile zeigt vor dem Senden
+ * genau diesen Text (F08). Anlass (Vergleich mit Claude, 25.10.2026): die wörtliche Frage
+ * „Ich will mir selbst ein Balkonkraftwerk mit 8 Modulen installieren was kosten die Module“
+ * fand nur allgemeine Ratgeber, die Stichwörter fanden Preisseiten für Anlagen mit 8 Modulen.
+ * Ein großgeschriebenes Füllwort mitten im Satz bleibt stehen — es kann ein Name sein („an der
+ * Oder“). Bleiben weniger als zwei Wörter übrig, gilt die Frage unverändert.
+ */
+// Gesprächsauftakt als GANZE Wendung (Codex F07: aus „Okay, schauen wir mal: Elterngeld 2025“
+// blieb sonst „schauen“ stehen). Interjektion nur mit Satzzeichen ODER mit folgender Wendung —
+// „Gut Hohenhaus Öffnungszeiten“ bleibt unangetastet.
+const OPENER_INTERJECTION = '(?:okay|ok|also|naja|na ja|na dann|na gut|gut|ja|hm+|ähm|äh|hallo|hi|hey|moin|well|so)'
+const OPENER_PHRASE = "(?:schau(?:en)?\\s+wir\\s+mal|schau(?:en)?\\s+wir|schau(?:en)?\\s+mal|mal\\s+sehen|lass(?:t)?\\s+uns(?:\\s+mal)?(?:\\s+(?:schauen|sehen|gucken))?|sag\\s+mal|let'?s\\s+see)"
+const OPENER_RE = new RegExp(
+  `^(?:${OPENER_INTERJECTION}\\s*[,!.…;:]\\s*(?:${OPENER_PHRASE}\\b)?|(?:${OPENER_INTERJECTION}\\s+)?${OPENER_PHRASE}\\b)[\\s,!.…;:–—-]*`,
+  'iu'
+)
+
+export function searchWordsFromQuestion(question: string): string {
+  const q = question.replace(/\s+/g, ' ').trim()
+  const parts = q.replace(OPENER_RE, '').split(' ')
+  const kept = parts.filter((raw, k) => {
+    const bare = raw.replace(/^[\s"'„“‚‘(«»]+|[\s"'“”‘’)«»,;:!?.…]+$/g, '')
+    const w = bare.toLowerCase()
+    if (w === '' ) return false
+    if (!SEARCH_FILLER.has(w)) return true
+    // Satzanfang („Ich …“, „Was …“) oder nach einem Satzzeichen: großgeschrieben heißt dort nichts.
+    const sentenceStart = k === 0 || /[.!?:]$/.test(parts[k - 1])
+    return /^\p{Lu}/u.test(bare) && !sentenceStart
+  }).map((raw) => raw.replace(/[,;:!?…]+$/g, '').replace(/(?<!\p{N})\.$/u, ''))
+  return kept.length >= 2 ? kept.join(' ') : q
+}
+
+/** Ab so vielen Wörtern lohnt das Angebot, sonst nur bei Gesprächssätzen. */
+const OFFER_MIN_WORDS = 8
+
+/**
+ * Stichwörter anbieten? Nur bei langen Fragen, aus denen mindestens drei Füllwörter fallen, oder bei
+ * Gesprächssätzen (`looksConversational` auf der ORIGINALFRAGE, Codex F04). Sonst null.
+ */
+export function offerSearchWords(question: string): string | null {
+  const q = question.replace(/\s+/g, ' ').trim()
+  if (!q) return null
+  const suggestion = searchWordsFromQuestion(q)
+  if (suggestion === q) return null
+  const words = q.split(' ').length
+  const removed = words - suggestion.split(' ').length
+  return (words >= OFFER_MIN_WORDS && removed >= 3) || looksConversational(q) ? suggestion : null
+}
+
 // ── Treffer, die keine Sachquelle sind ───────────────────────────────────────
 
 export type WebSkipCategory = 'translator' | 'social'
@@ -626,6 +715,12 @@ const NEGATIONS = new Set([
 export interface SentenceExtra {
   /** Zahlen im Satz, die in keiner zitierten Seite vorkommen. */
   missingNumbers: string[]
+  /**
+   * Zahlen, die nicht in der zitierten Seite stehen, aber in der Frage des Nutzers
+   * („Balkonkraftwerk mit 8 Modulen“). Weiterhin eine Warnung (Codex F02), nur mit
+   * erklärter Herkunft.
+   */
+  questionNumbers?: string[]
   /** Satz enthält eine Verneinung — der Wortvergleich kann sie nicht prüfen. */
   negation: boolean
   /**
@@ -651,9 +746,16 @@ export function isGapStatement(sentence: string): boolean {
  * geschlossen“, und eine erfundene Zahl fällt im Wortanteil kaum ins Gewicht. Beides wird
  * deshalb eigens markiert. Geprüft werden nur Sätze mit gültiger Nummer; bei Sätzen ohne
  * Nummer steht schon „ohne Quellennummer“.
+ *
+ * Zahlen aus der Frage, die nicht in der Seite stehen, bleiben eine Warnung, werden aber als
+ * `questionNumbers` getrennt benannt („nur aus deiner Frage“) — sonst bringt eine
+ * Suggestivfrage ihre Zahl als Seitenbeleg durch (Codex F02, chat-suchqualitaet-2.md).
+ * Eine Verneinung wird nie per Wortanteil „freigesprochen“ (F03: „mit/ohne Speicher nicht
+ * erlaubt“ hätte die Warnung verloren).
  */
-export function sentenceExtras(answer: string, report: CitationReport, excerpts: readonly string[]): SentenceExtra[] {
+export function sentenceExtras(answer: string, report: CitationReport, excerpts: readonly string[], question = ''): SentenceExtra[] {
   const sourceWords = excerpts.map(contentWords)
+  const questionWords = contentWords(question)
   return report.sentences.map((s: SentenceCheck) => {
     if (s.refs.length === 0) {
       return { missingNumbers: [], negation: false, gap: s.status === 'uncited' && isGapStatement(answer.slice(s.start, s.end)) }
@@ -661,9 +763,12 @@ export function sentenceExtras(answer: string, report: CitationReport, excerpts:
     const plain = answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' ')
     const words = contentWords(plain)
     const cited = s.refs.map((n) => sourceWords[n - 1]).filter(Boolean)
-    const missingNumbers = [...words].filter((w) => /\p{N}/u.test(w) && !cited.some((sw) => sw.has(w)))
+    const notOnPage = [...words].filter((w) => /\p{N}/u.test(w) && !cited.some((sw) => sw.has(w)))
+    const missingNumbers = notOnPage.filter((w) => !questionWords.has(w))
+    const questionNumbers = notOnPage.filter((w) => questionWords.has(w))
     const tokens = plain.toLowerCase().match(/\p{L}+/gu) ?? []
-    return { missingNumbers, negation: tokens.some((t) => NEGATIONS.has(t)) }
+    const negation = tokens.some((t) => NEGATIONS.has(t))
+    return { missingNumbers, negation, ...(questionNumbers.length ? { questionNumbers } : {}) }
   })
 }
 

@@ -228,3 +228,19 @@ describe('Abkürzungen beenden keinen Satz', () => {
     expect(r.sentences[0].status).toBe('uncited')
   })
 })
+
+describe('Quellennummer als Satzanfang (Vergleich mit Claude, 25.10.2026)', () => {
+  it('„… nichts. [1] nennt …“ sind zwei Sätze, die Nummer gehört zum zweiten', () => {
+    const answer = 'Zu den Modulkosten steht in den Seiten nichts. [1] nennt als Einstiegspreis 279 Euro.'
+    const report = analyzeCitations(answer, ['Einstiegspreis für kleine Systeme rund 279 Euro.'])
+    expect(report.sentences).toHaveLength(2)
+    expect(report.sentences[0].refs).toEqual([])
+    expect(report.sentences[1].refs).toEqual([1])
+  })
+
+  it('nachgestellte Nummer vor großem Satzanfang bleibt beim Satz davor', () => {
+    const answer = 'Der Beitrag beträgt 18 Euro. [1] Er gilt ab Januar.'
+    const report = analyzeCitations(answer, ['Der Beitrag beträgt 18 Euro.'])
+    expect(report.sentences[0].refs).toEqual([1])
+  })
+})
