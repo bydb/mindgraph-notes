@@ -23315,6 +23315,7 @@ body.presentation-mode *::after {
 .petrol-chat-send:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 .petrol-chat-send:disabled { background: var(--bg-tertiary); color: var(--text-secondary); cursor: default; }
 .petrol-chat-send.is-stop { background: var(--text-primary); color: var(--bg-primary); }
+.petrol-chat-topic-btn { height: 32px; flex-shrink: 1; min-width: 0; max-width: 45%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .petrol-chat-note { font-size: 12px; line-height: 1.45; color: var(--text-secondary); }
 .petrol-chat-note.is-error { color: var(--color-danger); }
 .petrol-chat-note.is-warn, .petrol-web-line-warn { color: color-mix(in srgb, var(--color-warning) 80%, var(--text-primary)); }

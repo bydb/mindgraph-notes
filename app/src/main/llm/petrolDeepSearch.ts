@@ -22,6 +22,8 @@ import { UNTRUSTED_BEGIN, UNTRUSTED_END, sanitizeHeaderPart } from '../rag/vault
 export type DeepPhase = 'plan' | 'search' | 'pick' | 'fetch'
 
 export type DeepLimitation = 'plan-failed' | 'retry-plan-failed' | 'pick-failed' | 'no-search' | 'guard-skipped' | 'timeout' | 'budget'
+  /** Nur Recherche-Schleife (petrolWebLoop.ts), die dieselbe Ergebnisform liefert. */
+  | 'loop-error' | 'loop-iterations' | 'loop-context'
 
 export interface DeepQueryTrace {
   text: string

@@ -226,13 +226,18 @@ export interface WebDeepInfo {
    * retry = Nachsuche.
    */
   queries: Array<{ text: string; origin: WebDeepQueryOrigin; ok: boolean; hits: number; withoutNumbers?: string[] }>
-  rejected: Array<{ text: string; reason: 'empty' | 'too-long' | 'duplicate' | 'over-limit' }>
+  rejected: Array<{ text: string; reason: 'empty' | 'too-long' | 'duplicate' | 'over-limit' | 'url' | 'email' | 'control' | 'id' }>
   /**
    * plan-failed / pick-failed = Rückfall; no-search = Planung scheiterte und es wurde gar nicht
    * gesucht; timeout = Recherchefrist; budget = Grenze erreicht; window = Modellfenster begrenzte
    * die Seitenzahl.
    */
-  limited: Array<'plan-failed' | 'retry-plan-failed' | 'pick-failed' | 'no-search' | 'guard-skipped' | 'timeout' | 'budget' | 'window'>
+  limited: Array<'plan-failed' | 'retry-plan-failed' | 'pick-failed' | 'no-search' | 'guard-skipped' | 'timeout' | 'budget' | 'window'
+    | 'loop-error' | 'loop-iterations' | 'loop-context' | 'loop-fallback'>
+  /** Recherche-Schleife: das Modell suchte und las selbst. */
+  loop?: boolean
+  /** Themen früherer Webfragen, die der Schleife mitgegeben wurden (F47) — Text des Nutzers. */
+  topics?: string[]
   candidates: number
   picked: number
   searches: number
@@ -332,6 +337,11 @@ const CHATTY_PHRASE = /^(?:mal sehen|schau(?:en)? wir|lass(?:t)? uns|sag mal|kan
 // Stichwortfassung Nachrichtenseiten. Nur mit Objekt/Partikel danach — „Erklärvideo Photosynthese“
 // oder „Liste der UNESCO-Welterbestätten“ bleiben Suchen.
 const CHATTY_REQUEST = /^(?:bitte\s+)?(?:erstell|schreib|mach|gib|nenn|erklär|fass|zeig|such|find|sag|list|formulier|übersetz|bring)(?:e|t)?\s+(?:mir|uns|bitte|mal)\b|^(?:bitte\s+)?(?:erstelle|schreibe|fasse|erkläre|nenne|zeige|formuliere|übersetze)\s+(?:eine?[nmrs]?|die|den|das|kurz)\b|^(?:please\s+)?(?:give|write|make|create|tell|show|find)\s+(?:me|us)\b|^(?:please\s+)?summari[sz]e\b|^bitte\b/
+// „Schau(e) bitte/nach/mal/auf …“, „Guck mal …“, „Recherchiere …“ (GUI-Test 26.10.2026: „Schaue bitte
+// auf weiteren Seiten“ lieferte plex.tv und tagesschau.de). Das Partikel muss als ganzes Wort folgen —
+// Bindestrich zählt nicht als Ende (Codex F01, chat-nachfrage-weitere-seiten.md): „Guck mal-Reihe“ und
+// „Schauinsland Wetter“ bleiben Suchen. Englisch nur mit „more/other“: „Look at Me Film“ ist eine Suche.
+const CHATTY_LOOK = /^(?:schau(?:e|t)?|guck(?:e|t)?)\s+(?:bitte|nach|mal|auf)(?=$|[\s,!.?…;:])|^such(?:e|t)?\s+(?:noch|weiter|gründlich\w*|genauer|ausführlich\w*)(?=$|[\s,!.?…;:])|^recherchier(?:e|t)?(?=$|[\s,!.?…;:])|^(?:please\s+)?(?:look|search|check)\s+(?:(?:for|at|on)\s+)?(?:more|other)\b/
 // Eindeutig gesprächige Formeln, auch mitten in den ersten Wörtern („Na dann, schauen wir mal“).
 const CHATTY_ANYWHERE = /\b(?:schau(?:en)? wir mal|mal sehen|wie geht'?s|wie gehts|wie geht es (?:dir|euch|ihnen))\b/
 // Nur Füllwörter, höchstens zwei.
@@ -353,7 +363,7 @@ export function looksConversational(query: string): boolean {
   const words = q.split(/\s+/).filter(Boolean)
   if (words.length > CHATTY_MAX_WORDS) return false
   if (words.length <= 2 && words.every(w => CHATTY_ONLY.has(w.replace(/[,!.…;:?]+$/, '')))) return true
-  if (CHATTY_PHRASE.test(q) || CHATTY_INTERJECTION_THEN.test(q) || CHATTY_REQUEST.test(q)) return true
+  if (CHATTY_PHRASE.test(q) || CHATTY_INTERJECTION_THEN.test(q) || CHATTY_REQUEST.test(q) || CHATTY_LOOK.test(q)) return true
   if (CHATTY_ANYWHERE.test(words.slice(0, 6).join(' '))) return true
   const m = CHATTY_INTERJECTION.exec(q)
   return !!m && !/\d/.test(q.slice(m[0].length))
@@ -904,9 +914,34 @@ const RANGE_GAP = /^\s*(?:[–—-]|bis|to)\s*$/u
 // „53,90 €“ in der Antwort gegen „€53,90“ auf der Seite als nicht belegt.
 const PREFIX_CURRENCY = /(?<![\p{L}\p{N}])(€|\$|eur|usd)\s?(\d[\d.,]*\d|\d)(?![\p{L}\p{N}])/gu
 
-// Eindeutige Dezimalzahl (ein oder zwei Nachkommastellen) in einer Schreibweise: 5.5 = 5,5 (F41).
-// Drei Nachkommastellen bleiben, wie sie sind — „3.000“ ist ein Tausender, „3,000“ unklar.
-const decimal = (n: string): string => (/^\d+[.,]\d{1,2}$/.test(n) ? n.replace('.', ',') : n)
+/**
+ * Eine Schreibweise für Beträge (GUI-Test 26.10.2026, Marin-E-Bikes): die Antwort schrieb „$5,199“,
+ * der Shop „$5,199.00“ bzw. „5199 USD“ — alles derselbe Preis, gemeldet wurde „Zahl nicht in der
+ * Seite“. Englische Tausender mit mehreren Gruppen oder Nachkommastellen (1,234,567 / 1,234.50) und
+ * deutsche (1.234 / 1.234,50) verlieren den Trenner; Null-Nachkommastellen gleicht erst der Vergleich
+ * an (`withoutZeroFraction`). Genau EINE Komma-Dreiergruppe („5,199“) ist mehrdeutig — englischer
+ * Tausender oder deutsche Dezimalzahl mit drei Stellen — und gilt nur bei einer Währung als Tausender
+ * (Codex F46: „1,234 %“ ist nicht „1234 %“).
+ */
+export function canonNumber(n: string, currency = false): string {
+  let int = n
+  let frac = ''
+  let m: RegExpExecArray | null
+  if ((m = /^(\d{1,3}(?:,\d{3})+)(?:\.(\d+))?$/.exec(n)) && (currency || m[2] !== undefined || /,\d{3},/.test(m[1]))) { int = m[1].replace(/,/g, ''); frac = m[2] ?? '' }
+  else if ((m = /^(\d{1,3}(?:\.\d{3})+)(?:,(\d+))?$/.exec(n))) { int = m[1].replace(/\./g, ''); frac = m[2] ?? '' }
+  // Eindeutige Dezimalzahl (ein oder zwei Nachkommastellen): 5.5 = 5,5 (F41).
+  else if ((m = /^(\d+)[.,](\d{1,2})$/.exec(n))) { int = m[1]; frac = m[2] }
+  else return n
+  return frac ? `${int},${frac}` : int
+}
+
+/** Vergleichsform: Null-Nachkommastellen weg („5199,00usd“ = „5199usd“); die Anzeige behält „19,50 €“. */
+// Nur ein- oder zweistellige Nachkommateile (Cent): die mehrdeutige Dreiergruppe „1,000“ bleibt,
+// sonst würde „1 %“ gegen eine englische Seite mit „1,000 %“ (tausend) freigesprochen (Codex F54).
+const withoutZeroFraction = (key: string): string => key.replace(/^(\d+),(\d{1,2})(?!\d)/, (_m, int: string, frac: string) => {
+  const f = frac.replace(/0+$/, '')
+  return f ? `${int},${f}` : int
+})
 
 /**
  * Zahlen mit Einheit aus dem Originaltext (Codex F27/F33): die direkt folgende bekannte Einheit
@@ -920,11 +955,12 @@ export function numberUnits(text: string): string[] {
   const lower = text.toLowerCase()
   for (const m of lower.matchAll(WHOLE_VALUE)) out.add(m[0])
   let rest = lower.replace(WHOLE_VALUE, (v) => ' '.repeat(v.length))
-  for (const m of rest.matchAll(PREFIX_CURRENCY)) out.add(decimal(thousands(m[2])) + UNIT_CANON[m[1]])
+  for (const m of rest.matchAll(PREFIX_CURRENCY)) out.add(canonNumber(m[2], true) + UNIT_CANON[m[1]])
   rest = rest.replace(PREFIX_CURRENCY, (v) => ' '.repeat(v.length))
   const found: Array<{ num: string; unit: string; start: number; end: number }> = []
   for (const m of rest.matchAll(NUMBER_UNIT)) {
-    found.push({ num: decimal(thousands(m[1])), unit: UNIT_CANON[m[2] ?? m[3] ?? m[4] ?? ''] ?? '', start: m.index ?? 0, end: (m.index ?? 0) + m[0].length })
+    const unit = UNIT_CANON[m[2] ?? m[3] ?? m[4] ?? ''] ?? ''
+    found.push({ num: canonNumber(m[1], unit === 'usd' || unit === 'eur'), unit, start: m.index ?? 0, end: (m.index ?? 0) + m[0].length })
   }
   for (let i = found.length - 2; i >= 0; i--) {
     const a = found[i]
@@ -957,7 +993,10 @@ function showNumber(key: string): string {
 /** Belegmenge einer Seite: jede Zahl einmal mit Einheit und einmal ohne. */
 function pageNumbers(text: string): Set<string> {
   const out = new Set<string>()
-  for (const n of numberUnits(text)) { out.add(n); out.add(numberCore(n)) }
+  for (const n of numberUnits(text)) {
+    const z = withoutZeroFraction(n)
+    out.add(n); out.add(numberCore(n)); out.add(z); out.add(numberCore(z))
+  }
   return out
 }
 
@@ -984,7 +1023,7 @@ export function sentenceExtras(answer: string, report: CitationReport, excerpts:
     const plain = answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' ')
     const cited = s.refs.map((n) => sourceNumbers[n - 1]).filter(Boolean)
     // Zahl ohne Einheit: irgendwo auf der Seite genügt; mit Einheit nur mit derselben Einheit.
-    const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n)))
+    const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n) || pn.has(withoutZeroFraction(n))))
     const missingNumbers = notOnPage.filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
     const questionNumbers = notOnPage.filter((n) => askedNumbers.has(numberCore(n))).map(showNumber)
     const tokens = plain.toLowerCase().match(/\p{L}+/gu) ?? []

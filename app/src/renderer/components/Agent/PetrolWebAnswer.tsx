@@ -230,7 +230,11 @@ const DEEP_LIMIT_KEYS: Record<WebDeepInfo['limited'][number], TranslationKey> = 
   'guard-skipped': 'petrolChat.webDeepLimitedGuardSkipped',
   timeout: 'petrolChat.webDeepLimitedTimeout',
   budget: 'petrolChat.webDeepLimitedBudget',
-  window: 'petrolChat.webDeepLimitedWindow'
+  window: 'petrolChat.webDeepLimitedWindow',
+  'loop-error': 'petrolChat.webDeepLimitedLoopError',
+  'loop-iterations': 'petrolChat.webDeepLimitedLoopIterations',
+  'loop-context': 'petrolChat.webDeepLimitedLoopContext',
+  'loop-fallback': 'petrolChat.webDeepLimitedLoopFallback'
 }
 
 const SKIP_KEYS: Record<WebSkipCategory, TranslationKey> = {
@@ -243,7 +247,11 @@ const DEEP_REJECT_KEYS: Record<WebDeepInfo['rejected'][number]['reason'], Transl
   empty: 'petrolChat.webDeepRejectEmpty',
   'too-long': 'petrolChat.webDeepRejectTooLong',
   duplicate: 'petrolChat.webDeepRejectDuplicate',
-  'over-limit': 'petrolChat.webDeepRejectOverLimit'
+  'over-limit': 'petrolChat.webDeepRejectOverLimit',
+  url: 'petrolChat.webDeepRejectUrl',
+  email: 'petrolChat.webDeepRejectEmail',
+  control: 'petrolChat.webDeepRejectControl',
+  id: 'petrolChat.webDeepRejectId'
 }
 
 /** Je Herkunft eine Zeile — der Rückfall sagt genau, womit gesucht wurde (Codex F29). */
@@ -301,6 +309,7 @@ export function WebDeepLine({ deep }: { deep: WebDeepInfo | undefined }) {
       ) : (
         <div className="petrol-web-muted">{t('petrolChat.webDeepCounts', { picked: deep.picked, candidates: deep.candidates, searches: deep.searches, fetches: deep.fetches })}</div>
       )}
+      {deep.topics && deep.topics.length > 0 && <div className="petrol-web-muted">{t('petrolChat.webLoopTopics', { topics: deep.topics.map(quote).join(', ') })}</div>}
       {deep.rejected.length > 0 && <div className="petrol-web-muted">{t('petrolChat.webDeepRejected', { list: deep.rejected.map(r => `${r.text ? quote(r.text) : '—'} (${t(DEEP_REJECT_KEYS[r.reason])})`).join(', ') })}</div>}
       {limited.length > 0 && <div className="petrol-web-muted petrol-web-warn">{t('petrolChat.webDeepLimited', { reasons: limited.join(' · ') })}</div>}
       {deep.unused.length > 0 && <div className="petrol-web-muted">{t('petrolChat.webDeepUnused', { hosts: deep.unused.join(', ') })}</div>}

@@ -1010,6 +1010,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchSpeechEnabled = useIsModuleEnabled('speech')
   const searchRemarkableEnabled = useIsModuleEnabled('remarkable')
   const searchWebResearchEnabled = useIsModuleEnabled('web-research')
+  const petrolWebLoop = useUIStore(s => s.petrolWebLoop)
+  const setPetrolWebLoop = useUIStore(s => s.setPetrolWebLoop)
   const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const agentShellModuleOn = useIsModuleEnabled('agent-shell')
   const agentComputerModuleOn = useIsModuleEnabled('agent-computer')
@@ -1791,7 +1793,13 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   {/* ── Agent-Fähigkeiten (nur bei aktivem Modul) ── */}
                   {(searchWebResearchEnabled || agentShellModuleOn || agentComputerModuleOn) && <SectionTitle title={t('settings.aiTab.agent')} />}
                   {searchWebResearchEnabled && (
-                    <Card anchor="ai-webresearch"><div className="sui-embed"><WebResearchSection /></div></Card>
+                    <Card anchor="ai-webresearch">
+                      <div className="sui-embed"><WebResearchSection /></div>
+                      {/* Experimentell, standardmäßig aus (chat-nachfrage-weitere-seiten.md Runde 5). */}
+                      <Row label={t('petrolChat.webLoopLabel')} hint={t('petrolChat.webLoopHint')}>
+                        <Toggle checked={petrolWebLoop} onChange={setPetrolWebLoop} ariaLabel={t('petrolChat.webLoopLabel')} />
+                      </Row>
+                    </Card>
                   )}
                   {agentShellModuleOn && (
                     <Card anchor="ai-agentshell"><div className="sui-embed"><AgentShellSection /></div></Card>

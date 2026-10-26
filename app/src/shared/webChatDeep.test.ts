@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   DEEP_LIMITS, checkQuestionTerms, looksLikeBareFollowUp, maxPagesForPlace, mergeCandidatesRoundRobin,
-  numbersMissingInQueries, parsePickReply, parsePlanReply, stripUnaskedDates, previousWebQuestion, questionTerms, withPreviousQuestion
+  numbersMissingInQueries, parsePickReply, parsePlanReply, stripUnaskedDates, previousWebQuestion, questionTerms, withPreviousQuestion,
+  asksForMorePages, asksForDeeperSearch, offerPreviousTopic, applyPreviousTopic
 } from './webChatDeep'
 
 describe('Suchplan prüfen (R1, F04)', () => {
@@ -103,6 +104,91 @@ describe('Nachfrage ohne Bezug: nur Hinweis (S1, F09, F16)', () => {
   })
 })
 
+describe('Bitte um weitere Seiten (chat-nachfrage-weitere-seiten.md, F02)', () => {
+  it('erkennt kurze Bitten auf Deutsch und Englisch', () => {
+    for (const q of ['Schaue bitte auf weiteren Seiten', 'andere Quellen bitte', 'Gibt es mehr Quellen?', 'Schau woanders', 'look for more sources', 'Try other pages', 'Search elsewhere',
+      // Codex F13: längere Bitte mit Rückbezug
+      'Kannst du bitte noch auf anderen aktuellen amtlichen Seiten dazu nachsehen?'])
+      expect(asksForMorePages(q), q).toBe(true)
+  })
+
+  it('schweigt bei Suchen ohne Bitte und bei langen eigenständigen Fragen', () => {
+    for (const q of ['Rundfunkbeitrag 2026 Höhe', 'Seitenwind Fahrrad', 'Mehrseitige Formulare barrierefrei', '',
+      // Codex F13: eigenständige Fragen ohne Rückbezug
+      'Welche anderen Quellen erklären die Anmeldung in Marburg?',
+      // Codex F23: „bitte“/„auch“ sind kein Rückbezug, ein eigenes Thema macht die Frage selbständig
+      'Welche anderen Quellen erklären auch die Anmeldung in Marburg?',
+      'Bitte suche andere Quellen zur Anmeldung in Marburg',
+      'Andere Quellen zur Anmeldung',
+      // Codex F33: Verweiswort, aber eigenes Thema im selben Satz
+      'Welche anderen Quellen gibt es dazu, wie man in Marburg ein Gewerbe anmeldet?',
+      'Welche weiteren Seiten der Stadtverwaltung erklären die Anmeldung eines Zweitwohnsitzes in Marburg genau und vollständig?'])
+      expect(asksForMorePages(q), q).toBe(false)
+  })
+
+  it('bietet die vorige Frage an — Bitte um Seiten in beiden Modi, bloße Nachfrage nur bei gründlich', () => {
+    const prev = 'Parfüms von Alessandro Gualtieri 2023 bis 2026'
+    expect(offerPreviousTopic(prev, 'Schaue bitte auf weiteren Seiten', false)).toBe(true)
+    expect(offerPreviousTopic(prev, 'Schaue bitte auf weiteren Seiten', true)).toBe(true)
+    expect(offerPreviousTopic(prev, 'Und 2027?', false)).toBe(false)
+    expect(offerPreviousTopic(prev, 'Und 2027?', true)).toBe(true)
+    expect(offerPreviousTopic(null, 'andere Quellen', false)).toBe(false)
+    expect(offerPreviousTopic(prev, 'Was kostet eine Bahncard 50?', true)).toBe(false)
+  })
+
+  it('setzt die Vorfrage nur dort voran, wo sie noch fehlt (Codex F12/F22)', () => {
+    const prev = 'Parfüms von Alessandro Gualtieri 2023 bis 2026'
+    const ask = 'Schaue bitte auf weiteren Seiten'
+    // kein eigenes Suchfeld: nur der Entwurf
+    expect(applyPreviousTopic(prev, ask, null)).toEqual({ draft: `${prev} – ${ask}`, webQuery: null })
+    // offenes Suchfeld ohne Thema: beide
+    expect(applyPreviousTopic(prev, ask, 'weitere Seiten')).toEqual({ draft: `${prev} – ${ask}`, webQuery: `${prev} – weitere Seiten` })
+    // Suchfeld trägt das Thema schon (z. B. nach Eingabe): nicht verdoppeln
+    expect(applyPreviousTopic(prev, ask, `${prev.toLowerCase()} Erscheinungsjahr`).webQuery).toBe(`${prev.toLowerCase()} Erscheinungsjahr`)
+  })
+
+  it('achtet auch auf das offene Suchfeld und auf eine selbst vorangestellte Vorfrage (Codex F32)', () => {
+    const prev = 'Parfüms von Alessandro Gualtieri 2023 bis 2026'
+    const typed = `${prev} – Schaue auf weiteren Seiten`
+    // Vorfrage selbst getippt, Suchfeld noch ohne Thema: weiter anbieten
+    expect(offerPreviousTopic(prev, typed, false, 'weitere Seiten')).toBe(true)
+    // beides mit Thema: nicht mehr
+    expect(offerPreviousTopic(prev, typed, false, `${prev} weitere Seiten`)).toBe(false)
+    // kein eigenes Suchfeld: der Entwurf genügt
+    expect(offerPreviousTopic(prev, typed, false, null)).toBe(false)
+  })
+
+  it('überspringt Webfragen ohne eigenes Thema (GUI-Test 26.10.2026)', () => {
+    const msgs = [
+      { role: 'user', origin: 'web', content: 'Welche neuen Parfüms hat Gualtieri herausgebracht' },
+      { role: 'assistant', origin: 'web', content: 'x' },
+      { role: 'user', origin: 'web', content: 'suche bitte noch gründlicher' },
+      { role: 'assistant', origin: 'web', content: 'y' }
+    ]
+    expect(previousWebQuestion(msgs)).toBe('Welche neuen Parfüms hat Gualtieri herausgebracht')
+    expect(offerPreviousTopic(previousWebQuestion(msgs), 'suche bitte noch gründlicher', false)).toBe(true)
+  })
+
+  it('nimmt kein älteres Webthema, wenn danach eine Antwort ohne Web kam (Codex F33)', () => {
+    const msgs = [
+      { role: 'user', origin: 'web', content: 'Rundfunkbeitrag 2026' },
+      { role: 'assistant', origin: 'web', content: 'x' },
+      { role: 'user', content: 'Erklär mir Photosynthese' },
+      { role: 'assistant', content: 'Photosynthese ist …' }
+    ]
+    expect(previousWebQuestion(msgs)).toBeNull()
+    // gestoppte Nicht-Web-Antwort zählt nicht als Bezug
+    expect(previousWebQuestion([...msgs.slice(0, 3), { role: 'assistant', content: 'Photo', stopped: true }])).toBe('Rundfunkbeitrag 2026')
+  })
+
+  it('verschwindet, sobald die vorige Frage im Feld steht', () => {
+    const prev = 'Parfüms von Alessandro Gualtieri 2023 bis 2026'
+    const draft = withPreviousQuestion(prev, 'Schaue bitte auf weiteren Seiten')
+    expect(offerPreviousTopic(prev, draft, false)).toBe(false)
+    expect(offerPreviousTopic(prev, draft, true)).toBe(false)
+  })
+})
+
 describe('Zahlen der Frage in den Suchanfragen (F24)', () => {
   it('meldet Jahr/Zahl, die in keiner Anfrage steht; Tausender gleich', () => {
     expect(numbersMissingInQueries('Rundfunkbeitrag 2027?', ['Rundfunkbeitrag 2026'])).toEqual(['2027'])
@@ -149,5 +235,19 @@ describe('Messung 25.10.2026: kein ungefragtes Datum in der Suchanfrage', () => 
     const p = parsePlanReply(JSON.stringify({ queries: ['Politik 2026-10-26', '26.10.2026'] }), 2, q)
     expect(p?.queries).toEqual(['Politik'])
     expect(p?.rejected).toEqual([{ text: '26.10.2026', reason: 'empty' }])
+  })
+})
+
+describe('Bitte um gründlichere Suche (GUI-Test 26.10.2026)', () => {
+  it('erkennt Bitten ohne eigenes Thema', () => {
+    for (const q of ['Suche noch gründlicher', 'Recherchiere genauer', 'Bitte gründlicher suchen', 'Schau nochmal genauer nach', 'search more thoroughly', 'dig deeper'])
+      expect(asksForDeeperSearch(q), q).toBe(true)
+  })
+  it('schweigt bei Fragen mit eigenem Thema oder ohne Suchverb', () => {
+    for (const q of ['Suche gründlicher nach Mietrecht in Marburg', 'Wie genauer messen?', 'Gründliche Reinigung Backofen', 'Tiefer Brunnen Kosten', ''])
+      expect(asksForDeeperSearch(q), q).toBe(false)
+  })
+  it('bietet in der Schnellsuche die vorige Frage an', () => {
+    expect(offerPreviousTopic('Parfüms Gualtieri 2023 bis 2026', 'Suche noch gründlicher', false)).toBe(true)
   })
 })

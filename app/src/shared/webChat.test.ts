@@ -7,6 +7,7 @@ import {
   runFetchQueue,
   withWebFootnotes,
   sentenceExtras,
+  canonNumber,
   searchWordsFromQuestion,
   offerSearchWords,
   webChatCharBudget,
@@ -380,7 +381,18 @@ describe('Gesprächssatz statt Suchwörter (Nutzertest 24.10.2026)', () => {
       'Ja und dann',
       'Wie geht es dir?',
       'Can you look this up?',
-      'Okay, ' + 'wort '.repeat(14)
+      'Okay, ' + 'wort '.repeat(14),
+      // GUI-Test 26.10.2026 (chat-nachfrage-weitere-seiten.md, Schritt 1)
+      'Schaue bitte auf weiteren Seiten',
+      'Schaue nach welche Parfüms Alesandro Gultieri von2023 bis 2026 veröffentlicht hat',
+      'Schau mal, was es dazu gibt',
+      'Guck mal nach Zugverbindungen',
+      'Schaut auf anderen Seiten',
+      'Recherchiere die Preise für Wärmepumpen',
+      'look for more sources',
+      'Please check other sites',
+      'Suche noch gründlicher',
+      'Suche weiter'
     ]) expect(looksConversational(q), q).toBe(true)
   })
 
@@ -398,6 +410,15 @@ describe('Gesprächssatz statt Suchwörter (Nutzertest 24.10.2026)', () => {
       'Okay, Boomer Film 2019',
       'Wie geht es Pflanzen im Winter',
       'Please Please Me Beatles Album',
+      // Codex F01: Wortgrenze nach dem Partikel, Bindestrich zählt nicht
+      'Schauinsland Wetter',
+      'Guck mal-Reihe Folge 3',
+      'Schauspieler Tatort Münster',
+      'Recherchieren lernen Uni',
+      'Look at Me Film',
+      'Search engine optimization basics',
+      'Suche nach Wohnung Marburg',
+      'Suchergebnisse Google entfernen',
       '',
       '   '
     ]) expect(looksConversational(q), q).toBe(false)
@@ -678,5 +699,54 @@ describe('Messung 25.10.2026: Sperrliste und verirrtes </think>', () => {
   it('entfernt vollständige Nachdenkblöcke und lässt normale Antworten unverändert', () => {
     expect(stripStrayThink('<think>überlegen</think>\nAntwort.')).toBe('Antwort.')
     expect(stripStrayThink('Antwort ohne Marken.')).toBe('Antwort ohne Marken.')
+  })
+})
+
+describe('Beträge in verschiedenen Schreibweisen (GUI-Test 26.10.2026, Marin-E-Bikes)', () => {
+  const answer = 'Rift Zone EL1 kostet $5,199 und EL2 $6,499. [1]'
+  const missing = (page: string) => {
+    const report = analyzeCitations(answer, [page], { sourceTitles: ['t'] })
+    return sentenceExtras(answer, report, [page]).flatMap((e) => e.missingNumbers)
+  }
+
+  it('Cent, englische und fehlende Tausendertrenner gelten als derselbe Preis', () => {
+    expect(missing('Rift Zone EL1 $5,199.00 USD, Rift Zone EL2 $6,499.00')).toEqual([])
+    expect(missing('Rift Zone EL1 Price 5199 USD, EL2 6499 USD')).toEqual([])
+    expect(missing('Rift Zone EL1 $5,199 Rift Zone EL2 $6,499')).toEqual([])
+  })
+
+  it('„1234 %“ wird von „1,234 %“ nicht freigesprochen (Codex F46)', () => {
+    const a = 'Der Anteil stieg um 1234 %. [1]'
+    const page = 'Der Anteil stieg um 1,234 % im Jahr.'
+    const report = analyzeCitations(a, [page], { sourceTitles: ['t'] })
+    expect(sentenceExtras(a, report, [page]).flatMap((e) => e.missingNumbers)).toEqual(['1234 %'])
+  })
+
+  it('„1 %“ wird von „1,000 %“ nicht freigesprochen und umgekehrt (Codex F54)', () => {
+    const check = (a: string, page: string) => {
+      const report = analyzeCitations(a, [page], { sourceTitles: ['t'] })
+      return sentenceExtras(a, report, [page]).flatMap((e) => e.missingNumbers)
+    }
+    expect(check('Die Steigerung lag bei 1 %. [1]', 'Die Steigerung lag bei 1,000 % laut Bericht.')).toEqual(['1 %'])
+    expect(check('Die Steigerung lag bei 1000 %. [1]', 'Die Steigerung lag bei 1,000 % laut Bericht.')).toEqual(['1000 %'])
+    // Cent bleiben angeglichen
+    expect(check('Das Ticket kostet 19,50 €. [1]', 'Das Ticket kostet 19,5 € pro Person.')).toEqual([])
+  })
+
+  it('ein anderer Preis bleibt markiert', () => {
+    expect(missing('Rift Zone EL1 $5,299.00, Rift Zone EL2 $6,499.00')).toEqual(['5199 $'])
+  })
+
+  it('Normalform', () => {
+    // eine Komma-Dreiergruppe ist mehrdeutig: nur bei Währung ein Tausender (Codex F46)
+    expect(canonNumber('5,199')).toBe('5,199')
+    expect(canonNumber('5,199', true)).toBe('5199')
+    expect(canonNumber('5,199.50')).toBe('5199,50')
+    expect(canonNumber('5.199,00')).toBe('5199,00')
+    expect(canonNumber('1,000,000')).toBe('1000000')
+    expect(canonNumber('5.5')).toBe('5,5')
+    expect(canonNumber('18,36')).toBe('18,36')
+    expect(canonNumber('2026')).toBe('2026')
+    expect(canonNumber('5.4.296')).toBe('5.4.296')
   })
 })

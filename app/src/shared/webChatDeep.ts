@@ -36,6 +36,8 @@ export const DEEP_LIMITS = {
 // ── Modellantworten prüfen ───────────────────────────────────────────────────
 
 export type DeepRejectReason = 'empty' | 'too-long' | 'duplicate' | 'over-limit'
+  /** Nur Recherche-Schleife (F42): Adresse, E-Mail, Steuerzeichen, lange fremde Ziffernfolge. */
+  | 'url' | 'email' | 'control' | 'id'
 
 export interface DeepPlan {
   queries: string[]
@@ -312,17 +314,113 @@ export function looksLikeBareFollowUp(question: string): boolean {
   return BARE_START.test(q) || BARE_REF.test(q)
 }
 
+// Bis zu drei Beiwörter dazwischen („anderen aktuellen amtlichen Seiten“, „other reliable sources“).
+const MORE_PAGES = /\b(?:weitere[nmrs]?|andere[nmrs]?|mehr|neue[nmrs]?|zusätzliche[nmrs]?)(?:\s+\S+){0,3}?\s+(?:seiten|webseiten|websites|quellen|treffer|ergebnisse)\b|\b(?:woanders|anderswo)\b|\b(?:more|other|different|new|additional)(?:\s+\S+){0,3}?\s+(?:pages|sites|websites|sources|results)\b|\belsewhere\b/i
+// Bitt-, Such- und Verweiswörter, die kein Thema tragen („Schaue bitte noch dazu auf weiteren Seiten“).
+// Ein Verweiswort wie „dazu“ allein macht eine Frage nicht rückbezüglich, wenn sie ihr Thema selbst
+// nennt (Codex F33: „Welche anderen Quellen gibt es dazu, wie man in Marburg ein Gewerbe anmeldet?“).
+const MORE_PAGES_REQUEST_WORDS = new Set([
+  'schau', 'schaue', 'schaut', 'guck', 'gucke', 'guckt', 'such', 'suche', 'sucht', 'recherchier', 'recherchiere',
+  'recherchiert', 'nachsehen', 'nachschauen', 'nachgucken', 'finde', 'zeig', 'zeige', 'bitte', 'noch', 'auch', 'mal',
+  'gerne', 'gern', 'please', 'look', 'search', 'check', 'try', 'find', 'show', 'also', 'too', 'some', 'any',
+  'dazu', 'davon', 'darüber', 'hierzu', 'hierüber', 'nochmal', 'einmal', 'again', 'this', 'that'
+])
+const MORE_PAGES_MAX_WORDS = 14
+
+/**
+ * Kurze Bitte um weitere Seiten zum vorigen Thema („Schaue bitte auf weiteren Seiten“, „andere
+ * Quellen?“). GUI-Test 26.10.2026: der Satz ging wörtlich an die Suche, das Thema fehlte Suche UND
+ * Antwortmodell (Codex F02/F07, chat-nachfrage-weitere-seiten.md). NUR Anlass für einen Hinweis.
+ */
+export function asksForMorePages(question: string): boolean {
+  const words = question.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0 || words.length > MORE_PAGES_MAX_WORDS || !MORE_PAGES.test(question)) return false
+  // Nur, wenn die Bitte kein eigenes Thema nennt (Codex F23/F33): nach Abzug der Wendung, der
+  // Füll-, Bitt- und Verweiswörter darf kein Sachwort übrig bleiben. „Bitte suche andere Quellen zur
+  // Anmeldung in Marburg“ behält „Anmeldung“ und „Marburg“ — eigenständig.
+  const rest = question.replace(new RegExp(MORE_PAGES.source, 'gi'), ' ')
+  const content = (rest.match(/[\p{L}\p{N}]+/gu) ?? [])
+    .filter((w) => !isSearchFiller(w) && !MORE_PAGES_REQUEST_WORDS.has(w.toLowerCase()))
+  return content.length === 0
+}
+
+// „Suche noch gründlicher“ (GUI-Test 26.10.2026): der Satz ging wörtlich an die Suche und fand
+// Synonymseiten zu „gründlich“. Gemeint war der Schalter „gründlich“ für das vorige Thema.
+const DEEPER_HOW = /\b(?:gründlich\w*|genauer|ausführlich\w*|tiefer|intensiv\w*|sorgfältig\w*|besser|thorough\w*|deeper|harder|carefully|depth)\b/iu
+const DEEPER_VERB = /\b(?:such\w*|recherch\w*|schau\w*|guck\w*|nachseh\w*|nachschau\w*|search\w*|look\w*|dig|research\w*)\b/iu
+const DEEPER_EXTRA = new Set(['weiter', 'mehr', 'more', 'in', 'noch', 'nochmal', 'einmal', 'please', 'bitte', 'mal', 'nach'])
+
+/**
+ * Bitte, gründlicher zu suchen, ohne eigenes Thema („Suche noch gründlicher“, „recherchiere genauer“,
+ * „search more thoroughly“). NUR Anlass für ein Angebot — gründlich einschalten und die vorige
+ * Frage sichtbar ins Feld setzen.
+ */
+export function asksForDeeperSearch(question: string): boolean {
+  const words = question.trim().split(/\s+/).filter(Boolean)
+  if (words.length === 0 || words.length > MORE_PAGES_MAX_WORDS) return false
+  if (!DEEPER_HOW.test(question) || !DEEPER_VERB.test(question)) return false
+  const content = (question.match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => {
+    const l = w.toLowerCase()
+    return !DEEPER_HOW.test(w) && !DEEPER_VERB.test(w) && !DEEPER_EXTRA.has(l) && !isSearchFiller(w) && !MORE_PAGES_REQUEST_WORDS.has(l)
+  })
+  return content.length === 0
+}
+
+/** Steht die vorige Frage schon vorn im Text? (Leerraum und Groß-/Kleinschreibung egal.) */
+function startsWithQuestion(previous: string, text: string): boolean {
+  const prev = previous.replace(/\s+/g, ' ').trim().toLowerCase()
+  return !!prev && text.replace(/\s+/g, ' ').trim().toLowerCase().startsWith(prev)
+}
+
+/**
+ * Klick „Vorige Frage als Thema ergänzen“: Entwurf und — falls offen — Suchfeld der Schnellsuche
+ * bekommen die Vorfrage sichtbar vorangestellt, jedes nur, wenn sie dort noch fehlt (Codex F12/F22).
+ * `webQuery: null` = kein eigenes Suchfeld, dann geht der Entwurf an die Suche.
+ */
+export function applyPreviousTopic(previous: string, draft: string, webQuery: string | null): { draft: string; webQuery: string | null } {
+  return {
+    draft: startsWithQuestion(previous, draft) ? draft : withPreviousQuestion(previous, draft),
+    webQuery: webQuery == null || startsWithQuestion(previous, webQuery) ? webQuery : withPreviousQuestion(previous, webQuery)
+  }
+}
+
+/**
+ * Soll der Chat anbieten, die vorige Webfrage sichtbar ins Feld zu setzen? Bitten um weitere Seiten
+ * in beiden Suchmodi, sonstige kurze Nachfragen nur bei „gründlich“ (S1). Erkannt wird an der
+ * eigenen Bitte — hat der Nutzer die Vorfrage selbst vorangestellt, zählt der Rest dahinter (F32).
+ * Angeboten wird, solange sie im Entwurf ODER im offenen Suchfeld der Schnellsuche (`webQuery`,
+ * null = keins) noch fehlt — sonst ginge die Frage mit Thema ans Modell, die Suche ohne (F32).
+ */
+export function offerPreviousTopic(previous: string | null, draft: string, deep: boolean, webQuery: string | null = null): boolean {
+  if (!previous) return false
+  const prev = previous.replace(/\s+/g, ' ').trim()
+  const q = draft.replace(/\s+/g, ' ').trim()
+  if (!prev || !q) return false
+  const draftHas = startsWithQuestion(prev, q)
+  const queryHas = webQuery == null || startsWithQuestion(prev, webQuery)
+  if (draftHas && queryHas) return false
+  const own = draftHas ? q.slice(prev.length).replace(/^[\s–—:,-]+/, '') : q
+  if (!own) return false
+  return asksForMorePages(own) || asksForDeeperSearch(own) || (deep && looksLikeBareFollowUp(own))
+}
+
 /**
  * Die vorige vom Nutzer gesendete Frage einer Websuche (nicht die Modell-Suchanfragen, F16) —
- * nur aus Wechseln mit Antwort, nicht aus gestoppten oder gescheiterten.
+ * nur aus Wechseln mit Antwort, nicht aus gestoppten oder gescheiterten. Steht danach eine fertige
+ * Antwort OHNE Websuche, bezieht sich die nächste Nachricht auf sie, nicht auf das ältere Webthema:
+ * dann null (Codex F33).
  */
 export function previousWebQuestion(messages: ReadonlyArray<{ role: string; origin?: string; content: string; stopped?: boolean; error?: boolean; followUp?: boolean }>): string | null {
   for (let i = messages.length - 1; i > 0; i--) {
     const a = messages[i]
     const q = messages[i - 1]
+    if (a.role === 'assistant' && a.origin !== 'web' && !a.stopped && !a.error && a.content.trim()) return null
     if (a.role !== 'assistant' || q.role !== 'user' || q.origin !== 'web' || q.followUp) continue
     if (a.stopped || a.error || q.stopped) continue
     const text = q.content.trim()
+    // Eine Webfrage ohne eigenes Thema („suche bitte noch gründlicher“, „andere Quellen?“) ist kein
+    // Thema zum Ergänzen — weiter zurück zur letzten Frage MIT Thema (GUI-Test 26.10.2026).
+    if (text && (asksForMorePages(text) || asksForDeeperSearch(text))) continue
     if (text) return text
   }
   return null

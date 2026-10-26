@@ -29,7 +29,7 @@ import type { AgentRoute } from '../../../shared/agentRoute'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { buildChatHandover, formatHandoverTranscript } from '../../utils/chatHandover'
 import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META } from '../../../shared/webResearch'
-import { looksLikeBareFollowUp, previousWebQuestion, withPreviousQuestion } from '../../../shared/webChatDeep'
+import { applyPreviousTopic, asksForDeeperSearch, asksForMorePages, offerPreviousTopic, previousWebQuestion } from '../../../shared/webChatDeep'
 import { followUpQuery, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
 import { WebAnswerText, WebCheck, WebDeepLine, WebProvenanceLine, WebSkippedLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
@@ -102,6 +102,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // Websuche: Modul + Einrichtung wie auf der Auftragskarte (dieselbe Konfiguration).
   const webModule = useIsModuleEnabled('web-research')
   const webConfig = useUIStore(s => s.webResearchConfig)
+  const webLoopOn = useUIStore(s => s.petrolWebLoop)
   const setWebConfig = useUIStore(s => s.setWebResearchConfig)
   useEffect(() => {
     if (webModule && !webConfig) {
@@ -118,9 +119,29 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const webProvider = webConfig ? WEB_SEARCH_PROVIDER_META[webConfig.provider].label : ''
   const webOn = !!scope?.webArmed && webModule && webConfigured
   // „Gründlich“ (chat-gruendliche-suche.md): Modell plant die Suche, eine Wahl je Frage (R1).
-  const webDeep = webOn && !!scope?.webDeep
+  // Recherche-Schleife (experimentell): läuft im Main über den gründlichen Weg; keine Wahl
+  // schnell/gründlich, keine Satz- oder Themenhinweise — das Modell versteht den Zusammenhang selbst.
+  const webDeep = webOn && (webLoopOn || !!scope?.webDeep)
   const prevWebQuestion = previousWebQuestion(messages)
-  const deepFollowHint = webDeep && !!prevWebQuestion && looksLikeBareFollowUp(draft)
+  // Vorige Frage sichtbar ins Feld (chat-nachfrage-weitere-seiten.md, F02/F06/F07): sie gilt dann für
+  // Suche, Antwort und Prüfung, und gesendet wird, was im Feld steht. Nur auf Klick, nie still.
+  const topicHint = webOn && !webLoopOn && offerPreviousTopic(prevWebQuestion, draft, webDeep, webDeep ? null : scope?.webQuery ?? null)
+  // „Suche noch gründlicher“ in der Schnellsuche: gemeint ist der Schalter — ein Klick schaltet
+  // ihn ein und setzt die vorige Frage sichtbar ins Feld (GUI-Test 26.10.2026).
+  const deeperAsk = topicHint && !webDeep && asksForDeeperSearch(draft)
+  const topicHintText = deeperAsk ? t('petrolChat.webDeeperHint')
+    : asksForMorePages(draft) ? t('petrolChat.webMorePagesHint') : t('petrolChat.webDeepFollowHint')
+  // Ein offenes Suchfeld der Schnellsuche geht statt des Entwurfs an die Suche (Codex F12): dann
+  // bekommt auch das Feld die Vorfrage, sichtbar — sonst fehlte der Suche das Thema weiter.
+  const searchDeeperWithTopic = () => {
+    chat().setDraft(tabId, applyPreviousTopic(prevWebQuestion ?? '', draft, null).draft)
+    chat().setWeb(tabId, { webDeep: true, webQuery: null })
+  }
+  const addPreviousTopic = () => {
+    const next = applyPreviousTopic(prevWebQuestion ?? '', draft, webDeep ? null : scope?.webQuery ?? null)
+    chat().setDraft(tabId, next.draft)
+    if (next.webQuery !== (scope?.webQuery ?? null)) chat().setWeb(tabId, { webQuery: next.webQuery })
+  }
   // Vorschlag = die Frage, unverändert (F08). Gesendet wird exakt, was im Feld steht.
   const webQuery = scope?.webQuery ?? draft
   // Stichwörter nur als Angebot auf Klick, bei langen Fragen und Gesprächssätzen (Codex-Prüfung
@@ -154,7 +175,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // Gesprächssatz statt Stichwörter: nur Warnung, gesendet wird trotzdem (Nutzertest 24.10.2026).
   // Geprüft wird, was gesendet würde: nach „Stichwörter verwenden“ ist der Gesprächsanfang weg
   // (OPENER_RE), die Warnung verschwindet dann zu Recht (GUI-Test 25.10.2026).
-  const webQueryChatty = webOn && !webDeep && !webQueryProblem && looksConversational(webQueryNorm)
+  // Steht der Themenhinweis, ist er der genauere Rat — die Satzwarnung träte doppelt daneben.
+  const webQueryChatty = webOn && !webDeep && !webQueryProblem && !topicHint && looksConversational(webQueryNorm)
   const webProgress = busy ? scope?.webProgress ?? null : null
 
   // Modelle des aktiven Backends (Ollama bzw. LM Studio), wie im Notiz-Chat.
@@ -704,6 +726,18 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" /></svg>
             </button>
           )}
+          {/* Themenangebot direkt neben Senden (Nutzer, 26.10.2026): als graue Zeile über dem Feld wurde es
+              beim schnellen Tippen übersehen. Nur ein Angebot — Senden bleibt unverändert möglich. */}
+          {topicHint && !busy && (
+            <button
+              type="button"
+              className="agent-card-btn is-accent petrol-chat-topic-btn"
+              title={t('petrolChat.webTopicPrevious', { q: prevWebQuestion ?? '' })}
+              onClick={deeperAsk ? searchDeeperWithTopic : addPreviousTopic}
+            >
+              {t(deeperAsk ? 'petrolChat.webDeeperTakeTopic' : 'petrolChat.webDeepAddTopic')}
+            </button>
+          )}
           {busy ? (
             <button type="button" className="petrol-chat-send is-stop" onClick={() => chat().stop(tabId)} aria-label={t('petrolChat.stop')} title={t('petrolChat.stop')}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
@@ -720,12 +754,11 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             sichtbare Text, nichts wird still gekürzt). */}
         {webDeep && !busy && (
           <div className="petrol-web-line">
-            <span>{[t('petrolChat.webDeepConsent', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathParts].join(' · ')}</span>
-            <button type="button" className="agent-card-link-btn" aria-pressed={true} onClick={() => chat().setWeb(tabId, { webDeep: false })}>{t('petrolChat.webDeepOff')}</button>
-            {deepFollowHint && (
+            <span>{[t(webLoopOn ? 'petrolChat.webLoopConsent' : 'petrolChat.webDeepConsent', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathParts].join(' · ')}</span>
+            {!webLoopOn && <button type="button" className="agent-card-link-btn" aria-pressed={true} onClick={() => chat().setWeb(tabId, { webDeep: false })}>{t('petrolChat.webDeepOff')}</button>}
+            {topicHint && (
               <span className="petrol-web-line-warn">
-                {t('petrolChat.webDeepFollowHint')}{' '}
-                <button type="button" className="agent-card-link-btn" title={prevWebQuestion ?? ''} onClick={() => chat().setDraft(tabId, withPreviousQuestion(prevWebQuestion ?? '', draft))}>{t('petrolChat.webDeepAddTopic')}</button>
+                {topicHintText} {t('petrolChat.webTopicPrevious', { q: prevWebQuestion ?? '' })}
               </span>
             )}
           </div>
@@ -743,6 +776,11 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             )}
             {webQueryLong && <span className="petrol-web-line-warn">{t('petrolChat.webQueryLongHint')}</span>}
             {webQueryChatty && <span className="petrol-web-line-warn">{t('petrolChat.webQueryChattyHint')}</span>}
+            {topicHint && (
+              <span className="petrol-web-line-warn">
+                {topicHintText} {t('petrolChat.webTopicPrevious', { q: prevWebQuestion ?? '' })}
+              </span>
+            )}
           </div>
         )}
         {webOn && !busy && webQueryOpen && (
@@ -763,6 +801,11 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             {webQueryProblem && <div className="petrol-chat-note is-error">{webQueryProblem}</div>}
             {webQueryLong && <div className="petrol-chat-note is-warn">{t('petrolChat.webQueryLongHint')}</div>}
             {webQueryChatty && <div className="petrol-chat-note is-warn">{t('petrolChat.webQueryChattyHint')}</div>}
+            {topicHint && (
+              <div className="petrol-chat-note is-warn">
+                {topicHintText} {t('petrolChat.webTopicPrevious', { q: prevWebQuestion ?? '' })}
+              </div>
+            )}
             <div className="petrol-web-paths">
               {[t('petrolChat.webPathSearch', { provider: webProvider }), ...webPathParts].join(' · ')}
               {/* Gerade bei langen Fragen nützt „gründlich“ am meisten (Codex F30). */}

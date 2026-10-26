@@ -161,7 +161,7 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud, shellLockReason } from '../shared/modelCompatibility'
-import { listCloudModels, chat as llmChat, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
+import { listCloudModels, chat as llmChat, chatWithTools, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
@@ -170,10 +170,11 @@ import { buildPetrolChatSystemPrompt, sanitizeWebTopics, webTopicsBlock } from '
 import { sanitizeChatContext } from './noteAgent/chatContext'
 import { buildPetrolWebSystemPrompt, prepareWebExcerpt } from './llm/petrolWebPrompt'
 import { gatherWebSources, defaultWebGatherDeps } from './llm/petrolWebChat'
-import { runDeepResearch } from './llm/petrolDeepSearch'
+import { runDeepResearch, type DeepResult } from './llm/petrolDeepSearch'
+import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import type { CloudProviderSettings } from '../shared/llmBackend'
-import { freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
+import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
@@ -6713,6 +6714,8 @@ function localDateString(d = new Date()): string {
 }
 
 /** Streamt die Modellphase über den gewählten Weg; `onDelta` bekommt jedes Textstück. */
+const numbersOnly = (t: { missing: string[]; similar: string[] }) => ({ missing: t.missing.filter(x => /^\d/.test(x)), similar: [] })
+
 async function streamPetrolWebModel(
   params: PetrolWebParams,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
@@ -6848,7 +6851,11 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     const followUpMark = followUp ? { basis: { kind: 'snapshot' as const } } : {}
     // „Gründlich“: das Modell plant die Suchanfragen aus der Frage, `query` wird nicht benutzt
     // (chat-gruendliche-suche.md, R1). Nie zusammen mit einer Nachfrage aus Auszügen.
-    const deep = !snapshotRequested && params.deep === true
+    // Recherche-Schleife (experimentell, Schalter vom Main selbst gelesen): ersetzt schnelle und
+    // gründliche Suche — das Modell sucht und liest selbst (main/llm/petrolWebLoop.ts).
+    // Standard seit 26.10.2026 (Nutzerentscheidung nach GUI-Tests): nur ein ausdrückliches `false` schaltet ab.
+    const loopOn = !snapshotRequested && (await loadUISettings()).petrolWebLoop !== false
+    const deep = !snapshotRequested && (params.deep === true || loopOn)
     let query = ''
     if (!snapshotRequested && !deep) {
       query = normalizeQuery(typeof params.query === 'string' ? params.query : '')
@@ -6963,16 +6970,72 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
         }
         return { frozen, pages }
       }
-      const researched = await runDeepResearch(question, {
+      const deepRun = (deadlineMs: number) => runDeepResearch(question, {
         model: callModel, search: netDeps.search, fetchPage: netDeps.fetchPage, sanitize: sanitizeUntrustedText,
         excerpts: entries => freezeBest(entries).frozen.sources.map(src => src.excerpt)
       }, {
         userSignal: req.controller.signal,
-        deadlineMs: usesLocalOllama ? DEEP_LIMITS.deadlineLocalMs : DEEP_LIMITS.deadlineMs,
+        deadlineMs,
         today,
         maxPages,
         onPhase: (phase, detail) => send('petrol-chat-progress', { phase, started: 0, host: detail.host ?? null, query: detail.query ?? null })
       })
+      // Recherche-Schleife: Werkzeugaufrufe über denselben Modellweg wie die Antwort. Kann das Modell
+      // keine Werkzeuge (oder ruft keins auf), läuft sichtbar die feste gründliche Suche (`loop-fallback`).
+      const loopNumCtx = webChatNumCtx(LOOP_LIMITS.fetches * LOOP_LIMITS.excerptChars + 8000, contextTokens)
+      const loopChat = async (msgs: ChatMessage[], tools: Parameters<typeof chatWithTools>[1], signal: AbortSignal) => {
+        let base: LlmChatOptions
+        if (params.cloud?.model) {
+          const resolved = await resolveCloudChatOptions(params.cloud)
+          if (!resolved) throw new Error('Cloud ist gewählt, aber kein API-Key hinterlegt.')
+          base = resolved.chatOptions
+        } else if (backend === 'lmstudio') {
+          base = { backend: 'lmstudio', lmstudioUrl: getLMStudioUrl(params.lmStudioPort), lmstudioModel: params.model }
+        } else {
+          base = { backend: 'ollama', ollamaModel: params.model, numCtx: loopNumCtx, ollamaThink: false }
+        }
+        const run = () => chatWithTools(msgs, tools, { ...base, signal, timeoutMs: 120_000, telemetryModule: 'chat' })
+        return usesLocalOllama ? withOllamaActivity('petrol-web-chat', run) : run()
+      }
+      let loopFallback = false
+      let researched: DeepResult
+      const deepDeadline = usesLocalOllama ? DEEP_LIMITS.deadlineLocalMs : DEEP_LIMITS.deadlineMs
+      if (loopOn) {
+        const loopDeadline = usesLocalOllama ? LOOP_LIMITS.deadlineLocalMs : LOOP_LIMITS.deadlineMs
+        const loopStarted = Date.now()
+        const looped = await runLoopResearch(question, {
+          chat: loopChat, search: netDeps.search, fetchPage: netDeps.fetchPage, sanitize: sanitizeUntrustedText, excerptFor: prepare
+        }, {
+          userSignal: req.controller.signal,
+          deadlineMs: loopDeadline,
+          today,
+          topics: webTopics.map(tp => tp.text),
+          // Nur lokal bekannt: Werkzeugverlauf muss in num_ctx passen, mit Platz für die Antwort (F43).
+          ...(params.cloud?.model ? {}
+            : backend === 'lmstudio' ? { maxPromptChars: LOOP_LIMITS.lmstudioPromptChars }
+            : { maxPromptChars: Math.max(4000, (loopNumCtx - 2048) * WEB_CHAT_CHARS_PER_TOKEN) }),
+          onPhase: (phase, detail) => send('petrol-chat-progress', { phase, started: 0, host: detail.host ?? null, query: detail.query ?? null })
+        })
+        if (looped.modelError && !req.controller.signal.aborted) {
+          // Modellfehler ist kein Werkzeugproblem (F45): ehrlich melden, keine Suche hinterher.
+          provenance.endedIn = 'model'
+          return finish({ kind: 'error', error: looped.modelError, sources: [], failures: [], notFetched: 0 })
+        }
+        // Nur wenn noch nichts gesucht wurde (F44); die feste Suche bekommt höchstens die Restzeit der
+        // Schleifenfrist, nie eine Verlängerung (F53). Ist sie verbraucht, gibt es keinen Rückfall.
+        const remaining = Math.min(deepDeadline, loopDeadline - (Date.now() - loopStarted))
+        if (looped.fallback && !req.controller.signal.aborted && remaining > 0) {
+          console.warn('[petrol-web-loop] Rückfall auf gründliche Suche:', looped.fallbackReason)
+          loopFallback = true
+          researched = await deepRun(remaining)
+        } else if (looped.fallback && !req.controller.signal.aborted) {
+          researched = { ...looped, trace: { ...looped.trace, limited: [...looped.trace.limited, 'timeout'] } }
+        } else {
+          researched = looped
+        }
+      } else {
+        researched = await deepRun(deepDeadline)
+      }
       markPhase('net')
       const okEntries = researched.entries.filter(e => e.outcome.ok)
       provenance.searchOk = researched.trace.queries.some(q => q.ok)
@@ -6987,7 +7050,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       const traceInfo = (extra: Partial<WebDeepInfo> = {}): WebDeepInfo => ({
         queries: researched.trace.queries,
         rejected: researched.trace.rejected,
-        limited: [...researched.trace.limited],
+        limited: [...researched.trace.limited, ...(loopFallback ? ['loop-fallback' as const] : [])],
         candidates: researched.trace.candidates,
         picked: researched.trace.picked,
         searches: researched.trace.searches,
@@ -6997,6 +7060,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
         terms: { missing: [], similar: [] },
         ...(researched.trace.numbersNotInQueries.length ? { numbersNotInQueries: researched.trace.numbersNotInQueries } : {}),
         hits: researched.trace.hits.map(h => ({ ...h, title: sanitizeSourceTitle(h.title) })),
+        ...(loopOn && !loopFallback ? { loop: true, ...(webTopics.length ? { topics: webTopics.map(tp => tp.text) } : {}) } : {}),
         ...extra
       })
       if (researched.stoppedBy === 'stopped') {
@@ -7026,7 +7090,10 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       deepInfo = {
         ...base,
         unused,
-        terms: checkQuestionTerms(question, sources.map(src => src.excerpt)),
+        // In der Schleife übersetzt das Modell beim Suchen selbst (deutsche Frage, englische Seiten) —
+        // der Wörterabgleich meldete dann nur Rauschen („neuen, Mountainbikes, Jahr …“, GUI-Test
+        // 26.10.2026). Dort bleiben nur Zahlen und Jahre der Frage, die wirklich fehlen können.
+        terms: loopOn && !loopFallback ? numbersOnly(checkQuestionTerms(question, sources.map(src => src.excerpt))) : checkQuestionTerms(question, sources.map(src => src.excerpt)),
         hits: (base.hits ?? []).map(h => h.status !== 'read' ? h
           : dupUrls.has(h.url) ? { ...h, status: 'duplicate' as const }
           : unusedUrls.has(h.url) ? { ...h, status: 'unused' as const } : h)
