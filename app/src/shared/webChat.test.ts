@@ -16,9 +16,11 @@ import {
   followUpQuery,
   lastSentWebQuery,
   isGapStatement,
+  numberUnits,
   shortenHistoryToFit,
   looksConversational,
   skipCategoryForHost,
+  stripStrayThink,
   splitSkippedHits,
   type QueueEntry,
   type WebChatCandidate,
@@ -72,7 +74,7 @@ describe('Abruf-Warteschlange (F16)', () => {
   it('bei drei brauchbaren Seiten kein weiterer Start (kein zusätzlicher Host)', async () => {
     const { pending, fetchOne } = controllable()
     const q = runFetchQueue(cands(8), fetchOne, { stopReason: () => null })
-    for (const p of pending.splice(0)) p.resolve(ok('Inhalt'))
+    for (const p of pending.splice(0)) p.resolve(ok('Inhalt', p.c.url))
     const entries = await q
     expect(entries.length).toBe(3)
     expect(pending.length).toBe(0)
@@ -85,10 +87,10 @@ describe('Abruf-Warteschlange (F16)', () => {
     b.resolve({ ok: false, reason: 'empty' })
     await tick()
     expect(pending.map((p) => p.c.index)).toEqual([3])
-    c.resolve(ok('C'))
-    pending.splice(0)[0].resolve(ok('D'))
+    c.resolve(ok('C', c.c.url))
+    { const d = pending.splice(0)[0]; d.resolve(ok('D', d.c.url)) }
     await tick()
-    slow.resolve(ok('A'))
+    slow.resolve(ok('A', slow.c.url))
     const entries = await q
     expect(entries.filter((e) => e.outcome.ok).length).toBe(3)
   })
@@ -111,7 +113,7 @@ describe('Abruf-Warteschlange (F16)', () => {
     const refill = pending.splice(0) // der nachgezogene vierte Abruf
     expect(refill.length).toBe(1)
     stop = 'stopped'
-    first[1].resolve(ok('spät'))
+    first[1].resolve(ok('spät', first[1].c.url))
     refill[0].resolve({ ok: false, reason: 'error' })
     await tick()
     expect(pending.length).toBe(0)
@@ -155,6 +157,18 @@ describe('Budget (F17)', () => {
 
 describe('Einfrieren (F06, F19)', () => {
   const entry = (index: number, outcome: WebFetchOutcome): QueueEntry => ({ candidate: cands(8)[index], outcome })
+
+  it('F36: zwei Treffer mit derselben Zielseite sind eine Quelle und ein Duplikat', () => {
+    const r = freezeWebSources(
+      [entry(0, ok('Seite A', 'https://ziel.example/')), entry(1, ok('Seite A', 'https://ziel.example/')), entry(2, ok('Seite C', 'https://c.example/'))],
+      { systemChars: 1000, questionChars: 10, history: [] },
+      (t) => t,
+      1
+    )
+    expect(r.sources.map((s) => s.host)).toEqual(['ziel.example'])
+    expect(r.used).toEqual([0])
+    expect(r.duplicates).toEqual([1])
+  })
 
   it('Nummern folgen der Trefferreihenfolge, nicht der Abschlussreihenfolge; Fehler ohne Nummer', () => {
     const { sources, failures } = freezeWebSources(
@@ -211,7 +225,7 @@ describe('Zusatzprüfungen je Satz (F21)', () => {
     expect(report.sentences[0].status).toBe('cited-high')
     const ex = sentenceExtras(answer, report, src)
     expect(ex[0]).toEqual({ missingNumbers: [], negation: true })
-    expect(ex[1].missingNumbers).toEqual(['19,50'])
+    expect(ex[1].missingNumbers).toEqual(['19,50 €'])
     expect(ex[2]).toEqual({ missingNumbers: [], negation: false })
   })
 
@@ -302,13 +316,13 @@ describe('Weniger Fehlalarm in der Satzprüfung (Vergleich mit Claude, 25.10.202
     const src = ['Der Beitrag beträgt 18,36 Euro.']
     const answer = 'Der Beitrag beträgt 20 Euro [1].'
     const ex = sentenceExtras(answer, analyzeCitations(answer, src), src, 'Sind es 20 Euro?')
-    expect(ex[0].questionNumbers).toEqual(['20'])
+    expect(ex[0].questionNumbers).toEqual(['20 €'])
   })
 
   it('Zahl, die weder in Seite noch Frage steht, bleibt eine Warnung', () => {
     const answer = 'Erlaubt sind höchstens 2400 Watt [1].'
     const ex = sentenceExtras(answer, analyzeCitations(answer, [page]), [page], 'Wie viel Watt?')
-    expect(ex[0].missingNumbers).toEqual(['2400'])
+    expect(ex[0].missingNumbers).toEqual(['2400 W'])
     expect(ex[0].questionNumbers).toBeUndefined()
   })
 
@@ -526,5 +540,143 @@ describe('Suchwörter aus der Frage, ohne Modell (Vergleich mit Claude, 25.10.20
 
   it('Zahl mit Punkt am Ende bleibt, Satzzeichen fallen weg', () => {
     expect(searchWordsFromQuestion('Was passiert am 1. Mai 2027?')).toBe('passiert 1. Mai 2027')
+  })
+})
+
+describe('GUI-Test 25.10.2026: weniger Fehlalarm', () => {
+  it('Lücke mit Zahl aus der Frage und Einzahl „Auszug“ gilt als benannte Lücke', () => {
+    // Seit F44 bewusst strenger: eine Zahl hinter dem Doppelpunkt lässt die Warnung stehen.
+    expect(isGapStatement('Dazu steht in den abgerufenen Seiten nichts: der konkrete Betrag für 3.000 € brutto.', 'Wie viel Elterngeld bei 3000 brutto?')).toBe(false)
+    expect(isGapStatement('Zum Betrag für 3.000 € brutto steht in den abgerufenen Seiten nichts.', 'Wie viel Elterngeld bei 3000 brutto?')).toBe(true)
+    expect(isGapStatement('Ein Stückpreis pro Modul wird in keinem Auszug genannt.')).toBe(true)
+    expect(isGapStatement('In den Seiten steht nichts dazu, die Frist endet aber 2027.', 'Frist?')).toBe(false)
+  })
+
+  it('Wortverbindung mit Zahl meldet nur die Zahl', () => {
+    const src = ['Das Set mit acht Modulen kostet 2.696 Euro.']
+    const answer = 'Die 8-Modul-Preise gelten für ein Set mit 2.696 Euro [1].'
+    const ex = sentenceExtras(answer, analyzeCitations(answer, src), src, 'Balkonkraftwerk mit 8 Modulen')
+    expect(ex[0].missingNumbers).toEqual([])
+    expect(ex[0].questionNumbers).toEqual(['8'])
+  })
+})
+
+describe('Codex-Prüfung F27/F28 (Code-Runde)', () => {
+  it('F27: gleiche Ziffern mit anderer Einheit gelten NICHT als Seitenbeleg', () => {
+    const src = ['Der 800W-Wechselrichter ist erlaubt.']
+    const answer = 'Das 800Wp-Set ist erlaubt [1].'
+    const ex = sentenceExtras(answer, analyzeCitations(answer, src), src, 'Ist ein Balkonkraftwerk erlaubt?')
+    expect(ex[0].missingNumbers).toEqual(['800 Wp'])
+  })
+
+  it('F27: gleiche Einheit bleibt belegt, auch in einer Wortverbindung', () => {
+    const src = ['Der 800W-Wechselrichter ist erlaubt.']
+    const answer = 'Mit 800W ist es erlaubt [1].'
+    expect(sentenceExtras(answer, analyzeCitations(answer, src), src)[0].missingNumbers).toEqual([])
+  })
+
+  it('F28: Lücke mit Gegenbehauptung gilt nicht als neutrale Lücke', () => {
+    expect(isGapStatement('Die Quelle bestätigt 2027 nicht, 20 Euro sind falsch.', 'Sind es 2027 20 Euro?')).toBe(false)
+    expect(isGapStatement('In den Seiten steht nichts zu 2027, der Beitrag steigt.', 'Beitrag 2027?')).toBe(false)
+    expect(isGapStatement('In den Seiten steht nichts zum Preis, auch nicht zur Montage.')).toBe(true)
+  })
+})
+
+describe('Codex-Prüfung F33/F34 (Code-Runde 2)', () => {
+  it('F33: Prozent gegen Euro und getrennte Einheiten gelten nicht als belegt', () => {
+    const src = ['Der Zuschuss beträgt 20 Euro. Erlaubt sind 800 W.']
+    const a1 = 'Der Zuschuss beträgt 20 % [1].'
+    expect(sentenceExtras(a1, analyzeCitations(a1, src), src)[0].missingNumbers).toEqual(['20 %'])
+    const a2 = 'Erlaubt sind 800 Wp [1].'
+    expect(sentenceExtras(a2, analyzeCitations(a2, src), src)[0].missingNumbers).toEqual(['800 Wp'])
+  })
+
+  it('F33: gleiche Einheit in anderer Schreibweise und Zahl ohne Einheit bleiben belegt', () => {
+    const src = ['Der Zuschuss beträgt 20 € pro Jahr, Laufzeit 8 Jahren.']
+    const a = 'Der Zuschuss beträgt 20 Euro, die Laufzeit 8 Jahre, also 20 im Jahr [1].'
+    expect(sentenceExtras(a, analyzeCitations(a, src), src)[0].missingNumbers).toEqual([])
+  })
+
+  it('F34: Doppelpunkt mit Aussage und erneutes „Quelle“ heben die Warnung nicht auf', () => {
+    const q = 'Steigt der Beitrag 2027 auf 20 Euro?'
+    expect(isGapStatement('Die Quelle nennt dazu nichts: 2027 steigt der Beitrag auf 20 Euro.', q)).toBe(false)
+    expect(isGapStatement('Die Quelle nennt dazu nichts: der Beitrag steigt auf 20 Euro.', q)).toBe(false)
+    expect(isGapStatement('Die Quelle nennt dazu nichts, die Quelle bestätigt 20 Euro.', q)).toBe(false)
+    expect(isGapStatement('Die Seiten nennen nichts zum Beitrag für 2027.', q)).toBe(true)
+  })
+})
+
+describe('Codex-Prüfung F38–F41/F44 (Code-Runde 3)', () => {
+  const extras = (answer: string, page: string, q = '') => sentenceExtras(answer, analyzeCitations(answer, [page]), [page], q)[0]
+
+  it('F38: Weiterleitungen auf dieselbe Seite zählen einmal, ein eigenständiger Nachrücker wird abgerufen', async () => {
+    const got = await runFetchQueue(cands(5), async (c) => ok('Seite', c.index < 3 ? 'https://ziel.example/' : `https://${c.host}/`), { stopReason: () => null, maxUsable: 2, maxAttempts: 5 })
+    expect(got.map((e) => e.candidate.index).sort()).toEqual([0, 1, 2, 3])
+  })
+
+  it('F39: in einem Bereich gilt die Einheit für beide Zahlen', () => {
+    expect(numberUnits('600–800 W')).toEqual(['600w', '800w'])
+    expect(extras('Erlaubt sind 600–800 W [1].', 'Möglich sind 600 Wp und 800 W.').missingNumbers).toEqual(['600 W'])
+  })
+
+  it('F40: Uhrzeit und Schrägstrichdatum werden als Ganzes verglichen', () => {
+    expect(extras('Öffnet 12:30 Uhr [1].', 'Öffnet 12:45 Uhr; Einlass 30 Minuten vorher.').missingNumbers).toEqual(['12:30'])
+    expect(extras('Termin am 03/04/2026 [1].', 'Termin am 04/03/2026.').missingNumbers).toEqual(['03/04/2026'])
+    expect(extras('Öffnet 12:45 Uhr [1].', 'Öffnet 12:45 Uhr.').missingNumbers).toEqual([])
+  })
+
+  it('F41: ausgeschriebene Einheiten und Dezimalpunkt gelten wie Kurzform und Komma', () => {
+    expect(extras('Das Kabel ist 3 Meter lang [1].', 'Kabellänge 3 m.').missingNumbers).toEqual([])
+    expect(extras('Der Satz liegt bei 5.5 % [1].', 'Der Satz beträgt 5,5 %.').missingNumbers).toEqual([])
+    expect(extras('Es sind 3.000 Euro [1].', 'Es sind 3000 €.').missingNumbers).toEqual([])
+  })
+
+  it('F44: jede Zahl hinter dem Doppelpunkt lässt die Warnung stehen', () => {
+    expect(isGapStatement('Die Quelle nennt dazu nichts: der Beitrag erhöht sich 2027 auf 20 Euro.', 'Steigt der Beitrag 2027 auf 20 Euro?')).toBe(false)
+    expect(isGapStatement('Die Seiten nennen nichts dazu: weder den Betrag noch die Frist.')).toBe(true)
+  })
+})
+
+describe('GUI-Test 25.10.2026: vorangestellte Währung', () => {
+  it('„ab €53,90“ auf der Seite belegt „53,90 €“ in der Antwort', () => {
+    const src = ['Solarmodule ab €53,90 im Shop.']
+    const a = 'Solarmodule gibt es ab 53,90 € pro Modul [1].'
+    expect(sentenceExtras(a, analyzeCitations(a, src), src)[0].missingNumbers).toEqual([])
+    expect(numberUnits('EUR 20 oder $5')).toEqual(['20eur', '5usd'])
+    expect(numberUnits('Preis €1.072 für 8 × 450-Wp-Module')).toContain('1072eur')
+  })
+})
+
+describe('GUI-Test 25.10.2026: Aufforderungen an den Chat', () => {
+  it('„Erstelle mir …“, „Fasse … zusammen“, „Gib mir …“ warnen; echte Suchen nicht', () => {
+    for (const q of ['Erstelle mir eine Zusammenfassung der politischen Ereignisse von heute', 'Fasse mir die Nachrichten zusammen', 'Gib mir drei Ideen für ein Abendessen', 'Schreibe eine Absage für Donnerstag', 'Bitte die Öffnungszeiten vom Rathaus', 'Give me the latest news', 'Summarize the EU AI Act'])
+      expect(looksConversational(q), q).toBe(true)
+    for (const q of ['Liste der UNESCO-Welterbestätten Deutschland', 'Erklärvideo Photosynthese', 'Zusammenfassung politische Ereignisse heute', 'Schreibtisch höhenverstellbar Test', 'Machu Picchu Eintritt 2027', 'Findelkind Rechtslage'])
+      expect(looksConversational(q), q).toBe(false)
+  })
+})
+
+describe('Messung 25.10.2026: Sperrliste und verirrtes </think>', () => {
+  it('überspringt Erwachsenenseiten, aber keine Nachrichtenseiten', () => {
+    expect(skipCategoryForHost('theporndude.com')).toBe('adult')
+    expect(skipCategoryForHost('de.xhamster.com')).toBe('adult')
+    expect(skipCategoryForHost('example.xxx')).toBe('adult')
+    expect(skipCategoryForHost('www.zdfheute.de')).toBeNull()
+    expect(skipCategoryForHost('www.tagesschau.de')).toBeNull()
+  })
+
+  it('nimmt die Fassung nach dem letzten </think> statt beider Fassungen', () => {
+    const draft = 'Entwurf: Der Beitrag liegt bei 18,36 Euro [1].'
+    const final = 'Der Rundfunkbeitrag liegt bei 18,36 Euro pro Haushalt [1].'
+    expect(stripStrayThink(`${draft}\n</think>\n\n${final}`)).toBe(final)
+  })
+
+  it('behält den Text, wenn nach </think> nichts mehr kommt', () => {
+    expect(stripStrayThink('Antwort [1].\n</think>\n')).toBe('Antwort [1].')
+  })
+
+  it('entfernt vollständige Nachdenkblöcke und lässt normale Antworten unverändert', () => {
+    expect(stripStrayThink('<think>überlegen</think>\nAntwort.')).toBe('Antwort.')
+    expect(stripStrayThink('Antwort ohne Marken.')).toBe('Antwort ohne Marken.')
   })
 })

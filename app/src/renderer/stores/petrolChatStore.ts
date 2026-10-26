@@ -38,6 +38,10 @@ export interface PetrolChatMessage {
   origin?: 'web'
   /** Nur Frage: die Suchwörter, die tatsächlich gesendet wurden. */
   webQuery?: string
+  /** Nur Frage: „gründlich“ — die Suchanfragen hat das Modell geplant (stehen an der Antwort). */
+  webDeep?: boolean
+  /** Nur gestoppte „gründliche“ Frage: Suchanfragen, die bis zum Stopp gesendet waren (F25). */
+  webSentQueries?: string[]
   /** Frage zu eingefrorenen Auszügen, ohne neue Suche. */
   followUp?: boolean
   /** Kennung der Auszüge, an die diese Frage gebunden wurde — für „Erneut senden“. */
@@ -58,8 +62,10 @@ export interface PetrolChatMessage {
 
 /** Fortschritt der laufenden Webanfrage — nur Anzeige, keine Quelle der Wahrheit. */
 export interface PetrolWebProgressState {
-  phase: 'search' | 'fetch' | 'model'
+  phase: 'plan' | 'search' | 'pick' | 'fetch' | 'model'
   hosts: string[]
+  /** Nur „gründlich“: bisher gesendete Suchanfragen (Anzeige während des Laufs). */
+  queries?: string[]
   sources?: WebSource[]
   failures?: WebFetchFailure[]
   notFetched?: number
@@ -90,6 +96,8 @@ export interface PetrolChatScope {
   webArmed: boolean
   /** Suchwörter im Feld; null = noch nicht bearbeitet (Vorschlag = Frage). */
   webQuery: string | null
+  /** „Gründlich suchen“ für die nächste Webfrage; geht nach jedem Senden aus (eine Wahl je Frage, R1). */
+  webDeep: boolean
   /** Nachfrage zu einer fertigen Webantwort; null = nicht gewählt. Der Renderer kennt nur die Kennung. */
   followUp: { snapshotId: string } | null
   webProgress: PetrolWebProgressState | null
@@ -101,8 +109,8 @@ export interface PetrolSendOptions {
   lmStudioPort?: number
   cloud: { model: string; provider: CloudProviderId } | null
   run: PetrolActiveRun
-  /** Gesetzt = Websuche mit genau diesen Suchwörtern. */
-  web?: { query: string }
+  /** Gesetzt = Websuche mit genau diesen Suchwörtern, bzw. `deep` = Modell plant die Suche. */
+  web?: { query: string; deep?: boolean }
   /** Gesetzt = Nachfrage aus eingefrorenen Auszügen, ohne neue Suche. */
   followUp?: { snapshotId: string }
 }
@@ -115,7 +123,7 @@ interface PetrolChatState {
   setMode: (id: string, mode: AgentTabMode) => void
   setDraft: (id: string, text: string) => void
   setModel: (id: string, patch: Partial<Pick<PetrolChatScope, 'localModel' | 'cloudProvider'>>) => void
-  setWeb: (id: string, patch: Partial<Pick<PetrolChatScope, 'webArmed' | 'webQuery'>>) => void
+  setWeb: (id: string, patch: Partial<Pick<PetrolChatScope, 'webArmed' | 'webQuery' | 'webDeep'>>) => void
   /** „Hiermit weiterfragen“: Kennung setzen oder aufheben. Schaltet den Globus aus. */
   setFollowUp: (id: string, snapshotId: string | null) => void
   /** Prüfergebnis des Weges nachtragen, wenn beim Senden noch „wird geprüft“ galt (Codex F28). */
@@ -138,6 +146,7 @@ function freshScope(): PetrolChatScope {
     cloudProvider: null,
     webArmed: false,
     webQuery: null,
+    webDeep: false,
     followUp: null,
     webProgress: null
   }
@@ -187,6 +196,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
           ...prev,
           phase: p.phase,
           hosts: p.host ? [...prev.hosts, p.host] : prev.hosts,
+          ...(p.query ? { queries: [...(prev.queries ?? []), p.query] } : {}),
           ...(p.sources ? { sources: p.sources, failures: p.failures ?? [], notFetched: p.notFetched ?? 0 } : {})
         }
       })
@@ -235,11 +245,12 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         })
         return
       }
+      const questionAt = Date.now()
       patch(id, {
         messages: [...before, follow
           ? { role: 'user', content: question, origin: 'web', followUp: true, followUpSnapshotId: follow.snapshotId, at: Date.now() }
           : web
-            ? { role: 'user', content: question, origin: 'web', webQuery: web.query, at: Date.now() }
+            ? { role: 'user', content: question, origin: 'web', ...(web.deep ? { webDeep: true } : { webQuery: web.query }), at: questionAt }
             : { role: 'user', content: question, at: Date.now() }],
         streaming: '',
         active: !web && !follow && webTopics.length ? { ...opts.run, webTopics: webTopics.length } : opts.run,
@@ -247,8 +258,9 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         // Globus nach jedem Senden aus; das Suchfeld und die Nachfrage starten beim nächsten Mal neu.
         webArmed: false,
         webQuery: null,
+        webDeep: false,
         followUp: null,
-        webProgress: follow ? { phase: 'model', hosts: [] } : web ? { phase: 'search', hosts: [] } : null
+        webProgress: follow ? { phase: 'model', hosts: [] } : web ? { phase: web.deep ? 'plan' : 'search', hosts: [] } : null
       })
       set({ activeScope: id })
       if (web || follow) {
@@ -258,6 +270,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
             requestId: req,
             question,
             query: follow ? '' : web!.query,
+            ...(web?.deep ? { deep: true } : {}),
             scopeId: id,
             ...(follow ? { snapshotId: follow.snapshotId } : {}),
             history,
@@ -271,7 +284,18 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         } catch (e) {
           wres = { success: false, error: e instanceof Error ? e.message : String(e) }
         }
-        if (req !== currentRequest) return
+        if (req !== currentRequest) {
+          // Gestoppt: das Main-Ergebnis kommt trotzdem und trägt die vollständige Spur der
+          // gesendeten Anfragen — der Fortschritt beim Stopp kann eine gerade gestartete Suche
+          // noch nicht kennen (Codex F35). Nur die Anfragen werden an die Frage nachgetragen.
+          const sent = wres.result?.deep?.queries.map(q => q.text) ?? []
+          const sc = get().scopes[id]
+          if (web?.deep && sent.length && sc) {
+            const k = sc.messages.findIndex(m => m.role === 'user' && m.at === questionAt)
+            if (k >= 0) patch(id, { messages: sc.messages.map((m, i) => (i === k ? { ...m, webSentQueries: sent } : m)) })
+          }
+          return
+        }
         currentRequest = null
         const sc = get().scopes[id]
         set({ activeScope: null })
@@ -317,7 +341,11 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       // Kam noch gar nichts, wird die Frage selbst als abgebrochen markiert; sonst ginge sie
       // als offene Frage mit der nächsten ans Modell (Codex F31).
       const kept = sc.streaming ?? ''
-      const last = sc.messages[sc.messages.length - 1]
+      const lastRaw = sc.messages[sc.messages.length - 1]
+      // Gründliche Suche: was bis zum Stopp gesendet war, bleibt an der Frage sichtbar (F25).
+      const sent = sc.webProgress?.queries
+      const last = lastRaw?.role === 'user' && sent?.length ? { ...lastRaw, webSentQueries: [...sent] } : lastRaw
+      const before = last && last !== lastRaw ? [...sc.messages.slice(0, -1), last] : sc.messages
       // Webanfrage: das Bruchstück behält die Quellen, die beim Stopp feststanden — ohne
       // Prüfung, aber nachvollziehbar, woraus es stammt.
       const webMark: Partial<PetrolChatMessage> = last?.origin === 'web'
@@ -329,10 +357,10 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         active: null,
         webProgress: null,
         messages: kept.trim()
-          ? [...sc.messages, { role: 'assistant', content: kept, model: sc.active?.label, stopped: true, ...webMark, at: Date.now() }]
+          ? [...before, { role: 'assistant', content: kept, model: sc.active?.label, stopped: true, ...webMark, at: Date.now() }]
           : last?.role === 'user'
             ? [...sc.messages.slice(0, -1), { ...last, stopped: true }]
-            : sc.messages
+            : before
       })
       set({ activeScope: null })
     },
@@ -340,7 +368,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
     clear: id => {
       if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
       dropSnapshots(id)
-      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: false, webQuery: null, followUp: null })
+      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: false, webQuery: null, webDeep: false, followUp: null })
     },
 
     dispose: id => {

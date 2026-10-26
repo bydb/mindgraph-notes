@@ -29,9 +29,10 @@ import type { AgentRoute } from '../../../shared/agentRoute'
 import { useIsModuleEnabled } from '../../utils/modules'
 import { buildChatHandover, formatHandoverTranscript } from '../../utils/chatHandover'
 import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META } from '../../../shared/webResearch'
+import { looksLikeBareFollowUp, previousWebQuestion, withPreviousQuestion } from '../../../shared/webChatDeep'
 import { followUpQuery, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
-import { WebAnswerText, WebCheck, WebProvenanceLine, WebSkippedLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
+import { WebAnswerText, WebCheck, WebDeepLine, WebProvenanceLine, WebSkippedLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 
 interface Props {
   tabId: string
@@ -116,6 +117,10 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   )
   const webProvider = webConfig ? WEB_SEARCH_PROVIDER_META[webConfig.provider].label : ''
   const webOn = !!scope?.webArmed && webModule && webConfigured
+  // „Gründlich“ (chat-gruendliche-suche.md): Modell plant die Suche, eine Wahl je Frage (R1).
+  const webDeep = webOn && !!scope?.webDeep
+  const prevWebQuestion = previousWebQuestion(messages)
+  const deepFollowHint = webDeep && !!prevWebQuestion && looksLikeBareFollowUp(draft)
   // Vorschlag = die Frage, unverändert (F08). Gesendet wird exakt, was im Feld steht.
   const webQuery = scope?.webQuery ?? draft
   // Stichwörter nur als Angebot auf Klick, bei langen Fragen und Gesprächssätzen (Codex-Prüfung
@@ -139,16 +144,17 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     if (previousWebQuery) chat().setWeb(tabId, { webQuery: followUpQuery(previousWebQuery, draft) })
   }
   // Eigenes Feld nur, wenn der Nutzer ändern will (webQuery gesetzt) oder die Frage zu lang ist.
-  const webQueryOpen = scope?.webQuery != null || isQueryTooLong(normalizeQuery(draft))
-  const webQueryProblem = !webOn ? null
+  const webQueryOpen = !webDeep && (scope?.webQuery != null || isQueryTooLong(normalizeQuery(draft)))
+  const webQueryProblem = !webOn || webDeep ? null
     : !webQueryNorm ? t('petrolChat.webQueryEmpty')
     : isQueryTooLong(webQueryNorm) ? t('petrolChat.webQueryTooLong', { max: WEB_QUERY_MAX_CHARS, n: webQueryLen })
     : null
   // Lange Suchwörter: Hinweis, keine Sperre (Nutzertest: lange Suche → Spam-Treffer).
-  const webQueryLong = webOn && !webQueryProblem && webQueryLen > WEB_CHAT_QUERY_SOFT_MAX
+  const webQueryLong = webOn && !webDeep && !webQueryProblem && webQueryLen > WEB_CHAT_QUERY_SOFT_MAX
   // Gesprächssatz statt Stichwörter: nur Warnung, gesendet wird trotzdem (Nutzertest 24.10.2026).
-  // Aus Stichwörtern verschwindet der Gesprächsanfang — dann zählt die Originalfrage (Codex F04).
-  const webQueryChatty = webOn && !webQueryProblem && (looksConversational(webQueryNorm) || (webQuery === keywordOffer && looksConversational(normalizeQuery(draft))))
+  // Geprüft wird, was gesendet würde: nach „Stichwörter verwenden“ ist der Gesprächsanfang weg
+  // (OPENER_RE), die Warnung verschwindet dann zu Recht (GUI-Test 25.10.2026).
+  const webQueryChatty = webOn && !webDeep && !webQueryProblem && looksConversational(webQueryNorm)
   const webProgress = busy ? scope?.webProgress ?? null : null
 
   // Modelle des aktiven Backends (Ollama bzw. LM Studio), wie im Notiz-Chat.
@@ -276,7 +282,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       lmStudioPort: ollama.lmStudioPort,
       cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null,
       run: { label: activeCloudRoute ? activeCloudRoute.label : model, routeText: selectedRouteText, routeKind: selectedRouteKind, routeKey },
-      web: withWeb ? { query: webQueryNorm } : undefined,
+      web: withWeb ? (webDeep ? { query: question.trim(), deep: true } : { query: webQueryNorm }) : undefined,
       followUp: followId ? { snapshotId: followId } : undefined
     })
     if (keep) chat().setDraft(tabId, keep)
@@ -554,9 +560,13 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       {turn.question.origin === 'web' && turn.question.webQuery && turn.question.webQuery !== turn.question.content.trim() && (
                         <span className="petrol-turn-webq">{t('petrolChat.webQueryLabel')}: {turn.question.webQuery}</span>
                       )}
+                      {!!turn.question.webSentQueries?.length && (
+                        <span className="petrol-turn-webq">{t('petrolChat.webDeepSentUntilStop', { queries: turn.question.webSentQueries.map(q => `„${q}“`).join(', ') })}</span>
+                      )}
                     </span>
                     {turn.question.followUp
                       ? <span className="petrol-turn-webbadge">{t('petrolChat.followUpBadge')}</span>
+                      : turn.question.webDeep ? <span className="petrol-turn-webbadge">{t('petrolChat.webDeepBadge')}</span>
                       : turn.question.origin === 'web' && turn.question.webQuery && <span className="petrol-turn-webbadge">{t('petrolChat.webBadge')}</span>}
                     {turn.question.stopped && <span className="petrol-turn-flag">{t('petrolChat.stopped')}</span>}
                   </div>
@@ -575,6 +585,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       )}
                     </div>
                     {turn.answer.web?.snapshotGone && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
+                    {turn.answer.web?.deep && <div className="petrol-web-block"><WebDeepLine deep={turn.answer.web.deep} /></div>}
                     {turn.answer.web?.basis?.kind === 'snapshot' && (
                       <div className="petrol-web-muted">{t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) })}</div>
                     )}
@@ -584,6 +595,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                   <>
                   <div className="petrol-web-block">
                     <WebUnfetchedHits hits={turn.answer.web.unfetchedHits ?? []} failures={turn.answer.web.failures} />
+                    <WebDeepLine deep={turn.answer.web.deep} />
                     <WebSkippedLine skipped={turn.answer.web.skipped} />
                     <WebProvenanceLine p={turn.answer.web.provenance} />
                   </div>
@@ -608,6 +620,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       {turn.answer.web?.basis?.kind === 'snapshot' ? (
                         <div className="petrol-web-muted petrol-web-prov">{[t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) }), modelRouteLine(t, turn.answer.web.provenance)].filter(Boolean).join(' · ')}</div>
                       ) : turn.answer.web ? <WebProvenanceLine p={turn.answer.web.provenance} /> : null}
+                      <WebDeepLine deep={turn.answer.web?.deep} />
                       <WebSkippedLine skipped={turn.answer.web?.skipped} />
                       {!!turn.answer.web?.historyDropped && (
                         <div className="petrol-web-muted">{t('petrolChat.historyDropped', { n: turn.answer.web.historyDropped })}</div>
@@ -635,7 +648,10 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     <div className="petrol-turn-foot">
                       <span className="petrol-turn-model">{active?.label ?? ''}</span>
                       <span className="petrol-turn-model">
-                        {webProgress.phase === 'search' ? t('petrolChat.webPhaseSearch', { provider: webProvider })
+                        {webProgress.phase === 'plan' ? t('petrolChat.webPhasePlan')
+                          : webProgress.phase === 'pick' ? t('petrolChat.webPhasePick')
+                          : webProgress.phase === 'search' && webProgress.queries?.length ? t('petrolChat.webPhaseSearchQuery', { provider: webProvider, query: webProgress.queries[webProgress.queries.length - 1] })
+                          : webProgress.phase === 'search' ? t('petrolChat.webPhaseSearch', { provider: webProvider })
                           : webProgress.phase === 'fetch' ? t('petrolChat.webPhaseFetch', { n: webProgress.hosts.length })
                           : streaming ? t('petrolChat.writing') : t('petrolChat.webPhaseModel', { n: webProgress.sources?.length ?? 0 })}
                       </span>
@@ -702,9 +718,22 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             „nimmt viel Platz weg“). Sie nennt alle Datenwege (F11). Das Suchfeld erscheint nur zum
             Ändern oder wenn die Frage für eine Suche zu lang ist (F08: gesendet wird exakt der
             sichtbare Text, nichts wird still gekürzt). */}
-        {webOn && !busy && !webQueryOpen && (
+        {webDeep && !busy && (
+          <div className="petrol-web-line">
+            <span>{[t('petrolChat.webDeepConsent', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathParts].join(' · ')}</span>
+            <button type="button" className="agent-card-link-btn" aria-pressed={true} onClick={() => chat().setWeb(tabId, { webDeep: false })}>{t('petrolChat.webDeepOff')}</button>
+            {deepFollowHint && (
+              <span className="petrol-web-line-warn">
+                {t('petrolChat.webDeepFollowHint')}{' '}
+                <button type="button" className="agent-card-link-btn" title={prevWebQuestion ?? ''} onClick={() => chat().setDraft(tabId, withPreviousQuestion(prevWebQuestion ?? '', draft))}>{t('petrolChat.webDeepAddTopic')}</button>
+              </span>
+            )}
+          </div>
+        )}
+        {webOn && !webDeep && !busy && !webQueryOpen && (
           <div className="petrol-web-line">
             <span>{[t('petrolChat.webLineSearch', { provider: webProvider }), ...webPathParts].join(' · ')}</span>
+            <button type="button" className="agent-card-link-btn" aria-pressed={false} onClick={() => chat().setWeb(tabId, { webDeep: true })}>{t('petrolChat.webDeepToggle')}</button>
             <button type="button" className="agent-card-link-btn" onClick={() => chat().setWeb(tabId, { webQuery: draft })}>{t('petrolChat.webQueryEdit')}</button>
             {keywordOffer && (
               <button type="button" className="agent-card-link-btn" title={keywordOffer} onClick={() => chat().setWeb(tabId, { webQuery: keywordOffer })}>{t('petrolChat.webQueryUseKeywords')}</button>
@@ -736,6 +765,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             {webQueryChatty && <div className="petrol-chat-note is-warn">{t('petrolChat.webQueryChattyHint')}</div>}
             <div className="petrol-web-paths">
               {[t('petrolChat.webPathSearch', { provider: webProvider }), ...webPathParts].join(' · ')}
+              {/* Gerade bei langen Fragen nützt „gründlich“ am meisten (Codex F30). */}
+              {' '}<button type="button" className="agent-card-link-btn" aria-pressed={false} onClick={() => chat().setWeb(tabId, { webDeep: true })}>{t('petrolChat.webDeepToggle')}</button>
               {previousWebQuery && webQuery.indexOf(previousWebQuery) !== 0 && (
                 <> <button type="button" className="agent-card-link-btn" title={previousWebQuery} onClick={takePreviousQuery}>{t('petrolChat.webQueryTakePrevious')}</button></>
               )}

@@ -7,7 +7,7 @@ import type { FileEntry, SecretStorageResult, SyncRestoreResult } from '../share
 import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
 import { webSearch as webResearchSearch } from './webResearch/providers'
 import { originNeedsPrivateApproval as webResearchNeedsApproval } from './webResearch/egress'
-import { isWebResearchConfigComplete, normalizeWebUrl, extractUrlsFromInstruction, KEY_PROVIDERS, normalizeQuery, isQueryTooLong, sanitizeSourceTitle, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META, type WebSearchProviderId } from '../shared/webResearch'
+import { isWebResearchConfigComplete, normalizeWebUrl, hostnameFromUrl, extractUrlsFromInstruction, KEY_PROVIDERS, normalizeQuery, isQueryTooLong, sanitizeSourceTitle, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META, type WebSearchProviderId } from '../shared/webResearch'
 import {
   HTML_PREVIEW_SCHEME,
   previewPathnameToFsPath,
@@ -170,8 +170,10 @@ import { buildPetrolChatSystemPrompt, sanitizeWebTopics, webTopicsBlock } from '
 import { sanitizeChatContext } from './noteAgent/chatContext'
 import { buildPetrolWebSystemPrompt, prepareWebExcerpt } from './llm/petrolWebPrompt'
 import { gatherWebSources, defaultWebGatherDeps } from './llm/petrolWebChat'
+import { runDeepResearch } from './llm/petrolDeepSearch'
+import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import type { CloudProviderSettings } from '../shared/llmBackend'
-import { freezeWebSourcesToFit, petrolCloudAllowed, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
+import { freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
@@ -6716,7 +6718,9 @@ async function streamPetrolWebModel(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   signal: AbortSignal,
   onDelta: (delta: string) => void,
-  numCtx?: number
+  numCtx?: number,
+  /** Planen/Wählen der gründlichen Suche: kurze JSON-Antwort, kein verdecktes Nachdenken (Ollama). */
+  noThink = false
 ): Promise<string> {
   const controller = new AbortController()
   const onAbort = () => controller.abort()
@@ -6736,7 +6740,7 @@ async function streamPetrolWebModel(
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: params.model, messages, stream: true, ...(!isLmStudio && numCtx ? { options: { num_ctx: numCtx } } : {}) }),
+      body: JSON.stringify({ model: params.model, messages, stream: true, ...(!isLmStudio && numCtx ? { options: { num_ctx: numCtx } } : {}), ...(!isLmStudio && noThink ? { think: false } : {}) }),
       signal: controller.signal
     })
     if (!response.ok || !response.body) throw new Error(`${isLmStudio ? 'LM Studio' : 'Ollama'} API Fehler: ${response.status}`)
@@ -6842,8 +6846,11 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     const scopeId = snapshotRequested ? mode.scopeId : sanitizeScopeId(params.scopeId)
     if (snapshotRequested) followUp = true
     const followUpMark = followUp ? { basis: { kind: 'snapshot' as const } } : {}
+    // „Gründlich“: das Modell plant die Suchanfragen aus der Frage, `query` wird nicht benutzt
+    // (chat-gruendliche-suche.md, R1). Nie zusammen mit einer Nachfrage aus Auszügen.
+    const deep = !snapshotRequested && params.deep === true
     let query = ''
-    if (!snapshotRequested) {
+    if (!snapshotRequested && !deep) {
       query = normalizeQuery(typeof params.query === 'string' ? params.query : '')
       if (!query) return { success: false, error: 'Die Suchwörter sind leer.' }
       if (isQueryTooLong(query)) return { success: false, error: `Die Suchwörter sind länger als ${WEB_QUERY_MAX_CHARS} Zeichen. Bitte kürzen.` }
@@ -6890,6 +6897,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     let historyDropped = 0
     let skipped: WebSkippedHit[] = []
     let webTopics: ReturnType<typeof sanitizeWebTopics> = []
+    let deepInfo: WebDeepInfo | undefined
 
     if (mode.mode === 'snapshot') {
       // Nach den awaits lesen: Tabwechsel oder Fenster-Schließen kann den Snapshot inzwischen
@@ -6906,6 +6914,126 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       notFetched = 0
       historyForModel = resolved.history
       historyDropped = resolved.dropped
+    } else if (deep) {
+      // Gründliche Suche (chat-gruendliche-suche.md, Rev. 3 + F16–F21): Main führt feste Schritte.
+      if (!webConfig) return { success: false, error: 'Die Webrecherche ist nicht eingerichtet (Einstellungen → KI & Modelle → Webrecherche).' }
+      provenance.searchProvider = WEB_SEARCH_PROVIDER_META[webConfig.provider].label
+      webTopics = sanitizeWebTopics(params.webTopics, sanitizeUntrustedText)
+      // Der Wörterabgleich steht nur in der Anzeige, nicht im Systemtext: als Hinweis an das Modell
+      // eröffnete es jede sechste Antwort mit „Das Wort ‚nehmen‘ kommt nicht vor“ (Messung 25.10.2026).
+      const reservedQuestion = question.length
+      const measure = (f: { sources: WebSource[]; history: Array<{ content: string }> }) =>
+        measureWithFollowUpRoom({ sources: f.sources, history: f.history, questionChars: reservedQuestion, topics: webTopics, today, sanitize: sanitizeUntrustedText })
+      // Obergrenze VOR dem Abruf (F19): Platz ohne Quellen und ohne Verlauf (der weicht zuerst),
+      // Kopfzeilen geschätzt. Nach dem Abruf wird echt gemessen.
+      const place = charBudget - measure({ sources: [], history: [] }) - 200 * DEEP_LIMITS.maxPages
+      const maxPages = maxPagesForPlace(place)
+      if (maxPages === 0) {
+        return finish({ kind: 'error', error: 'Das Kontextfenster dieses Modells ist zu klein für die gründliche Suche. Nimm die schnelle Suche oder ein Modell mit größerem Fenster.', sources: [], failures: [], notFetched: 0 })
+      }
+      const netDeps = defaultWebGatherDeps(webConfig, apiKey)
+      const planCtx = backend === 'ollama' ? webChatNumCtx(6000, contextTokens) : undefined
+      const callModel = (msgs: Array<{ role: 'system' | 'user'; content: string }>, signal: AbortSignal) => usesLocalOllama
+        ? withOllamaActivity('petrol-web-chat', () => streamPetrolWebModel(params, msgs, signal, () => {}, planCtx, true))
+        : streamPetrolWebModel(params, msgs, signal, () => {}, planCtx, true)
+      // Einfrieren mit echter Messung (F19): Verlauf weicht zuerst (sourcesMin = n × Mindestlänge);
+      // ein Auszug unter der Mindestlänge kostet die LETZTE Seite, dann wird neu eingefroren.
+      // Dieselbe Funktion entscheidet im Ablauf über die Nachsuche (F22).
+      const prepare = (t: string) => prepareWebExcerpt(t, sanitizeUntrustedText)
+      const freezeN = (entries: QueueEntry[], n: number) => freezeWebSourcesToFit(
+        entries,
+        {
+          systemChars: buildPetrolWebSystemPrompt([], today, sanitizeUntrustedText, webTopics).length + 200 * n,
+          questionChars: reservedQuestion,
+          history,
+          total: charBudget,
+          sourcesMin: n * DEEP_LIMITS.minExcerpt,
+          sourcesMax: Math.max(WEB_CHAT_SOURCES_MAX, n * 3000)
+        },
+        prepare,
+        f => measure(f),
+        n
+      )
+      const freezeBest = (entries: QueueEntry[]) => {
+        let pages = maxPages
+        let frozen = freezeN(entries, pages)
+        while (frozen.sources.length > 1 && frozen.sources.some(src => src.truncated && src.excerpt.length < DEEP_LIMITS.minExcerpt)) {
+          pages = frozen.sources.length - 1
+          frozen = freezeN(entries, pages)
+        }
+        return { frozen, pages }
+      }
+      const researched = await runDeepResearch(question, {
+        model: callModel, search: netDeps.search, fetchPage: netDeps.fetchPage, sanitize: sanitizeUntrustedText,
+        excerpts: entries => freezeBest(entries).frozen.sources.map(src => src.excerpt)
+      }, {
+        userSignal: req.controller.signal,
+        deadlineMs: usesLocalOllama ? DEEP_LIMITS.deadlineLocalMs : DEEP_LIMITS.deadlineMs,
+        today,
+        maxPages,
+        onPhase: (phase, detail) => send('petrol-chat-progress', { phase, started: 0, host: detail.host ?? null, query: detail.query ?? null })
+      })
+      markPhase('net')
+      const okEntries = researched.entries.filter(e => e.outcome.ok)
+      provenance.searchOk = researched.trace.queries.some(q => q.ok)
+      provenance.fetchAttempts = researched.trace.fetches
+      provenance.fetchOk = okEntries.length
+      provenance.contactedHosts = researched.contactedHosts
+      if (researched.trace.searches === 0) provenance.searchProvider = null
+      skipped = researched.skipped
+      const skippedMark = skipped.length ? { skipped } : {}
+      // Die Spur gehört in JEDEN Endzustand (F25) — gerade bei Fehler und Stopp will man sehen,
+      // was gesendet wurde.
+      const traceInfo = (extra: Partial<WebDeepInfo> = {}): WebDeepInfo => ({
+        queries: researched.trace.queries,
+        rejected: researched.trace.rejected,
+        limited: [...researched.trace.limited],
+        candidates: researched.trace.candidates,
+        picked: researched.trace.picked,
+        searches: researched.trace.searches,
+        fetches: researched.trace.fetches,
+        maxPages,
+        unused: [],
+        terms: { missing: [], similar: [] },
+        ...(researched.trace.numbersNotInQueries.length ? { numbersNotInQueries: researched.trace.numbersNotInQueries } : {}),
+        hits: researched.trace.hits.map(h => ({ ...h, title: sanitizeSourceTitle(h.title) })),
+        ...extra
+      })
+      if (researched.stoppedBy === 'stopped') {
+        provenance.endedIn = 'search'
+        return finish({ kind: 'stopped', sources: [], failures: [], notFetched: 0, ...skippedMark, deep: traceInfo() })
+      }
+      if (researched.searchError && okEntries.length === 0) {
+        provenance.endedIn = 'search'
+        return finish({ kind: 'error', error: researched.searchError, sources: [], failures: [], notFetched: 0, ...skippedMark, deep: traceInfo() })
+      }
+      const { frozen, pages } = freezeBest(researched.entries)
+      sources = frozen.sources
+      failures = frozen.failures
+      historyForModel = frozen.history
+      notFetched = researched.notFetched
+      // Zuordnung über die Abrufkennung, nicht über die Zieladresse (Codex F36): zwei Treffer, die
+      // auf dieselbe Seite weiterleiten, sind eine Quelle und ein Duplikat.
+      const usedIdx = new Set(frozen.used)
+      const dupIdx = new Set(frozen.duplicates)
+      const unusedEntries = okEntries.filter(e => !usedIdx.has(e.candidate.index) && !dupIdx.has(e.candidate.index))
+      const unusedUrls = new Set(unusedEntries.map(e => e.candidate.url))
+      const dupUrls = new Set(okEntries.filter(e => dupIdx.has(e.candidate.index)).map(e => e.candidate.url))
+      const unused = unusedEntries
+        .map(e => { const o = e.outcome as Extract<typeof e.outcome, { ok: true }>; return hostnameFromUrl(o.finalUrl) ?? o.finalUrl })
+      const base = traceInfo()
+      if (unused.length > 0 && pages < DEEP_LIMITS.maxPages) base.limited.push('window')
+      deepInfo = {
+        ...base,
+        unused,
+        terms: checkQuestionTerms(question, sources.map(src => src.excerpt)),
+        hits: (base.hits ?? []).map(h => h.status !== 'read' ? h
+          : dupUrls.has(h.url) ? { ...h, status: 'duplicate' as const }
+          : unusedUrls.has(h.url) ? { ...h, status: 'unused' as const } : h)
+      }
+      if (sources.length === 0) {
+        return finish({ kind: 'nothing-readable', sources: [], failures, notFetched, ...skippedMark, unfetchedHits: [], deep: deepInfo })
+      }
     } else {
       if (!webConfig) return { success: false, error: 'Die Webrecherche ist nicht eingerichtet (Einstellungen → KI & Modelle → Webrecherche).' }
       provenance.searchProvider = WEB_SEARCH_PROVIDER_META[webConfig.provider].label
@@ -6968,7 +7096,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     }
 
     const topicsForPrompt = followUp ? [] : webTopics
-    const droppedMark = { ...(historyDropped > 0 ? { historyDropped } : {}), ...(skipped.length ? { skipped } : {}) }
+    const droppedMark = { ...(historyDropped > 0 ? { historyDropped } : {}), ...(skipped.length ? { skipped } : {}), ...(deepInfo ? { deep: deepInfo } : {}) }
     // Quellen gehen VOR der Modellphase an die Anzeige — wird gestoppt, bleibt sichtbar,
     // woraus das Bruchstück stammt. Bei einer Nachfrage sind das die alten Auszüge, nicht neue Abrufe.
     send('petrol-chat-progress', { phase: 'model', sources, failures, notFetched })
@@ -7001,7 +7129,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       return finish({ kind: 'stopped', sources, failures, notFetched, ...followUpMark, ...droppedMark })
     }
     // Prüfer, Anzeige und Export arbeiten auf demselben normalisierten Text (wie Vault-Chat).
-    const answer = full.replace(/\r\n?/g, '\n').replace(/[\uE000-\uF8FF]/g, '')
+    const answer = stripStrayThink(full.replace(/\r\n?/g, '\n').replace(/[\uE000-\uF8FF]/g, ''))
     if (!answer.trim()) return finish({ kind: 'error', error: '', sources, failures, notFetched, ...followUpMark, ...droppedMark })
     const excerpts = sources.map(s => s.excerpt)
     const report = analyzeCitations(answer, excerpts, { sourceTitles: sources.map(s => s.title) })

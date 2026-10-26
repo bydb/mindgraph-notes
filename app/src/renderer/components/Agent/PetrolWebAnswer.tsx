@@ -11,7 +11,7 @@ import { sanitizeHtml } from '../../utils/sanitize'
 import { createWebAnswerMarkdown, markWebAnswer, onlyNeutralFlags, sentenceFlags, type WebAnswerEnv, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
 import type { CitationEnv } from '../../utils/citationMarkdown'
 import type { CitationReport, SentenceCheck } from '../../../shared/rag/citations'
-import type { SentenceExtra, WebChatProvenance, WebFetchFailReason, WebFetchFailure, WebSkippedHit, WebSource, WebUnfetchedHit } from '../../../shared/webChat'
+import type { SentenceExtra, WebChatProvenance, WebDeepHit, WebDeepInfo, WebDeepQueryOrigin, WebFetchFailReason, WebFetchFailure, WebSkipCategory, WebSkippedHit, WebSource, WebUnfetchedHit } from '../../../shared/webChat'
 
 const md = createWebAnswerMarkdown()
 
@@ -216,10 +216,98 @@ export function WebUnfetchedHits({ hits, failures }: { hits: WebUnfetchedHit[]; 
 export function WebSkippedLine({ skipped }: { skipped: WebSkippedHit[] | undefined }) {
   const { t } = useTranslation()
   if (!skipped || skipped.length === 0) return null
-  const kinds = [...new Set(skipped.map(s => t(s.category === 'translator' ? 'petrolChat.webSkipTranslator' : 'petrolChat.webSkipSocial')))].join(', ')
+  const kinds = [...new Set(skipped.map(s => t(SKIP_KEYS[s.category])))].join(', ')
   const n = skipped.reduce((sum, s) => sum + (s.count || 1), 0)
   const hosts = skipped.map(s => ((s.count || 1) > 1 ? `${s.host} (${s.count}×)` : s.host)).join(', ')
   return <div className="petrol-web-muted">{t('petrolChat.webSkipped', { n, kinds, hosts })}</div>
+}
+
+const DEEP_LIMIT_KEYS: Record<WebDeepInfo['limited'][number], TranslationKey> = {
+  'plan-failed': 'petrolChat.webDeepLimitedPlan',
+  'retry-plan-failed': 'petrolChat.webDeepLimitedRetryPlan',
+  'pick-failed': 'petrolChat.webDeepLimitedPick',
+  'no-search': 'petrolChat.webDeepLimitedNoSearch',
+  'guard-skipped': 'petrolChat.webDeepLimitedGuardSkipped',
+  timeout: 'petrolChat.webDeepLimitedTimeout',
+  budget: 'petrolChat.webDeepLimitedBudget',
+  window: 'petrolChat.webDeepLimitedWindow'
+}
+
+const SKIP_KEYS: Record<WebSkipCategory, TranslationKey> = {
+  translator: 'petrolChat.webSkipTranslator',
+  social: 'petrolChat.webSkipSocial',
+  adult: 'petrolChat.webSkipAdult'
+}
+
+const DEEP_REJECT_KEYS: Record<WebDeepInfo['rejected'][number]['reason'], TranslationKey> = {
+  empty: 'petrolChat.webDeepRejectEmpty',
+  'too-long': 'petrolChat.webDeepRejectTooLong',
+  duplicate: 'petrolChat.webDeepRejectDuplicate',
+  'over-limit': 'petrolChat.webDeepRejectOverLimit'
+}
+
+/** Je Herkunft eine Zeile — der Rückfall sagt genau, womit gesucht wurde (Codex F29). */
+const DEEP_ORIGIN_KEYS: Record<WebDeepQueryOrigin, TranslationKey> = {
+  plan: 'petrolChat.webDeepSearched',
+  guard: 'petrolChat.webDeepGuard',
+  fallback: 'petrolChat.webDeepFallback',
+  'fallback-words': 'petrolChat.webDeepFallbackWords',
+  retry: 'petrolChat.webDeepRetry'
+}
+
+const DEEP_HIT_KEYS: Record<WebDeepHit['status'], TranslationKey> = {
+  read: 'petrolChat.webDeepHitRead',
+  unused: 'petrolChat.webDeepHitUnused',
+  duplicate: 'petrolChat.webDeepHitDuplicate',
+  failed: 'petrolChat.webDeepHitFailed',
+  'not-tried': 'petrolChat.webDeepHitNotTried',
+  'not-picked': 'petrolChat.webDeepHitNotPicked'
+}
+
+/**
+ * Gründliche Suche (chat-gruendliche-suche.md, R1/S2): jede GESENDETE Anfrage, Verworfenes mit
+ * Grund, Einschränkungen, nicht Verwendetes, die Trefferliste mit Ausgang (F26) und der
+ * Wörterabgleich — nie „abgedeckt“.
+ */
+export function WebDeepLine({ deep }: { deep: WebDeepInfo | undefined }) {
+  const { t } = useTranslation()
+  if (!deep) return null
+  const quote = (q: string) => `„${q}“`
+  const origins = (Object.keys(DEEP_ORIGIN_KEYS) as WebDeepQueryOrigin[]).filter(o => deep.queries.some(q => q.origin === o))
+  const limited = [...new Set(deep.limited)].map(l => t(DEEP_LIMIT_KEYS[l]))
+  const hits = deep.hits ?? []
+  return (
+    <div className="petrol-web-deep">
+      {deep.numbersNotInQueries && deep.numbersNotInQueries.length > 0 && (
+        <div className="petrol-web-muted petrol-web-warn">{t('petrolChat.webDeepNumbersNotInQueries', { numbers: deep.numbersNotInQueries.join(', ') })}</div>
+      )}
+      {origins.map(o => (
+        <div key={o} className="petrol-web-muted">
+          {t(DEEP_ORIGIN_KEYS[o], { queries: deep.queries.filter(q => q.origin === o).map(q => quote(q.text) + (q.withoutNumbers?.length ? ` (${t('petrolChat.webDeepWithout', { numbers: q.withoutNumbers.join(', ') })})` : '') + (q.ok ? '' : ` (${t('petrolChat.webDeepQueryFailed')})`)).join(', ') })}
+        </div>
+      ))}
+      {hits.length > 0 ? (
+        <details className="petrol-web-deep-hits">
+          <summary className="petrol-web-muted">{t('petrolChat.webDeepCounts', { picked: deep.picked, candidates: deep.candidates, searches: deep.searches, fetches: deep.fetches })}</summary>
+          <ol>
+            {hits.map((h, i) => (
+              <li key={`${h.round}-${i}`} className={`petrol-web-muted is-${h.status}`}>
+                <span>{h.title || h.host}</span> · <span>{h.host}</span> · <span>{t(DEEP_HIT_KEYS[h.status])}</span>
+                {h.round === 2 && <> · <span>{t('petrolChat.webDeepHitRetry')}</span></>}
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : (
+        <div className="petrol-web-muted">{t('petrolChat.webDeepCounts', { picked: deep.picked, candidates: deep.candidates, searches: deep.searches, fetches: deep.fetches })}</div>
+      )}
+      {deep.rejected.length > 0 && <div className="petrol-web-muted">{t('petrolChat.webDeepRejected', { list: deep.rejected.map(r => `${r.text ? quote(r.text) : '—'} (${t(DEEP_REJECT_KEYS[r.reason])})`).join(', ') })}</div>}
+      {limited.length > 0 && <div className="petrol-web-muted petrol-web-warn">{t('petrolChat.webDeepLimited', { reasons: limited.join(' · ') })}</div>}
+      {deep.unused.length > 0 && <div className="petrol-web-muted">{t('petrolChat.webDeepUnused', { hosts: deep.unused.join(', ') })}</div>}
+      {deep.terms.missing.length > 0 && <div className="petrol-web-muted petrol-web-warn">{t('petrolChat.webDeepMissing', { terms: deep.terms.missing.join(', ') })}</div>}
+      {deep.terms.similar.length > 0 && <div className="petrol-web-muted">{t('petrolChat.webDeepSimilar', { terms: deep.terms.similar.join(', ') })}</div>}
+    </div>
+  )
 }
 
 /** Datenweg dieses Laufs aus Main-Provenienz (F11): Suchanbieter, Hosts, Modellweg. */

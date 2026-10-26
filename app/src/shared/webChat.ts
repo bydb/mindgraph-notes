@@ -12,7 +12,7 @@
 // - Fußnoten-Export (F13)
 
 import { hostnameFromUrl, normalizeWebUrl, type WebSearchHit } from './webResearch'
-import { contentWords, replaceCitationRefs, type CitationReport, type SentenceCheck } from './rag/citations'
+import { replaceCitationRefs, type CitationReport, type SentenceCheck } from './rag/citations'
 import { cloudRoutesForFeature, type CloudProviderSettings } from './llmBackend'
 
 // ── Grenzen ──────────────────────────────────────────────────────────────────
@@ -213,6 +213,52 @@ export interface WebChatResult {
   snapshotGone?: boolean
   /** Treffer, die gar nicht erst abgerufen wurden, weil sie keine Sachquelle sind (`splitSkippedHits`). */
   skipped?: WebSkippedHit[]
+  /** Nur „gründlich“: was wirklich gesucht, gewählt und weggelassen wurde (chat-gruendliche-suche.md, R1). */
+  deep?: WebDeepInfo
+}
+
+/** Provenienz einer gründlichen Suche — jede gesendete Anfrage, jede Einschränkung, nie geschönt. */
+export interface WebDeepInfo {
+  /**
+   * Jede gesendete Anfrage. plan = vom Modell geplant; guard = Stichwörter der Frage, weil eine
+   * Zahl der Frage in keiner geplanten Anfrage stand (F24); fallback = Planung scheiterte, mit
+   * der getippten Frage gesucht; fallback-words = mit daraus gebildeten Stichwörtern (F29);
+   * retry = Nachsuche.
+   */
+  queries: Array<{ text: string; origin: WebDeepQueryOrigin; ok: boolean; hits: number; withoutNumbers?: string[] }>
+  rejected: Array<{ text: string; reason: 'empty' | 'too-long' | 'duplicate' | 'over-limit' }>
+  /**
+   * plan-failed / pick-failed = Rückfall; no-search = Planung scheiterte und es wurde gar nicht
+   * gesucht; timeout = Recherchefrist; budget = Grenze erreicht; window = Modellfenster begrenzte
+   * die Seitenzahl.
+   */
+  limited: Array<'plan-failed' | 'retry-plan-failed' | 'pick-failed' | 'no-search' | 'guard-skipped' | 'timeout' | 'budget' | 'window'>
+  candidates: number
+  picked: number
+  searches: number
+  fetches: number
+  /** Seiten-Obergrenze aus dem Platz im Modell (S4). */
+  maxPages: number
+  /** Abgerufen und lesbar, aber aus Platzgründen nicht verwendet (Hosts). */
+  unused: string[]
+  /** Wörterabgleich über die eingefrorenen Auszüge (S2) — nie „abgedeckt“. */
+  terms: { missing: string[]; similar: string[] }
+  /** Zahlen/Jahre der Frage, die in keiner geplanten Suchanfrage standen (F24). */
+  numbersNotInQueries?: string[]
+  /** Jeder Treffer, der zur Wahl stand, mit Ausgang (F26). Titel = fremder Text, nur als Text zeigen. */
+  hits?: WebDeepHit[]
+}
+
+export type WebDeepQueryOrigin = 'plan' | 'guard' | 'fallback' | 'fallback-words' | 'retry'
+
+export interface WebDeepHit {
+  title: string
+  host: string
+  url: string
+  /** 1 = erste Runde, 2 = Nachsuche. */
+  round: 1 | 2
+  /** read = eingefroren; unused = gelesen, kein Platz; duplicate = gleiche Zielseite wie ein anderer Treffer; failed = Abruf gescheitert; not-tried = gewählt, nicht mehr abgerufen; not-picked = nicht gewählt. */
+  status: 'read' | 'unused' | 'duplicate' | 'failed' | 'not-tried' | 'not-picked'
 }
 
 /** Renderer → Main. Keine URLs, kein Anbieter, kein Schlüssel (F01). */
@@ -232,11 +278,15 @@ export interface PetrolWebRequest {
   cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null
   /** Eigene frühere Webfragen des Nutzers als Thema (chat-webthema-im-verlauf.md); der Main prüft. */
   webTopics?: Array<{ text: string; clipped: boolean }>
+  /** „Gründlich“: das Modell plant die Suchanfragen aus `question` (`query` wird ignoriert). */
+  deep?: boolean
 }
 
 export interface PetrolWebProgress {
   requestId: string
-  phase: 'search' | 'fetch' | 'model'
+  phase: 'plan' | 'search' | 'pick' | 'fetch' | 'model'
+  /** Nur „gründlich“, Phase search: die gerade gesendete Anfrage. */
+  query?: string | null
   started?: number
   host?: string | null
   /** Ab der Modellphase: die eingefrorenen Quellen. */
@@ -277,6 +327,11 @@ const CHATTY_INTERJECTION = /^(?:okay|ok|also|hm+|ähm|äh|naja|na ja|na dann|na
 const CHATTY_INTERJECTION_THEN = /^(?:okay|ok|also|naja|na ja|na dann|na gut|gut|ja|nein|hm+|ähm|äh|well|so)\s*,?\s*(?:schau(?:en)? (?:wir|mal)|mal sehen|lass(?:t)? uns|und (?:jetzt|dann|nun)|was (?:nun|jetzt))\b/
 // Wendungen, die an Petrol gerichtet sind, nicht an eine Suchmaschine.
 const CHATTY_PHRASE = /^(?:mal sehen|schau(?:en)? wir|lass(?:t)? uns|sag mal|kannst du|könntest du|weißt du|hast du|ich (?:möchte|will|würde|wollte|brauche|suche)|can you|could you|would you|let'?s|tell me|i (?:want|would like|need))\b/
+// Aufforderungen an Petrol („Erstelle mir eine Zusammenfassung …“, „Fasse … zusammen“). GUI-Test
+// 25.10.2026: dieser Satz wörtlich lieferte bei Tavily dreimal Recycling-Preise aus Texas, die
+// Stichwortfassung Nachrichtenseiten. Nur mit Objekt/Partikel danach — „Erklärvideo Photosynthese“
+// oder „Liste der UNESCO-Welterbestätten“ bleiben Suchen.
+const CHATTY_REQUEST = /^(?:bitte\s+)?(?:erstell|schreib|mach|gib|nenn|erklär|fass|zeig|such|find|sag|list|formulier|übersetz|bring)(?:e|t)?\s+(?:mir|uns|bitte|mal)\b|^(?:bitte\s+)?(?:erstelle|schreibe|fasse|erkläre|nenne|zeige|formuliere|übersetze)\s+(?:eine?[nmrs]?|die|den|das|kurz)\b|^(?:please\s+)?(?:give|write|make|create|tell|show|find)\s+(?:me|us)\b|^(?:please\s+)?summari[sz]e\b|^bitte\b/
 // Eindeutig gesprächige Formeln, auch mitten in den ersten Wörtern („Na dann, schauen wir mal“).
 const CHATTY_ANYWHERE = /\b(?:schau(?:en)? wir mal|mal sehen|wie geht'?s|wie gehts|wie geht es (?:dir|euch|ihnen))\b/
 // Nur Füllwörter, höchstens zwei.
@@ -298,7 +353,7 @@ export function looksConversational(query: string): boolean {
   const words = q.split(/\s+/).filter(Boolean)
   if (words.length > CHATTY_MAX_WORDS) return false
   if (words.length <= 2 && words.every(w => CHATTY_ONLY.has(w.replace(/[,!.…;:?]+$/, '')))) return true
-  if (CHATTY_PHRASE.test(q) || CHATTY_INTERJECTION_THEN.test(q)) return true
+  if (CHATTY_PHRASE.test(q) || CHATTY_INTERJECTION_THEN.test(q) || CHATTY_REQUEST.test(q)) return true
   if (CHATTY_ANYWHERE.test(words.slice(0, 6).join(' '))) return true
   const m = CHATTY_INTERJECTION.exec(q)
   return !!m && !/\d/.test(q.slice(m[0].length))
@@ -376,6 +431,11 @@ export function searchWordsFromQuestion(question: string): string {
   return kept.length >= 2 ? kept.join(' ') : q
 }
 
+/** Füllwort im Sinne der Stichwort-Kürzung (auch für den Wörterabgleich der gründlichen Suche). */
+export function isSearchFiller(word: string): boolean {
+  return SEARCH_FILLER.has(word.toLowerCase())
+}
+
 /** Ab so vielen Wörtern lohnt das Angebot, sonst nur bei Gesprächssätzen. */
 const OFFER_MIN_WORDS = 8
 
@@ -395,7 +455,7 @@ export function offerSearchWords(question: string): string | null {
 
 // ── Treffer, die keine Sachquelle sind ───────────────────────────────────────
 
-export type WebSkipCategory = 'translator' | 'social'
+export type WebSkipCategory = 'translator' | 'social' | 'adult'
 
 export interface WebSkippedHit {
   host: string
@@ -420,6 +480,13 @@ const SKIP_DOMAINS: ReadonlyArray<{ category: WebSkipCategory; domains: readonly
     // für den Nutzer Quellen. Abrufbar sind dort nur Titel und Beschreibung — die Prüfung vergleicht Wörter.
     domains: ['tiktok.com', 'instagram.com', 'facebook.com', 'x.com', 'twitter.com'],
     patterns: [/(?:^|\.)pinterest\.[a-z.]+$/]
+  },
+  {
+    category: 'adult',
+    // Gründliche Suche nach „politische Ereignisse heute“ rief real theporndude.com ab (Messung
+    // 25.10.2026). „porn“ im Hostnamen reicht als Muster; die Treffer bleiben als „übersprungen“ sichtbar.
+    domains: ['xvideos.com', 'xnxx.com', 'xhamster.com', 'redtube.com', 'onlyfans.com', 'chaturbate.com', 'spankbang.com', 'eporner.com', 'beeg.com', 'stripchat.com', 'livejasmin.com', 'brazzers.com'],
+    patterns: [/porn/, /\.(?:xxx|sex|porn|adult)$/]
   }
 ]
 
@@ -464,6 +531,22 @@ export function splitSkippedHits<T extends { url: string }>(hits: readonly T[]):
   return { kept, skipped }
 }
 
+/**
+ * Räumt verirrte Nachdenk-Marken aus einer Antwort. Trotz `think: false` schreibt qwen3.8 gelegentlich
+ * ein nacktes `</think>` und wiederholt danach die ganze Antwort (6 von 102 Läufen, Messung
+ * 25.10.2026). Gilt: der Text NACH dem letzten `</think>` ist die Antwort, der davor ein Entwurf;
+ * ist danach nichts mehr, bleibt der Entwurf. Vollständige `<think>…</think>`-Blöcke fallen weg.
+ */
+export function stripStrayThink(text: string): string {
+  let out = text.replace(/<think>[\s\S]*?<\/think>/gi, '')
+  const close = out.toLowerCase().lastIndexOf('</think>')
+  if (close >= 0) {
+    const after = out.slice(close + '</think>'.length)
+    out = after.trim() ? after : out.slice(0, close)
+  }
+  return out.replace(/<\/?think>/gi, '').trim()
+}
+
 // ── Treffer → Kandidaten ─────────────────────────────────────────────────────
 
 /** Normalisiert, dedupliziert und begrenzt die Treffer; Reihenfolge des Anbieters bleibt. */
@@ -492,6 +575,12 @@ export interface FetchQueueOptions {
   stopReason: () => 'timeout' | 'stopped' | null
   /** Wird synchron beim Start eines Abrufs gemeldet (Fortschritt, Provenienz). */
   onStart?: (c: WebChatCandidate) => void
+  /**
+   * Schon gelesene Zielseiten (auch aus früheren Runden). Eine Weiterleitung auf eine davon zählt
+   * nicht als brauchbare Seite — sonst ließe sie einen eigenständigen Nachrücker liegen (Codex F38).
+   * Wird hier ergänzt.
+   */
+  seenFinal?: Set<string>
 }
 
 export interface QueueEntry {
@@ -519,6 +608,7 @@ export function runFetchQueue(
   let attempts = 0
   let open = 0
   let usable = 0
+  const seenFinal = opts.seenFinal ?? new Set<string>()
 
   return new Promise<QueueEntry[]>((resolve) => {
     const finishIfIdle = () => {
@@ -546,7 +636,10 @@ export function runFetchQueue(
           let outcome: WebFetchOutcome = raw
           if (stop) outcome = { ok: false, reason: stop }
           else if (raw.ok && !raw.text.trim()) outcome = { ok: false, reason: 'empty' }
-          if (outcome.ok) usable++
+          if (outcome.ok && !seenFinal.has(outcome.finalUrl)) {
+            seenFinal.add(outcome.finalUrl)
+            usable++
+          }
           entries.push({ candidate, outcome })
           startNext()
           finishIfIdle()
@@ -648,16 +741,26 @@ export function applyWebChatBudget(input: BudgetInput): BudgetResult {
 export function freezeWebSources(
   entries: readonly QueueEntry[],
   budget: Omit<BudgetInput, 'pages'>,
-  prepare: (text: string) => string
-): { sources: WebSource[]; failures: WebFetchFailure[]; history: BudgetMessage[] } {
+  prepare: (text: string) => string,
+  /** „Gründlich“ friert bis zu 4 Seiten in Wahlreihenfolge ein (chat-gruendliche-suche.md, S4). */
+  maxSources: number = WEB_CHAT_MAX_SOURCES
+): FrozenWebSources {
   const ordered = [...entries].sort((a, b) => a.candidate.index - b.candidate.index)
   const okEntries: Array<{ c: WebChatCandidate; o: Extract<WebFetchOutcome, { ok: true }>; text: string }> = []
   const failures: WebFetchFailure[] = []
+  const duplicates: number[] = []
+  const seenFinal = new Set<string>()
   for (const e of ordered) {
     if (!e.outcome.ok) {
       failures.push({ host: e.candidate.host, reason: e.outcome.reason })
       continue
     }
+    // Zwei Treffer, die auf dieselbe Seite weiterleiten, sind EINE Quelle (Codex F36).
+    if (seenFinal.has(e.outcome.finalUrl)) {
+      duplicates.push(e.candidate.index)
+      continue
+    }
+    seenFinal.add(e.outcome.finalUrl)
     const text = prepare(e.outcome.text).trim()
     if (!text) {
       failures.push({ host: e.candidate.host, reason: 'empty' })
@@ -665,10 +768,12 @@ export function freezeWebSources(
     }
     okEntries.push({ c: e.candidate, o: e.outcome, text })
   }
-  const kept = okEntries.slice(0, WEB_CHAT_MAX_SOURCES)
+  const kept = okEntries.slice(0, maxSources)
   const b = applyWebChatBudget({ ...budget, pages: kept.map((k) => k.text) })
+  const used: number[] = []
   const sources: WebSource[] = kept.map((k, i) => {
     const finalHost = hostnameFromUrl(k.o.finalUrl) ?? k.c.host
+    if (b.excerpts[i].text.trim().length > 0) used.push(k.c.index)
     return {
       n: i + 1,
       title: k.o.title || k.c.title || finalHost,
@@ -680,7 +785,17 @@ export function freezeWebSources(
       truncated: k.o.truncated || b.excerpts[i].cut
     }
   }).filter((s) => s.excerpt.trim().length > 0).map((s, i) => ({ ...s, n: i + 1 }))
-  return { sources, failures, history: b.history }
+  return { sources, failures, history: b.history, used, duplicates }
+}
+
+export interface FrozenWebSources {
+  sources: WebSource[]
+  failures: WebFetchFailure[]
+  history: BudgetMessage[]
+  /** `candidate.index` je eingefrorener Quelle, in Quellenreihenfolge. */
+  used: number[]
+  /** `candidate.index` der Abrufe, die auf eine schon eingefrorene Zielseite führten. */
+  duplicates: number[]
 }
 
 /**
@@ -693,14 +808,15 @@ export function freezeWebSourcesToFit(
   entries: readonly QueueEntry[],
   budget: Omit<BudgetInput, 'pages'> & { total: number },
   prepare: (text: string) => string,
-  measure: (frozen: { sources: WebSource[]; history: BudgetMessage[] }) => number
+  measure: (frozen: { sources: WebSource[]; history: BudgetMessage[] }) => number,
+  maxSources: number = WEB_CHAT_MAX_SOURCES
 ): ReturnType<typeof freezeWebSources> {
-  let frozen = freezeWebSources(entries, budget, prepare)
+  let frozen = freezeWebSources(entries, budget, prepare, maxSources)
   for (let i = 0; i < 3; i++) {
     const overflow = measure(frozen) - budget.total
     if (overflow <= 0 || frozen.sources.length === 0) break
     const sourceChars = frozen.sources.reduce((n, src) => n + src.excerpt.length, 0)
-    frozen = freezeWebSources(entries, { ...budget, sourcesMax: Math.max(0, sourceChars - overflow - 50) }, prepare)
+    frozen = freezeWebSources(entries, { ...budget, sourcesMax: Math.max(0, sourceChars - overflow - 50) }, prepare, maxSources)
   }
   return frozen
 }
@@ -733,11 +849,116 @@ export interface SentenceExtra {
 
 // Lücken-Satz: nennt die Seiten/Auszüge/Quellen UND ihr Fehlen, ohne eigene Zahl, kurz.
 // Eine Zahl oder ein langer Satz kann eine Behauptung tragen — dann bleibt die Warnung.
-const GAP_SOURCE = /\b(?:seiten|auszüge|auszügen|auszugen|quellen|pages|excerpts|sources)\b/iu
+const GAP_SOURCE = /\b(?:seite|seiten|auszug|auszüge|auszügen|auszugen|quelle|quellen|page|pages|excerpt|excerpts|source|sources)\b/iu
 const GAP_ABSENCE = /\b(?:nicht|nichts|kein|keine|keinen|keinem|keiner|fehlt|fehlen|unklar|not|no|nothing|none|missing)\b/iu
-export function isGapStatement(sentence: string): boolean {
+// Gegenbehauptung neben der Lücke („… bestätigt 2027 nicht, 20 Euro sind falsch“, Codex F28).
+const GAP_COUNTER = /\b(?:aber|sondern|jedoch|allerdings|dennoch|trotzdem|falsch|stimmt|stimmen|richtig|korrekt|tatsächlich|but|however|instead|wrong|incorrect|correct|actually)\b/iu
+// Behauptendes Verb hinter einem Doppelpunkt („… nichts: 2027 steigt der Beitrag“, Codex F34).
+const GAP_CLAIM_VERB = /\b(?:ist|sind|war|waren|wird|werden|wurde|wurden|hat|haben|gilt|gelten|beträgt|betragen|kostet|liegt|liegen|steigt|steigen|sinkt|sinken|bestätigt|bestätigen|nennt|nennen|zeigt|zeigen|steht|stehen|gibt|geben|erlaubt|darf|dürfen|muss|müssen|kann|können|soll|sollen|is|are|was|were|will|has|have|costs|rises|falls|shows|states|confirms)\b/iu
+export function isGapStatement(sentence: string, question = ''): boolean {
   const plain = sentence.replace(/(?<!\\)\[\d{1,3}\]/g, ' ').trim()
-  return plain.length <= 220 && !/\p{N}/u.test(plain) && GAP_SOURCE.test(plain) && GAP_ABSENCE.test(plain)
+  if (plain.length > 220 || !GAP_SOURCE.test(plain) || !GAP_ABSENCE.test(plain) || GAP_COUNTER.test(plain)) return false
+  // Hinter einem Doppelpunkt darf nur stehen, WAS fehlt („… nichts: der Betrag für 3.000 €“),
+  // keine Aussage mit eigenem Verb und nichts, was mit einer Zahl beginnt (Codex F34).
+  const colon = plain.indexOf(':')
+  const head = colon >= 0 ? plain.slice(0, colon) : plain
+  const tail = colon >= 0 ? plain.slice(colon + 1) : ''
+  // Eine Zahl hinter dem Doppelpunkt reicht schon (Codex F44): eine Verbliste hat immer Lücken
+  // („… nichts: der Beitrag erhöht sich 2027 auf 20 Euro“). Lieber eine Warnung zu viel.
+  if (tail && (GAP_CLAIM_VERB.test(tail) || /\d/.test(tail))) return false
+  // Jeder weitere Satzteil muss selbst ein Fehlen benennen — ein erneutes „Quelle“ reicht nicht
+  // („… nichts, die Quelle bestätigt 20 Euro“, F28/F34).
+  // (Kommas hinter dem Doppelpunkt zählen nur auf, was fehlt.)
+  const clauses = head.split(/[,;–—]|\s-\s/).map((c) => c.trim()).filter(Boolean)
+  if (clauses.slice(1).some((c) => !GAP_ABSENCE.test(c))) return false
+  // Eine Zahl darf nur stehen, wenn sie aus der Frage stammt („… nichts zum Betrag für 3.000 €
+  // brutto“) — sonst kann sie eine Behauptung tragen (GUI-Test 25.10.2026).
+  const asked = new Set(numberUnits(question).map(numberCore))
+  return numberUnits(plain).every((n) => asked.has(numberCore(n)))
+}
+
+const thousands = (n: string): string => (/^\d{1,3}(?:\.\d{3})+$/.test(n) ? n.replace(/\./g, '') : n)
+
+// Bekannte Einheiten, auf eine Schreibweise gebracht (20 € = 20 Euro, 8 Jahre = 8 Jahren).
+const UNIT_CANON: Record<string, string> = {
+  '%': '%', prozent: '%', percent: '%',
+  '€': 'eur', euro: 'eur', eur: 'eur', cent: 'ct', ct: 'ct', '$': 'usd', usd: 'usd', dollar: 'usd',
+  w: 'w', watt: 'w', wp: 'wp', wattpeak: 'wp', kw: 'kw', kilowatt: 'kw', kwp: 'kwp', kwh: 'kwh', kilowattstunde: 'kwh', kilowattstunden: 'kwh',
+  wh: 'wh', mwh: 'mwh', v: 'v', volt: 'v', mah: 'mah',
+  kg: 'kg', kilogramm: 'kg', kilo: 'kg', g: 'g', gramm: 'g', km: 'km', kilometer: 'km', kilometern: 'km',
+  m: 'm', meter: 'm', metern: 'm', cm: 'cm', zentimeter: 'cm', mm: 'mm', millimeter: 'mm',
+  l: 'l', liter: 'l', litern: 'l', ml: 'ml', milliliter: 'ml', gb: 'gb', mb: 'mb', tb: 'tb',
+  jahr: 'jahr', jahre: 'jahr', jahren: 'jahr', jahres: 'jahr', year: 'jahr', years: 'jahr',
+  monat: 'monat', monate: 'monat', monaten: 'monat', month: 'monat', months: 'monat',
+  woche: 'woche', wochen: 'woche', week: 'woche', weeks: 'woche',
+  tag: 'tag', tage: 'tag', tagen: 'tag', day: 'tag', days: 'tag',
+  stunde: 'h', stunden: 'h', std: 'h', h: 'h', hour: 'h', hours: 'h',
+  minute: 'min', minuten: 'min', min: 'min', minutes: 'min'
+}
+const NUMBER_UNIT = /(?<![\p{L}\p{N}])(\d[\d.,]*\d|\d)(?:\s?([%€$])|(\p{L}+)|\s(\p{L}+))?/gu
+// Uhrzeiten und Datumsangaben sind EIN Wert (Codex F40): „12:30“ darf nicht über eine 12 und eine
+// 30 irgendwo auf der Seite als belegt gelten, „03/04/2026“ nicht über „04/03/2026“.
+const WHOLE_VALUE = /(?<![\p{L}\p{N}])(?:\d{4}-\d{1,2}-\d{1,2}|\d{1,4}\/\d{1,2}\/\d{1,4}|\d{1,2}:\d{2}(?::\d{2})?)(?![\p{L}\p{N}])/gu
+const RANGE_GAP = /^\s*(?:[–—-]|bis|to)\s*$/u
+// Vorangestellte Währung („ab €53,90“, „EUR 20“, „$5“) — GUI-Test 25.10.2026: sonst galt
+// „53,90 €“ in der Antwort gegen „€53,90“ auf der Seite als nicht belegt.
+const PREFIX_CURRENCY = /(?<![\p{L}\p{N}])(€|\$|eur|usd)\s?(\d[\d.,]*\d|\d)(?![\p{L}\p{N}])/gu
+
+// Eindeutige Dezimalzahl (ein oder zwei Nachkommastellen) in einer Schreibweise: 5.5 = 5,5 (F41).
+// Drei Nachkommastellen bleiben, wie sie sind — „3.000“ ist ein Tausender, „3,000“ unklar.
+const decimal = (n: string): string => (/^\d+[.,]\d{1,2}$/.test(n) ? n.replace('.', ',') : n)
+
+/**
+ * Zahlen mit Einheit aus dem Originaltext (Codex F27/F33): die direkt folgende bekannte Einheit
+ * gehört zur Zahl, auch mit Leerzeichen und als Zeichen — „20 %“ → „20%“, „800 Wp“ und „800Wp-Set“
+ * → „800wp“, „2.696 Euro“ → „2696eur“. Unbekanntes danach („8 Module“, „8-Modul-Preise“) bleibt
+ * reine Zahl. In einem Bereich gilt die Einheit für beide Enden („600–800 W“, F39). Uhrzeiten und
+ * Datumsangaben bleiben ganz (F40). Deutsche Tausender und eindeutige Dezimalzahlen angeglichen.
+ */
+export function numberUnits(text: string): string[] {
+  const out = new Set<string>()
+  const lower = text.toLowerCase()
+  for (const m of lower.matchAll(WHOLE_VALUE)) out.add(m[0])
+  let rest = lower.replace(WHOLE_VALUE, (v) => ' '.repeat(v.length))
+  for (const m of rest.matchAll(PREFIX_CURRENCY)) out.add(decimal(thousands(m[2])) + UNIT_CANON[m[1]])
+  rest = rest.replace(PREFIX_CURRENCY, (v) => ' '.repeat(v.length))
+  const found: Array<{ num: string; unit: string; start: number; end: number }> = []
+  for (const m of rest.matchAll(NUMBER_UNIT)) {
+    found.push({ num: decimal(thousands(m[1])), unit: UNIT_CANON[m[2] ?? m[3] ?? m[4] ?? ''] ?? '', start: m.index ?? 0, end: (m.index ?? 0) + m[0].length })
+  }
+  for (let i = found.length - 2; i >= 0; i--) {
+    const a = found[i]
+    const b = found[i + 1]
+    if (!a.unit && b.unit && RANGE_GAP.test(rest.slice(a.end, b.start))) a.unit = b.unit
+  }
+  for (const f of found) out.add(f.num + f.unit)
+  return [...out]
+}
+
+/** Nur der Zahlenkern („800wp“ → „800“) — für die Herkunft „aus deiner Frage“, nie als Seitenbeleg. */
+export function numberCore(part: string): string {
+  if (/^[\d:/-]+$/.test(part) && /[:/-]/.test(part)) return part
+  const m = part.match(/\d[\d.,]*/)
+  return m ? thousands(m[0].replace(/[.,]+$/, '')) : part
+}
+
+const UNIT_SHOW: Record<string, string> = {
+  eur: '€', usd: '$', w: 'W', wp: 'Wp', kw: 'kW', kwp: 'kWp', kwh: 'kWh', wh: 'Wh', mwh: 'MWh', v: 'V', mah: 'mAh',
+  gb: 'GB', mb: 'MB', tb: 'TB', jahr: 'Jahre', monat: 'Monate', woche: 'Wochen', tag: 'Tage'
+}
+
+/** Anzeige: „800wp“ → „800 Wp“, „20%“ → „20 %“, „2696eur“ → „2696 €“. */
+function showNumber(key: string): string {
+  const core = numberCore(key)
+  const unit = key.slice(key.indexOf(core) + core.length)
+  return unit ? `${core} ${UNIT_SHOW[unit] ?? unit}` : core
+}
+
+/** Belegmenge einer Seite: jede Zahl einmal mit Einheit und einmal ohne. */
+function pageNumbers(text: string): Set<string> {
+  const out = new Set<string>()
+  for (const n of numberUnits(text)) { out.add(n); out.add(numberCore(n)) }
+  return out
 }
 
 /**
@@ -754,18 +975,18 @@ export function isGapStatement(sentence: string): boolean {
  * erlaubt“ hätte die Warnung verloren).
  */
 export function sentenceExtras(answer: string, report: CitationReport, excerpts: readonly string[], question = ''): SentenceExtra[] {
-  const sourceWords = excerpts.map(contentWords)
-  const questionWords = contentWords(question)
+  const sourceNumbers = excerpts.map(pageNumbers)
+  const askedNumbers = new Set(numberUnits(question).map(numberCore))
   return report.sentences.map((s: SentenceCheck) => {
     if (s.refs.length === 0) {
-      return { missingNumbers: [], negation: false, gap: s.status === 'uncited' && isGapStatement(answer.slice(s.start, s.end)) }
+      return { missingNumbers: [], negation: false, gap: s.status === 'uncited' && isGapStatement(answer.slice(s.start, s.end), question) }
     }
     const plain = answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' ')
-    const words = contentWords(plain)
-    const cited = s.refs.map((n) => sourceWords[n - 1]).filter(Boolean)
-    const notOnPage = [...words].filter((w) => /\p{N}/u.test(w) && !cited.some((sw) => sw.has(w)))
-    const missingNumbers = notOnPage.filter((w) => !questionWords.has(w))
-    const questionNumbers = notOnPage.filter((w) => questionWords.has(w))
+    const cited = s.refs.map((n) => sourceNumbers[n - 1]).filter(Boolean)
+    // Zahl ohne Einheit: irgendwo auf der Seite genügt; mit Einheit nur mit derselben Einheit.
+    const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n)))
+    const missingNumbers = notOnPage.filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
+    const questionNumbers = notOnPage.filter((n) => askedNumbers.has(numberCore(n))).map(showNumber)
     const tokens = plain.toLowerCase().match(/\p{L}+/gu) ?? []
     const negation = tokens.some((t) => NEGATIONS.has(t))
     return { missingNumbers, negation, ...(questionNumbers.length ? { questionNumbers } : {}) }

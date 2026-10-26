@@ -448,6 +448,181 @@ Vorschlag: Vor der Implementierung Goldwerte mit Geltungsdatum, Region, Annahmen
 
 **Urteil:** Rev. 3 ist **noch nicht baureif**. Minimal fehlen (1) eine eindeutige Quelle für S1s sichtbaren Themenzusatz und ehrliche S2-Begriffslabels, (2) ein Abruf-/Budgetablauf, der Ersatzränge, finale Promptmessung und Mindestlänge zusammenführt, sowie (3) eine widerspruchsfreie Trennung von Recherche-Timeout und Nutzer-Stopp. S6 kann als spätere Abnahme vorbereitet werden; die Standardentscheidung braucht die unabhängige Quellenprüfung.
 
+### Code-Prüfung
+
+Stand `5f7d1b41` plus uncommittete Änderungen. Gezielte Läufe: `petrolDeepSearch.test.ts`, `webChatDeep.test.ts`, `webChat.test.ts`, `citations.test.ts`, `petrolWebChat.test.ts` — 112 Tests grün. Die folgenden Fälle werden dadurch nicht widerlegt.
+
+### F22 — Nachsuche prüft andere Texte als die spätere Antwort
+Schwere: hoch  
+Stelle: `app/src/main/llm/petrolDeepSearch.ts:276–280`, `app/src/main/index.ts:6982–7023`, `app/src/shared/webChat.ts:704–735`  
+Status: [OFFEN]  
+Beschreibung: `runDeepResearch` entscheidet über die einzige Nachsuche anhand aller **rohen** lesbaren Abrufe. Der Handler friert erst danach ein, kürzt per Budget und lässt gegebenenfalls Seiten ganz fallen. Steht z. B. „8 Module“ erst am Ende eines 8.000-Zeichen-Auszugs, gilt der Begriff vor dem Einfrieren als gefunden; nach der Kürzung fehlt er in allen Modellquellen. `deepInfo.terms` meldet das korrekt, aber das Suchbudget wird nicht mehr genutzt. Dasselbe passiert, wenn ein Abruf wegen `maxPages` oder Mindestlänge nicht zur Belegbasis wird. Der Test zur Nachsuche (`petrolDeepSearch.test.ts:72–86`) verwendet kurze Texte ohne anschließendes Einfrieren.  
+Vorschlag: Über Nachsuche erst anhand der **final eingefrorenen Auszüge** entscheiden oder nach dem ersten Einfrieren genau einmal neu bewerten, bevor die restliche Suche startet. Danach erneut einfrieren und nur diese endgültigen Texte für Prompt, Anzeige und Satzprüfung verwenden; einen integrierten Test mit Stichwort hinter der Budgetgrenze ergänzen.
+
+### F23 — Bei einer Seite verschwindet eine erfolgreiche Nachsuche
+Schwere: hoch  
+Stelle: `app/src/main/llm/petrolDeepSearch.ts:148–157`, `app/src/main/llm/petrolDeepSearch.ts:294–296`, `app/src/main/index.ts:6996–7002`  
+Status: [OFFEN]  
+Beschreibung: Bei `maxPages = 1` und einer lesbaren ersten Seite wird wegen fehlender Wörter trotzdem ein Nachsuch-Abruf gestartet (`slots = 1`). `ordered()` behält aber **mindestens eine** alte Seite (`Math.max(1, 1 − retryOk.length)`), stellt die neue dahinter und `freezeN(1)` friert wieder nur die alte ein. Die Nachsuche verbraucht Anbieter- und Abrufbudget, kann die Antwort aber nie verbessern. Die Tests prüfen Verdrängung nur mit `maxPages: 2` (`petrolDeepSearch.test.ts:72–86`).  
+Vorschlag: Bei erfolgreicher Nachsuche `maxPages − retryOk.length` alte Seiten behalten, auch wenn das null ist. Test mit `maxPages: 1`, einer unpassenden ersten und einer passenden neuen Seite; die neue muss Quelle `[1]` werden.
+
+### F24 — Suchplan und Trefferwahl können die Belegbasis semantisch verschieben
+Schwere: hoch  
+Stelle: `app/src/shared/webChatDeep.ts:78–94`, `app/src/main/llm/petrolDeepSearch.ts:71–105`, `app/src/main/llm/petrolDeepSearch.ts:267–274`  
+Status: [OFFEN]  
+Beschreibung: Der Main prüft JSON, Länge und Nummern, aber keinen Bezug der Modellanfragen zu Zahlen/Jahr/Ort der Frage. Eine formal gültige Anfrage zu „Rundfunkbeitrag 2026“ nach einer Frage zu 2027 wird ohne Rückfrage gesucht. Bei der Wahl können Titel/Anrisse trotz `UNTRUSTED`-Delimiter das Modell zu einer gültigen Nummer einer präparierten Seite lenken; die URL-Allowlist verhindert eine fremde URL, nicht diese Auswahl. Das Testbeispiel `petrolDeepSearch.test.ts:148–152` belegt nur, dass Delimiter vorhanden sind und keine URL im Prompt steht. Die spätere Zitatprüfung vergleicht wiederum nur mit den so gewählten Seiten.  
+Vorschlag: Mindestens die harten Bedingungen der Nutzerfrage (insbesondere Jahreszahlen, Mengen, Ort und Negation) in Plan und Auswahl als Verlustwarnung prüfen; bei Verlust die ursprüngliche Frage zusätzlich suchen oder die Einschränkung sichtbar als nicht recherchiert markieren. Für die Trefferwahl adversariale Titel/Anrisse testen und die gewählten sowie übergangenen Kandidaten in der Provenienz halten. Keine Qualitätsbehauptung aus einer gültigen JSON-Nummer ableiten.
+
+### F25 — Gerade bei Fehler und Stopp verschwinden gesendete Suchanfragen
+Schwere: hoch  
+Stelle: `app/src/main/index.ts:6971–6977`, `app/src/renderer/components/Agent/PetrolChat.tsx:573–620`, `app/src/renderer/stores/petrolChatStore.ts:178–199`, `app/src/renderer/stores/petrolChatStore.ts:322–340`  
+Status: [OFFEN]  
+Beschreibung: Bei einem Suchfehler ohne lesbare Seite gibt der Main vor Aufbau von `deepInfo` ein `error` zurück. Bei einem Fehler der Antwortphase kann `deepInfo` im Ergebnis stehen, aber der Renderer zeigt im Fehlerzweig nur `WebSkippedLine` und `WebProvenanceLine`, **nicht** `WebDeepLine`. Bei Nutzer-Stopp verwirft der Store die Fortschritts-Anfragen und erhält nur die Quellen als `webPartial`. Damit ist die R1-Zusage „jede tatsächlich gesendete Suchanfrage hinterher sichtbar“ genau in den Fällen unerfüllt, in denen der Nutzer wissen muss, was das Modell an den Anbieter geschickt hat. Tests decken diesen Renderer-Pfad nicht.  
+Vorschlag: Einen Main-seitigen Deep-Trace auch in `error`/`stopped`/`nothing-readable` zurückgeben und im Renderer in jedem Endzustand anzeigen. Beim Stopp die bis dahin gesendeten Anfragen aus dem Fortschritt behalten, falls der IPC-Abbruch kein Ergebnis mehr liefert. Versuch und bestätigten Anbietererfolg getrennt benennen.
+
+### F26 — „Treffer gewählt“ zeigt nur Zähler statt die Auswahl
+Schwere: mittel  
+Stelle: `app/src/shared/webChat.ts:220–238`, `app/src/main/llm/petrolDeepSearch.ts:220–244`, `app/src/renderer/components/Agent/PetrolWebAnswer.tsx:248–259`  
+Status: [OFFEN]  
+Beschreibung: `WebDeepInfo` speichert `candidates` und `picked` nur als Zahlen. `WebDeepLine` zeigt „x von y Treffern gewählt“ sowie verwendete Quellen und einige ungenutzte **abgerufene** Hosts, aber keine Liste der gewählten und verworfenen Suchtreffer. R1 verspricht ausdrücklich „welche Treffer gewählt bzw. nicht gewählt wurden“. Der Nutzer kann damit eine modellgesteuerte Auslassung eines amtlichen oder aktuellen Treffers nicht nachvollziehen; die Zahl klingt wie eine Auswahlprüfung.  
+Vorschlag: Pro Kandidat mindestens Host/Titel, Such-Herkunft und Status `gewählt`/`abgerufen`/`verworfen`/`nicht versucht` speichern und begrenzt aufklappbar anzeigen. Diese Angaben aus Main-Daten erzeugen, nicht aus Renderer-Zählern ableiten.
+
+### F27 — Zahlen mit verschiedener Einheit gelten nun als auf der Seite vorhanden
+Schwere: hoch  
+Stelle: `app/src/shared/webChat.ts:784–825`, `app/src/main/index.ts:7125–7127`  
+Status: [OFFEN]  
+Beschreibung: `numberTokens` löst aus alphanumerischen Wörtern nur die Ziffern heraus. `sentenceExtras` akzeptiert danach einen Zahlentreffer, sobald **irgendein** zitierter Auszug dieselben Ziffern enthält. Eine Antwort „800Wp-Set“ gegen eine Seite über „800W-Wechselrichter“ verliert so die Warnung „Zahl nicht in der Seite“, obwohl die Einheiten für Balkonkraftwerke gerade entscheidend sind. Zuvor blieb `800wp-set` gegenüber `800w-wechselrichter` als ganzes Inhaltswort verschieden. Der neue GUI-Test (`webChat.test.ts:539–545`) prüft nur die gewünschte Entschärfung bei „8-Modul-Preise“, nicht kollidierende Einheiten. Das betrifft schnellen **und** gründlichen Webchat; der Vault-Chat ruft `sentenceExtras` nicht auf.  
+Vorschlag: Zahlen in Wortverbindungen nur für die **Frage-Zahl-Warnung** isolieren, nicht als Seitenbeleg freisprechen. Für Maße und Einheiten (W/Wp, kW/kWh, brutto/netto) den vollständigen Token oder eine typisierte Zahl-Einheit-Paarung vergleichen. Einen Test mit gleichem Zahlenwert und anderer Einheit ergänzen.
+
+### F28 — Eine unbelegte Gegenbehauptung kann als neutrale Lücke erscheinen
+Schwere: hoch  
+Stelle: `app/src/shared/webChat.ts:766–776`, `app/src/shared/webChat.ts:808–814`, `app/src/renderer/utils/webAnswerMarkdown.ts:23–40`  
+Status: [OFFEN]  
+Beschreibung: `isGapStatement` lässt jetzt Zahlen aus der Frage in einem unzitierten Satz zu und erkennt auch „Quelle“ im Singular. Beispielsweise erfüllt „Die Quelle bestätigt 2027 nicht, 20 Euro sind falsch.“ bei der Frage „Kostet es 2027 20 Euro?“ alle Bedingungen: kurz, `Quelle`, `nicht`, nur Fragezahlen. Der zweite Satzteil behauptet jedoch unbelegt, dass 20 Euro falsch sind. `sentenceFlags` ersetzt dann `uncited` durch die neutrale Marke `gap`; die Prüfzusammenfassung zieht ihn sogar von den unzitierten Sätzen ab (`PetrolWebAnswer.tsx:110–112`). Das ist eine Regression im schnellen wie im gründlichen Webchat. Die neuen Tests (`webChat.test.ts:532–536`) enthalten keinen solchen zusammengesetzten Satz.  
+Vorschlag: Lücken-Ausnahme nur für enge Satzformen ohne zusätzliche Wertung/Gegenbehauptung zulassen oder gemischte Sätze weiterhin als `uncited` markieren. Fragezahlen allein dürfen eine zusätzliche Behauptung nicht neutralisieren. Gegenbeispiel samt Varianten mit „aber“, „sondern“ und Doppelpunkt testen.
+
+### F29 — Der Planungs-Fallback wird als wörtliche Suche bezeichnet, auch wenn er Wörter streicht
+Schwere: mittel  
+Stelle: `app/src/main/llm/petrolDeepSearch.ts:255–264`, `app/src/renderer/utils/i18n/petrolChat.ts:137–140`, `app/src/renderer/components/Agent/PetrolWebAnswer.tsx:248–257`  
+Status: [OFFEN]  
+Beschreibung: Ist die getippte Frage über 250 Zeichen lang, verwendet der Fallback `searchWordsFromQuestion(question)`. Das entfernt Wörter und kann Bedingungen verlieren; trotzdem lautet die sichtbare Einschränkung „Planung fehlgeschlagen, mit deiner Frage gesucht“. Ist auch der Stichworttext zu lang, findet gar keine Suche statt und dieselbe Meldung bleibt. Die tatsächlich versuchte Anfrage erscheint zwar bei Erfolg im Trace, die zusammenfassende Aussage und der in Rev. 1 zugesagte wörtliche Fallback sind falsch. Der Fallback-Test (`petrolDeepSearch.test.ts:58–63`) nutzt nur eine kurze Frage.  
+Vorschlag: Fallback auf lange Frage nicht still umformulieren; entweder vorab sichtbare Kürzung durch den Nutzer verlangen oder „automatisch gebildete Stichwörter“ mit tatsächlichem Text und ausgelassenen Bedingungen benennen. Ohne gültige Anfrage ausdrücklich „nicht gesucht“ ausgeben. Grenztests bei 251 und bei weiterhin zu langen Stichwörtern ergänzen.
+
+### F30 — Der Opt-in-Schalter verschwindet bei langen Fragen
+Schwere: mittel  
+Stelle: `app/src/renderer/components/Agent/PetrolChat.tsx:146–150`, `app/src/renderer/components/Agent/PetrolChat.tsx:717–755`  
+Status: [OFFEN]  
+Beschreibung: Der Knopf „gründlich suchen“ steht nur in der kompakten Webzeile (`!webQueryOpen`). Sobald die Frage länger als die Suchanbietergrenze ist oder der Nutzer das Suchfeld geöffnet hat, rendert nur das Suchfeld, ohne diesen Knopf. Gerade bei langen Fragen, für die die Modellplanung sinnvoll sein soll, kann ein Laie den gründlichen Modus nicht wählen; im Feld bleibt die schnelle Suche wegen zu langer `webQuery` gesperrt. Die reinen Deep-Tests prüfen diesen UI-Zustand nicht.  
+Vorschlag: Den Umschalter in beiden Webzeilen zeigen; bei Wechsel zu „gründlich“ das Suchfeld schließen und vor dem Senden den neuen Datenweg-Text anzeigen. Einen Komponenten-/GUI-Test mit Frage über 250 Zeichen und geöffnetem Suchfeld ergänzen.
+
+**Urteil:** Such- und Abrufstarts sind im Deep-Orchestrator tatsächlich auf 3/5 begrenzt; die Recherchefrist bricht das gemeinsame Recherche-Signal ab und `runFetchQueue` stuft erst danach eintreffende Abrufe als Timeout ein (`petrolDeepSearch.ts:122–131,230–244`; `webChat.ts:543–550`). Die Antwort verwendet weiterhin `req.controller.signal`, sodass Nutzer-Stopp auch dort greift (`index.ts:7107–7120`). Planung bekommt zunächst nur Frage und Datum; die Nachplanung zusätzlich eigene Suchwörter und daraus berechnete Fragebegriffe (`petrolDeepSearch.ts:71–87,282–285`). Der Vault-Chat nutzt `sentenceExtras` nicht; dort ist aus den Änderungen an `webChat.ts` keine direkte Regression ersichtlich (`index.ts:8697`; `index.ts:7127`). **Abnahme: offen.** F22/F23 können die einzige Nachsuche wirkungslos machen; F25–F29 lassen Auswahl und Prüfstatus glaubwürdiger erscheinen, als der Code trägt. Die grünen Tests prüfen diese Übergänge nicht.
+
+### Code-Prüfung Runde 2
+
+**Nachprüfung F22–F30:** F22: Die Nachsuche prüft jetzt dieselbe `freezeBest`-Funktion wie die endgültige Antwort (`petrolDeepSearch.ts:308–311`, `index.ts:6973–6984,7026`); der probeweise Aufruf bereitet höchstens fünf Abrufe auf, ein eigener Korrektheitsfehler ist nicht erkennbar. F23: Die Ersatzseite darf bei `maxPages = 1` die alte vollständig verdrängen (`petrolDeepSearch.ts:157–167`). F24: weiterhin nur teilweise, siehe F31/F32. F25: siehe F35. F26: siehe F36. F27/F28: siehe F33/F34. F29: Herkunft und „nicht gesucht“ werden jetzt zutreffend unterschieden (`petrolDeepSearch.ts:283–294`, `PetrolWebAnswer.tsx:241–247,275–279`); zur Verwerfung aller Plananfragen siehe F37. F30: Der Umschalter steht auch im geöffneten Suchfeld (`PetrolChat.tsx:748–770`). Die gezielten Tests `webChat.test.ts`, `webChatDeep.test.ts` und `petrolDeepSearch.test.ts` laufen mit 84/84 grün; die folgenden Gegenfälle sind darin nicht enthalten.
+
+### F31 — Späte Jahreszahl wird beim Schutz der Suchanfragen übersehen
+Schwere: hoch  
+Stelle: `app/src/shared/webChatDeep.ts:187–204`, `app/src/shared/webChatDeep.ts:253–261`, `app/src/main/llm/petrolDeepSearch.ts:274–282`  
+Status: [OFFEN]  
+Beschreibung: `questionTerms` beendet die Sammlung nach zehn Begriffen. `numbersMissingInQueries` betrachtet ausschließlich diese Liste. Steht ein entscheidendes Jahr oder eine Menge erst nach zehn anderen Inhaltswörtern, bleibt eine Modellanfrage mit anderem Jahr unbeanstandet; die zusätzliche Suche mit Frage-Stichwörtern entfällt. Beispiel: zehn Sachbegriffe vor „2027“, Modell plant nur „… 2026“. Auch der spätere Wörterabgleich meldet diese ausgelassene Zahl dann nicht.  
+Vorschlag: Zahlen/Jahre aus der **gesamten** Frage unabhängig von der Zehn-Begriffe-Grenze prüfen und für die Anzeige sowie den Such-Guard erhalten; Test mit einer Zahl hinter dem zehnten Begriff.
+
+### F32 — Der vorsorgliche Suchlauf verbraucht die einzige adaptive Nachsuche
+Schwere: mittel  
+Stelle: `app/src/main/llm/petrolDeepSearch.ts:274–282`, `app/src/main/llm/petrolDeepSearch.ts:297–335`, `app/src/shared/webChatDeep.ts:14–20`  
+Status: [OFFEN]  
+Beschreibung: Liefert das Modell zwei formal gültige Anfragen ohne eine Fragezahl, hängt der Main sofort die Stichwortsuche als **dritte** Anfrage an. Nach dem Seitenabruf kann `checkQuestionTerms` eine reale Lücke erkennen, `canMore` ist wegen drei bereits gestarteter Suchen jedoch falsch. Selbst wenn die Guard-Suche null oder unpassende Treffer lieferte und noch Abrufbudget frei ist, wird keine gezielte Nachsuche mehr geplant. Der Test zu F24 belegt nur den Fall mit **einer** geplanten Anfrage (`petrolDeepSearch.test.ts:180–191`).  
+Vorschlag: Das dritte Suchkontingent bis nach Prüfung der ersten Quellen zurückhalten oder eine der beiden geplanten Anfragen durch die Guard-Anfrage ersetzen; Fall „zwei Plananfragen + erfolglose Guard-Anfrage + fehlender Begriff“ testen.
+
+### F33 — Prozent und getrennte Einheiten passieren die Zahlenprüfung
+Schwere: hoch  
+Stelle: `app/src/shared/rag/citations.ts:101–109`, `app/src/shared/webChat.ts:820–829`, `app/src/shared/webChat.ts:855–870`  
+Status: [OFFEN]  
+Beschreibung: F27 schützt angehängte Buchstabeneinheiten wie `800Wp` gegen `800W`. `contentWords` entfernt aber `%`; bei Leerzeichen trennt es auch Buchstabeneinheiten vom Zahlenwort. Eine Antwort „20 %“ gegen eine zitierte Seite mit „20 Euro“ hat auf beiden Seiten denselben `numberParts`-Wert `20` und erhält keine Zahlenwarnung. Dasselbe gilt für „800 Wp“ gegen „800 W“. Der F27-Test prüft nur angehängte Einheiten (`webChat.test.ts:548–560`). Gerade diese abweichenden Maße können eine zitierte, falsche Aussage glaubwürdig machen.  
+Vorschlag: Zahl und unmittelbar folgende Einheit bzw. Prozentzeichen aus dem Originaltext als Paar prüfen; unbekannte oder getrennte Einheiten konservativ markieren. Tests mit `20 %`/`20 Euro` und `800 Wp`/`800 W`.
+
+### F34 — Doppelpunkt und erneutes „Quelle“ neutralisieren eine Gegenbehauptung
+Schwere: hoch  
+Stelle: `app/src/shared/webChat.ts:794–809`, `app/src/renderer/utils/webAnswerMarkdown.ts:23–40`  
+Status: [OFFEN]  
+Beschreibung: F28 sperrt bestimmte Gegenwörter und prüft Satzteile nach Komma/Semikolon; der Doppelpunkt wird ausdrücklich nicht getrennt. Bei der Frage „Steigt der Beitrag 2027 auf 20 Euro?“ gilt „Die Quelle nennt dazu nichts: 2027 steigt der Beitrag auf 20 Euro.“ dennoch als neutrale `gap`: Quelle und Negation stehen vor dem Doppelpunkt, beide Zahlen stammen aus der Frage, ein `GAP_COUNTER`-Wort fehlt. Auch nach Komma reicht im zweiten Teil das Wort „Quelle“, etwa „Die Quelle nennt dazu nichts, die Quelle bestätigt 20 Euro.“ So verschwindet die Warnung für eine unzitierte Sachbehauptung.  
+Vorschlag: Die Lücken-Ausnahme auf reine Aussagen über fehlende Information begrenzen; bei Doppelpunkt und weiteren Teilsätzen mit eigenem Sachprädikat `uncited` behalten. Beide Beispiele als Gegenproben testen.
+
+### F35 — Stopp kann eine bereits gestartete Suchanfrage aus der Spur verlieren
+Schwere: mittel  
+Stelle: `app/src/main/llm/petrolDeepSearch.ts:194–199`, `app/src/main/index.ts:6989–6991`, `app/src/renderer/stores/petrolChatStore.ts:187–203`, `app/src/renderer/stores/petrolChatStore.ts:286–299`, `app/src/renderer/stores/petrolChatStore.ts:324–350`  
+Status: [OFFEN]  
+Beschreibung: Der Main startet die Suche unmittelbar nach dem asynchron gesendeten Fortschrittsereignis. Stoppt der Nutzer, nachdem die Anfrage an den Anbieter ging, aber bevor das Fortschrittsereignis im Renderer verarbeitet wurde, speichert `stop()` keine `webSentQueries`. Danach setzt `abortCurrent()` die Kennung auf `null`; verspäteter Fortschritt und das Main-Ergebnis mit vollständiger Spur werden verworfen. Damit ist die Zusage „jede tatsächlich gesendete Suchanfrage hinterher sichtbar“ trotz F25 nicht verlässlich.  
+Vorschlag: Beim Stopp die vom Main bestätigte Spur an die gestoppte Frage nachtragen oder eine geordnete Abschlussnachricht mit gestarteten Anfragen verarbeiten; einen Test für „Suchstart vor Stopp, Fortschritt nach Stopp“ ergänzen.
+
+### F36 — Zwei Weiterleitungen auf dieselbe Seite gelten beide als verwendet
+Schwere: mittel  
+Stelle: `app/src/shared/webChat.ts:725–739`, `app/src/main/index.ts:7031–7045`, `app/src/renderer/components/Agent/PetrolWebAnswer.tsx:250–286`  
+Status: [OFFEN]  
+Beschreibung: Die eingefrorene Quelle trägt die **Ziel-URL** nach Weiterleitung. `unusedUrls` vergleicht jede erfolgreiche Ziel-URL mit der eingefrorenen Liste; leiten zwei gewählte Treffer auf dieselbe Seite, gilt auch ein wegen `maxPages` nicht eingefrorener Treffer als benutzt. In der aufklappbaren Liste bleibt er `read` („gelesen und verwendet“), obwohl nur der andere Abruf als Quelle vorliegt. Das verdeckt, welche Wahl tatsächlich zur Belegbasis wurde.  
+Vorschlag: Verwendete Abrufe über stabile Kandidaten-/Abrufkennung statt nur über `finalUrl` zuordnen und gleiche Zielseiten vor dem Einfrieren deduplizieren; Weiterleitungsfall mit `maxPages = 1` testen.
+
+### F37 — Sind alle Modellanfragen ungültig, fehlen die versprochenen Ablehnungsgründe
+Schwere: niedrig  
+Stelle: `app/src/shared/webChatDeep.ts:78–95`, `app/src/main/llm/petrolDeepSearch.ts:269–285`, `app/src/renderer/components/Agent/PetrolWebAnswer.tsx:295–296`  
+Status: [OFFEN]  
+Beschreibung: `parsePlanReply` sammelt zwar `rejected`, liefert bei null gültigen Anfragen aber insgesamt `null`. Der Main setzt dann nur `plan-failed` und zeigt den Fallback; die verworfenen Texte und Gründe gelangen nie in `trace.rejected`. Eine ausschließlich zu lange oder leere Modellanfrage wird entgegen der zugesagten Spur nicht mit Ablehnungsgrund angezeigt.  
+Vorschlag: Ein syntaktisch lesbares JSON auch mit leerer `queries`-Liste samt `rejected` zurückgeben; der Main kann weiterhin den Fallback wählen und die Gründe anzeigen. Test mit ausschließlich zu langer Modellanfrage.
+
+### Code-Prüfung Runde 3
+
+**Nachprüfung F31–F37:** F31 trägt: Zahlen nach dem zehnten Wort bleiben in `questionTerms` (`webChatDeep.ts:194–212`). F32 trägt für den getesteten Fall mit fehlender Zahl; die verbleibenden Grenzen stehen in F42/F43. F33 behebt die Beispiele mit `%` und getrenntem `Wp`, aber Bereiche, Uhrzeiten und Schreibvarianten bleiben problematisch (F39–F41). F34 sperrt die beiden gemeldeten Gegenbeispiele; eine weitere Aussageform bleibt neutral (F44). F35 trägt beim normalen Main-Abschluss: die Anfrage wird nach Stopp über `questionAt` ergänzt (`petrolChatStore.ts:248–253,287–297`). F36 ordnet verwendete Abrufe nun über Kennungen zu, führt aber eine Regression beim Sammeln verschiedener Seiten ein (F38). F37 trägt für lesbares JSON mit ausschließlich ungültigen Anfragen (`webChatDeep.ts:78–97`, `petrolDeepSearch.ts:271–282`). Die drei gezielten Testsuiten laufen mit 91/91 grün; die folgenden Gegenfälle prüfen sie nicht.
+
+### F38 — Deduplizierung nach dem Abruf lässt brauchbare Treffer liegen
+Schwere: hoch  
+Stelle: `app/src/shared/webChat.ts:569–605`, `app/src/shared/webChat.ts:703–750`, `app/src/main/llm/petrolWebChat.ts:101–113`  
+Status: [OFFEN]  
+Beschreibung: Die schnelle Suche beendet ihre Abruf-Warteschlange nach drei `ok`-Seiten; Weiterleitungen auf dieselbe Zielseite zählen dabei mehrfach als brauchbar. Erst danach fasst `freezeWebSources` sie zusammen. Führen die ersten drei Treffer auf dieselbe Zielseite, bleibt genau **eine** Quelle übrig, obwohl Treffer 4 und 5 innerhalb des bestehenden Abrufbudgets andere Quellen liefern könnten. Vor F36 gingen drei Auszüge ins Modell; nach der Änderung wird die Belegbasis ohne Ersatz kleiner. Der F36-Test ruft nur `freezeWebSources` direkt auf (`webChat.test.ts:159–169`) und belegt keinen Nachrücker im echten Sammelpfad. Dasselbe Problem kann die Seitenzahl der gründlichen Suche verringern.  
+Vorschlag: Ein Duplikat nach finaler URL im Abruf-Zähler nicht als weitere brauchbare Quelle behandeln und innerhalb des vorhandenen Startbudgets den nächsten Kandidaten versuchen; Sammeltest mit drei Weiterleitungen auf eine Seite plus eigenständigem vierten Treffer.
+
+### F39 — Ein Leistungsbereich verliert die Einheit seiner ersten Zahl
+Schwere: hoch  
+Stelle: `app/src/shared/webChat.ts:855–869`, `app/src/shared/webChat.ts:890–894`, `app/src/shared/webChat.ts:910–925`  
+Status: [OFFEN]  
+Beschreibung: `numberUnits('600–800 W')` liefert `600` und `800w`, weil die Einheit nur unmittelbar auf die letzte Zahl folgt. Eine zitierte Seite mit „600 Wp und 800 W“ liefert `600wp` und `800w`; `pageNumbers` fügt außerdem die nackte `600` hinzu. Damit erhält die Antwort „600–800 W [1]“ **keine Zahlenwarnung**, obwohl die Seite für 600 nur Wp statt W nennt. Das betrifft auch die schnelle Suche, die dieselbe `sentenceExtras`-Prüfung verwendet (`index.ts:7150–7152`).  
+Vorschlag: Bei Zahlenbereichen die nachgestellte Einheit auf beide Endpunkte beziehen oder den gesamten Bereich als Einheit prüfen; Gegenprobe `600–800 W` gegen `600 Wp und 800 W`.
+
+### F40 — Uhrzeit und Schrägstrichdatum werden als lose Ziffern belegt
+Schwere: hoch  
+Stelle: `app/src/shared/webChat.ts:855–869`, `app/src/shared/webChat.ts:890–925`  
+Status: [OFFEN]  
+Beschreibung: Der neue Matcher zerlegt `12:30 Uhr` in `12` und `30`. Steht auf der Seite „Öffnet 12:45 Uhr; Einlass 30 Minuten vorher“, sind beide Ziffern irgendwo vorhanden und die falsche Antwort „Öffnet 12:30 Uhr [1]“ bekommt keine Zahlenwarnung. Beim Schrägstrichdatum bleibt derselbe strukturelle Fehler: `03/04/2026` und `04/03/2026` haben dieselbe lose Zahlenmenge, obwohl sie bei gleicher Datums-Konvention verschiedene Tage bezeichnen. Die Zeitangabe ist eine neue Regression gegenüber dem vorher ganz verglichenen `12:30`-Token.  
+Vorschlag: Uhrzeiten und Datumsangaben vor Einzelzahlen erkennen und als zusammenhängende Werte vergleichen; bei unklaren Formaten konservativ warnen. Tests für falsche Uhrzeit mit anderweitig vorkommender Minute und vertauschtes Schrägstrichdatum.
+
+### F41 — Gängige Schreibweisen derselben Einheit erzeugen Fehlalarme
+Schwere: mittel  
+Stelle: `app/src/shared/webChat.ts:842–855`, `app/src/shared/webChat.ts:910–925`  
+Status: [OFFEN]  
+Beschreibung: Die neue Einheitenliste versteht `m` und `g`, aber nicht „Meter“ und „Gramm“. `numberUnits('3 m')` wird `3m`, `numberUnits('3 Meter')` nur `3`; eine korrekt zitierte Antwort erhält so eine Zahlenwarnung. Auch `5,5 %` und `5.5 %` bleiben als dieselbe Dezimalzahl in deutscher/englischer Schreibweise verschieden. Diese Prüfung läuft ebenfalls in der **schnellen** Suche und kann deren zuvor unauffällige Antworten neu als fragwürdig markieren. Die Tests decken nur Euro/€, Jahre/Jahren und identische Kurzformen (`webChat.test.ts:581–594`).  
+Vorschlag: Häufige ausgeschriebene Maße ergänzen, Dezimalpunkt/-komma nur bei eindeutigem Dezimalformat angleichen und unbekannte Einheiten nicht als sicheren Unterschied ausgeben; Gegenproben in schnellem und gründlichem Modus.
+
+### F42 — Eine Jahreszahl in irgendeiner Teilquelle ersetzt keine Suche zum richtigen Teilthema
+Schwere: hoch  
+Stelle: `app/src/shared/webChatDeep.ts:227–268`, `app/src/main/llm/petrolDeepSearch.ts:277–280`, `app/src/main/llm/petrolDeepSearch.ts:304–320`  
+Status: [OFFEN]  
+Beschreibung: `numbersMissingInQueries` prüft alle geplanten Anfragen als eine Menge; `checkQuestionTerms` prüft alle Auszüge ebenfalls als eine Menge. Bei einer Frage nach **Leistung und Förderung 2027** kann das Modell „Leistung 2026“ und „Förderung 2027“ suchen. Die Zahl 2027 gilt dann im Plan und in der Förderungsseite als vorhanden; die deterministische Guard-Nachsuche für Leistung 2027 startet nicht. Der Nutzer sieht zwar beide Suchtexte, aber die Antwort kann eine fachlich passende 2026-Seite als Beleg für den falschen Jahresstand nutzen.  
+Vorschlag: Harte Bedingungen je Suchaspekt beziehungsweise je ausgewählter Seite prüfen; mindestens die Kombination „Teilthema + Jahr“ erhalten und bei Verlust sichtbar als nicht recherchiert markieren. Test mit zwei Aspekten und nur einem korrekt datierten Treffer.
+
+### F43 — Bei langen Fragen verliert die deterministische Nachsuche ihren Zahlenschutz
+Schwere: mittel  
+Stelle: `app/src/main/llm/petrolDeepSearch.ts:272–280`, `app/src/main/llm/petrolDeepSearch.ts:317–329`, `app/src/shared/webResearch.ts:349–360`  
+Status: [OFFEN]  
+Beschreibung: Ist die aus der Frage gebildete Stichwortfassung länger als die Anbietergrenze, überspringt der Main trotz `guardNeeded` den deterministischen Suchlauf und fragt wieder das Modell. Dessen neue Anfrage wird nur auf JSON/Form und Länge geprüft; dieselbe Jahreszahl kann erneut fehlen. Gerade für lange Fragen, für die „gründlich“ angeboten wird, bleibt F32 damit nur bedingt erfüllt. Der UI-Hinweis `numbersNotInQueries` nennt den Verlust im ersten Plan, aber keinen ausgefallenen Guard.  
+Vorschlag: Für diesen Fall eine deterministische, begrenzte Anfrage bilden, die die fehlende Zahl und die nötigen Sachbegriffe behält, oder die nicht durchgeführte Schutzsuche ausdrücklich anzeigen. Grenztest mit Stichwortfassung über 400 Zeichen und erneut falsch geplantem Jahr.
+
+### F44 — Ein anderes Verb hinter Doppelpunkt bleibt neutrale Lücke
+Schwere: mittel  
+Stelle: `app/src/shared/webChat.ts:818–837`, `app/src/renderer/utils/webAnswerMarkdown.ts:23–40`  
+Status: [OFFEN]  
+Beschreibung: F34 erkennt hinter dem Doppelpunkt nur eine Zahl am Anfang oder ein Verb aus `GAP_CLAIM_VERB`. Bei der Frage „Steigt der Beitrag 2027 auf 20 Euro?“ gilt „Die Quelle nennt dazu nichts: der Beitrag erhöht sich 2027 auf 20 Euro.“ weiterhin als neutrale `gap`: „erhöht“ steht nicht in der Verbliste, beide Zahlen stammen aus der Frage, und der Nachsatz wird nicht weiter zerlegt. Der Nachsatz ist aber eine unzitierte Sachbehauptung; die neutrale Marke entfernt ihre Warnfarbe.  
+Vorschlag: Nach dem Doppelpunkt nur enge Benennungen des fehlenden Gegenstands zulassen, statt eine Liste behauptender Verben als Ausschluss zu verwenden; die Gegenprobe als unzitierten Satz testen.
+
 ## Claude-Antwort
 
 ### Runde 1 (25.10.2026)
@@ -476,6 +651,159 @@ rund 7.700 Zeichen). F09–F15 tragen. Statt weiterer Heuristiken mit Nutzerfrei
 - **F14 [ADRESSIERT im Entwurf]** S5 (Frist und Stopp getrennt, eigene Antwortphase).
 - **F15 [ADRESSIERT im Entwurf]** S6 (vorab festgelegte Kernangaben, gepaart, blind, Risikoklassen).
 
+### Runde 3 (25.10.2026) und Umsetzung
+Nachgeprüft: F16–F21 tragen; F16–F20 sind als Bauvorgaben umgesetzt, F21 als Vorgehen für die
+Messung (Claude bereitet vor, der Nutzer entscheidet über den Standard). Nutzerfreigabe: bauen,
+danach Code-Prüfung durch Codex.
+
+Gebaut (uncommittet):
+- `app/src/shared/webChatDeep.ts` — Grenzen `DEEP_LIMITS`, `parsePlanReply` (verwirft mit Grund,
+  kürzt nie), `parsePickReply` (nur eigene Nummern), `mergeCandidatesRoundRobin` (reihum,
+  Herkunft), `maxPagesForPlace`, `checkQuestionTerms` (wörtlich / ähnlich / fehlt, F17),
+  `looksLikeBareFollowUp` (nur Hinweis, F09), `previousWebQuestion` + `withPreviousQuestion`
+  (vorige NUTZERfrage, F16). Tests `webChatDeep.test.ts`.
+- `app/src/main/llm/petrolDeepSearch.ts` — `runDeepResearch`: Planen (nur Frage + Datum), Suchen,
+  Wählen, Lesen, höchstens eine Nachsuche; ein Zähler für Suchen (3) und begonnene Abrufe (5),
+  Ränge ≤ Restbudget (F18); Recherchefrist getrennt vom Nutzer-Stopp, Rückfall nur vor Fristablauf
+  (F20); Seiten der Nachsuche verdrängen die letzten der ersten Runde. Tests mit gefälschtem Modell,
+  Suchdienst und Abruf: `petrolDeepSearch.test.ts`.
+- `app/src/main/index.ts` Handler `petrol-chat-web`: Zweig `deep` (Obergrenze der Seiten vor dem
+  Abruf, echtes Einfrieren mit `sourcesMin = n × 1500` und Neu-Einfrieren bei zu kurzem Auszug,
+  F19), `deepTermsBlock` im Systemtext (Platz reserviert), Ergebnis `deep` (`WebDeepInfo`).
+  `streamPetrolWebModel` mit `noThink` für Planen/Wählen.
+- Renderer: Schalter „gründlich suchen“ in der Webzeile, wörtlicher Einwilligungstext, Hinweis
+  „Vorige Frage als Thema ergänzen“ (setzt den Entwurf), Fortschritt Plan/Suche „…“/Wahl/Abruf,
+  `WebDeepLine` unter der Antwort (gesendete Anfragen, Verworfenes, Einschränkungen, nicht
+  Verwendetes, Wörterabgleich). Nach dem Senden zurück auf „schnell“.
+- Dazu die vier GUI-Befunde: Gesprächssatz-Warnung prüft nur noch den Suchtext; Lücken-Satz mit
+  Zahl aus der Frage und Einzahl („Auszug“) gilt als Lücke; Zahlen in Wortverbindungen
+  („8-Modul-Preise“) werden nur als Zahl verglichen; deutsche Tausender gleichgesetzt.
+
+Belege: typecheck grün, Gesamtlauf 3045 grün (1 bekannter Zeit-Test der Shell-Umgebungsprobe),
+Build grün. Nicht geprüft: GUI und echter Lauf (Bildschirm gesperrt, Dev-App wartet auf
+Schlüsselbund).
+
+### Code-Prüfung F22–F30 (25.10.2026) — alle neun vom Nutzer freigegeben
+
+- **F22 [ADRESSIERT]** `DeepDeps.excerpts` (`petrolDeepSearch.ts`): die Nachsuche-Entscheidung
+  läuft über die Auszüge, die der Main probeweise einfriert (`freezeBest` in `index.ts`, dieselbe
+  Funktion wie beim echten Einfrieren). Test „F22: … Auszüge, die das Modell sähe“.
+- **F23 [ADRESSIERT]** `ordered()`: `Math.max(0, …)` statt `Math.max(1, …)` — Seiten der Nachsuche
+  ersetzen notfalls alle alten. Test „F23: bei Platz für eine Seite …“.
+- **F24 [ADRESSIERT, teilweise]** `numbersMissingInQueries` (`webChatDeep.ts`): fehlt eine Zahl
+  oder ein Jahr der Frage in allen geplanten Anfragen, sucht die Stichwortfassung der Frage
+  zusätzlich (Herkunft `guard`, verbraucht ggf. das Nachsuch-Budget). Anzeige „Nicht in den
+  Suchanfragen des Modells: 2027“. Semantische Verschiebung ohne Zahl (Ort, Verneinung) und eine
+  einseitige Trefferwahl erkennt das nicht — dafür bleibt die Trefferliste (F26) sichtbar.
+- **F25 [ADRESSIERT]** `traceInfo()` in `index.ts`: Spur auch bei `stopped` und `error`;
+  `WebDeepLine` jetzt im Fehlerzweig. Stopp im Renderer (der das Main-Ergebnis verwirft): die
+  bis dahin gesendeten Anfragen aus dem Fortschritt landen als `webSentQueries` an der Frage.
+- **F26 [ADRESSIERT]** `trace.hits` / `WebDeepInfo.hits`: jeder zur Wahl stehende Treffer mit
+  Ausgang (gelesen und verwendet / gelesen, kein Platz / Abruf gescheitert / gewählt, nicht mehr
+  abgerufen / nicht gewählt), Runde 2 markiert; aufklappbar unter der Zählzeile. Titel über
+  `sanitizeSourceTitle`, nur als Text gerendert.
+- **F27 [ADRESSIERT]** `numberParts` / `numberCore` (`webChat.ts`): Seitenbeleg über ganze
+  Zahlteile mit Einheit („800wp“ ≠ „800w“), zerlegt nur an Bindestrich/Schrägstrich; der reine
+  Zahlenkern zählt nur für „aus deiner Frage“. Tests F27.
+- **F28 [ADRESSIERT]** `isGapStatement`: keine Gegenbehauptungs-Wörter (`GAP_COUNTER`), und jeder
+  weitere Satzteil nach Komma/Semikolon/Gedankenstrich muss selbst eine Lücke oder Quelle nennen.
+  Doppelpunkt trennt bewusst nicht („… nichts: der Betrag für 3.000 €“). Tests F28.
+- **F29 [ADRESSIERT]** Herkunft `fallback` (getippte Frage) / `fallback-words` (daraus gebildete
+  Stichwörter), Einschränkung `no-search`, wenn gar nicht gesucht wurde; Anzeige je Herkunft.
+- **F30 [ADRESSIERT]** Schalter „gründlich suchen“ auch im geöffneten Suchfeld.
+
+Belege: typecheck grün, Gesamtlauf 3054 grün (der bekannte Zeit-Test der Shell-Umgebungsprobe
+fiel einmal, einzeln grün), Build grün. Nicht geprüft: GUI und echter Lauf.
+
+### Code-Prüfung Runde 2, F31–F37 (25.10.2026) — vom Nutzer freigegeben („mache weiter“)
+
+- **F31 [ADRESSIERT]** `questionTerms`: die Zehnergrenze gilt nur für Wörter, Zahlen/Jahre
+  zählen immer — damit auch für `numbersMissingInQueries` und den Wörterabgleich. Test F31.
+- **F32 [ADRESSIERT]** Keine vorsorgliche Zusatzsuche mehr. `numbersNotInQueries` wird nur
+  festgehalten; fehlt eine dieser Zahlen nach Runde 1 auch in den (probeweise eingefrorenen)
+  Auszügen, ist die eine Nachsuche deterministisch die Stichwortfassung der Frage (Herkunft
+  `guard`, kein neuer Planungsaufruf). Höchstens 3 Suchen bleiben. Tests „F24/F32“ (Zahl im
+  Auszug → keine Zusatzsuche; zwei Plananfragen + Zahl fehlt → Nachsuche mit Stichwörtern,
+  3 Modellaufrufe).
+- **F33 [ADRESSIERT]** `numberUnits` (`webChat.ts`) liest Zahl + direkt folgende bekannte
+  Einheit aus dem Originaltext, auch mit Leerzeichen und als Zeichen (`%`, `€`, `$`); Einheiten
+  auf eine Schreibweise gebracht (€ = Euro, Jahre = Jahren). Eine Zahl MIT Einheit gilt nur mit
+  derselben Einheit als belegt, eine Zahl ohne Einheit mit jeder Fundstelle. Unbekanntes Wort nach
+  der Zahl („8 Module“) bleibt reine Zahl. Anzeige „20 %“, „800 Wp“, „2696 €“. Tests F33.
+- **F34 [ADRESSIERT]** `isGapStatement`: hinter einem Doppelpunkt kein behauptendes Verb
+  (`GAP_CLAIM_VERB`) und kein Beginn mit einer Zahl; weitere Satzteile vor dem Doppelpunkt
+  brauchen ein eigenes Fehlen-Wort, ein erneutes „Quelle“ reicht nicht mehr. Tests F34.
+- **F35 [ADRESSIERT]** Store: nach einem Stopp wird das trotzdem eintreffende Main-Ergebnis
+  nicht mehr ganz verworfen — seine `deep.queries` werden als `webSentQueries` an die Frage
+  nachgetragen (über `questionAt`). Kein Unit-Test (Store/IPC), nur Typprüfung.
+- **F36 [ADRESSIERT]** `freezeWebSources` legt Abrufe mit gleicher Zieladresse zusammen
+  (vorher wurden sie als zwei Quellen eingefroren — betrifft auch die schnelle Suche) und
+  liefert `used`/`duplicates` als Abrufkennungen; der Main ordnet Treffer darüber zu, neuer
+  Ausgang „führt auf dieselbe Seite wie ein anderer Treffer“. Test F36.
+- **F37 [ADRESSIERT]** `parsePlanReply` liefert bei lesbarem JSON ohne gültige Anfrage eine
+  leere Liste mit Gründen; der Main zeigt die Gründe und nimmt den Rückfall. Test F37.
+
+Belege: typecheck grün, Gesamtlauf 3061 grün (bekannter Zeit-Test der Shell-Umgebungsprobe),
+Build grün. Nicht geprüft: GUI und echter Lauf.
+
+### Code-Prüfung Runde 3, F38–F44 (25.10.2026) — vom Nutzer freigegeben („mache weiter“)
+
+- **F38 [ADRESSIERT]** `runFetchQueue` zählt eine Weiterleitung auf eine schon gelesene Zielseite
+  nicht als brauchbar (`seenFinal`, in der gründlichen Suche über beide Runden geteilt); der
+  nächste Treffer rückt im vorhandenen Startbudget nach. Test F38; zwei ältere
+  Warteschlangen-Tests bekamen eigene Zieladressen.
+- **F39 [ADRESSIERT]** `numberUnits`: in einem Bereich („600–800 W“, „600 bis 800 W“) gilt die
+  Einheit für beide Enden. Test F39.
+- **F40 [ADRESSIERT]** Uhrzeiten, Schrägstrich- und ISO-Datum werden vor den Einzelzahlen als
+  ganzer Wert erkannt (`WHOLE_VALUE`). Test F40.
+- **F41 [ADRESSIERT]** Ausgeschriebene Einheiten (Meter, Gramm, Kilogramm, Kilometer, Liter,
+  Kilowatt …) und eindeutige Dezimalzahlen (1–2 Nachkommastellen: 5.5 = 5,5). Test F41.
+- **F44 [ADRESSIERT]** Jede Zahl hinter dem Doppelpunkt lässt die Warnung stehen (statt
+  Verbliste allein). Bewusst strenger: „… nichts: der Betrag für 3.000 €“ ist wieder gelb; die
+  Form „Zum Betrag für 3.000 € steht nichts“ bleibt Lücke. Test angepasst und F44.
+- **F42 [ADRESSIERT, nur Anzeige]** Jede Anfrage trägt `withoutNumbers`; die Anzeige schreibt
+  „(ohne 2027)“ hinter die Anfrage. Keine Prüfung je Teilthema — die App weiß nicht verlässlich,
+  welche Zahl zu welchem Aspekt gehört.
+- **F43 [ADRESSIERT, nur Anzeige]** Einschränkung `guard-skipped` („Schutzsuche mit deinen
+  Stichwörtern nicht möglich (zu lang)“), dann plant wie bisher das Modell.
+
+Belege: typecheck grün, Gesamtlauf 3067 grün, Build grün. Prüfschleife danach auf Empfehlung
+beendet (abnehmender Ertrag, Randfälle der Zahlenprüfung); nächster Schritt GUI-Test.
+
+### GUI-Test 25.10.2026 (Dev-App, CDP)
+
+Frage „Ich will mir selbst ein Balkonkraftwerk mit 8 Modulen installieren was kosten die Module“, gründlich:
+- **qwen3.5:4b lokal**, 25 s: Plan „Balkonkraftwerk 8 Module Kosten“ + „Selbst installiertes
+  Balkonmodul Preis“ (Anzeige „ohne 8“), Shops gewählt, Antwort benennt die Lücke. Befund: die
+  Nachsuch-Planung des kleinen Modells lieferte gelegentlich kaputtes JSON → bisher still keine
+  Nachsuche. **Behoben:** Einschränkung `retry-plan-failed` + Nachsuche mit den Stichwörtern
+  der Frage (Test).
+- **OpenRouter gpt-6-luna**, 24 s: Nachsuche lief, alpha-solar.shop (8-Modul-Seite) gelesen,
+  ehrliche Antwort. In der GUI: Antwort mit Preisen für 8 Module (800–1.600 €, 1.072 €).
+  Befund: Seiten schreiben die Währung VORAN („ab €53,90“, „€1.072“) → Fehlalarm „Zahl nicht in
+  der Seite“. **Behoben:** `PREFIX_CURRENCY` in `numberUnits` (Test).
+- Oberfläche: Einwilligungstext nennt Modellweg und Datenweg korrekt (lokal / OpenRouter),
+  Trefferliste aufklappbar und lesbar, Badge „Web · gründlich“. YouTube-Treffer in der Liste ist
+  Absicht (Nutzerentscheidung 24.10.2026).
+
+- **Nutzertest „Erstelle mir eine Zusammenfassung der politischen Ereignisse von heute“** (schnell,
+  OpenRouter): Recycling-Preise aus Texas. Nachgestellt: derselbe wörtliche Satz liefert bei Tavily
+  wechselnd Nachrichtenseiten (1×) oder Recycling-Seiten (2×) — Anbieter-Schwankung bei
+  Befehlssätzen; die App benannte die Lücke korrekt. Gründlich plant „politische Ereignisse heute
+  25. Oktober 2026“ und fand in drei Läufen Nachrichtenseiten (einmal `pick-failed`, nicht
+  wiederholbar). Befund: „Erstelle“/„Zusammenfassung“ galten als fehlende Prüfbegriffe und lösten
+  eine unnötige Nachsuche aus. **Behoben:** `TASK_WORDS` nur im Wörterabgleich (Füllwortliste der
+  Suchwörter unverändert). Offen: die Antwort des Modells blieb trotz Schlagzeilen sehr
+  zurückhaltend („bestätigen nicht, dass heute“) — Prompt-Frage, nicht angefasst.
+
+- **Nachgemessen (schnell, Tavily):** „Erstelle mir eine Zusammenfassung der politischen Ereignisse
+  von heute“ wörtlich → 3× Recycling-Seiten; „Zusammenfassung politischen Ereignisse heute“ 2× und
+  „Erstelle Zusammenfassung politischen Ereignisse heute“ (= Angebot „Stichwörter verwenden“) 1×
+  ZDFheute/Tagesspiegel/FAZ; „Zusammenfassung der politischen Ereignisse von heute“ → knowunity.de.
+  Befund: die Gesprächssatz-Warnung erkannte Aufforderungen nicht. **Behoben:** `CHATTY_REQUEST`
+  in `looksConversational` (nur Warnung, sendet weiter wörtlich), Hinweistext nennt zusätzlich
+  „gründlich suchen“. Gegenproben ohne Warnung im Test.
+
 ## Status
 
-Angelegt 25.10.2026. Rev. 1 (F01–F08) und Rev. 2 (F09–F15) geprüft, Rev. 3 geschrieben, Codex-Runde 3 offen. Kein Code.
+Angelegt 25.10.2026. Rev. 1–3 geprüft (F01–F21). Gebaut nach Rev. 3 + F16–F20. Code-Prüfung F22–F44 umgesetzt (drei Runden). GUI-Test 25.10.2026 mit lokal und OpenRouter, zwei Befunde behoben. Abnahme durch den Nutzer offen.
