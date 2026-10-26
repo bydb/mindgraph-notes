@@ -154,7 +154,7 @@ export function defaultWebGatherDeps(config: WebResearchConfig, apiKey: string |
           truncated: r.truncated
         }
       } catch (err) {
-        return { ok: false, reason: fetchFailReason(err) }
+        return { ok: false, reason: fetchFailReason(err), status: err instanceof FetchExtractError ? err.status : undefined }
       }
     }
   }

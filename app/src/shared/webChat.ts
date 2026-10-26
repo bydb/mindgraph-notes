@@ -31,6 +31,12 @@ export const WEB_CHAT_MAX_ATTEMPTS = 5
 export const WEB_CHAT_NET_DEADLINE_MS = 25_000
 /** Gemeinsame Grenze für Systemtext + Frage + Verlauf + Quellen (F17). */
 export const WEB_CHAT_TOTAL_BUDGET = 20_000
+/**
+ * Cloud-Modelle (OpenRouter, LLMBase, Ollama-Cloud) melden kein Fenster, haben aber weit mehr als
+ * 20 000 Zeichen. Mit dem lokalen Startwert passten nur vier Seiten, eine gelesene Shopseite mit dem
+ * Europreis fiel weg, und die Antwort sagte „kein Europreis“ (Codex F66, 26.10.2026).
+ */
+export const WEB_CHAT_CLOUD_BUDGET = 40_000
 export const WEB_CHAT_HISTORY_MAX = 4_000
 export const WEB_CHAT_SOURCES_MAX = 12_000
 /** Darunter bekommen Quellen Vorrang vor weiterem Verlauf. */
@@ -48,8 +54,8 @@ export const WEB_CHAT_MIN_NUM_CTX = 8_192
  * Zeichengrenze für den ganzen Prompt. Ohne bekanntes Fenster (Cloud, LM Studio) gilt der
  * Startwert; bei bekanntem Fenster passt der Prompt samt Antwortreserve hinein.
  */
-export function webChatCharBudget(contextTokens: number | null): number {
-  if (!contextTokens || contextTokens <= 0) return WEB_CHAT_TOTAL_BUDGET
+export function webChatCharBudget(contextTokens: number | null, cloud = false): number {
+  if (!contextTokens || contextTokens <= 0) return cloud ? WEB_CHAT_CLOUD_BUDGET : WEB_CHAT_TOTAL_BUDGET
   return Math.max(0, Math.min(WEB_CHAT_TOTAL_BUDGET, (contextTokens - WEB_CHAT_ANSWER_TOKENS) * WEB_CHAT_CHARS_PER_TOKEN))
 }
 
@@ -151,6 +157,11 @@ export interface WebSource {
   /** Länge des aufbereiteten Seitentexts vor jeder Kürzung. */
   originalChars: number
   truncated: boolean
+  /**
+   * Titel stammt aus der abgerufenen Seite selbst (nicht aus dem Suchtreffer). Nur dann zählen Zahlen
+   * darin als Seitenbeleg (Codex F62). Fehlt bei älteren Schnappschüssen = nicht belegfähig.
+   */
+  titleFromPage?: boolean
 }
 
 export type WebFetchFailReason = 'timeout' | 'stopped' | 'empty' | 'too-large' | 'http' | 'type' | 'blocked' | 'error'
@@ -169,7 +180,7 @@ export interface WebUnfetchedHit {
 
 export type WebFetchOutcome =
   | { ok: true; title: string; finalUrl: string; fetchedAt: string; text: string; originalChars: number; truncated: boolean }
-  | { ok: false; reason: WebFetchFailReason }
+  | { ok: false; reason: WebFetchFailReason; /** HTTP-Status bei `http`, sonst leer. */ status?: number }
 
 /** Was unter der Antwort steht — aus dem Main, nie aus dem Renderer geschätzt (F11, F14). */
 export interface WebChatProvenance {
@@ -230,9 +241,9 @@ export interface WebDeepInfo {
   /**
    * plan-failed / pick-failed = Rückfall; no-search = Planung scheiterte und es wurde gar nicht
    * gesucht; timeout = Recherchefrist; budget = Grenze erreicht; window = Modellfenster begrenzte
-   * die Seitenzahl.
+   * die Seitenzahl; pages = feste Seitengrenze erreicht, weitere gelesene Seiten blieben draußen (F66).
    */
-  limited: Array<'plan-failed' | 'retry-plan-failed' | 'pick-failed' | 'no-search' | 'guard-skipped' | 'timeout' | 'budget' | 'window'
+  limited: Array<'plan-failed' | 'retry-plan-failed' | 'pick-failed' | 'no-search' | 'guard-skipped' | 'timeout' | 'budget' | 'window' | 'pages'
     | 'loop-error' | 'loop-iterations' | 'loop-context' | 'loop-fallback'>
   /** Recherche-Schleife: das Modell suchte und las selbst. */
   loop?: boolean
@@ -787,6 +798,7 @@ export function freezeWebSources(
     return {
       n: i + 1,
       title: k.o.title || k.c.title || finalHost,
+      titleFromPage: !!k.o.title,
       url: k.o.finalUrl,
       host: finalHost,
       fetchedAt: k.o.fetchedAt,
@@ -847,6 +859,21 @@ export interface SentenceExtra {
    * erklärter Herkunft.
    */
   questionNumbers?: string[]
+  /**
+   * Zahlen in einem Satz OHNE Quellennummer (Modellwissen). Der Systemtext verbietet sie dort;
+   * steht trotzdem eine, ist sie durch keine Seite gedeckt. Zahlen aus der Frage zählen nicht.
+   */
+  unsourcedNumbers?: string[]
+  /**
+   * Kurzes Etikett ohne Nummer und ohne Zahl (Tabellenkopf „Preis“, Zeilenname „Raspberry Pi 5“):
+   * keine Aussage, also auch kein „Modellwissen“ (Nutzertest 26.10.2026).
+   */
+  label?: boolean
+  /**
+   * Preis und weitere Angabe mit Einheit („4 GB … 179,89 €“) stehen beide in der Seite, aber nirgends
+   * beieinander — ob der Preis zu dieser Variante gehört, ist nicht geprüft (Codex F65).
+   */
+  apartNumbers?: string[]
   /** Satz enthält eine Verneinung — der Wortvergleich kann sie nicht prüfen. */
   negation: boolean
   /**
@@ -859,7 +886,8 @@ export interface SentenceExtra {
 
 // Lücken-Satz: nennt die Seiten/Auszüge/Quellen UND ihr Fehlen, ohne eigene Zahl, kurz.
 // Eine Zahl oder ein langer Satz kann eine Behauptung tragen — dann bleibt die Warnung.
-const GAP_SOURCE = /\b(?:seite|seiten|auszug|auszüge|auszügen|auszugen|quelle|quellen|page|pages|excerpt|excerpts|source|sources)\b/iu
+// „Angaben“ seit F69: „Einen Europreis nennen die abgerufenen Angaben nicht“ galt sonst als Modellwissen.
+const GAP_SOURCE = /\b(?:seite|seiten|auszug|auszüge|auszügen|auszugen|quelle|quellen|angabe|angaben|page|pages|excerpt|excerpts|source|sources)\b/iu
 const GAP_ABSENCE = /\b(?:nicht|nichts|kein|keine|keinen|keinem|keiner|fehlt|fehlen|unklar|not|no|nothing|none|missing)\b/iu
 // Gegenbehauptung neben der Lücke („… bestätigt 2027 nicht, 20 Euro sind falsch“, Codex F28).
 const GAP_COUNTER = /\b(?:aber|sondern|jedoch|allerdings|dennoch|trotzdem|falsch|stimmt|stimmen|richtig|korrekt|tatsächlich|but|however|instead|wrong|incorrect|correct|actually)\b/iu
@@ -892,7 +920,7 @@ const thousands = (n: string): string => (/^\d{1,3}(?:\.\d{3})+$/.test(n) ? n.re
 // Bekannte Einheiten, auf eine Schreibweise gebracht (20 € = 20 Euro, 8 Jahre = 8 Jahren).
 const UNIT_CANON: Record<string, string> = {
   '%': '%', prozent: '%', percent: '%',
-  '€': 'eur', euro: 'eur', eur: 'eur', cent: 'ct', ct: 'ct', '$': 'usd', usd: 'usd', dollar: 'usd',
+  '€': 'eur', euro: 'eur', eur: 'eur', cent: 'ct', ct: 'ct', '$': 'usd', usd: 'usd', dollar: 'usd', dollars: 'usd',
   w: 'w', watt: 'w', wp: 'wp', wattpeak: 'wp', kw: 'kw', kilowatt: 'kw', kwp: 'kwp', kwh: 'kwh', kilowattstunde: 'kwh', kilowattstunden: 'kwh',
   wh: 'wh', mwh: 'mwh', v: 'v', volt: 'v', mah: 'mah',
   kg: 'kg', kilogramm: 'kg', kilo: 'kg', g: 'g', gramm: 'g', km: 'km', kilometer: 'km', kilometern: 'km',
@@ -952,7 +980,9 @@ const withoutZeroFraction = (key: string): string => key.replace(/^(\d+),(\d{1,2
  */
 export function numberUnits(text: string): string[] {
   const out = new Set<string>()
-  const lower = text.toLowerCase()
+  // „59 US-Dollar“ las sich als Zahl mit Wort „US“ ohne Einheit (GUI-Test 26.10.2026) — gleich lang
+  // ersetzen, damit die Positionen für Bereiche stimmen.
+  const lower = text.toLowerCase().replace(/\bus-?dollars?\b/gu, (v) => 'dollar'.padEnd(v.length))
   for (const m of lower.matchAll(WHOLE_VALUE)) out.add(m[0])
   let rest = lower.replace(WHOLE_VALUE, (v) => ' '.repeat(v.length))
   for (const m of rest.matchAll(PREFIX_CURRENCY)) out.add(canonNumber(m[2], true) + UNIT_CANON[m[1]])
@@ -1000,6 +1030,64 @@ function pageNumbers(text: string): Set<string> {
   return out
 }
 
+// „laut Auszug 3“, „Quelle 1 und 2“: Verweise auf die eigene Quellenliste sind keine Sachzahlen.
+// Vorher meldete die Prüfung „Zahl nicht in der Seite: 3“ (Nutzertest 26.10.2026).
+// Nur Wörter, die im Antworttext praktisch nur als Quellenverweis vorkommen — „Treffer 2“ kann eine
+// Sachangabe sein (Codex F63).
+const SOURCE_MENTION = /\b(?:Auszug|Auszügen|Auszüge|Quelle|Quellen|excerpts?|sources?)\s+(\d{1,2}(?:\s*(?:,|und|and|&|bis|-|–)\s*\d{1,2})*)\b/giu
+
+/**
+ * Etikett statt Aussage: höchstens vier Wörter, kein Satzzeichen am Ende, mindestens ein Wort aus
+ * Buchstaben. Ziffern nur als Teil eines Namens („Raspberry Pi 5“) — höchstens eine einzelne Ziffer
+ * ohne Einheit („Preis 59“ ist eine Angabe, Codex F61); „8 GB“, „189 €“ oder „seit 2023“ bleiben prüfpflichtig.
+ */
+function isLabel(text: string): boolean {
+  const plain = text.replace(/[*_`#|]/g, ' ').trim()
+  if (!plain || /[.!?:;]$/.test(plain) || plain.split(/\s+/).length > 4 || !/\p{L}{2,}/u.test(plain)) return false
+  const nums = numberUnits(plain)
+  return nums.length === 0 || (nums.length === 1 && /^\d$/.test(nums[0]))
+}
+
+/**
+ * Liegt die Stelle in der Kopfzeile einer Tabelle oder in der ersten Spalte? Nur dort ist eine kurze
+ * Zelle ein Etikett; „Kostet weniger“ in einer Inhaltsspalte bleibt eine Aussage (Codex F61).
+ */
+function isTableLabelCell(answer: string, pos: number): boolean {
+  const lineStart = answer.lastIndexOf('\n', pos - 1) + 1
+  const nl = answer.indexOf('\n', pos)
+  const lineEnd = nl < 0 ? answer.length : nl
+  const line = answer.slice(lineStart, lineEnd)
+  if (!line.includes('|')) return false
+  const next = nl < 0 ? '' : answer.slice(nl + 1, (answer.indexOf('\n', nl + 1) + 1 || answer.length + 1) - 1)
+  if (/^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/.test(next)) return true
+  const pipesBefore = (answer.slice(lineStart, pos).match(/\|/g) ?? []).length
+  return line.trimStart().startsWith('|') ? pipesBefore === 1 : pipesBefore === 0
+}
+
+/** Fenster für „steht beieinander“: etwa eine Produktkarte oder Tabellenzeile. */
+const NEAR_WINDOW = 300
+
+/**
+ * Stehen alle Zahlen gemeinsam in EINEM Abschnitt der Seite? Ein Preis-Satz trägt Preis und Variante
+ * zusammen; einzeln irgendwo auf der Seite reicht nicht — bei Geizhals & Co. stehen auf einer Seite
+ * viele Varianten mit vielen Preisen (Codex F65). Fenster mit halber Überlappung.
+ */
+function numbersNear(excerpt: string, nums: readonly string[]): boolean {
+  if (excerpt.length <= NEAR_WINDOW) return true
+  for (let i = 0; i < excerpt.length; i += NEAR_WINDOW / 2) {
+    const win = pageNumbers(excerpt.slice(i, i + NEAR_WINDOW))
+    if (nums.every((n) => win.has(n) || win.has(withoutZeroFraction(n)))) return true
+    if (i + NEAR_WINDOW >= excerpt.length) break
+  }
+  return false
+}
+
+/** Quellenverweise entfernen — nur, wenn jede Nummer darin eine echte Quellennummer ist. */
+export function withoutSourceMentions(text: string, sourceCount: number): string {
+  return text.replace(SOURCE_MENTION, (m, nums: string) =>
+    (nums.match(/\d+/g) ?? []).every((d) => Number(d) >= 1 && Number(d) <= sourceCount) ? ' ' : m)
+}
+
 /**
  * Deterministische Ergänzung zum Wortvergleich, ausgerichtet an `report.sentences`:
  * „Der Vertrag wurde nicht geschlossen [1]“ hat hohe Wortdeckung mit „Der Vertrag wurde
@@ -1018,17 +1106,27 @@ export function sentenceExtras(answer: string, report: CitationReport, excerpts:
   const askedNumbers = new Set(numberUnits(question).map(numberCore))
   return report.sentences.map((s: SentenceCheck) => {
     if (s.refs.length === 0) {
-      return { missingNumbers: [], negation: false, gap: s.status === 'uncited' && isGapStatement(answer.slice(s.start, s.end), question) }
+      const text = answer.slice(s.start, s.end)
+      const gap = s.status === 'uncited' && isGapStatement(text, question)
+      if (s.status === 'uncited' && !gap && isLabel(text) && isTableLabelCell(answer, s.start)) return { missingNumbers: [], negation: false, label: true }
+      const unsourced = s.status === 'uncited' && !gap
+        ? numberUnits(withoutSourceMentions(text, excerpts.length)).filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
+        : []
+      return { missingNumbers: [], negation: false, gap, ...(unsourced.length ? { unsourcedNumbers: unsourced } : {}) }
     }
-    const plain = answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' ')
+    const plain = withoutSourceMentions(answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' '), excerpts.length)
     const cited = s.refs.map((n) => sourceNumbers[n - 1]).filter(Boolean)
     // Zahl ohne Einheit: irgendwo auf der Seite genügt; mit Einheit nur mit derselben Einheit.
     const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n) || pn.has(withoutZeroFraction(n))))
     const missingNumbers = notOnPage.filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
     const questionNumbers = notOnPage.filter((n) => askedNumbers.has(numberCore(n))).map(showNumber)
+    // Nur wenn jede Zahl einzeln belegt ist und ein Preis dabei ist: sonst meldet schon `number`.
+    const withUnit = numberUnits(plain).filter((n) => numberCore(n) !== n)
+    const apart = notOnPage.length === 0 && withUnit.length >= 2 && withUnit.some((n) => /(?:eur|usd)$/.test(n))
+      && !s.refs.some((n) => excerpts[n - 1] !== undefined && numbersNear(excerpts[n - 1], withUnit))
     const tokens = plain.toLowerCase().match(/\p{L}+/gu) ?? []
     const negation = tokens.some((t) => NEGATIONS.has(t))
-    return { missingNumbers, negation, ...(questionNumbers.length ? { questionNumbers } : {}) }
+    return { missingNumbers, negation, ...(questionNumbers.length ? { questionNumbers } : {}), ...(apart ? { apartNumbers: withUnit.map(showNumber) } : {}) }
   })
 }
 
@@ -1075,7 +1173,7 @@ export function withWebFootnotes(
   const warnings = report.sentences.flatMap((s, k) => {
     const flag = labels.flagFor(k)
     if (!flag) return []
-    const text = answer.slice(s.start, s.end).replace(/\s+/g, ' ')
+    const text = answer.slice(s.start, s.end).replace(/\*\*|__/g, '').replace(/\s+/g, ' ').trim()
     return [`> - **${flag}:** ${text.length > 160 ? `${text.slice(0, 160)}…` : text}`]
   })
   const warnBlock = warnings.length ? `\n> ${labels.warnings}\n${warnings.join('\n')}` : ''

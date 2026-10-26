@@ -55,6 +55,8 @@ describe('Seitenzahl nach Platz (S4)', () => {
   it('Mindestlänge 1500 je Seite, höchstens 4', () => {
     expect(maxPagesForPlace(20000)).toBe(DEEP_LIMITS.maxPages)
     expect(maxPagesForPlace(3200)).toBe(2)
+    expect(maxPagesForPlace(40000, DEEP_LIMITS.maxPagesCloud)).toBe(DEEP_LIMITS.maxPagesCloud)
+    expect(maxPagesForPlace(40000)).toBe(DEEP_LIMITS.maxPages)
     expect(maxPagesForPlace(1000)).toBe(0)
   })
 })

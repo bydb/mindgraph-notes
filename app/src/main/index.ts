@@ -6893,7 +6893,9 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     const usesLocalOllama = backend === 'ollama' && route.provider !== 'ollama-cloud'
     // Kontextfenster des lokalen Modells kennen (F17): Budget und num_ctx richten sich danach.
     const contextTokens = usesLocalOllama ? await ollamaContextLength(params.model) : null
-    const charBudget = webChatCharBudget(contextTokens)
+    const cloudRoute = !usesLocalOllama && route.kind === 'cloud'
+    const charBudget = webChatCharBudget(contextTokens, cloudRoute)
+    const pageCap = cloudRoute ? DEEP_LIMITS.maxPagesCloud : DEEP_LIMITS.maxPages
     if (req.controller.signal.aborted) return finish({ kind: 'stopped', sources: [], failures: [], notFetched: 0, ...followUpMark })
 
     const today = localDateString()
@@ -6933,8 +6935,8 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
         measureWithFollowUpRoom({ sources: f.sources, history: f.history, questionChars: reservedQuestion, topics: webTopics, today, sanitize: sanitizeUntrustedText })
       // Obergrenze VOR dem Abruf (F19): Platz ohne Quellen und ohne Verlauf (der weicht zuerst),
       // Kopfzeilen geschätzt. Nach dem Abruf wird echt gemessen.
-      const place = charBudget - measure({ sources: [], history: [] }) - 200 * DEEP_LIMITS.maxPages
-      const maxPages = maxPagesForPlace(place)
+      const place = charBudget - measure({ sources: [], history: [] }) - 200 * pageCap
+      const maxPages = maxPagesForPlace(place, pageCap)
       if (maxPages === 0) {
         return finish({ kind: 'error', error: 'Das Kontextfenster dieses Modells ist zu klein für die gründliche Suche. Nimm die schnelle Suche oder ein Modell mit größerem Fenster.', sources: [], failures: [], notFetched: 0 })
       }
@@ -7086,7 +7088,8 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       const unused = unusedEntries
         .map(e => { const o = e.outcome as Extract<typeof e.outcome, { ok: true }>; return hostnameFromUrl(o.finalUrl) ?? o.finalUrl })
       const base = traceInfo()
-      if (unused.length > 0 && pages < DEEP_LIMITS.maxPages) base.limited.push('window')
+      // Auch bei voller Seitenzahl sichtbar: gelesene Seiten blieben draußen (Codex F66).
+      if (unused.length > 0) base.limited.push(pages < pageCap ? 'window' : 'pages')
       deepInfo = {
         ...base,
         unused,
@@ -7200,7 +7203,10 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     if (!answer.trim()) return finish({ kind: 'error', error: '', sources, failures, notFetched, ...followUpMark, ...droppedMark })
     const excerpts = sources.map(s => s.excerpt)
     const report = analyzeCitations(answer, excerpts, { sourceTitles: sources.map(s => s.title) })
-    const extras = sentenceExtras(answer, report, excerpts, question)
+    // Zahlen im Seitentitel („Raspberry Pi 5 (8 GB RAM), 189,00 €“) gelten als Seitenzahlen: das Modell
+    // sieht den Titel im Kopf der Quelle, und Shops nennen den Preis oft nur dort (Nutzertest 26.10.2026).
+    // Nur ein Titel aus der Seite selbst, nie der Suchtreffer-Titel (Codex F62).
+    const extras = sentenceExtras(answer, report, sources.map(s => s.titleFromPage ? `${s.title}\n${s.excerpt}` : s.excerpt), question)
     // Nur eine fertige Antwort mit zitierter Quelle wird eingefroren. Die Nachfrage legt
     // eine neue Kennung derselben Auszüge an, damit die nächste Frage an diese Antwort bindet.
     const newSnapshotId = !event.sender.isDestroyed() && scopeId && report.usedSources.length > 0

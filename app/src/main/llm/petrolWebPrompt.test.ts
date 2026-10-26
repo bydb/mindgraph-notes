@@ -25,7 +25,9 @@ describe('Petrol-Web-Prompt: Seiten sind untrusted (F05)', () => {
   it('der Text widerspricht nicht dem Webzugriff (F12)', () => {
     const prompt = buildPetrolWebSystemPrompt([], '2026-10-24', id)
     expect(prompt).not.toMatch(/nichts im Internet nachsehen/)
-    expect(prompt).toMatch(/Ausschließlich aus diesen Auszügen/)
+    expect(prompt).toMatch(/NUR, wenn sie so in einem Auszug stehen/)
+    expect(prompt).toMatch(/Eigenes Wissen darfst du ergänzen/)
+    expect(prompt).toMatch(/In Sätzen ohne Nummer keine Zahlen/)
   })
 
   it('eine Nachfrage sagt, dass nicht neu gesucht wurde, und enthält die frühere Antwort nicht (F03)', () => {

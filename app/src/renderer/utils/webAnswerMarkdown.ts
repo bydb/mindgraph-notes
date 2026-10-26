@@ -18,14 +18,66 @@ import type { CitationReport, SentenceCheck } from '../../shared/rag/citations'
 import type { SentenceExtra } from '../../shared/webChat'
 import { citationMarkdownPlugin } from './citationMarkdown'
 
-export type WebSentenceFlag = 'uncited' | 'low' | 'invalid' | 'quote' | 'heading' | 'number' | 'questionNumber' | 'negation' | 'gap'
+export type WebSentenceFlag = 'uncited' | 'low' | 'invalid' | 'quote' | 'heading' | 'number' | 'questionNumber' | 'unsourcedNumber' | 'apart' | 'negation' | 'gap'
 
-/** Marken ohne Warnfarbe: sie benennen etwas, warnen aber nicht. „Zahl aus deiner Frage“ warnt (Codex F02). */
-export const NEUTRAL_FLAGS: ReadonlySet<WebSentenceFlag> = new Set(['gap'])
+/**
+ * Marken ohne Warnfarbe: sie benennen etwas, warnen aber nicht. „Zahl aus deiner Frage“ warnt (Codex F02).
+ * Seit 26.10.2026 darf die Webantwort Modellwissen ohne Nummer ergänzen (Nutzerentscheidung) —
+ * `uncited` heißt jetzt „Modellwissen“ und ist gekennzeichnet, nicht gewarnt. Eine Zahl darin warnt.
+ */
+export const NEUTRAL_FLAGS: ReadonlySet<WebSentenceFlag> = new Set(['gap', 'uncited'])
 
 /** Trägt der Satz nur neutrale Marken? Dann ohne Warnfarbe anzeigen. */
 export function onlyNeutralFlags(flags: readonly WebSentenceFlag[]): boolean {
   return flags.length > 0 && flags.every((f) => NEUTRAL_FLAGS.has(f))
+}
+
+/**
+ * Nur „Modellwissen“: Orange statt Grau — Grau las sich wie „in Ordnung“, dabei prüft niemand diese
+ * Sätze, auch Namen und Daten ohne Ziffern nicht (Codex F60). Petrol bleibt den Sätzen mit Quelle
+ * vorbehalten, Rot den harten Befunden (Nutzerentscheidung 26.10.2026).
+ */
+export function onlyKnowledgeFlags(flags: readonly WebSentenceFlag[]): boolean {
+  return flags.length > 0 && flags.every((f) => f === 'uncited')
+}
+
+/**
+ * Harte Befunde: die Zahl, das Zitat oder die Quellennummer passt nicht — rot statt orange.
+ * Eine Verneinung gehört NICHT dazu: sie ist nur ungeprüft, kein nachgewiesener Fehler (Codex F68).
+ */
+export const SEVERE_FLAGS: ReadonlySet<WebSentenceFlag> = new Set(['number', 'unsourcedNumber', 'questionNumber', 'invalid', 'quote'])
+
+export function hasSevereFlag(flags: readonly WebSentenceFlag[]): boolean {
+  return flags.some((f) => SEVERE_FLAGS.has(f))
+}
+
+/**
+ * Zeichen im Textfluss statt ausgeschriebener Marke (Nutzerwunsch 26.10.2026: Text störte den
+ * Lesefluss). Der volle Wortlaut steht im Tooltip, in der Legende und in der Prüfung je Satz.
+ * Vorrang: harter Befund vor Modellwissen vor geringer Übereinstimmung.
+ */
+export type WebMarkKind = 'severe' | 'apart' | 'knowledge' | 'gap' | 'other'
+
+export const MARK_GLYPHS: Record<WebMarkKind, string> = { severe: '!', apart: '↔', knowledge: '', gap: '∅', other: '?' }
+
+/**
+ * Marken für Text, Tooltip und Export — ohne „geringe Wortübereinstimmung“ (Nutzerentscheidung
+ * 26.10.2026): deutsche Sätze gegen englische Seiten und jede gute Umformulierung senken die
+ * Wortdeckung; im Raspberry-Test trugen 8 von 10 belegten Sätzen das Zeichen, es trennte richtig
+ * nicht von falsch. Es bleibt in „Prüfung je Satz“. Zahlen, Zitate, Nummern prüfen eigene Marken.
+ */
+export function inlineFlags(flags: readonly WebSentenceFlag[]): WebSentenceFlag[] {
+  return flags.filter((f) => f !== 'low')
+}
+
+export function markKind(all: readonly WebSentenceFlag[]): WebMarkKind | null {
+  const flags = inlineFlags(all)
+  if (flags.length === 0) return null
+  if (hasSevereFlag(flags)) return 'severe'
+  if (flags.includes('apart')) return 'apart'
+  if (flags.includes('uncited')) return 'knowledge'
+  if (flags.every((f) => f === 'gap')) return 'gap'
+  return 'other'
 }
 
 /**
@@ -35,6 +87,7 @@ export function onlyNeutralFlags(flags: readonly WebSentenceFlag[]): boolean {
  */
 export function sentenceFlags(s: SentenceCheck, extra?: SentenceExtra): WebSentenceFlag[] {
   const out: WebSentenceFlag[] = []
+  if (extra?.label) return out
   if (s.status === 'unchecked') out.push('heading')
   // Ehrlich benannte Lücke: neutrale Marke statt „ohne Quellennummer“ (Nutzertest 24.10.2026).
   if (s.status === 'uncited') out.push(extra?.gap ? 'gap' : 'uncited')
@@ -43,6 +96,8 @@ export function sentenceFlags(s: SentenceCheck, extra?: SentenceExtra): WebSente
   if (s.quotes.some((q) => !q.found)) out.push('quote')
   if (extra && extra.missingNumbers.length > 0) out.push('number')
   if (extra?.questionNumbers?.length) out.push('questionNumber')
+  if (extra?.unsourcedNumbers?.length) out.push('unsourcedNumber')
+  if (extra?.apartNumbers?.length) out.push('apart')
   if (extra?.negation) out.push('negation')
   return out
 }
@@ -74,7 +129,7 @@ export function markWebAnswer(answer: string, report: CitationReport, extras?: r
 }
 
 export interface WebAnswerEnv {
-  flags?: { label: (sentenceIndex: number) => string | null; isNeutral?: (sentenceIndex: number) => boolean }
+  flags?: { label: (sentenceIndex: number) => string | null; kind: (sentenceIndex: number) => WebMarkKind | null }
 }
 
 const FLAG_RE = /^\[\uE002(\d{1,4})\uE003\]/
@@ -90,15 +145,16 @@ function flagPlugin(md: MarkdownIt): void {
       if (label) {
         const token = state.push('web_flag', 'span', 0)
         token.content = label
-        token.meta = { neutral: flags?.isNeutral?.(Number(m[1])) === true }
+        token.meta = { kind: flags?.kind(Number(m[1])) ?? 'other' }
       }
     }
     state.pos += m[0].length
     return true
   })
   md.renderer.rules.web_flag = (tokens, idx) => {
-    const neutral = tokens[idx].meta?.neutral === true
-    return ` <span class="petrol-web-flag${neutral ? ' is-neutral' : ''}">${md.utils.escapeHtml(tokens[idx].content)}</span>`
+    const kind = (tokens[idx].meta?.kind ?? 'other') as WebMarkKind
+    const label = md.utils.escapeHtml(tokens[idx].content)
+    return `<span class="petrol-web-mark is-${kind}" title="${label}" aria-label="${label}">${MARK_GLYPHS[kind]}</span>`
   }
 }
 

@@ -308,6 +308,61 @@ Nutzerfreigabe: Die Lückenrunde wird hinter einem Schalter gebaut, standardmä�
    - Ändert sich damit etwas für Nutzer lokaler Modelle ohne Werkzeuge (Zeit, Fehlermeldungen)?
 5. **Ergebnisform:** Spur, Anzeige, Export, „Hiermit weiterfragen“ und Snapshot mit Schleifenergebnis: Passt `entries`/`index`/`hits` zu dem, was `freezeBest` und die Anzeige erwarten?
 
+### Runde 7 (26.10.2026): Schleife gibt bei gesperrter Website zu früh auf — Code-Prüfung
+
+**Anlass (Nutzertest mit installierter 1.1.0, OpenRouter claude-haiku-5.5):**
+- Frage „Was kostet ein Raspberry Pi 5 mit KI Modul“. 2 Suchen, 15 Treffer, das Modell las drei Treffer von www.raspberrypi.com. Alle drei scheiterten (die Website antwortet automatischen Abrufen mit HTTP 403, per curl nachgeprüft). Danach hörte es auf. Ergebnis: „Die Websuche hat nichts Lesbares geliefert.“ 5 Abrufe und 12 Treffer anderer Websites blieben ungenutzt.
+- Das Modell bekam nur „Treffer n (host) konnte nicht gelesen werden.“ — ohne Grund, ohne Restbudget, ohne Hinweis auf andere Websites.
+
+**Zu prüfender Code (uncommittet, Nutzerfreigabe „umsetzen und danach Codex prüfen lassen“):**
+- `app/src/main/webResearch/fetchExtract.ts`: `FetchExtractError.status` (HTTP-Status der Fehlerseite).
+- `app/src/shared/webChat.ts`: `WebFetchOutcome` Fehlerzweig mit optionalem `status`.
+- `app/src/main/llm/petrolWebChat.ts` `defaultWebGatherDeps.fetchPage`: reicht `status` durch.
+- `app/src/main/llm/petrolWebLoop.ts`:
+  - `DENYING_STATUS` (401/403/429/451) und `deniesHost`: nach so einer Antwort oder `blocked` landet die Website in `deniedHosts`. Weitere Treffer von dort werden NICHT abgerufen, kosten kein Budget und werden in späteren Trefferlisten als „(Website sperrt Abrufe)“ markiert. 404 sperrt nicht.
+  - `failText`: Fehlschlag mit Grund und „Noch N Abrufe frei — nimm Treffer anderer Websites oder suche neu.“
+  - Systemtext: neue Zeile „Scheitert ein Abruf oder sperrt eine Website, nimm Treffer anderer Websites …“.
+  - `LOOP_NOTHING_READ_NUDGE`: will das Modell ohne Werkzeugaufruf enden, obwohl noch keine Seite lesbar war und Abrufe frei sind, bekommt es EINMAL diesen Anstoß (als user-Nachricht) und die Schleife läuft weiter.
+- Tests: `petrolWebLoop.test.ts` (Raspberry-Fall, 404 sperrt nicht, Anstoß einmal, danach ehrlicher Abschluss).
+
+**Prüffragen:** Kann der Anstoß eine Endlosschleife, Budget- oder Fristüberschreitung erzeugen? Kann `deniedHosts` legitime Seiten fälschlich ausschließen (z. B. 429 als vorübergehend, Subdomains, Host-Schreibweise)? Lässt sich der Anstoß als Prompt-Injection-Kanal missbrauchen oder verändert er die UNTRUSTED-Rahmung? Passt die Trace-Anzeige (übersprungene gesperrte Treffer erscheinen als „nicht gewählt“)? Sind die Tests aussagekräftig?
+
+### Runde 8 (26.10.2026): Modellwissen in Webantworten, Tabellen-Etiketten, Zahlen aus dem Seitentitel — Code-Prüfung
+
+**Anlass:** Vergleich mit Claude bei „Raspberry Pi 5 vs. Arduino UNO Q für Schüler“. Petrol schrieb „laut Auszug 3 …“, endete mit „lässt sich nicht belegen“, die Prüfung meldete „Zahl nicht in der Seite: 3“ (von „Auszug 3“). **Nutzerentscheidung:** Modellwissen erlauben, aber gekennzeichnet. GUI-Test danach: „sieht gut aus“.
+
+**Zu prüfender Code (uncommittet):**
+- `app/src/main/llm/petrolWebPrompt.ts:42-53`: Fakten (Zahlen, Preise, Daten, Namen, Versionen) nur aus Auszügen mit `[n]`; Einordnung/Empfehlung aus eigenem Wissen in Sätzen OHNE Nummer; keine Zahlen in solchen Sätzen; nicht über „Auszüge“ reden; Tabellen erlaubt (Nummer in der Zelle), Überschriften weiter verboten.
+- `app/src/shared/webChat.ts:1022-1060`: `withoutSourceMentions` (Verweise „Auszug/Quelle/Treffer N“ nur bei gültiger Quellennummer entfernt, vor dem Zahlenabgleich), `unsourcedNumbers` für Sätze ohne Nummer (Zahlen aus der Frage ausgenommen), `isLabel`/`label` (≤ 4 Wörter, kein Satzzeichen am Ende, ≥ 1 Buchstabenwort, höchstens eine Zahl mit 1–2 Ziffern ohne Einheit) → keine Marke.
+- `app/src/renderer/utils/webAnswerMarkdown.ts`: `uncited` ist jetzt NEUTRAL („Modellwissen, ohne Quelle“), neue Warnmarke `unsourcedNumber`, `label` → keine Marke. `PetrolWebAnswer.tsx`: Zusammenfassung zieht Etiketten ab. i18n `petrolChat.webStatusUncited/webCheckUncited/webStatusUnsourcedNumber`.
+- `app/src/main/index.ts:7205`: `sentenceExtras` bekommt `Titel + Auszug` je Quelle (Preise stehen bei Shops oft nur im Titel); `analyzeCitations` unverändert nur mit Auszügen.
+- `app/src/renderer/styles/index.css:23259-23270`: Tabellenstile (nur Optik).
+- Tests: `shared/webChat.test.ts` (Block „Modellwissen und Quellenverweise“), `renderer/utils/webAnswerMarkdown.test.ts`, `main/llm/petrolWebPrompt.test.ts`.
+
+**Prüffragen:** Kann ein Modell Fakten ohne Warnung als „Modellwissen“ durchschmuggeln (Zahlen als Wörter, „seit letztem Jahr“, Namen, Versionen)? Lässt `isLabel` Aussagen ohne Marke durch (kurze Behauptungen wie „Nicht empfehlenswert“, „Kostet weniger“)? Kann `withoutSourceMentions` echte Sachzahlen schlucken („Seite 3“, „Treffer 2 von 5“)? Ist der Seitentitel als Zahlenbeleg vertretbar (untrusted, vom Modell gesehen) — und weicht er von dem ab, was `analyzeCitations` prüft? Wird irgendwo (Export, Nachfrage-Snapshot, Vault-Chat, Notiz-Agent) die neue Neutralität von `uncited` ungewollt übernommen? Sind die Tests aussagekräftig?
+
+### Runde 9 (26.10.2026): Ergebnis überzeugt nicht — Ursachen suchen, noch kein Code
+
+**Anlass:** Nutzer nach GUI-Test: „schaue dir das Ergebnis an und bespreche es mit Codex — überzeugend ist was anderes.“ Frage: „Vergleich bitte … Arduino UNO Q und Raspberry Pi 5 im Bildungskontext … Eignung der Klassenstufe und auch eine preisliche Gegenüberstellung.“ Modus Web · gründlich (Schleife), Modell OpenRouter `openai/gpt-6-luna` (Cloud, großes Fenster).
+
+**Was die Antwort zeigt (abgeschrieben vom Bildschirm):**
+- Tabelle Kriterium | UNO Q | Pi 5, Zeilen Grundidee / Typische Lernprojekte / Preisangabe. Preise: „2 GB RAM und 16 GB eMMC … im US-Shop 59 US-Dollar [2]“ und „Für die Variante mit 4 GB RAM wird ein Angebotspreis von 179,89 Euro aufgeführt [3]“. Quelle [3] ist geizhals.de mit Titel „Raspberry Pi 5 Modell B ab € 179,89 (2026)“.
+- Pi-5-Zelle: „die Vergleichsseite nennt keine Echtzeitsteuerung über einen zusätzlichen Mikrocontroller [1][3]“ → rotes „!“ (Verneinung).
+- Klassenstufe nur aus Modellwissen und vage („jüngere oder noch wenig erfahrene Lernende …“, „Sekundarstufe II und berufliche Bildung …“), alle ○.
+- „Einen Europreis für den UNO Q nennen die abgerufenen Angaben nicht.“ → ○ Modellwissen (nicht als Lücke erkannt).
+- Prüfung: 19 Sätze · 5 Modellwissen · **8 mit geringer Wortübereinstimmung** · 1 Verneinung. Fast jeder zitierte Satz trägt „≈“.
+- Rechercheweg: 5 Suchen, 8 Abrufe (Grenze erreicht), raspberrypi.com Fehlerseite, docs.arduino.cc leer; **„Abgerufen, aus Platzgründen nicht verwendet: docs.arduino.cc, www.welectron.com“** — welectron ist ein deutscher Shop, der UNO Q vermutlich in Euro führt.
+
+**Meine Vermutungen (bitte gegen den Code prüfen, nicht übernehmen):**
+1. **Preis wohl falsch zugeordnet:** 179,89 € passt eher zur 16-GB-Variante bzw. zum günstigsten Angebot irgendeiner Variante; „4 GB“ stammt vermutlich aus der Frage-/Suchanfrage („Raspberry Pi 5 4GB Preis …“). Die Prüfung sieht nur „179,89 steht in der Seite“ und schweigt — der gefährlichste Fall: falsch und unauffällig. Gibt es einen Weg, Zahl UND Bezugsgröße (4 GB) gemeinsam zu prüfen, ohne Rauschen?
+2. **4-Seiten-Deckel auch in der Cloud:** `DEEP_LIMITS.maxPages = 4` (`app/src/shared/webChatDeep.ts:24`) und `freezeBest` (`app/src/main/index.ts:6964`) werfen Seiten weg, obwohl das Cloud-Fenster riesig ist. Gerade die Seite mit dem Europreis fiel raus, danach sagt die Antwort „kein Europreis“. Welche Seiten fallen in welcher Reihenfolge raus (Reihenfolge der `use`-Liste? Abrufreihenfolge?), und ist `window` in `limited` korrekt?
+3. **„≈“ ist Dauerrauschen:** deutsche Sätze gegen englische Seiten (`DEFAULT_THRESHOLD = 0.3`, `app/src/shared/rag/citations.ts:86`). Wenn 8 von 10 Sätzen markiert sind, trägt die Marke keine Information mehr und macht die Antwort unglaubwürdig. Ausblenden, nur in der Prüfliste, oder sprachunabhängig (Zahlen/Eigennamen) messen?
+4. **Rot für Verneinung ist falsch eingestuft** (meine Änderung von heute): `SEVERE_FLAGS` in `app/src/renderer/utils/webAnswerMarkdown.ts` enthält `negation` — das ist „nicht prüfbar“, kein Befund. Außerdem redet der Satz über die Quelle („die Vergleichsseite nennt keine …“), obwohl der Prompt das verbietet.
+5. **Lückensatz nicht erkannt:** „nennen die abgerufenen Angaben nicht“ — `GAP_SOURCE` (`app/src/shared/webChat.ts:878`) kennt „Angaben“/„abgerufen“ nicht.
+6. **Klassenstufe:** keine Quelle zur Eignung gefunden; Antwort weicht ins Vage aus. Liegt das an der Suche (Suchanfragen siehe Spur: „Arduino UNO Q Klassenstufe Unterricht Schule Bildung Arduino“ u. a.), am Budget, oder ist das schlicht Modellwissen-Terrain, das ehrlicher als „keine Quelle zur Klassenstufe gefunden, Einschätzung:“ gerahmt werden sollte?
+
+**Prüffragen:** Welche der Vermutungen tragen, mit `datei:zeile`? Was übersehe ich? Was davon macht die Antwort WIRKLICH unglaubwürdig, was ist Kosmetik? Reihenfolge der Abhilfen nach Wirkung, mit Risiko (neue Fehlalarme, neue stille Fehler). Gesonderte Bewertung der heutigen UI-Änderungen (Zeichen ○ ≈ ! ∅ im Text statt Textmarken, Legende, eingeklappte Quellen in `PetrolWebAnswer.tsx` `WebMarkLegend`/`WebSourcesFold`, `PetrolChat.tsx`): verstecken sie etwas, das sichtbar sein muss?
+
 ## Kontext/Anker
 
 - Warnung: `app/src/shared/webChat.ts:334` (`CHATTY_REQUEST`), `looksConversational` direkt darunter. Tests stehen in `app/src/shared/webChat.test.ts`.
@@ -727,6 +782,133 @@ Status: [OFFEN]
 `TOOL_UNSUPPORTED` verlangt überwiegend den Werkzeugbegriff **vor** „not support“; als Sonderfall erkennt es nur `does not support tools`. Eine Meldung `model does not support function calling` oder `model does not support tool calls` wird nicht erkannt. Der Main zeigt dann einen Modellfehler und führt gerade für ein Modell ohne Werkzeugfähigkeit keinen zugesagten Rückfall aus. Der Test deckt nur `does not support tools` und einen 401-Fehler ab (`petrolWebLoop.test.ts:105`).  
 Vorschlag: Werkzeug-Inkompatibilität anhand strukturierter Backend-Fehler erfassen; bis dahin beide Wortfolgen und übliche Synonyme gezielt testen und die Fehlermeldung bei unbekanntem Text korrekt lassen.
 
+### F56 — Ein 403 oder 429 für eine URL sperrt auch lesbare Seiten desselben Hosts
+Schwere: hoch  
+Stelle: app/src/main/llm/petrolWebLoop.ts:93, app/src/main/llm/petrolWebLoop.ts:110, app/src/main/llm/petrolWebLoop.ts:255, app/src/main/llm/petrolWebLoop.ts:273  
+Status: [OFFEN]  
+`deniesHost` deutet einen einzelnen HTTP 401/403/429/451 oder `blocked` als Aussage über **alle** Treffer des Ausgangshosts. Ein 403 kann nur einen geschützten Produktpfad betreffen, während eine andere Seite öffentlich ist; 429 kann vorübergehend oder pfadspezifisch sein. `blocked` kann auch durch eine einzelne unzulässige Weiterleitung entstehen. Der spätere Abruf derselben Host-Zeichenfolge wird ohne Versuch verworfen. Damit kann gerade eine maßgebliche Quelle aus der Belegbasis fallen; der Modelltext behauptet zudem unbelegt, auch weitere Treffer seien nicht lesbar. Der 404-Test prüft lediglich einen Status, der ohnehin nicht auf der Sperrliste steht (`petrolWebLoop.test.ts:222`).  
+Vorschlag: Nur den gescheiterten Treffer sicher ausschließen. Eine Host-Sperre erst nach wiederholten, passenden Sperrantworten oder mit einem ausdrücklich als Heuristik gekennzeichneten, engen Laufzeitlimit verwenden; 429 und URL-bezogene `blocked`-Gründe nicht als dauerhafte Host-Aussage behandeln. Einen 403-Pfad neben einem lesbaren Pfad desselben Hosts testen.
+
+### F57 — Vom Modell gewählte, automatisch gesperrte Treffer erscheinen als „nicht gewählt“
+Schwere: mittel  
+Stelle: app/src/main/llm/petrolWebLoop.ts:256, app/src/main/llm/petrolWebLoop.ts:270, app/src/main/llm/petrolWebLoop.ts:191, app/src/main/llm/petrolWebLoop.ts:197, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:266  
+Status: [OFFEN]  
+Ein `web_fetch` für einen bereits gesperrten Host kehrt vor `fetched.set` und ohne eigene Trace-Markierung zurück. `finish` setzt den Treffer deshalb auf `not-picked`, `notFetched` zählt ihn mit, und die Anzeige übersetzt das als „nicht gewählt“, obwohl das Modell ihn ausdrücklich gewählt und die App ihn verweigert hat. Im Raspberry-Test wird nur geprüft, dass kein zweiter Netzabruf stattfindet; der irreführende Trace-Status wird nicht geprüft (`petrolWebLoop.test.ts:189`).  
+Vorschlag: Einen eigenen Status „vom Modell gewählt, wegen Host-Sperre nicht abgerufen“ erfassen und in Spur sowie Zählern entsprechend benennen. Die Testfolge über `trace.hits` und die Anzeige prüfen.
+
+### F58 — Dieselbe sperrende Website kann unter einer anderen Host-Schreibweise erneut Budget kosten
+Schwere: mittel  
+Stelle: app/src/main/llm/petrolWebLoop.ts:174, app/src/main/llm/petrolWebLoop.ts:255, app/src/main/llm/petrolWebLoop.ts:273, app/src/main/llm/petrolWebChat.ts:156, app/src/main/webResearch/fetchExtract.ts:98, app/src/shared/webResearch.ts:154  
+Status: [OFFEN]  
+`deniedHosts` vergleicht nur `c.host` exakt. `www.beispiel.de` und `beispiel.de` bleiben verschiedene Schlüssel; ebenso ein Host mit abschließendem Punkt. Führt ein Treffer per Redirect zu einer 403-Seite auf einem anderen Host, besitzt `FetchExtractError` zwar `finalUrl`, aber `defaultWebGatherDeps.fetchPage` reicht nur den Status durch. Die Schleife sperrt damit den Ausgangshost und kennt den tatsächlich ablehnenden Zielhost nicht: weitere Treffer auf den Zielhost verbrauchen erneut Abrufbudget, während der Ausgangshost zu Unrecht gesperrt sein kann (F56). Die Tests verwenden nur identische Hostnamen ohne Weiterleitung.  
+Vorschlag: Für Fehlabrufe die finale URL/Redirect-Kette bis zur Schleife erhalten und die Sperrentscheidung an der tatsächlich antwortenden Adresse festmachen; Host-Aliasse nur anhand beobachteter Weiterleitungen zusammenführen. Mit `www`/Apex und einem Redirect auf 403 testen.
+
+### F59 — Der Anstoß speist eine von Suchtreffern beeinflusste Modellantwort als Assistententext wieder ein
+Schwere: mittel  
+Stelle: app/src/main/llm/petrolWebLoop.ts:205, app/src/main/llm/petrolWebLoop.ts:247, app/src/main/llm/petrolWebLoop.ts:309, app/src/main/llm/petrolWebLoop.ts:316  
+Status: [OFFEN]  
+Der Anstoß selbst ist fester App-Text und endet wegen `nudged` und der Rundengrenze. Neu ist aber: Wenn das Modell nach untrusted Suchtreffern ohne lesbare Seite eine freie Antwort statt eines Werkzeugs liefert, wird deren voller `reply.text` vor dem Anstoß als **Assistenten-Nachricht** in den nächsten Modellaufruf übernommen. Ein Suchanriss kann das Modell zu einer wiedergegebenen Anweisung bewegen; diese steht im nächsten Zug dann nicht mehr nur im gerahmten Werkzeugergebnis, sondern zusätzlich als ungerahmter Assistententext. Der Test prüft nur das Vorkommen des festen Anstoßes, nicht die Rollen und Inhalte des nächsten Aufrufs (`petrolWebLoop.test.ts:239`).  
+Vorschlag: Bei dieser einmaligen Fortsetzung die freie Modellantwort nicht erneut einspeisen; nur den App-Anstoß und die bereits als untrusted gerahmten Werkzeugergebnisse verwenden. Einen Test mit injizierendem Trefferanriss und einer entsprechenden freien Modellantwort ergänzen.
+
+### F60 — Ungestützte Fakten ohne Ziffern erscheinen neutral als Modellwissen
+Schwere: hoch  
+Stelle: app/src/main/llm/petrolWebPrompt.ts:46, app/src/main/llm/petrolWebPrompt.ts:47, app/src/shared/webChat.ts:1052, app/src/shared/webChat.ts:1056, app/src/renderer/utils/webAnswerMarkdown.ts:28, app/src/renderer/utils/webAnswerMarkdown.ts:45  
+Status: [OFFEN]  
+Der Prompt verbietet Namen, Versionen und aktuelle Fakten aus eigenem Wissen. Die neue Prüfung warnt in Sätzen ohne Quellennummer jedoch nur bei **Ziffern**; ein Satz wie „Die UNO Q nutzt einen Qualcomm-Prozessor.“ oder „Das Modell kam letztes Jahr heraus.“ erhält bloß die neutrale Marke „Modellwissen, ohne Quelle“. Ausgeschriebene Zahlen, relative Daten und konkrete Produktbehauptungen durchlaufen denselben Weg. Das ist mehr als die erlaubte Einordnung und kann als sachliche Antwort glaubwürdiger wirken, als ihre Belegbasis trägt. Die Tests prüfen nur `12 Euro` und einen allgemeinen Empfehlungssatz (`webChat.test.ts:766`).  
+Vorschlag: Sätze ohne Quelle sichtbar als **unbelegte Modellangabe** kennzeichnen, wenn sie eine konkrete überprüfbare Behauptung enthalten; die Erlaubnis für Einordnung nicht als faktische Freigabe behandeln. Mindestens Namen, ausgeschriebene Mengen und relative Zeitangaben als adversariale Testfälle aufnehmen und bei nicht verlässlicher Erkennung keine beruhigende Neutralfarbe verwenden.
+
+### F61 — Kurze Behauptungen werden als Tabellen-Etiketten unsichtbar
+Schwere: hoch  
+Stelle: app/src/shared/webChat.ts:1022, app/src/shared/webChat.ts:1025, app/src/shared/webChat.ts:1055, app/src/renderer/utils/webAnswerMarkdown.ts:42, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:113  
+Status: [OFFEN]  
+`isLabel` prüft nur Länge, Satzzeichen und Ziffernform, nicht ob der Text eine Aussage macht. „Kostet weniger“, „Nicht empfehlenswert“ oder „Preis 59“ erfüllen die Regel (höchstens vier Wörter, kein Satzzeichen; eine kurze Zahl ist erlaubt) und bekommen `label: true`. `sentenceFlags` gibt dann **gar keine** Marke zurück; die Prüfzusammenfassung zieht sie sogar von den Sätzen ohne Quellennummer ab. In einer Vergleichstabelle kann damit sogar ein unbelegter Preis ohne Zahlenwarnung stehen. Die Tests enthalten Etiketten und `189 €`, aber keine kurzen behauptenden Zellen oder Preise ohne Währungszeichen (`webChat.test.ts:780`).  
+Vorschlag: Die Etiketten-Ausnahme auf klar strukturelle Spaltenköpfe/Zeilenbezeichner begrenzen, nicht auf jede kurze Zelle oder jeden kurzen Satz anwenden. „Kostet weniger“, „Nicht empfehlenswert“ und „Preis 59“ als unzitierte Angaben testen.
+
+### F62 — Zahlen aus dem Titel gelten als Beleg, obwohl der Satzprüfer nur den Auszug bewertet
+Schwere: hoch  
+Stelle: app/src/shared/webChat.ts:789, app/src/main/llm/petrolWebPrompt.ts:16, app/src/main/index.ts:7202, app/src/main/index.ts:7205, app/src/shared/rag/citations.ts:360, app/src/shared/webChat.ts:1062  
+Status: [OFFEN]  
+`sentenceExtras` sucht Zahlen nun im untrusted Seitentitel **und** im eingefrorenen Text; `analyzeCitations` bewertet die Wortdeckung weiterhin nur gegen den Text. Ein Preis kann ausschließlich im HTML-/Treffertitel stehen, während die Seite selbst ihn nicht bestätigt. Enthält der Auszug genug andere Wörter des Antwortsatzes, wird dieser als `cited-high` eingestuft und die fehlende Zahl nicht mehr gemeldet. Zudem kann `WebSource.title` bei leerem Seitentitel vom Suchtreffer stammen, also von einem anderen Datenstück als der abgerufenen Seite. Der neue Test gibt Titel und Text bereits **gemeinsam** an beide Prüfer und belegt die reale Abweichung gerade nicht (`webChat.test.ts:794`).  
+Vorschlag: Titel-only-Zahlen getrennt als „nur im Seitentitel“ markieren und nicht wie Textbelege entwarnen. Den Wortvergleich und die Zahlenprüfung auf dieselbe klar bezeichnete Basis beziehen; einen Test mit Suchtreffertitel, abweichendem Seitentext und scheinbar hoher Wortdeckung ergänzen.
+
+### F63 — „Treffer 2“ kann eine echte Sachzahl aus der Prüfung entfernen
+Schwere: mittel  
+Stelle: app/src/shared/webChat.ts:1015, app/src/shared/webChat.ts:1030, app/src/shared/webChat.ts:1061, app/src/shared/webChat.ts:1064  
+Status: [OFFEN]  
+`withoutSourceMentions` löscht jede Folge `Treffer <gültige Quellennummer>` unabhängig vom Satzsinn und vor dem Zahlenvergleich. In einem Sport- oder Suchergebnissatz kann „Treffer 2“ eine inhaltliche Zahl sein; bei mindestens zwei Quellen verschwindet die `2` trotzdem, auch wenn der Satz `[1]` zitiert und Seite 1 nur einen Treffer nennt. „Seite 3“ ist von dieser Regex nicht betroffen, aber die pauschale `Treffer`-Ausnahme reicht für eine falsche Entwarnung. Der Test prüft nur echte Verweise wie „Laut Auszug 2“ (`webChat.test.ts:756`).  
+Vorschlag: Solche Verweise nur in eindeutigen Metasprache-Formen (etwa „laut Quelle 2“) ausnehmen oder bei Mehrdeutigkeit die Zahl weiter prüfen. Gegenproben mit „zweiter Treffer“/„Treffer 2“ als Sachangabe ergänzen.
+
+### F64 — Die aufgeklappte Satzprüfung unterschlägt die neue Zahlenwarnung
+Schwere: mittel  
+Stelle: app/src/renderer/components/Agent/PetrolWebAnswer.tsx:119, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:138, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:146, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:45  
+Status: [OFFEN]  
+Die Kurzprüfung zählt `unsourcedNumbers` und die Antwort bekommt eine Warnmarke. Im aufgeklappten Satzbericht baut `extraLabels` jedoch nur `missingNumbers`, `questionNumbers` und Verneinung ein. Der betroffene Satz wird schwach eingefärbt, erklärt aber bloß „Modellwissen, ohne Quelle“ statt „Zahl ohne Quelle: 12 €“. Gerade beim Prüfen der konkreten Warnung fehlt damit der Grund an der Stelle, an der der Nutzer ihn erwartet. Die Renderer-Tests prüfen nur `sentenceFlags`, nicht `WebCheck` (`webAnswerMarkdown.test.ts:46`).  
+Vorschlag: `unsourcedNumbers` mit demselben Label wie die Inline-Marke in `extraLabels` aufnehmen und einen UI-Test für den aufgeklappten Bericht ergänzen.
+
+### F65 — Preis und Gerätevariante werden getrennt statt als Aussage geprüft
+Schwere: hoch  
+Stelle: app/src/shared/webChat.ts:1010, app/src/shared/webChat.ts:1073, app/src/shared/webChat.ts:1088, app/src/shared/rag/citations.ts:415, app/src/main/index.ts:7202  
+Status: [OFFEN]  
+Die Vermutung zum konkreten Preis **ist aus der abgeschriebenen Antwort nicht beweisbar**; der eingefrorene Auszug von [3] fehlt. Der Code erlaubt aber genau den gefährlichen Fehler: `pageNumbers` sammelt Zahlen und Einheiten über die **ganze** Seite, `sentenceExtras` prüft jede Zahl unabhängig gegen diese Menge. `analyzeCitations` zählt gemeinsame Wörter ab 30 %, ohne eine Zuordnung von „4 GB“ und „179,89 €“ zu prüfen. Stehen 4 GB und 179,89 € bei verschiedenen Varianten oder Angeboten derselben Geizhals-Seite, können beide Zahlen durchgehen und der zusammengesetzte Preis-Satz `cited-high` wirken. Das ist eine sachliche Fehlzuordnung mit glaubwürdiger Quellenmarke, kein bloßes Anzeigeproblem.  
+Vorschlag: Für Preis-/Varianten-Sätze zuerst einen engen gemeinsamen Belegbereich (gleiche Tabellenzeile, Produktkarte oder Satz) verlangen oder die Zuordnung ausdrücklich als ungeprüft anzeigen. Einen Test mit zwei Varianten und vertauschten Preisen gegen denselben Auszug anlegen. Nicht bloß auf gemeinsames Auftreten irgendwo auf der Seite prüfen; das würde den Fehler festschreiben. Risiko: knappe oder schlecht extrahierte Shops erzeugen zusätzliche Warnungen.
+
+### F66 — Vier-Seiten-Deckel verwirft gelesene Quellen auch in der Cloud ohne sichtbaren Begrenzungsgrund
+Schwere: hoch  
+Stelle: app/src/shared/webChat.ts:51, app/src/shared/webChatDeep.ts:24, app/src/shared/webChatDeep.ts:180, app/src/main/llm/petrolWebLoop.ts:195, app/src/main/llm/petrolWebLoop.ts:199, app/src/main/index.ts:6964, app/src/main/index.ts:7083, app/src/main/index.ts:7089  
+Status: [OFFEN]  
+Vermutung 2 trägt im Kern: Bei Cloud ist `contextTokens` unbekannt, deshalb gilt das **app-eigene** Zeichenbudget; `maxPagesForPlace` deckelt zusätzlich hart bei vier Seiten, unabhängig vom Cloud-Fenster. Die Schleife ordnet zuerst die Nummern aus `{"use": [...]}`, danach übrige Abrufe in Abrufreihenfolge; `freezeBest` friert daraus höchstens vier ein. Ob gerade Welectron die fünfte Seite war, ist ohne Laufdaten nicht beweisbar. Wenn vier Seiten passen, setzt `index.ts` den Grund `window` trotz weiterer `unusedEntries` **nicht**, denn die Bedingung verlangt `pages < DEEP_LIMITS.maxPages`. Der eingeklappte Quellenteil zeigt dann weder die verworfene Shopseite noch „eingeschränkte Recherche“ (`PetrolChat.tsx:634`, `PetrolWebAnswer.tsx:229`). Die Antwort kann „kein Europreis“ behaupten, obwohl der Lauf eine relevante Seite gelesen und vor der Antwort weggeworfen hat.  
+Vorschlag: `maxPages` und das Quellenbudget für größere bekannte Routen getrennt kalibrieren; vor allem jeden wegen Seitenzahl/Budget verworfenen lesbaren Abruf als Begrenzung sichtbar halten, auch bei vier von vier Seiten. Die `use`-Priorität gegen Teilfragen und den tatsächlichen eingefrorenen Inhalt prüfen. Risiko: mehr Seiten können kleine Modelle überlasten und auf Cloud die Kosten erhöhen; ein höherer Deckel allein garantiert keine bessere Auswahl.
+
+### F67 — Die „≈“-Flut ist ein unkalibrierter Sprach- und Formateffekt, kein Freispruch für die Sätze
+Schwere: mittel  
+Stelle: app/src/shared/rag/citations.ts:86, app/src/shared/rag/citations.ts:100, app/src/shared/rag/citations.ts:415, app/src/shared/rag/citations.ts:427, app/src/renderer/utils/webAnswerMarkdown.ts:64  
+Status: [OFFEN]  
+Vermutung 3 trägt als mögliche Ursache: Der Prüfer schneidet Inhaltswörter aus dem deutschen Antwortsatz und vergleicht sie **exakt** mit dem Quellentext; englische Formulierungen und Tabellenfragmente senken die Deckung auch bei richtiger Aussage. Aus acht „≈“ folgt aber nicht, dass alle acht Fehlalarme sind — eine vertauschte Gerätevariante oder ein unbelegter Klassentipp kann ebenfalls dabei sein. Die Marke einfach auszublenden oder die Schwelle von 0,3 zu senken würde echte Lücken still entwarnen.  
+Vorschlag: Die acht konkreten Sätze gegen ihre eingefrorenen Auszüge manuell klassifizieren und eine gemischte Deutsch/Englisch-Testmenge aufbauen; dann getrennte Signale für Zahl/Variante und Wortdeckung kalibrieren. Bis dahin „≈“ als schwaches, nicht als widerlegendes Signal beschriften und eine weniger aufdringliche Darstellung erst nach Messung wählen. Risiko: jede großzügigere Sprachangleichung erhöht stille Falschfreigaben.
+
+### F68 — Das rote Ausrufezeichen setzt Verneinung mit einem nachgewiesenen Fehler gleich
+Schwere: mittel  
+Stelle: app/src/renderer/utils/webAnswerMarkdown.ts:44, app/src/renderer/utils/webAnswerMarkdown.ts:45, app/src/renderer/utils/webAnswerMarkdown.ts:60, app/src/renderer/utils/i18n/petrolChat.ts:205, app/src/shared/webChat.ts:1092, app/src/main/llm/petrolWebPrompt.ts:49  
+Status: [OFFEN]  
+Vermutung 4 trägt: `negation` ist in `SEVERE_FLAGS`, also wird „keine Echtzeitsteuerung …“ rot `!`, obwohl die Regel nur ein Verneinungswort gefunden hat und **keinen Widerspruch** zur Seite geprüft hat. Die Legende beschreibt Rot als „Prüfbefund, z. B. Zahl nicht in der Seite“ und macht diesen bloßen Vorsichtshinweis stärker, als er ist. Zugleich verletzt „die Vergleichsseite nennt keine …“ die Promptregel, nicht über Seiten/Recherchen zu reden; ein negiertes Fehlen ist aus einer einzelnen Seite auch sachlich schwer zu belegen.  
+Vorschlag: Verneinung als eigenen „semantisch nicht geprüft“-Hinweis statt als roten Fehler führen; tatsächliche Zahl-/Zitat-/Referenzfehler rot belassen. Den Antwortprompt und Beispiele für Quellen-Abwesenheitsbehauptungen schärfen. Risiko: eine echte erfundene Negation wird farblich weniger auffallen, daher den Hinweis nicht entfernen.
+
+### F69 — Der konkrete Lückensatz wird als neutrales Modellwissen etikettiert
+Schwere: mittel  
+Stelle: app/src/shared/webChat.ts:878, app/src/shared/webChat.ts:884, app/src/shared/webChat.ts:1078, app/src/renderer/utils/webAnswerMarkdown.ts:79  
+Status: [OFFEN]  
+Vermutung 5 trägt: `GAP_SOURCE` kennt weder „Angaben“ noch „abgerufene Angaben“. Der Satz „Einen Europreis für den UNO Q nennen die abgerufenen Angaben nicht“ wird deshalb nicht als benannte Quellenlücke erkannt und erhält `uncited`/„Modellwissen“. Das verschleiert, dass er eine **negative Aussage über die tatsächlich übergebenen Seiten** macht; nach F66 kann diese Übergabe zudem eine bereits gelesene Europreis-Seite ausgeschlossen haben.  
+Vorschlag: Lückenformulierungen wie „die abgerufenen Angaben nennen nicht“ eng und mit Gegenbehauptungs-Schutz testen. Aussage nur auf die **eingefrorenen** Seiten beziehen („In den für diese Antwort verwendeten Auszügen …“); bei verworfenen lesbaren Seiten keine globale „kein Europreis gefunden“-Formulierung zulassen. Risiko: breitere `GAP_SOURCE`-Regex kann echte unbelegte Behauptungen neutralisieren.
+
+### F70 — Keine Prüfung, ob jede erfragte Vergleichsdimension eine Quelle trägt
+Schwere: hoch  
+Stelle: app/src/main/llm/petrolWebLoop.ts:135, app/src/main/llm/petrolWebLoop.ts:197, app/src/main/llm/petrolWebLoop.ts:323, app/src/main/index.ts:7074, app/src/main/llm/petrolWebPrompt.ts:47  
+Status: [OFFEN]  
+Vermutung 6 lässt sich aus der Spur nicht eindeutig auf „schlechte Suchanfrage“ zurückführen: fünf Suchen und acht Abrufe waren verbraucht, danach wählt das Modell bis zu vier Seiten und darf Eignung/Klassenstufe als eigenes Wissen ergänzen. Weder die Schleife noch `freezeBest` prüfen, ob **Preis beider Geräte, Klassenstufe und Lernprojekte** jeweils in den eingefrorenen Auszügen vorkommen. So wirkt eine vollständige Vergleichstabelle möglich, obwohl gerade die erfragte Klassenstufe nur als vage ○-Einschätzung vorliegt. Das ist ein inhaltliches Abdeckungsproblem, unabhängig davon, ob einzelne Suchwörter besser wären.  
+Vorschlag: Bei mehrteiligen Fragen die Teilfragen vor der Antwort sichtbar festhalten und nach dem Einfrieren pro Teilfrage „Quelle vorhanden / nur Einordnung / offen“ ermitteln. Fehlende Klassenstufen ausdrücklich als Lücke benennen und die Empfehlung davon trennen. Risiko: ein automatischer Teilfragen-Prüfer kann ebenfalls halluzinieren; seine Einstufung nicht als Faktencheck ausgeben.
+
+### F71 — Der neue Aufklapper versteckt verworfene Seiten und den Datenweg gerade im Grenzfall
+Schwere: mittel  
+Stelle: app/src/renderer/components/Agent/PetrolChat.tsx:634, app/src/renderer/components/Agent/PetrolChat.tsx:649, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:229, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:236, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:245, app/src/main/index.ts:7089  
+Status: [OFFEN]  
+Die Zusammenfassung nennt nur Zahl/Hosts der **eingefrorenen** Seiten und `limited`-Gründe. Nicht verwendete, aber gelesene Seiten, fehlgeschlagene Hosts, Suchanfragen und der tatsächliche Modell-/Suchanbieterweg liegen vollständig im geschlossenen `<details>`. Beim Vier-Seiten-Deckel fehlt häufig sogar das orange „eingeschränkte Recherche“ (F66). Ein Klick auf eine Hochzahl öffnet zwar den Aufklapper, aber bei einer unzitierten Preis-/Klassenstufen-Lücke gibt es keinen solchen Wegweiser. Damit wird genau die Information versteckt, die erklärt, warum die Antwort lückenhaft ist.  
+Vorschlag: Den Aufklapper für Antworten mit gelesenen, verworfenen Seiten oder Such-/Abruffehlern standardmäßig öffnen oder diese Gründe knapp bereits in der Zusammenfassung nennen; den tatsächlichen Datenweg dort zumindest als kurze Zeile erhalten. Risiko: mehr visuelle Dichte, deshalb nur auf relevante Einschränkungen reagieren.
+
+### F72 — Einzelne Prüfzeichen haben auf Touch und per Tastatur keinen erreichbaren Grund
+Schwere: mittel  
+Stelle: app/src/renderer/utils/webAnswerMarkdown.ts:139, app/src/renderer/utils/webAnswerMarkdown.ts:142, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:116, app/src/renderer/components/Agent/PetrolWebAnswer.tsx:155  
+Status: [OFFEN]  
+Die neuen ○/≈/!/∅ sind passive `<span>` mit `title` und `aria-label`, aber ohne Tastaturfokus oder Klickaktion; der konkrete Grund erscheint nur im Hover-Tooltip oder nach manuellem Öffnen der gesonderten Satzprüfung. Auf Touch fehlt Hover, und die Legende erklärt nur Kategorien. Bei einer dicht markierten Tabelle lässt sich ein bestimmtes `!` deshalb nicht direkt seinem Prüfsatz zuordnen. Das reduziert nicht die Modellqualität, erschwert aber die Überprüfung einer fraglichen Aussage.  
+Vorschlag: Prüfzeichen als fokussierbare Schaltfläche oder Link zum passenden Satzbericht ausgeben und die Detailzeile bei Aktivierung öffnen; das volle Label auf Touch/Klick zeigen. Risiko: zusätzliche Interaktion im Fließtext; mit Tabellen und Screenreader gegenprüfen.
+
+#### Reihenfolge der Abhilfen nach Wirkung und Risiko
+
+1. **F65 (hoch):** Preis und Variante am selben Belegort prüfen; größter Schutz vor glaubwürdig falsch zugeordneten Preisen. Risiko: zusätzliche Fehlalarme bei schlecht extrahierten Shops.
+2. **F66/F70 (hoch):** Verlorene gelesene Seiten sichtbar machen und Teilfragen gegen die **eingefrorene** Basis prüfen, bevor die Antwort Vollständigkeit suggeriert. Danach Seitenzahl/Quellenwahl anhand echter Läufe kalibrieren. Risiko: mehr Cloud-Kosten, Kontextlast und fehlerhafte Abdeckungsurteile.
+3. **F69/F71 (mittel):** Konkrete Quellenlücken ehrlich benennen und entscheidende Begrenzungen trotz Aufklapper zeigen. Risiko: zu breite Lückenerkennung und mehr UI-Dichte.
+4. **F68/F67 (mittel):** Rot für Verneinung korrigieren; die acht „≈“-Sätze erst mit Auszügen bewerten, dann Signal und Darstellung kalibrieren. Risiko: zu großzügiger Abgleich lässt falsche Aussagen durch.
+5. **F72 (mittel):** Prüfgründe per Tastatur/Touch direkt erreichbar machen. Risiko: zusätzliche Bedienelemente im Text.
+
 ## Claude-Antwort
 
 Gegenprüfung 26.10.2026: alle elf Belege am Code nachgesehen, alle tragen. Nutzerfreigabe: Schritt 1 und 2a umsetzen, 2b (F03–F05) getrennt, Schritt 3 (F08–F11) zurückgestellt.
@@ -815,6 +997,39 @@ Belege: typecheck sauber; `npm run test` 226 Dateien, 3102 grün; `electron-vite
 - F47/F48/F49: unverändert wie oben begründet (Entscheidung des Nutzers gegen eine Rückfrage vor dem Senden; F48 zurückgestellt; F49 abgelehnt).
 
 Belege: typecheck sauber, 3102 Tests grün (bekannter Zeitlimit-Fehlschlag `shellExecution.test.ts` unter Last), Build grün.
+
+### Runde 7 — Antworten (Nutzerfreigabe „ja“ zu allen vier, 26.10.2026)
+
+- **F56 [ADRESSIERT, teilweise]:** `blocked` sperrt die Website nicht mehr (`deniesHost`), nur noch 401/403/429/451. Diese sperren weiter ab der ersten Ablehnung — bei acht Abrufen ist „erst nach zwei“ im realen Fall wieder ein verlorener Abruf; Bot-Schutz gilt praktisch website-weit. Text ans Modell sagt jetzt „sperrt vermutlich“. Bekannte Grenze: ein pfadbezogener 403 schließt lesbare Seiten derselben Website aus. Test: `blocked` auf einer Adresse, Nachbaradresse wird gelesen.
+- **F57 [ADRESSIERT]:** abgewiesene Treffer landen ohne Budget als `{ ok: false, reason: 'blocked' }` in den Abrufen; Spur „gescheitert“, Anzeige „Nicht abgerufen: … (gesperrt)“, `notFetched` zählt sie nicht. Test prüft `trace.hits` und den Eintrag.
+- **F58 [ADRESSIERT, teilweise]:** `siteKey` (Kleinschreibung, ohne `www.`, ohne Punkt am Ende). Weiterleitung auf eine andere, sperrende Website bleibt offen (benannt im Code). Test mit `www.s.de`/`s.de`/`S.de.`.
+- **F59 [ADRESSIERT]:** vor dem Anstoß steht fester App-Text `{"use": []}` statt der freien Modellantwort. Test mit injizierendem Trefferanriss prüft Rollen und Inhalt des nächsten Aufrufs.
+
+Belege: typecheck grün, `petrolWebLoop.test.ts` 16/16, Gesamtsuite grün bis auf den bekannten Last-Wackler `shellExecution.test.ts` (einzeln 15/15), `electron-vite build` grün.
+
+### Runde 8 — Antworten (Nutzerfreigabe „ja, alle fünf umsetzen“, 26.10.2026)
+
+- **F60 [ADRESSIERT, teilweise]:** keine Erkennungsregeln für Namen/Daten ohne Ziffern (bewusst, siehe Memory „Modell steuern lassen statt Regeln flicken“). Stattdessen ehrliche Marke „Modellwissen, nicht geprüft“ in eigener Petrol-Farbe (`is-knowledge`, `onlyKnowledgeFlags`) statt des beruhigenden Graus. Bekannte Grenze: ein ziffernloser Fakt ohne Nummer erscheint als ungeprüftes Modellwissen, nicht als Warnung.
+- **F61 [ADRESSIERT]:** Etikett nur noch in Tabellenkopf oder erster Spalte (`isTableLabelCell`), Ziffern nur einzeln („Pi 5“). Test: „Kostet weniger“/„Nicht empfehlenswert“ in Inhaltsspalten und außerhalb der Tabelle sowie „Preis 59“ in der ersten Spalte sind keine Etiketten.
+- **F62 [ADRESSIERT, teilweise]:** `WebSource.titleFromPage`; nur Titel aus der abgerufenen Seite gehen in die Zahlenprüfung, Suchtreffer-Titel nie, ältere Schnappschüsse ohne Feld ebenfalls nicht. Keine eigene Marke „nur im Titel“: der Seitentitel ist Text derselben Seite und dem Modell als Kopf sichtbar.
+- **F63 [ADRESSIERT]:** „Treffer“ aus `SOURCE_MENTION` entfernt; Test mit „Treffer 2“ als Sachangabe.
+- **F64 [ADRESSIERT]:** `unsourcedNumbers` in der aufgeklappten Prüfung. Kein UI-Test (keine Komponententests im Projekt), Label identisch zur Inline-Marke.
+- Nebenbei: Fettschrift-Reste („Meine erste Wahl:**“) werden in Prüfliste und Export entfernt.
+
+Belege: typecheck grün, `webChat.test.ts` + `webAnswerMarkdown.test.ts` 92/92, Gesamtsuite grün bis auf den Last-Wackler `shellExecution.test.ts`, `electron-vite build` grün.
+
+### Runde 9 — Antworten (Nutzerfreigabe „setze erst mal so um“, 26.10.2026)
+
+Der Nutzer findet den Vergleich grundsätzlich plausibel und brauchbar und fragt, wie stark die Marken verunsichern dürfen. Umgesetzt sind deshalb Schritt 1 und 2. F67 und F72 bleiben offen, bis gemessen ist.
+
+- **F65 [ADRESSIERT]:** `sentenceExtras` setzt `apartNumbers`, wenn ein zitierter Satz mindestens zwei Zahlen mit Einheit trägt, eine davon ein Betrag ist und jede einzeln in der Seite steht, aber in keinem 300-Zeichen-Fenster einer zitierten Seite alle zusammen (`numbersNear`, `shared/webChat.ts`). Marke „↔“ orange, „Zuordnung ungeprüft“. Ist schon eine Zahl falsch, meldet nur `number`. Der Prompt verlangt: Variante zu einem Preis nur nennen, wenn der Auszug beides zusammen nennt. Nebenbei: „59 US-Dollar“ wurde nicht als USD erkannt, behoben. Tests: zwei Varianten, beieinander, ohne Preis, falsche Zahl.
+- **F66 [ADRESSIERT]:** Für Cloud ohne gemeldetes Fenster gilt `WEB_CHAT_CLOUD_BUDGET` = 40 000 Zeichen und `DEEP_LIMITS.maxPagesCloud` = 6 (`maxPagesForPlace(place, cap)`). Lokal bleibt alles wie bisher. Gelesene, aber nicht verwendete Seiten setzen jetzt immer eine Begrenzung: `window` unter dem Deckel, sonst das neue `pages`. Teilweise: Die Reihenfolge der `use`-Liste ist unverändert, das Messen an echten Läufen steht aus.
+- **F68 [ADRESSIERT]:** `negation` ist aus `SEVERE_FLAGS` entfernt und wird grau „?“ mit der Legende „nicht prüfbar, z. B. Verneinung“. Der Prompt verbietet ausdrücklich „die Vergleichsseite nennt keine …“.
+- **F69 [ADRESSIERT]:** `GAP_SOURCE` kennt jetzt „Angabe(n)“. Der Schutz gegen Gegenbehauptungen ist getestet („… aber 59 Euro sind üblich“ bleibt keine Lücke).
+- **F70 [ADRESSIERT, Teil]:** Nur über den Prompt: Bei mehrteiligen Fragen soll das Modell einen fehlenden Teil in einem eigenen Satz benennen („Zur Klassenstufe fand ich keine Quelle.“), der als Lücke erkannt wird, und danach ohne Nummer einschätzen. Eine automatische Prüfung je Teilfrage gibt es nicht. Begründung: Ein solcher Prüfer kann selbst halluzinieren (Codex' Risiko).
+- **F71 [ADRESSIERT]:** Die eingeklappte Zeile nennt „N gelesene nicht verwendet“ (orange) und „N nicht abrufbar“. Der Datenweg bleibt im Aufklapper. Teilweise: Er wird nicht automatisch geöffnet, weil der Nutzer die Fläche überladen fand.
+- **F67 [OFFEN]:** Erst die acht Sätze gegen gespeicherte Auszüge messen.
+- **F72 [OFFEN]:** Zeichen anklickbar machen, folgt.
 
 ## Status
 

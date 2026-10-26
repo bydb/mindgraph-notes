@@ -31,11 +31,14 @@ export interface FetchExtractResult {
 export class FetchExtractError extends Error {
   finalUrl?: string
   redirectChain?: string[]
-  constructor(message: string, info?: { finalUrl?: string; redirectChain?: string[] }) {
+  /** HTTP-Status der Fehlerseite, falls es eine war. */
+  status?: number
+  constructor(message: string, info?: { finalUrl?: string; redirectChain?: string[]; status?: number }) {
     super(message)
     this.name = 'FetchExtractError'
     this.finalUrl = info?.finalUrl
     this.redirectChain = info?.redirectChain
+    this.status = info?.status
   }
 }
 
@@ -93,7 +96,7 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
   // HTTP-Fehler NICHT als erfolgreiche Quelle speichern (Codex-Finding): eine 404-/500-Seite
   // ist kein Inhalt. Nur 2xx wird extrahiert — die echte finale URL + Kette reisen im Fehler mit.
   if (res.status < 200 || res.status >= 300) {
-    throw new FetchExtractError(`Seite antwortete mit HTTP ${res.status}: ${res.finalUrl}`, { finalUrl: res.finalUrl, redirectChain: res.redirectChain })
+    throw new FetchExtractError(`Seite antwortete mit HTTP ${res.status}: ${res.finalUrl}`, { finalUrl: res.finalUrl, redirectChain: res.redirectChain, status: res.status })
   }
 
   // Eine an der Bytegrenze gekappte Seite wird nie halb aufbereitet (Petrol-Chat, F03):

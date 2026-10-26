@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  withoutSourceMentions,
   applyWebChatBudget,
   candidatesFromHits,
   cutAtEnd,
@@ -169,6 +170,15 @@ describe('Einfrieren (F06, F19)', () => {
     expect(r.sources.map((s) => s.host)).toEqual(['ziel.example'])
     expect(r.used).toEqual([0])
     expect(r.duplicates).toEqual([1])
+  })
+
+  it('F62: nur ein Titel aus der Seite selbst ist als Zahlenbeleg markiert', () => {
+    const { sources } = freezeWebSources(
+      [entry(0, ok('Text', 'https://a.example/')), entry(1, { ...ok('Text', 'https://b.example/'), title: '' } as WebFetchOutcome)],
+      { systemChars: 1000, questionChars: 10, history: [] },
+      (t) => t
+    )
+    expect(sources.map((x) => x.titleFromPage)).toEqual([true, false])
   })
 
   it('Nummern folgen der Trefferreihenfolge, nicht der Abschlussreihenfolge; Fehler ohne Nummer', () => {
@@ -748,5 +758,113 @@ describe('Beträge in verschiedenen Schreibweisen (GUI-Test 26.10.2026, Marin-E-
     expect(canonNumber('18,36')).toBe('18,36')
     expect(canonNumber('2026')).toBe('2026')
     expect(canonNumber('5.4.296')).toBe('5.4.296')
+  })
+})
+
+describe('Modellwissen und Quellenverweise (26.10.2026)', () => {
+  const src = ['Der Raspberry Pi 5 mit 8GB kostet 81 Euro bei Digitalo.', 'Die UNO Q kostet 59 Dollar.']
+  it('„laut Auszug 2“ ist keine Sachzahl', () => {
+    const answer = 'Laut Auszug 2 kostet die UNO Q 59 Dollar [2].'
+    const report = analyzeCitations(answer, src)
+    expect(sentenceExtras(answer, report, src)[0].missingNumbers).toEqual([])
+  })
+  it('Verweis auf eine Nummer außerhalb der Quellenliste bleibt eine Zahl', () => {
+    expect(withoutSourceMentions('Quelle 7 nennt das', 2)).toContain('7')
+    expect(withoutSourceMentions('Auszug 1 und 2 nennen das', 2).trim()).toBe('nennen das')
+  })
+  it('Zahl in einem Satz ohne Nummer wird als „ohne Quelle“ markiert, Einordnung ohne Zahl nicht', () => {
+    const answer = 'Die UNO Q kostet 59 Dollar [2]. Für den Pi braucht man zusätzlich ein Netzteil für 12 Euro. Für Physical Computing ist die UNO Q einfacher.'
+    const report = analyzeCitations(answer, src)
+    const ex = sentenceExtras(answer, report, src)
+    expect(ex[1].unsourcedNumbers).toEqual(['12 €'])
+    expect(ex[2].unsourcedNumbers).toBeUndefined()
+  })
+  it('Zahlen aus der Frage zählen in Sätzen ohne Nummer nicht als ungedeckt', () => {
+    const answer = 'Für einen Klassensatz von 15 Geräten lohnt sich die einfachere Lösung.'
+    const report = analyzeCitations(answer, src)
+    expect(sentenceExtras(answer, report, src, 'Was brauche ich für 15 Geräte?')[0].unsourcedNumbers).toBeUndefined()
+  })
+  it('Tabellenkopf und Zeilennamen sind Etiketten, keine Modellwissen-Aussagen', () => {
+    const answer = '| | Raspberry Pi 5 | Arduino UNO Q |\n|---|---|---|\n| **Preis** | kostet 81 Euro [1] | 59 Dollar [2] |\n| **Lernen** | Bietet sich für Linux-Einsteiger an. | Gut für Hardwareprojekte. |'
+    const report = analyzeCitations(answer, src)
+    const ex = sentenceExtras(answer, report, src)
+    const textOf = (k: number) => answer.slice(report.sentences[k].start, report.sentences[k].end)
+    const labels = report.sentences.map((_, k) => k).filter((k) => ex[k].label).map(textOf)
+    expect(labels).toEqual(expect.arrayContaining(['Raspberry Pi 5', 'Arduino UNO Q']))
+    expect(labels.some((l) => l.includes('Linux-Einsteiger'))).toBe(false)
+  })
+  it('kurze Zellen mit Menge, Preis oder Jahr sind keine Etiketten', () => {
+    const answer = '| Modell | Preis | Jahr |\n|---|---|---|\n| 8 GB RAM | 189 € | seit 2023 |'
+    const report = analyzeCitations(answer, src)
+    const ex = sentenceExtras(answer, report, src)
+    const textOf = (k: number) => answer.slice(report.sentences[k].start, report.sentences[k].end)
+    const labels = report.sentences.map((_, k) => k).filter((k) => ex[k].label).map(textOf)
+    expect(labels).toEqual(['Modell', 'Preis', 'Jahr'])
+  })
+  it('Zahl aus dem Seitentitel gilt als Seitenzahl, wenn der Titel mitgegeben wird', () => {
+    const pages = ['Raspberry Pi 5 (8 GB RAM), 189,00 €\nIn den Warenkorb']
+    const answer = 'Ein Händler listet das Modell mit 8 GB RAM für 189 € [1].'
+    const report = analyzeCitations(answer, pages)
+    expect(sentenceExtras(answer, report, pages)[0].missingNumbers).toEqual([])
+  })
+  it('F61: kurze Aussagen in Inhaltsspalten und außerhalb von Tabellen sind keine Etiketten', () => {
+    const answer = '| Board | Preis | Urteil |\n|---|---|---|\n| Raspberry Pi 5 | Kostet weniger | Nicht empfehlenswert |\n| Preis 59 | x [1] | y [1] |\n\nNicht empfehlenswert'
+    const report = analyzeCitations(answer, src)
+    const ex = sentenceExtras(answer, report, src)
+    const textOf = (k: number) => answer.slice(report.sentences[k].start, report.sentences[k].end).trim()
+    const labels = report.sentences.map((_, k) => k).filter((k) => ex[k].label).map(textOf)
+    expect(labels).toEqual(['Board', 'Preis', 'Urteil', 'Raspberry Pi 5'])
+  })
+  it('F63: „Treffer 2“ ist eine Sachangabe und wird weiter geprüft', () => {
+    expect(withoutSourceMentions('Er erzielte Treffer 2 in der Nachspielzeit', 2)).toContain('2')
+    const answer = 'Er erzielte Treffer 2 in der Nachspielzeit [1].'
+    const pages = ['Er erzielte einen Treffer in der Nachspielzeit.']
+    const report = analyzeCitations(answer, pages)
+    expect(sentenceExtras(answer, report, pages)[0].missingNumbers).toEqual(['2'])
+  })
+})
+
+
+describe('Runde 9: Zuordnung, Lücken, Cloud-Budget (Codex F65/F66/F69)', () => {
+  const filler = (n: number) => ' Lieferbar in zwei bis drei Werktagen, Versand aus Deutschland.'.repeat(n)
+
+  it('F65: Preis und Variante weit auseinander → Zuordnung ungeprüft', () => {
+    const page = `Raspberry Pi 5 mit 4 GB RAM, Starterset.${filler(8)} Raspberry Pi 5 mit 16 GB RAM ab 179,89 Euro.`
+    const answer = 'Für die Variante mit 4 GB RAM werden 179,89 Euro genannt [1].'
+    const report = analyzeCitations(answer, [page])
+    expect(sentenceExtras(answer, report, [page])[0].apartNumbers).toEqual(['4 GB', '179,89 €'])
+  })
+
+  it('F65: Preis und Variante beieinander → kein Hinweis', () => {
+    const page = `${filler(8)} Raspberry Pi 5 mit 4 GB RAM ab 64,90 Euro.${filler(8)}`
+    const answer = 'Die Variante mit 4 GB RAM kostet 64,90 Euro [1].'
+    const report = analyzeCitations(answer, [page])
+    expect(sentenceExtras(answer, report, [page])[0].apartNumbers).toBeUndefined()
+  })
+
+  it('F65: ohne Preis oder mit fehlender Zahl kein Zuordnungshinweis (dort meldet „Zahl“)', () => {
+    const page = `Raspberry Pi 5 mit 4 GB RAM.${filler(8)} Speicherkarte 32 GB.`
+    const a1 = 'Es gibt 4 GB RAM und eine 32 GB Karte [1].'
+    expect(sentenceExtras(a1, analyzeCitations(a1, [page]), [page])[0].apartNumbers).toBeUndefined()
+    const a2 = 'Die 4 GB Variante kostet 99 Euro [1].'
+    const x2 = sentenceExtras(a2, analyzeCitations(a2, [page]), [page])[0]
+    expect(x2.missingNumbers).toEqual(['99 €'])
+    expect(x2.apartNumbers).toBeUndefined()
+  })
+
+  it('F69: „die abgerufenen Angaben nennen nicht“ ist eine benannte Lücke', () => {
+    expect(isGapStatement('Einen Europreis für den UNO Q nennen die abgerufenen Angaben nicht.')).toBe(true)
+    expect(isGapStatement('Zur Klassenstufe fand ich keine Quelle.')).toBe(true)
+    expect(isGapStatement('Die Angaben nennen keinen Europreis, aber 59 Euro sind üblich.')).toBe(false)
+  })
+
+  it('„59 US-Dollar“ ist ein Betrag in USD', () => {
+    expect(numberUnits('im US-Shop 59 US-Dollar')).toEqual(['59usd'])
+    expect(numberUnits('59 Dollars')).toEqual(['59usd'])
+  })
+
+  it('F66: Cloud ohne gemeldetes Fenster bekommt das größere Budget, lokal bleibt es', () => {
+    expect(webChatCharBudget(null, true)).toBeGreaterThan(webChatCharBudget(null))
+    expect(webChatCharBudget(8192, true)).toBe(webChatCharBudget(8192))
   })
 })

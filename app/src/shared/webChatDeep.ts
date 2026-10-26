@@ -22,6 +22,8 @@ export const DEEP_LIMITS = {
   ranks: 5,
   /** Höchstens so viele Seiten werden eingefroren. */
   maxPages: 4,
+  /** Cloud-Modelle mit größerem Budget (`WEB_CHAT_CLOUD_BUDGET`, Codex F66). */
+  maxPagesCloud: 6,
   /** Mindestlänge je eingefrorenem Auszug (S4). */
   minExcerpt: 1500,
   /** Kandidaten, die dem Modell zur Wahl gezeigt werden. */
@@ -177,8 +179,8 @@ export function mergeCandidatesRoundRobin(lists: ReadonlyArray<readonly WebSearc
 // ── Seitenzahl nach Platz (S4, F19) ──────────────────────────────────────────
 
 /** Obergrenze VOR dem Abruf: so viele Seiten passen mit Mindestlänge in den Platz. */
-export function maxPagesForPlace(placeChars: number): number {
-  return Math.max(0, Math.min(DEEP_LIMITS.maxPages, Math.floor(placeChars / DEEP_LIMITS.minExcerpt)))
+export function maxPagesForPlace(placeChars: number, cap: number = DEEP_LIMITS.maxPages): number {
+  return Math.max(0, Math.min(cap, Math.floor(placeChars / DEEP_LIMITS.minExcerpt)))
 }
 
 // ── Wörterabgleich (S2, F10, F17) ────────────────────────────────────────────

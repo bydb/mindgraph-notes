@@ -23256,6 +23256,18 @@ body.presentation-mode *::after {
 .petrol-turn-a pre { background: var(--bg-secondary); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; }
 .petrol-turn-a code { font-size: 0.92em; }
 .petrol-turn-a a { color: var(--accent-color); cursor: pointer; }
+/* Tabellen in Antworten (Vergleiche). `overflow-wrap: anywhere` der Fläche zählt in die Mindestbreite
+   der Zellen — ohne Rücksetzen schrumpfte die erste Spalte auf einen Buchstaben (Nutzertest 26.10.2026). */
+.petrol-turn-a:has(table) { overflow-x: auto; }
+.petrol-turn-a table { width: 100%; border-collapse: collapse; margin: 4px 0 10px; font-size: 13.5px; line-height: 1.5; }
+.petrol-turn-a th, .petrol-turn-a td {
+  overflow-wrap: break-word; hyphens: auto; min-width: 7em;
+  padding: 7px 10px; text-align: left; vertical-align: top;
+  border-bottom: 1px solid var(--border-color);
+}
+.petrol-turn-a thead th { font-weight: 600; border-bottom-width: 2px; }
+.petrol-turn-a tbody tr > :first-child { font-weight: 600; min-width: 8em; }
+.petrol-turn-a td .petrol-web-flag, .petrol-turn-a th .petrol-web-flag { white-space: normal; }
 .petrol-turn-error {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
   padding: 10px 14px;
@@ -23369,6 +23381,44 @@ body.presentation-mode *::after {
   background: color-mix(in srgb, var(--color-warning) 12%, var(--bg-primary));
 }
 .petrol-web-flag.is-neutral { color: var(--text-secondary); background: var(--bg-secondary); }
+/* Farben: Petrol = Satz mit Quelle (Hochzahl), Orange = Modellwissen und weiche Hinweise,
+   Rot = harter Befund (Zahl/Zitat/Quelle passt nicht). Nutzerentscheidung 26.10.2026. */
+.petrol-web-flag.is-knowledge {
+  color: color-mix(in srgb, var(--color-warning) 85%, var(--text-primary));
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--bg-primary));
+  border: 1px dashed color-mix(in srgb, var(--color-warning) 45%, var(--bg-primary));
+}
+.petrol-web-flag.is-severe {
+  color: color-mix(in srgb, var(--color-danger) 85%, var(--text-primary));
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--bg-primary));
+}
+/* Zeichen im Textfluss statt Textmarke (26.10.2026): hochgestellt wie die Quellennummer, voller
+   Wortlaut im Tooltip und in der Legende. Petrol = Quelle, Orange = Modellwissen/geringe
+   Übereinstimmung, Rot = Prüfbefund, Grau = Lücke/nicht prüfbar. */
+.petrol-web-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 13px; height: 13px; margin-left: 3px; border-radius: 50%;
+  font-size: 10px; font-weight: 700; line-height: 1; vertical-align: super;
+  cursor: help; user-select: none;
+}
+.petrol-web-mark.is-knowledge { width: 8px; height: 8px; border: 1.5px solid var(--color-warning); vertical-align: 0.35em; }
+.petrol-web-mark.is-apart { color: var(--color-warning); font-size: 12px; }
+.petrol-web-mark.is-severe { color: #fff; background: var(--color-danger); }
+.petrol-web-mark.is-gap, .petrol-web-mark.is-other { color: var(--text-secondary); font-size: 11px; }
+.petrol-turn-a td .petrol-web-mark, .petrol-turn-a th .petrol-web-mark { white-space: nowrap; }
+.petrol-web-legend { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 11.5px; color: var(--text-secondary); }
+.petrol-web-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+.petrol-web-legend-item .petrol-web-mark { margin-left: 0; vertical-align: middle; cursor: default; }
+.petrol-web-legend-item .nc-cite { font-size: 0.85em; margin: 0; cursor: default; }
+.petrol-web-fold { border-top: 1px solid var(--border-subtle); padding-top: 8px; }
+.petrol-web-fold > summary {
+  cursor: pointer; list-style-position: inside; display: list-item;
+  font-size: 12px; color: var(--text-secondary); line-height: 1.5;
+}
+.petrol-web-fold-title { font-weight: 600; color: var(--text-primary); margin-right: 8px; }
+.petrol-web-fold-meta + .petrol-web-fold-meta::before { content: ' · '; }
+.petrol-web-fold-body { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.petrol-web-sources.is-folded { border-top: none; padding-top: 0; }
 .petrol-web-appnote { color: var(--text-secondary); font-size: 13px; }
 .petrol-web-block { display: flex; flex-direction: column; gap: 8px; padding: 2px 14px 10px; }
 .petrol-web-muted { font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }

@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { createWebAnswerMarkdown, markWebAnswer, onlyNeutralFlags, sentenceFlags, type WebAnswerEnv, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
+import { createWebAnswerMarkdown, inlineFlags, markWebAnswer, MARK_GLYPHS, markKind, onlyNeutralFlags, sentenceFlags, type WebAnswerEnv, type WebMarkKind, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
 import type { CitationEnv } from '../../utils/citationMarkdown'
 import type { CitationReport, SentenceCheck } from '../../../shared/rag/citations'
 import type { SentenceExtra, WebChatProvenance, WebDeepHit, WebDeepInfo, WebDeepQueryOrigin, WebFetchFailReason, WebFetchFailure, WebSkipCategory, WebSkippedHit, WebSource, WebUnfetchedHit } from '../../../shared/webChat'
@@ -23,6 +23,8 @@ const FLAG_KEYS: Record<WebSentenceFlag, TranslationKey> = {
   heading: 'petrolChat.webStatusHeading',
   number: 'petrolChat.webStatusNumber',
   questionNumber: 'petrolChat.webStatusQuestionNumber',
+  unsourcedNumber: 'petrolChat.webStatusUnsourcedNumber',
+  apart: 'petrolChat.webStatusApart',
   negation: 'petrolChat.webStatusNegation',
   gap: 'petrolChat.webStatusGap'
 }
@@ -37,10 +39,12 @@ export function webFlagLabel(
   const s = report.sentences[k]
   if (!s) return null
   const extra = extras?.[k]
-  const flags = sentenceFlags(s, extra)
+  const flags = inlineFlags(sentenceFlags(s, extra))
   if (flags.length === 0) return null
   return flags.map(f => f === 'number' && extra ? t('petrolChat.webStatusNumber', { numbers: extra.missingNumbers.join(', ') })
     : f === 'questionNumber' && extra ? t('petrolChat.webStatusQuestionNumber', { numbers: (extra.questionNumbers ?? []).join(', ') })
+    : f === 'unsourcedNumber' && extra ? t('petrolChat.webStatusUnsourcedNumber', { numbers: (extra.unsourcedNumbers ?? []).join(', ') })
+    : f === 'apart' && extra ? t('petrolChat.webStatusApart', { numbers: (extra.apartNumbers ?? []).join(', ') })
     : t(FLAG_KEYS[f])).join(' · ')
 }
 
@@ -60,24 +64,28 @@ function openSource(url: string) {
 }
 
 /** Antworttext mit Hochzahlen und Prüfmarken; Modell-Links bleiben Text. */
-export function WebAnswerText({ answer, report, extras, anchor }: { answer: string; report?: CitationReport; extras?: SentenceExtra[]; anchor: string }) {
+export function WebAnswerText({ answer, report, extras, anchor, marks = true }: { answer: string; report?: CitationReport; extras?: SentenceExtra[]; anchor: string; marks?: boolean }) {
   const { t } = useTranslation()
   const html = useMemo(() => {
     if (!report) return sanitizeHtml(md.render(answer.replace(/[\uE000-\uF8FF]/g, '')))
     const env: CitationEnv & WebAnswerEnv = {
       cites: { resolve: () => null },
       flags: {
-        label: (k) => webFlagLabel(report, extras, k, t),
-        isNeutral: (k) => onlyNeutralFlags(sentenceFlags(report.sentences[k], extras?.[k]))
+        // Quellenkritik aus (Einstellung): nur Hochzahlen, keine Prüfzeichen.
+        label: (k) => (marks ? webFlagLabel(report, extras, k, t) : null),
+        kind: (k) => markKind(sentenceFlags(report.sentences[k], extras?.[k]))
       }
     }
     return sanitizeHtml(md.render(markWebAnswer(answer, report, extras), env))
-  }, [answer, report, extras, t])
+  }, [answer, report, extras, t, marks])
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const cite = (e.target as HTMLElement).closest('[data-cite]')
     if (!cite) return
     const row = document.getElementById(`${anchor}-${cite.getAttribute('data-cite')}`)
     if (!row) return
+    // Die Quellenliste ist eingeklappt — ein Klick auf die Hochzahl klappt sie auf.
+    const box = row.closest('details')
+    if (box && !box.open) box.open = true
     row.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     row.classList.add('is-flash')
     setTimeout(() => row.classList.remove('is-flash'), 1200)
@@ -100,6 +108,31 @@ function statusLabel(s: SentenceCheck, t: (k: TranslationKey) => string): string
   return parts.join(' · ')
 }
 
+const LEGEND_KEYS: Record<WebMarkKind, TranslationKey> = {
+  severe: 'petrolChat.webLegendSevere',
+  apart: 'petrolChat.webLegendApart',
+  knowledge: 'petrolChat.webLegendKnowledge',
+  gap: 'petrolChat.webLegendGap',
+  other: 'petrolChat.webLegendOther'
+}
+
+/** Legende zu den Zeichen im Text — nur die Zeichen, die in dieser Antwort vorkommen. */
+export function WebMarkLegend({ report, extras }: { report: CitationReport; extras?: SentenceExtra[] }) {
+  const { t } = useTranslation()
+  const present = new Set(report.sentences.map((s, k) => markKind(sentenceFlags(s, extras?.[k]))).filter((k): k is WebMarkKind => k !== null))
+  const order: WebMarkKind[] = ['knowledge', 'apart', 'severe', 'gap', 'other']
+  return (
+    <div className="petrol-web-legend">
+      <span className="petrol-web-legend-item"><span className="nc-cite">[1]</span>{t('petrolChat.webLegendCited')}</span>
+      {order.filter(k => present.has(k)).map(k => (
+        <span key={k} className="petrol-web-legend-item">
+          <span className={`petrol-web-mark is-${k}`} aria-hidden="true">{MARK_GLYPHS[k]}</span>{t(LEGEND_KEYS[k])}
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /** Zusammenfassung + aufklappbare Prüfung je Satz. */
 export function WebCheck({ answer, report, extras }: { answer: string; report: CitationReport; extras?: SentenceExtra[] }) {
   const { t } = useTranslation()
@@ -108,14 +141,16 @@ export function WebCheck({ answer, report, extras }: { answer: string; report: C
   const parts = [t('petrolChat.webCheckSummary', { sentences: s.sentences })]
   if (s.unchecked) parts.push(t('petrolChat.webCheckHeadings', { n: s.unchecked }))
   const gaps = extras?.filter(x => x.gap).length ?? 0
-  if (s.uncited - gaps > 0) parts.push(t('petrolChat.webCheckUncited', { n: s.uncited - gaps }))
+  const labels = extras?.filter(x => x.label).length ?? 0
+  if (s.uncited - gaps - labels > 0) parts.push(t('petrolChat.webCheckUncited', { n: s.uncited - gaps - labels }))
   if (gaps) parts.push(t('petrolChat.webCheckGaps', { n: gaps }))
-  if (s.low) parts.push(t('petrolChat.webCheckLow', { n: s.low }))
   if (s.invalidRefs) parts.push(t('petrolChat.webCheckInvalid', { n: s.invalidRefs }))
   if (s.quotesNotFound) parts.push(t('petrolChat.webCheckQuotes', { n: s.quotesNotFound }))
-  const numbers = extras?.filter(x => x.missingNumbers.length > 0 || (x.questionNumbers?.length ?? 0) > 0).length ?? 0
+  const numbers = extras?.filter(x => x.missingNumbers.length > 0 || (x.questionNumbers?.length ?? 0) > 0 || (x.unsourcedNumbers?.length ?? 0) > 0).length ?? 0
   const negations = extras?.filter(x => x.negation).length ?? 0
+  const apart = extras?.filter(x => (x.apartNumbers?.length ?? 0) > 0).length ?? 0
   if (numbers) parts.push(t('petrolChat.webCheckNumbers', { n: numbers }))
+  if (apart) parts.push(t('petrolChat.webCheckApart', { n: apart }))
   if (negations) parts.push(t('petrolChat.webCheckNegations', { n: negations }))
   return (
     <div className="petrol-web-check">
@@ -128,13 +163,15 @@ export function WebCheck({ answer, report, extras }: { answer: string; report: C
       {open && (
         <ol className="petrol-web-check-list">
           {report.sentences.map((sn, k) => ({ sn, k })).filter(({ sn }) => sn.status !== 'transition').map(({ sn, k }) => {
-            const text = answer.slice(sn.start, sn.end).replace(/\s+/g, ' ')
+            const text = answer.slice(sn.start, sn.end).replace(/\*\*|__/g, '').replace(/\s+/g, ' ').trim()
             const extra = extras?.[k]
             const flags = sentenceFlags(sn, extra)
             const weak = flags.length > 0 && !onlyNeutralFlags(flags)
             const extraLabels = [
               extra?.missingNumbers.length ? t('petrolChat.webStatusNumber', { numbers: extra.missingNumbers.join(', ') }) : '',
               extra?.questionNumbers?.length ? t('petrolChat.webStatusQuestionNumber', { numbers: extra.questionNumbers.join(', ') }) : '',
+              extra?.unsourcedNumbers?.length ? t('petrolChat.webStatusUnsourcedNumber', { numbers: extra.unsourcedNumbers.join(', ') }) : '',
+              extra?.apartNumbers?.length ? t('petrolChat.webStatusApart', { numbers: extra.apartNumbers.join(', ') }) : '',
               extra?.negation ? t('petrolChat.webStatusNegation') : ''
             ].filter(Boolean)
             return (
@@ -151,19 +188,21 @@ export function WebCheck({ answer, report, extras }: { answer: string; report: C
 }
 
 /** Abgerufene Quellen mit Verwendung; Fehlversuche ohne Nummer darunter. */
-export function WebSourceList({ sources, used, failures, notFetched, anchor }: {
+export function WebSourceList({ sources, used, failures, notFetched, anchor, noHeading }: {
   sources: WebSource[]
   /** null = keine Prüfung (Stopp) — dann ohne „zitiert/nicht zitiert“. */
   used: Set<number> | null
   failures: WebFetchFailure[]
   notFetched: number
   anchor: string
+  /** In der eingeklappten Box trägt die Zusammenfassung die Überschrift. */
+  noHeading?: boolean
 }) {
   const { t } = useTranslation()
   const failText = failures.map(f => `${f.host} (${t(REASON_KEYS[f.reason])})`).join(', ')
   return (
-    <div className="petrol-web-sources">
-      <span className="agent-card-eyebrow">{t('petrolChat.webSources')}</span>
+    <div className={`petrol-web-sources${noHeading ? ' is-folded' : ''}`}>
+      {!noHeading && <span className="agent-card-eyebrow">{t('petrolChat.webSources')}</span>}
       <ol>
         {sources.map(s => {
           const tags = [
@@ -184,6 +223,40 @@ export function WebSourceList({ sources, used, failures, notFetched, anchor }: {
       {notFetched > 0 && <div className="petrol-web-muted">{t('petrolChat.webMoreHits', { n: notFetched })}</div>}
       <div className="petrol-web-muted">{t('petrolChat.webDisclaimer')}</div>
     </div>
+  )
+}
+
+/**
+ * Quellen, Rechercheweg und Datenweg eingeklappt (Nutzerwunsch 26.10.2026: „überladen“).
+ * Die Zusammenfassung nennt Zahl und Websites; eine eingeschränkte Recherche steht auch
+ * eingeklappt sichtbar da, sie darf nicht im Aufklapper verschwinden.
+ */
+export function WebSourcesFold({ sources, used, limited, unused, failed, children }: {
+  sources: WebSource[]
+  used: Set<number> | null
+  limited: boolean
+  /** Gelesen, aber nicht in die Antwort übernommen — erklärt Lücken, gehört in die Zeile (F71). */
+  unused: number
+  /** Abrufe, die scheiterten. */
+  failed: number
+  children: React.ReactNode
+}) {
+  const { t } = useTranslation()
+  const hosts = [...new Set(sources.map(s => s.host.replace(/^www\./, '')))]
+  const count = used
+    ? t('petrolChat.webFoldCounted', { used: sources.filter(s => used.has(s.n)).length, n: sources.length })
+    : t('petrolChat.webFoldCount', { n: sources.length })
+  return (
+    <details className="petrol-web-fold">
+      <summary>
+        <span className="petrol-web-fold-title">{t('petrolChat.webFoldTitle')}</span>
+        <span className="petrol-web-fold-meta">{[count, hosts.join(', ')].filter(Boolean).join(' · ')}</span>
+        {unused > 0 && <span className="petrol-web-fold-meta petrol-web-warn">{t('petrolChat.webFoldUnused', { n: unused })}</span>}
+        {failed > 0 && <span className="petrol-web-fold-meta">{t('petrolChat.webFoldFailed', { n: failed })}</span>}
+        {limited && <span className="petrol-web-fold-meta petrol-web-warn">{t('petrolChat.webFoldLimited')}</span>}
+      </summary>
+      <div className="petrol-web-fold-body">{children}</div>
+    </details>
   )
 }
 
@@ -231,6 +304,7 @@ const DEEP_LIMIT_KEYS: Record<WebDeepInfo['limited'][number], TranslationKey> = 
   timeout: 'petrolChat.webDeepLimitedTimeout',
   budget: 'petrolChat.webDeepLimitedBudget',
   window: 'petrolChat.webDeepLimitedWindow',
+  pages: 'petrolChat.webDeepLimitedPages',
   'loop-error': 'petrolChat.webDeepLimitedLoopError',
   'loop-iterations': 'petrolChat.webDeepLimitedLoopIterations',
   'loop-context': 'petrolChat.webDeepLimitedLoopContext',

@@ -1012,6 +1012,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchWebResearchEnabled = useIsModuleEnabled('web-research')
   const petrolWebLoop = useUIStore(s => s.petrolWebLoop)
   const setPetrolWebLoop = useUIStore(s => s.setPetrolWebLoop)
+  const petrolWebCheckMarks = useUIStore(s => s.petrolWebCheckMarks)
+  const setPetrolWebCheckMarks = useUIStore(s => s.setPetrolWebCheckMarks)
   const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const agentShellModuleOn = useIsModuleEnabled('agent-shell')
   const agentComputerModuleOn = useIsModuleEnabled('agent-computer')
@@ -1798,6 +1800,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                       {/* Experimentell, standardmäßig aus (chat-nachfrage-weitere-seiten.md Runde 5). */}
                       <Row label={t('petrolChat.webLoopLabel')} hint={t('petrolChat.webLoopHint')}>
                         <Toggle checked={petrolWebLoop} onChange={setPetrolWebLoop} ariaLabel={t('petrolChat.webLoopLabel')} />
+                      </Row>
+                      <Row label={t('petrolChat.webCheckMarksLabel')} hint={t('petrolChat.webCheckMarksHint')}>
+                        <Toggle checked={petrolWebCheckMarks} onChange={setPetrolWebCheckMarks} ariaLabel={t('petrolChat.webCheckMarksLabel')} />
                       </Row>
                     </Card>
                   )}

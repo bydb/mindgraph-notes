@@ -732,6 +732,12 @@ interface UIState {
    * (schnell/gründlich). Der Main liest den Schlüssel selbst, fehlt er, gilt an.
    */
   petrolWebLoop: boolean
+  /**
+   * Petrol-Chat: Prüfzeichen, Legende und „Prüfung je Satz“ in Webantworten (Quellenkritik).
+   * Standard aus (Nutzerentscheidung 26.10.2026): Nutzer wollen eine Antwort, mit der sie etwas
+   * anfangen können; Fußnoten und Quellen genügen zum Selbstprüfen. Wer prüfen will, schaltet ein.
+   */
+  petrolWebCheckMarks: boolean
   // Shell-Zugriff des Notiz-Agenten (experimentell): erste Stufe des Opt-ins; die zweite
   // ist der Schalter pro Lauf. Der Main prüft dieses Flag in ui-settings.json selbst.
   agentShellEnabled: boolean
@@ -909,6 +915,7 @@ interface UIState {
   setWorkflowCanvasEnabled: (enabled: boolean) => void
   setWebResearchEnabled: (enabled: boolean) => void
   setPetrolWebLoop: (on: boolean) => void
+  setPetrolWebCheckMarks: (on: boolean) => void
   setAgentShellEnabled: (enabled: boolean) => void
   setAgentShell: (patch: Partial<ShellGuardrails>) => void
   setAgentComputerEnabled: (enabled: boolean) => void
@@ -1094,6 +1101,7 @@ const defaultState = {
   workflowCanvasEnabled: false,
   webResearchEnabled: false,
   petrolWebLoop: true,
+  petrolWebCheckMarks: false,
   agentShellEnabled: false,
   agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
   agentComputerEnabled: false,
@@ -1318,7 +1326,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1430,6 +1438,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setWorkflowCanvasEnabled: (enabled) => set({ workflowCanvasEnabled: enabled }),
   setWebResearchEnabled: (enabled) => set({ webResearchEnabled: enabled }),
   setPetrolWebLoop: (on) => set({ petrolWebLoop: on === true }),
+  setPetrolWebCheckMarks: (on) => set({ petrolWebCheckMarks: on === true }),
   setAgentShellEnabled: (enabled) => set({ agentShellEnabled: enabled }),
   setAgentShell: (patch) => set((state) => ({ agentShell: { ...DEFAULT_SHELL_GUARDRAILS, ...state.agentShell, ...patch } })),
   setAgentComputerEnabled: (enabled) => set({ agentComputerEnabled: enabled }),

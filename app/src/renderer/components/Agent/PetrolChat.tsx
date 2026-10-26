@@ -32,7 +32,7 @@ import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_
 import { applyPreviousTopic, asksForDeeperSearch, asksForMorePages, offerPreviousTopic, previousWebQuestion } from '../../../shared/webChatDeep'
 import { followUpQuery, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
-import { WebAnswerText, WebCheck, WebDeepLine, WebProvenanceLine, WebSkippedLine, WebSourceList, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
+import { WebAnswerText, WebCheck, WebDeepLine, WebMarkLegend, WebProvenanceLine, WebSkippedLine, WebSourceList, WebSourcesFold, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 
 interface Props {
   tabId: string
@@ -103,6 +103,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const webModule = useIsModuleEnabled('web-research')
   const webConfig = useUIStore(s => s.webResearchConfig)
   const webLoopOn = useUIStore(s => s.petrolWebLoop)
+  const checkMarks = useUIStore(s => s.petrolWebCheckMarks)
   const setWebConfig = useUIStore(s => s.setWebResearchConfig)
   useEffect(() => {
     if (webModule && !webConfig) {
@@ -341,7 +342,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       check: t('petrolChat.webFootCheck'),
       warnings: t('petrolChat.webFootWarnings'),
       // Eine benannte Lücke ist keine Warnung — sie steht im Text selbst.
-      flagFor: k => (extras?.[k]?.gap && report.sentences[k]?.status === 'uncited' ? null : webFlagLabel(report, extras, k, t))
+      flagFor: k => (!checkMarks || extras?.[k]?.gap && report.sentences[k]?.status === 'uncited' ? null : webFlagLabel(report, extras, k, t))
     })
   }
   const copy = async (msg: PetrolChatMessage) => {
@@ -625,11 +626,19 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                   </>
                 ) : turn.answer?.origin === 'web' ? (
                   <>
-                    <WebAnswerText answer={turn.answer.content} report={turn.answer.web?.report} extras={turn.answer.web?.extras} anchor={`petrol-src-${turn.answer.at}`} />
+                    <WebAnswerText answer={turn.answer.content} report={turn.answer.web?.report} extras={turn.answer.web?.extras} anchor={`petrol-src-${turn.answer.at}`} marks={checkMarks} />
                     <div className="petrol-web-block">
-                      {turn.answer.web?.report
+                      {checkMarks && turn.answer.web?.report && <WebMarkLegend report={turn.answer.web.report} extras={turn.answer.web.extras} />}
+                      {checkMarks && (turn.answer.web?.report
                         ? <WebCheck answer={turn.answer.content} report={turn.answer.web.report} extras={turn.answer.web.extras} />
-                        : <div className="petrol-web-muted">{t('petrolChat.webStoppedNoCheck')}</div>}
+                        : <div className="petrol-web-muted">{t('petrolChat.webStoppedNoCheck')}</div>)}
+                      <WebSourcesFold
+                        sources={turn.answer.web?.sources ?? turn.answer.webPartial?.sources ?? []}
+                        used={turn.answer.web?.report ? new Set(turn.answer.web.report.usedSources) : null}
+                        limited={(turn.answer.web?.deep?.limited.length ?? 0) > 0}
+                        unused={turn.answer.web?.deep?.unused.length ?? 0}
+                        failed={(turn.answer.web?.failures ?? turn.answer.webPartial?.failures ?? []).length}
+                      >
                       {(turn.answer.web?.sources ?? turn.answer.webPartial?.sources ?? []).length > 0 && (
                         <WebSourceList
                           sources={turn.answer.web?.sources ?? turn.answer.webPartial?.sources ?? []}
@@ -637,6 +646,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                           failures={turn.answer.web?.failures ?? turn.answer.webPartial?.failures ?? []}
                           notFetched={turn.answer.web?.notFetched ?? turn.answer.webPartial?.notFetched ?? 0}
                           anchor={`petrol-src-${turn.answer.at}`}
+                          noHeading
                         />
                       )}
                       {turn.answer.web?.basis?.kind === 'snapshot' ? (
@@ -644,6 +654,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       ) : turn.answer.web ? <WebProvenanceLine p={turn.answer.web.provenance} /> : null}
                       <WebDeepLine deep={turn.answer.web?.deep} />
                       <WebSkippedLine skipped={turn.answer.web?.skipped} />
+                      </WebSourcesFold>
                       {!!turn.answer.web?.historyDropped && (
                         <div className="petrol-web-muted">{t('petrolChat.historyDropped', { n: turn.answer.web.historyDropped })}</div>
                       )}
