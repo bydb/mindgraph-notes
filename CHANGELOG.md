@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.1] - 2026-10-26
+
+**Webantworten im Chat lesen sich jetzt wie eine Beratung, mit Tabelle, Einordnung und Empfehlung.** Bisher endeten Vergleichsfragen oft mit „lässt sich nicht belegen“. Jetzt stehen Fakten wie Preise, Zahlen und Daten mit Quellennummer da, und Petrol ergänzt eigene Einordnung und Empfehlungen ohne Nummer. Ein Klick auf die Nummer führt zur gelesenen Seite.
+
+### Hintergrund
+
+- **Quellenkritik auf Wunsch:** Unter Einstellungen → KI → Webrecherche zeigt „Quellenkritik in Webantworten anzeigen“ kleine Zeichen im Text. Sie markieren Modellwissen ohne Quelle, Zahlen, die nicht auf der Seite stehen, und Preise, die womöglich zu einer anderen Variante gehören. Dazu kommt die Prüfung je Satz. Standardmäßig ist das aus, die Antwort zeigt dann nur Quellennummern und die eingeklappte Quellenliste.
+- **Gesperrte Websites:** Manche Seiten verweigern automatische Abrufe. Die Recherche gibt dann nicht auf, sondern versucht andere Seiten, ohne ihr Abrufbudget an dieselbe Website zu verschwenden.
+- **Cloud-Modelle lesen mehr:** Mit einem Cloud-Modell fließen jetzt bis zu sechs gelesene Seiten in die Antwort statt vier. Wurde eine gelesene Seite trotzdem nicht verwendet, steht das in der Quellenzeile.
+- **Grenzen:** Die Prüfung vergleicht Wörter und Zahlen mit der Seite, sie ist kein Faktencheck. Sätze aus Modellwissen prüft niemand. Findet Petrol zu einem Teil der Frage keine Quelle, soll es das ausdrücklich sagen.
+
 ## [1.1.0] - 2026-10-26
 
 **Im Agent-Tab kannst du jetzt einfach chatten – auf Wunsch mit einer Websuche, die selbst recherchiert.** Schalte oben auf „Chat“ und frag wie in einem gewohnten Chatbot. Mit dem Globus sucht Petrol im Web, liest die passenden Seiten und sucht gezielt weiter, wenn noch etwas fehlt. Die Antwort stützt sich nur auf die gelesenen Seiten und nennt sie als Quellen.
