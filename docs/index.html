@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="google-site-verification" content="XuIkFK3V33YXi92ZBbb1AsgrCejIxVlfMPM_Zj0Ny3o">
   <title>MindGraph Notes – Der KI-Agent, der im Haus bleibt</title>
-  <meta name="description" content="MindGraph Notes mit dem Petrol Agent: KI erledigt Aufträge mit Ihren Unterlagen und liefert Word-, Excel- und PowerPoint-Dateien zur Prüfung. Standardmäßig lokal gerechnet, ohne Konto, Open Source. Für Schule, Hochschule, Verwaltung und Mittelstand.">
+  <meta name="description" content="MindGraph Notes mit dem Petrol Agent: Chat mit Websuche und Quellen, dazu Aufträge, die aus Ihren Unterlagen Word-, Excel- und PowerPoint-Dateien zur Prüfung machen. Standardmäßig lokal gerechnet, ohne Konto, Open Source. Für Schule, Hochschule, Verwaltung und Mittelstand.">
   <link rel="icon" type="image/svg+xml" href="mindgraph-logo.svg">
   <link rel="icon" href="favicon.ico" sizes="48x48">
   <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
@@ -18,7 +18,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://mindgraph-notes.de/">
   <meta property="og:title" content="MindGraph Notes – Der KI-Agent, der im Haus bleibt">
-  <meta property="og:description" content="Der Petrol Agent erledigt Aufträge mit Ihren Unterlagen und legt fertige Dateien zur Prüfung vor. Standardmäßig lokal, ohne Konto, Open Source.">
+  <meta property="og:description" content="Der Petrol Agent beantwortet Fragen mit Quellen zum Nachlesen und erledigt Aufträge mit Ihren Unterlagen – fertige Dateien zur Prüfung. Standardmäßig lokal, ohne Konto, Open Source.">
   <meta property="og:image" content="https://mindgraph-notes.de/og-image.png">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -29,7 +29,7 @@
 
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="MindGraph Notes – Der KI-Agent, der im Haus bleibt">
-  <meta name="twitter:description" content="KI-Aufträge mit Ihren Unterlagen, fertige Dateien zur Prüfung, standardmäßig lokal gerechnet. Open Source, ohne Konto.">
+  <meta name="twitter:description" content="Chat mit Quellen zum Nachlesen und KI-Aufträge mit Ihren Unterlagen, fertige Dateien zur Prüfung, standardmäßig lokal gerechnet. Open Source, ohne Konto.">
   <meta name="twitter:image" content="https://mindgraph-notes.de/og-image.png">
 
   <!-- Einzige Stelle, an der die Release-Version steht. Alle sichtbaren Versionsangaben
@@ -54,6 +54,7 @@
       "Ergebnisse als Word mit Briefkopf, Excel, PowerPoint nach Vorlage, Notiz",
       "Ergebnisse werden erst nach Freigabe gespeichert",
       "Skills: eigene Arbeitsanleitungen als Textnotiz (SKILL.md)",
+      "Petrol-Chat: optionale Websuche mit Quellen zum Nachlesen",
       "Vault-Chat mit Quellenstellen aus den eigenen Notizen",
       "Lokale KI ueber Ollama als Standard, Cloud nur nach Zustimmung",
       "Kein Konto, keine Telemetrie",
@@ -210,6 +211,19 @@
     }
     .step p { color: var(--text-mid); font-size: .96rem; }
     .outputs { margin-top: 2.4rem; }
+    .steps-title { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-top: 1.8rem; }
+    #chat .fineprint { margin-top: 1.6rem; }
+    .hero .hero-note { font-size: .92rem; color: var(--text-muted); max-width: 640px; margin: -1.2rem auto 1.8rem; }
+    .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+    .mode { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 1.6rem; display: flex; flex-direction: column; gap: .6rem; }
+    .mode .mode-ic { width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
+    .mode .mode-ic svg { width: 24px; height: 24px; }
+    .mode p { color: var(--text-mid); font-size: .96rem; }
+    .mode a { margin-top: auto; font-weight: 600; font-size: .94rem; }
+    .modes-note { margin-top: .9rem; }
+    .chat-top { grid-template-columns: .9fr 1.1fr; align-items: start; }
+    .chat-top > svg { margin-top: 5.2rem; }
+    .chat-top > svg { order: -1; }
     .outputs h3 { font-size: .82rem; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); margin-bottom: .8rem; }
     .chips { display: flex; flex-wrap: wrap; gap: .5rem; }
     .chip {
@@ -338,7 +352,8 @@
     /* --- Responsive --- */
     @media (max-width: 960px) {
       .nav-right a.opt { display: none; }
-      .skills-top, .practice { grid-template-columns: 1fr; }
+      .skills-top, .practice, .modes { grid-template-columns: 1fr; }
+      .chat-top > svg { order: 0; margin-top: 0; }
       .dl-grid { grid-template-columns: 1fr 1fr; }
     }
     @media (max-width: 720px) {
@@ -362,6 +377,7 @@
   <!-- Symbol-Bibliothek: alle Icons als Linien-SVG, Farbe über currentColor -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <defs>
+      <symbol id="i-chat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 11h7M8.5 14h4.5"/></symbol>
       <symbol id="i-doc" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
       <symbol id="i-table" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16"/></symbol>
       <symbol id="i-slides" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M12 16v4M8 20h8M7 9h6M7 12h4"/></symbol>
@@ -399,6 +415,7 @@
     <a class="logo" href="#top"><img src="mindgraph-logo.svg" alt="">MindGraph Notes</a>
     <div class="nav-right">
       <a href="#agent" data-i18n="nav.agent">Petrol Agent</a>
+      <a href="#chat" class="opt" data-i18n="nav.chat">Chat mit Quellen</a>
       <a href="#skills" data-i18n="nav.skills">Skills</a>
       <a href="#datenschutz" data-i18n="nav.privacy">Datenschutz</a>
       <a href="#it" class="opt" data-i18n="nav.it">Für die IT</a>
@@ -421,7 +438,8 @@
       </div>
       <p class="audience" data-i18n="hero.audience">Für Schule, Hochschule, Verwaltung und Mittelstand</p>
       <h1 data-i18n="hero.title">Der KI-Agent, <em>der im Haus bleibt.</em></h1>
-      <p class="lead" data-i18n="hero.sub">MindGraph Notes ist ein Arbeitsraum für Notizen und Dokumente. Darin arbeitet der <b>Petrol Agent</b>: Sie geben ihm einen Auftrag und Ihre Unterlagen, er liefert fertige Word-, Excel- oder PowerPoint-Dateien – zur Prüfung, bevor etwas gespeichert wird. Gerechnet wird standardmäßig auf Ihrem eigenen Rechner.</p>
+      <p class="lead" data-i18n="hero.sub">MindGraph Notes ist ein Arbeitsraum für Notizen und Dokumente. Darin arbeitet der <b>Petrol Agent</b>: Im Chat beantwortet er Fragen, auf Wunsch mit Websuche und Quellen zum Nachlesen. Als Auftrag erstellt er aus Ihren Unterlagen Word-, Excel- oder PowerPoint-Dateien, die Sie vor dem Speichern prüfen. Gerechnet wird standardmäßig auf Ihrem eigenen Rechner.</p>
+      <p class="hero-note" data-i18n="hero.note">Websuche und Cloud-Modelle sind optional. Bei der Websuche gehen Suchbegriffe an den gewählten Suchdienst – vor dem Senden zeigt die App, welche Daten wohin gehen.</p>
       <div class="hero-cta">
         <a href="#download" class="btn btn-primary"><svg aria-hidden="true" focusable="false"><use href="#i-download"/></svg><span data-i18n="hero.cta">Kostenlos herunterladen</span></a>
         <a href="#datenschutz" class="btn btn-ghost"><span data-i18n="hero.cta2">So bleiben Ihre Daten bei Ihnen</span></a>
@@ -546,9 +564,25 @@
     <div class="wrap">
       <div class="sec-head fade-in">
         <div class="label" data-i18n="ag.label">Der Petrol Agent</div>
-        <h2 data-i18n="ag.h">Kein Chatfenster, das Text ausgibt. <em>Ein Agent, der Dateien liefert.</em></h2>
-        <p class="lead" data-i18n="ag.lead">Ein KI-Chat liefert Text, den Sie anschließend selbst in Word, Excel oder PowerPoint übertragen. Der Petrol Agent erledigt den ganzen Arbeitsgang und legt das fertige Dokument vor.</p>
+        <h2 data-i18n="ag.h">Zwei Arbeitsweisen – <em>eine Frage klären oder eine Datei erstellen.</em></h2>
+        <p class="lead" data-i18n="ag.lead">Oben im Agent-Tab schalten Sie zwischen Chat und Auftrag um.</p>
       </div>
+      <div class="modes fade-in">
+        <div class="mode">
+          <div class="mode-ic"><svg aria-hidden="true" focusable="false"><use href="#i-chat"/></svg></div>
+          <h3 data-i18n="ag.m1h">Chat: eine Frage klären</h3>
+          <p data-i18n="ag.m1">Fragen, formulieren, laut nachdenken. Mit eingeschalteter Websuche liest Petrol passende Seiten und nennt Quellen zum Nachlesen. Ihre Notizen liest der Chat nicht von selbst.</p>
+          <a href="#chat" data-i18n="ag.m1a">Mehr zum Chat mit Websuche</a>
+        </div>
+        <div class="mode">
+          <div class="mode-ic"><svg aria-hidden="true" focusable="false"><use href="#i-doc"/></svg></div>
+          <h3 data-i18n="ag.m2h">Auftrag: eine Datei erstellen</h3>
+          <p data-i18n="ag.m2">Sie hängen Ihre Unterlagen an, der Agent erledigt den ganzen Arbeitsgang und legt Word, Excel oder PowerPoint zur Prüfung vor – statt Ihnen Text zum Abtippen zu geben.</p>
+          <a href="#auftrag" data-i18n="ag.m2a">So läuft ein Auftrag</a>
+        </div>
+      </div>
+      <p class="fineprint modes-note fade-in" data-i18n="ag.mnote">Aus dem Chat können Sie einen Auftrag vorbereiten. Bei Webantworten übernimmt der Agent nur Ihre Frage und recherchiert neu; Antwort und Quellen aus dem Chat werden nicht übernommen.</p>
+      <h3 class="steps-title" id="auftrag" data-i18n="ag.stepsh">So läuft ein Auftrag</h3>
       <div class="steps fade-in">
         <div class="step">
           <div class="step-n">1</div>
@@ -600,8 +634,41 @@
     </div>
   </section>
 
+  <!-- 2b · Chat mit Websuche -->
+  <section id="chat">
+    <div class="wrap">
+      <div class="skills-top chat-top fade-in">
+        <div>
+          <div class="label" data-i18n="ch.label">Chat mit Websuche</div>
+          <h2 data-i18n="ch.h">Fragen klären, ohne die App zu verlassen – <em>mit Quellen zum Nachlesen.</em></h2>
+          <p class="lead" data-i18n="ch.lead">Mit eingeschalteter Websuche sucht Petrol selbst nach Seiten, liest die passenden und kann bei offenen Punkten weitersuchen. Je nach Frage antwortet es mit Erklärung, Vergleich oder Empfehlung.</p>
+          <div class="skill-points">
+            <div><svg aria-hidden="true" focusable="false"><use href="#i-check"/></svg><p data-i18n="ch.p1"><b>Quellennummern für Angaben aus Seiten.</b> Zahlen, Preise und Daten soll Petrol nur aus gelesenen Seiten nehmen und mit Nummer versehen. Die Nummer führt zum Eintrag in der Quellenliste, von dort öffnen Sie die Seite. Einordnung aus Modellwissen bleibt ohne Nummer.</p></div>
+            <div><svg aria-hidden="true" focusable="false"><use href="#i-shield"/></svg><p data-i18n="ch.p2"><b>Quellenkritik, wenn Sie wollen.</b> Auf Wunsch markiert die App Zahlen, die nicht in der Quelle stehen, Preise, die zu einer anderen Variante gehören könnten, und Sätze aus Modellwissen. Ein Faktencheck ist das nicht – wichtige Angaben prüfen Sie anhand der Seiten.</p></div>
+            <div><svg aria-hidden="true" focusable="false"><use href="#i-lock"/></svg><p data-i18n="ch.p3"><b>Der Datenweg steht vor dem Senden da.</b> Die Recherche formuliert Suchbegriffe selbst und schickt sie an den Suchdienst Ihrer Wahl; welche es waren, zeigt die Antwort. Die Seiten ruft Ihr Rechner selbst ab. Mit einem Cloud-Modell gehen Frage, Gesprächsverlauf und Seitenauszüge an dessen Anbieter.</p></div>
+          </div>
+        </div>
+        <svg viewBox="0 0 420 340" role="img" data-i18n-aria="ch.aria" aria-label="Beispielansicht einer Webantwort: Angaben aus gelesenen Seiten mit Quellennummer, eine Einordnung aus Modellwissen ohne Nummer und die eingeklappte Quellenliste.">
+          <rect x="16" y="16" width="388" height="308" rx="16" fill="#fff" stroke="#e4dfd6" stroke-width="1.5"/>
+          <text class="g-kicker" x="34" y="44" data-i18n="ch.g0">BEISPIELANSICHT</text>
+          <rect class="g-bubble" x="268" y="58" width="120" height="36" rx="14"/>
+          <text class="g-text" x="284" y="81" data-i18n="ch.q">Ihre Frage</text>
+          <text class="g-text" x="34" y="128"><tspan data-i18n="ch.a1">Angabe aus einer gelesenen Seite.</tspan><tspan class="g-sup" dy="-6"> 1</tspan></text>
+          <text class="g-text" x="34" y="154"><tspan data-i18n="ch.a2">Noch eine Angabe, andere Seite.</tspan><tspan class="g-sup" dy="-6"> 2</tspan></text>
+          <text class="g-text" x="34" y="186" data-i18n="ch.a3">Einordnung und Empfehlung aus</text>
+          <text class="g-text" x="34" y="208" data-i18n="ch.a4">Modellwissen – ohne Nummer.</text>
+          <path d="M34 236 H386" stroke="#e4dfd6"/>
+          <path d="M36 258 l7 5 -7 5z" fill="#10696b"/>
+          <text class="g-text" x="52" y="268" font-weight="700" data-i18n="ch.fold">Quellen und Rechercheweg</text>
+          <text class="g-src" x="52" y="292" data-i18n="ch.foldmeta">2 von 3 Seiten zitiert · aufklappbar</text>
+        </svg>
+      </div>
+      <p class="fineprint fade-in" data-i18n="ch.fine">Die Websuche braucht das Modul Webrecherche und einen Suchdienst: Tavily, Linkup oder eine eigene SearXNG-Instanz, die Anfragen an weitere Suchmaschinen weitergeben kann. Mit einem lokalen Modell kann eine Webantwort mehrere Minuten dauern; das hängt von Modell, Rechner und Suchdienst ab. Ihre Notizen liest der Chat nicht von selbst.</p>
+    </div>
+  </section>
+
   <!-- 3 · Skills -->
-  <section id="skills">
+  <section id="skills" class="alt">
     <div class="wrap">
       <div class="skills-top fade-in">
         <div>
@@ -652,7 +719,7 @@
   </section>
 
   <!-- 4 · Nachvollziehbar -->
-  <section id="pruefbar" class="alt">
+  <section id="pruefbar">
     <div class="wrap">
       <div class="sec-head fade-in">
         <div class="label" data-i18n="pr.label">Nachvollziehbar</div>
@@ -689,7 +756,7 @@
             <circle class="g-num" cx="25" cy="192" r="9"/><text class="g-numtext" x="25" y="196" text-anchor="middle">2</text>
             <text class="g-src" x="42" y="197" data-i18n="pr.s2">Teamsitzung, 2. Juli</text>
           </svg>
-          <h3 data-i18n="pr.c2h">Antworten mit Quellenstellen</h3>
+          <h3 data-i18n="pr.c2h">Fragen an die eigenen Notizen (Vault-Chat)</h3>
           <p data-i18n="pr.c2">Der Vault-Chat beantwortet Fragen über Ihre gesamte Notizablage und soll jeden Satz mit der Stelle versehen, auf die er sich stützt. Die App markiert Sätze ohne oder mit schwach passender Quelle; findet die Suche nichts Passendes, antwortet sie „nichts gefunden“, statt zu raten. Ob eine Aussage stimmt, entscheiden Sie.</p>
         </div>
       </div>
@@ -697,7 +764,7 @@
   </section>
 
   <!-- 5 · Datenschutz -->
-  <section id="datenschutz">
+  <section id="datenschutz" class="alt">
     <span id="why"></span>
     <div class="wrap">
       <div class="sec-head fade-in">
@@ -707,7 +774,7 @@
       </div>
       <div class="qa fade-in">
         <div><h3 data-i18n="ds.q1">Wo rechnet die KI?</h3><p data-i18n="ds.a1">Standardmäßig auf Ihrem Rechner, mit einem lokalen Modell über Ollama. Vor jedem Agent-Lauf prüft die App, ob das Modell nachweislich lokal rechnet, und zeigt das Ergebnis an.</p></div>
-        <div><h3 data-i18n="ds.q2">Was darf der Agent lesen?</h3><p data-i18n="ds.a2">Ihre Notizablage und die Dateien, die Sie ihm für den Auftrag anhängen. Zugriff auf andere Programme oder die Kommandozeile ist ausgeschaltet und braucht eine doppelte Freigabe.</p></div>
+        <div><h3 data-i18n="ds.q2">Was darf der Agent lesen?</h3><p data-i18n="ds.a2">Im Auftrag Ihre Notizablage und die Dateien, die Sie ihm anhängen. Der Chat liest keine Notizen von selbst. Zugriff auf andere Programme oder die Kommandozeile ist ausgeschaltet und braucht eine doppelte Freigabe.</p></div>
         <div><h3 data-i18n="ds.q3">Wer speichert was?</h3><p data-i18n="ds.a3">Sie. Ergebnisse landen erst nach Ihrer Freigabe als normale Dateien in Ihrem Ordner. Im lokalen Standardbetrieb laufen Ihre Inhalte über keinen fremden Server; beim optionalen Sync verlassen nur verschlüsselte Daten den Rechner.</p></div>
         <div><h3 data-i18n="ds.q4">Braucht es ein Konto?</h3><p data-i18n="ds.a4">Nein. Keine Anmeldung, keine Telemetrie, keine Tracker – an den Hersteller gehen keine Nutzungsdaten.</p></div>
         <div><h3 data-i18n="ds.q5">Und wenn der Rechner zu schwach ist?</h3><p data-i18n="ds.a5">Dann können Sie bewusst ein Cloud-Modell zuschalten, auch bei einem Anbieter mit Servern in der EU. Vorher zeigt die App, welche Daten wohin gehen, und fragt nach Ihrer Zustimmung.</p></div>
@@ -748,7 +815,7 @@
             <tbody>
               <tr><td data-i18n="ds.t1a">Notizen &amp; Ergebnisse</td><td class="std" data-i18n="ds.t1b">Ordner auf Ihrem Rechner</td><td class="opt" data-i18n="ds.t1c">Sync, Ende-zu-Ende-verschlüsselt</td></tr>
               <tr><td data-i18n="ds.t2a">KI-Modell</td><td class="std" data-i18n="ds.t2b">lokal über Ollama</td><td class="opt" data-i18n="ds.t2c">Cloud-Modell pro Funktion, mit Hinweis auf die Datenwege</td></tr>
-              <tr><td data-i18n="ds.t3a">Webrecherche</td><td class="std" data-i18n="ds.t3b">aus</td><td class="opt" data-i18n="ds.t3c">Suchanfragen an den gewählten Suchdienst; gefundene Seiten ruft die App direkt ab</td></tr>
+              <tr><td data-i18n="ds.t3a">Webrecherche</td><td class="std" data-i18n="ds.t3b">aus</td><td class="opt" data-i18n="ds.t3c">Suchbegriffe an den gewählten Suchdienst (eine SearXNG-Instanz kann sie weitergeben); gefundene Seiten ruft die App direkt ab. Mit Cloud-Modell gehen Frage, Verlauf und Seitenauszüge an dessen Anbieter</td></tr>
               <tr><td data-i18n="ds.t7a">Bilderzeugung</td><td class="std" data-i18n="ds.t7b">aus</td><td class="opt" data-i18n="ds.t7c">Bildbeschreibung an Google – auch wenn das Sprachmodell lokal rechnet</td></tr>
               <tr><td data-i18n="ds.t4a">E-Mail</td><td class="std" data-i18n="ds.t4b">aus</td><td class="opt" data-i18n="ds.t4c">Verbindung nur zu Ihrem eigenen Mailserver; Analyse mit dem eingestellten Modell; gesendet wird nur auf Ihren Klick</td></tr>
               <tr><td data-i18n="ds.t5a">Kommandozeile</td><td class="std" data-i18n="ds.t5b">aus</td><td class="opt" data-i18n="ds.t5c">doppelte Freigabe; unter macOS in einer Sandbox des Betriebssystems, Schreiben nur im Arbeitsordner des Laufs</td></tr>
@@ -764,7 +831,7 @@
   </section>
 
   <!-- 6 · Für die IT -->
-  <section id="it" class="alt">
+  <section id="it">
     <div class="wrap">
       <div class="sec-head fade-in">
         <div class="label" data-i18n="it.label">Für IT und Beschaffung</div>
@@ -786,7 +853,7 @@
   </section>
 
   <!-- 7 · Praxis -->
-  <section id="praxis">
+  <section id="praxis" class="alt">
     <div class="wrap">
       <div class="practice fade-in">
         <div>
@@ -806,6 +873,19 @@
     </div>
   </section>
 
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="wrap narrow">
+      <div class="label" data-i18n="faq.label">Häufige Fragen</div>
+      <h2 data-i18n="faq.h">Kurz beantwortet.</h2>
+      <div class="faq-item"><h3 data-i18n="faq.q1">Was ist der Unterschied zu einem KI-Chat?</h3><p data-i18n="faq.a1">Für Fragen hat der Petrol Agent einen Chat – mit Websuche nennt er Quellen zum Nachlesen. Für Dokumente geht er weiter als ein Chat: Im Auftrag arbeitet er mit Ihren Dateien, folgt Ihren Skills und liefert fertige Dokumente, die Sie vor dem Speichern prüfen.</p></div>
+      <div class="faq-item"><h3 data-i18n="faq.q2">Was brauche ich für die lokale KI?</h3><p data-i18n="faq.a2">Das kostenlose Programm Ollama, das Sprachmodelle auf Ihrem Rechner ausführt. Ohne Modell funktionieren Notizen, Suche, Aufgaben und Sync trotzdem. LM Studio wird ebenfalls unterstützt; dort kann die App aber nicht nachweisen, wo das Modell rechnet, und weist es deshalb als „nicht geprüft“ aus.</p></div>
+      <div class="faq-item"><h3 data-i18n="faq.q3">Prüft die App, ob eine Antwort stimmt?</h3><p data-i18n="faq.a3">Nein, und sie behauptet es auch nicht. Sie zeigt, auf welche Stellen und Seiten sich eine Antwort stützt; die Quellenliste öffnen Sie direkt von der Antwort aus. Quellennummern sind ein Weg zum Nachlesen, keine Bestätigung der Aussage. Im Vault-Chat markiert sie Sätze ohne oder mit schwach passender Quelle; in Webantworten können Sie eine Quellenkritik einschalten, die etwa Zahlen markiert, die nicht in der Quelle stehen. Die inhaltliche Prüfung bleibt bei Ihnen.</p></div>
+      <div class="faq-item"><h3 data-i18n="faq.q4">Dürfen Schulen, Behörden und Unternehmen MindGraph kostenlos einsetzen?</h3><p data-i18n="faq.a4">Ja. Die Nutzung ist unter der AGPL-3.0-or-later frei, ohne Lizenzgebühren und ohne Abo. Die Datenschutzprüfung in Ihrer Einrichtung ersetzt diese Seite nicht – sie soll sie erleichtern.</p></div>
+      <div class="faq-item"><h3 data-i18n="faq.q5">Kann ich bestehende Notizen weiterverwenden?</h3><p data-i18n="faq.a5">Ja. Notizen sind Markdown-Dateien; einen bestehenden Obsidian-Ordner öffnen Sie direkt, mit Verknüpfungen, Tags und Eigenschaften. Sie können jederzeit auch wieder wechseln.</p></div>
+      <div class="faq-item"><h3 data-i18n="faq.q6">Ist die App stabil?</h3><p data-i18n="faq.a6">Seit Version 1.0 gilt MindGraph als stabil und ist täglich mit mehreren tausend Notizen im Einsatz. Neue Funktionen kommen regelmäßig; experimentelle Teile sind gekennzeichnet und standardmäßig ausgeschaltet.</p></div>
+    </div>
+  </section>
   <!-- 8 · Download -->
   <section class="download alt" id="download">
     <div class="wrap">
@@ -815,40 +895,27 @@
       <div class="dl-grid">
         <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-          <div><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg · v<span data-app-version>1.0.0</span></div></div>
+          <div><div class="dl-platform">macOS (Apple Silicon)</div><div class="dl-version">.dmg · v<span data-app-version>1.1.1</span></div></div>
         </a>
         <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-          <div><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg · v<span data-app-version>1.0.0</span></div></div>
+          <div><div class="dl-platform">macOS (Intel)</div><div class="dl-version">.dmg · v<span data-app-version>1.1.1</span></div></div>
         </a>
         <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
           <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
-          <div><div class="dl-platform">Windows</div><div class="dl-version">Setup .exe · v<span data-app-version>1.0.0</span></div></div>
+          <div><div class="dl-platform">Windows</div><div class="dl-version">Setup .exe · v<span data-app-version>1.1.1</span></div></div>
         </a>
         <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" class="dl-btn">
           <svg aria-hidden="true" focusable="false" viewBox="0 0 256 256" fill="currentColor"><path d="M220,152H36a12,12,0,0,0-12,12v40a12,12,0,0,0,12,12h80v12H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16H140V216h80a12,12,0,0,0,12-12V164A12,12,0,0,0,220,152Zm-4,48H40V168H216ZM36,136H220a12,12,0,0,0,12-12V44a12,12,0,0,0-12-12H36A12,12,0,0,0,24,44v80A12,12,0,0,0,36,136ZM40,48H216v72H40Z"/></svg>
-          <div><div class="dl-platform">Linux</div><div class="dl-version">.AppImage · v<span data-app-version>1.0.0</span></div></div>
+          <div><div class="dl-platform">Linux</div><div class="dl-version">.AppImage · v<span data-app-version>1.1.1</span></div></div>
         </a>
       </div>
       <p class="dl-note" data-i18n="dl.winnote">Windows: Die Datei mit <b>Setup</b> im Namen installiert sich und aktualisiert sich später selbst. Die Datei ohne „Setup“ ist die portable Fassung für Rechner ohne Installationsrechte – sie läuft direkt, aktualisiert sich aber nicht.</p>
       <p class="dl-note"><a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer" data-i18n="dl.all">Alle Downloads (deb, snap, zip …)</a></p>
-      <div class="release-line" id="changelog" data-i18n="release.lead"><b>Neu in Version 1.1.1:</b> Webantworten im Chat lesen sich jetzt wie eine Beratung: mit Vergleichstabellen, Einordnung und Empfehlung. Fakten tragen eine Quellennummer, die zur gelesenen Seite führt. Wer genauer prüfen will, schaltet die Quellenkritik in den Einstellungen ein. <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer">Release Notes</a></div>
+      <div class="release-line" id="changelog" data-i18n="release.lead"><b>Neu in Version 1.1.1:</b> Webantworten im Chat können jetzt Vergleiche, Einordnung und Empfehlungen enthalten. Angaben aus gelesenen Seiten tragen eine Quellennummer zum Nachlesen. Wer genauer prüfen will, schaltet die Quellenkritik in den Einstellungen ein. <a href="https://github.com/bydb/mindgraph-notes/releases/latest" target="_blank" rel="noopener noreferrer">Release Notes</a></div>
     </div>
   </section>
 
-  <!-- FAQ -->
-  <section id="faq">
-    <div class="wrap narrow">
-      <div class="label" data-i18n="faq.label">Häufige Fragen</div>
-      <h2 data-i18n="faq.h">Kurz beantwortet.</h2>
-      <div class="faq-item"><h3 data-i18n="faq.q1">Was ist der Unterschied zu einem KI-Chat?</h3><p data-i18n="faq.a1">Ein Chat liefert Text. Der Petrol Agent arbeitet mit Ihren Dateien, folgt Ihren Skills und liefert fertige Dokumente, die Sie vor dem Speichern prüfen.</p></div>
-      <div class="faq-item"><h3 data-i18n="faq.q2">Was brauche ich für die lokale KI?</h3><p data-i18n="faq.a2">Das kostenlose Programm Ollama, das Sprachmodelle auf Ihrem Rechner ausführt. Ohne Modell funktionieren Notizen, Suche, Aufgaben und Sync trotzdem. LM Studio wird ebenfalls unterstützt; dort kann die App aber nicht nachweisen, wo das Modell rechnet, und weist es deshalb als „nicht geprüft“ aus.</p></div>
-      <div class="faq-item"><h3 data-i18n="faq.q3">Prüft die App, ob eine Antwort stimmt?</h3><p data-i18n="faq.a3">Nein, und sie behauptet es auch nicht. Sie zeigt, auf welche Stellen sich eine Antwort stützt, und markiert Sätze ohne oder mit schwach passender Quelle. Die inhaltliche Prüfung bleibt bei Ihnen – die Quellen sind dafür mit einem Klick erreichbar.</p></div>
-      <div class="faq-item"><h3 data-i18n="faq.q4">Dürfen Schulen, Behörden und Unternehmen MindGraph kostenlos einsetzen?</h3><p data-i18n="faq.a4">Ja. Die Nutzung ist unter der AGPL-3.0-or-later frei, ohne Lizenzgebühren und ohne Abo. Die Datenschutzprüfung in Ihrer Einrichtung ersetzt diese Seite nicht – sie soll sie erleichtern.</p></div>
-      <div class="faq-item"><h3 data-i18n="faq.q5">Kann ich bestehende Notizen weiterverwenden?</h3><p data-i18n="faq.a5">Ja. Notizen sind Markdown-Dateien; einen bestehenden Obsidian-Ordner öffnen Sie direkt, mit Verknüpfungen, Tags und Eigenschaften. Sie können jederzeit auch wieder wechseln.</p></div>
-      <div class="faq-item"><h3 data-i18n="faq.q6">Ist die App stabil?</h3><p data-i18n="faq.a6">Seit Version 1.0 gilt MindGraph als stabil und ist täglich mit mehreren tausend Notizen im Einsatz. Neue Funktionen kommen regelmäßig; experimentelle Teile sind gekennzeichnet und standardmäßig ausgeschaltet.</p></div>
-    </div>
-  </section>
   </main>
 
   <footer>
@@ -905,12 +972,14 @@
     const translations = {
       de: {
         "hero.release": "Stabil · Version {vs}",
-        "release.lead": "<b>Neu in Version {vs}:</b> Webantworten im Chat lesen sich jetzt wie eine Beratung: mit Vergleichstabellen, Einordnung und Empfehlung. Fakten tragen eine Quellennummer, die zur gelesenen Seite führt. Wer genauer prüfen will, schaltet die Quellenkritik in den Einstellungen ein. <a href=\"https://github.com/bydb/mindgraph-notes/releases/latest\" target=\"_blank\" rel=\"noopener noreferrer\">Release Notes</a>"
+        "release.lead": "<b>Neu in Version {vs}:</b> Webantworten im Chat können jetzt Vergleiche, Einordnung und Empfehlungen enthalten. Angaben aus gelesenen Seiten tragen eine Quellennummer zum Nachlesen. Wer genauer prüfen will, schaltet die Quellenkritik in den Einstellungen ein. <a href=\"https://github.com/bydb/mindgraph-notes/releases/latest\" target=\"_blank\" rel=\"noopener noreferrer\">Release Notes</a>"
       },
       en: {
         "meta.title": "MindGraph Notes – The AI agent that stays in-house",
-        "meta.desc": "MindGraph Notes with the Petrol Agent: AI completes tasks with your documents and delivers Word, Excel and PowerPoint files for review. Local by default, no account, open source. For schools, universities, public administration and businesses.",
+        "meta.og": "The Petrol Agent answers questions with sources to read up on and completes tasks with your documents – finished files for review. Local by default, no account, open source.",
+        "meta.desc": "MindGraph Notes with the Petrol Agent: chat with web search and sources, plus tasks that turn your documents into Word, Excel and PowerPoint files for review. Local by default, no account, open source. For schools, universities, public administration and businesses.",
         "nav.agent": "Petrol Agent",
+        "nav.chat": "Chat with sources",
         "nav.skills": "Skills",
         "nav.privacy": "Privacy",
         "nav.it": "For IT",
@@ -921,7 +990,8 @@
         "hero.release": "Stable · Version {vs}",
         "hero.audience": "For schools, universities, public administration and businesses",
         "hero.title": "The AI agent <em>that stays in-house.</em>",
-        "hero.sub": "MindGraph Notes is a workspace for notes and documents. Inside it works the <b>Petrol Agent</b>: you give it a task and your documents, it delivers finished Word, Excel or PowerPoint files – for review, before anything is saved. By default, the AI runs on your own computer.",
+        "hero.sub": "MindGraph Notes is a workspace for notes and documents. Inside it works the <b>Petrol Agent</b>: in the chat it answers questions, with web search and sources to read up on if you like. As a task, it turns your documents into Word, Excel or PowerPoint files that you review before they are saved. By default, the AI runs on your own computer.",
+        "hero.note": "Web search and cloud models are optional. With web search, search terms go to the search service you chose – before sending, the app shows which data goes where.",
         "hero.cta": "Download for free",
         "hero.cta2": "How your data stays with you",
 
@@ -952,8 +1022,16 @@
         "trust.4": "macOS, Windows, Linux",
 
         "ag.label": "The Petrol Agent",
-        "ag.h": "Not a chat window that returns text. <em>An agent that delivers files.</em>",
-        "ag.lead": "An AI chat gives you text that you then copy into Word, Excel or PowerPoint yourself. The Petrol Agent does the whole job and hands you the finished document.",
+        "ag.h": "Two ways of working – <em>settle a question or create a file.</em>",
+        "ag.lead": "At the top of the Agent tab you switch between chat and task.",
+        "ag.m1h": "Chat: settle a question",
+        "ag.m1": "Ask, draft, think out loud. With web search on, Petrol reads relevant pages and names sources to read up on. The chat does not read your notes on its own.",
+        "ag.m1a": "More about chat with web search",
+        "ag.m2h": "Task: create a file",
+        "ag.m2": "You attach your documents, the agent does the whole job and presents Word, Excel or PowerPoint for review – instead of giving you text to copy over.",
+        "ag.m2a": "How a task works",
+        "ag.mnote": "From the chat you can prepare a task. For web answers the agent only takes over your question and researches again; the answer and sources from the chat are not carried over.",
+        "ag.stepsh": "How a task works",
         "ag.s1h": "Task and documents",
         "ag.s1": "Describe what you need and attach what it should work with: Word, Excel, PDF or an entire folder.",
         "ag.s2h": "It works step by step",
@@ -977,6 +1055,22 @@
         "ag.e2a": "“Write the quote on our letterhead.”",
         "ag.e2b": "“Merge the supplier lists and show me where they differ.”",
         "ag.e2c": "“Prepare the project status as slides for management.”",
+        "ch.label": "Chat with web search",
+        "ch.h": "Settle questions without leaving the app – <em>with sources to read up on.</em>",
+        "ch.lead": "With web search on, Petrol searches for pages by itself, reads the relevant ones and can search again where points remain open. Depending on the question, it answers with an explanation, a comparison or a recommendation.",
+        "ch.p1": "<b>Source numbers for facts from pages.</b> Petrol is told to take numbers, prices and dates only from pages it read and to number them. The number leads to the entry in the source list, from where you open the page. Context from model knowledge stays without a number.",
+        "ch.p2": "<b>Source criticism, if you want it.</b> On request, the app flags numbers not found in the source, prices that may belong to another variant, and sentences from model knowledge. That is not a fact check – check important details against the pages.",
+        "ch.p3": "<b>The data path is shown before sending.</b> The research phrases search terms itself and sends them to the search service you chose; the answer shows which ones. Your computer fetches the pages itself. With a cloud model, the question, conversation history and page excerpts go to its provider.",
+        "ch.aria": "Example view of a web answer: facts from pages read with source numbers, an assessment from model knowledge without a number, and the collapsed source list.",
+        "ch.g0": "EXAMPLE VIEW",
+        "ch.q": "Your question",
+        "ch.a1": "A fact from a page that was read.",
+        "ch.a2": "Another fact, another page.",
+        "ch.a3": "Assessment and recommendation from",
+        "ch.a4": "model knowledge – no number.",
+        "ch.fold": "Sources and research path",
+        "ch.foldmeta": "2 of 3 pages cited · expandable",
+        "ch.fine": "Web search needs the web research module and a search service: Tavily, Linkup or your own SearXNG instance, which may pass queries on to other search engines. With a local model, a web answer can take several minutes, depending on model, computer and search service. The chat does not read your notes on its own.",
 
         "sk.label": "Skills",
         "sk.h": "Your way of working – <em>written down once.</em>",
@@ -1038,7 +1132,7 @@
         "pr.src": "CITED PASSAGES",
         "pr.s1": "Project week – planning",
         "pr.s2": "Team meeting, 2 July",
-        "pr.c2h": "Answers with source passages",
+        "pr.c2h": "Questions about your own notes (vault chat)",
         "pr.c2": "Vault chat answers questions about your entire note archive and is instructed to cite the passage behind each sentence. The app flags sentences with no source or a weak match; if the search finds nothing suitable, it answers “nothing found” instead of guessing. Whether a statement is true is up to you.",
 
         "ds.label": "Privacy",
@@ -1047,7 +1141,7 @@
         "ds.q1": "Where does the AI run?",
         "ds.a1": "By default on your computer, with a local model via Ollama. Before every agent run the app checks whether the model demonstrably runs locally and shows the result.",
         "ds.q2": "What may the agent read?",
-        "ds.a2": "Your note archive and the files you attach to the task. Access to other programs or the command line is switched off and requires a double opt-in.",
+        "ds.a2": "In a task, your note archive and the files you attach. The chat does not read your notes on its own. Access to other programs or the command line is switched off and requires a double opt-in.",
         "ds.q3": "Who stores what?",
         "ds.a3": "You do. Results only land in your folder as ordinary files once you approve them. In the default local setup your content passes through no third-party server; with optional sync, only encrypted data leaves your computer.",
         "ds.q4": "Is an account required?",
@@ -1078,7 +1172,7 @@
         "ds.t2c": "Cloud model per feature, with a notice on data paths",
         "ds.t3a": "Web research",
         "ds.t3b": "off",
-        "ds.t3c": "Search queries go to the chosen search service; the app fetches the pages it finds directly",
+        "ds.t3c": "Search terms go to the chosen search service (a SearXNG instance may pass them on); the app fetches the pages it finds directly. With a cloud model, the question, history and page excerpts go to its provider",
         "ds.t7a": "Image generation",
         "ds.t7b": "off",
         "ds.t7c": "Image description sent to Google – even if the language model runs locally",
@@ -1128,16 +1222,16 @@
         "dl.sub": "Install, choose a folder, get started – a starter folder to try things out is included. Existing Markdown or Obsidian notes open directly.",
         "dl.winnote": "Windows: the file with <b>Setup</b> in its name installs the app and keeps it updated. The file without “Setup” is the portable version for computers without installation rights – it runs directly but does not update itself.",
         "dl.all": "All downloads (deb, snap, zip …)",
-        "release.lead": "<b>New in version {vs}:</b> Web answers in the chat now read like advice: with comparison tables, context and a recommendation. Facts carry a source number that leads to the page that was read. If you want to check more closely, turn on source criticism in the settings. <a href=\"https://github.com/bydb/mindgraph-notes/releases/latest\" target=\"_blank\" rel=\"noopener noreferrer\">Release notes</a>",
+        "release.lead": "<b>New in version {vs}:</b> Web answers in the chat can now contain comparisons, context and recommendations. Facts from pages read carry a source number to read up on. If you want to check more closely, turn on source criticism in the settings. <a href=\"https://github.com/bydb/mindgraph-notes/releases/latest\" target=\"_blank\" rel=\"noopener noreferrer\">Release notes</a>",
 
         "faq.label": "FAQ",
         "faq.h": "Answered briefly.",
         "faq.q1": "How is this different from an AI chat?",
-        "faq.a1": "A chat returns text. The Petrol Agent works with your files, follows your skills and delivers finished documents that you review before they are saved.",
+        "faq.a1": "For questions, the Petrol Agent has a chat – with web search it names sources to read up on. For documents it goes further than a chat: as a task it works with your files, follows your skills and delivers finished documents that you review before they are saved.",
         "faq.q2": "What do I need for local AI?",
         "faq.a2": "The free program Ollama, which runs language models on your computer. Without a model, notes, search, tasks and sync still work. LM Studio is supported too; there, however, the app cannot prove where the model runs and therefore labels it “not verified”.",
         "faq.q3": "Does the app check whether an answer is true?",
-        "faq.a3": "No, and it does not claim to. It shows which passages an answer relies on and flags sentences with no source or a weak match. Checking the content stays with you – the sources are one click away.",
+        "faq.a3": "No, and it does not claim to. It shows which passages and pages an answer relies on; you open the source list directly from the answer. Source numbers are a way to read up, not a confirmation of the statement. In the vault chat it flags sentences with no source or a weak match; for web answers you can switch on source criticism, which flags, for example, numbers not found in the source. Checking the content stays with you.",
         "faq.q4": "May schools, agencies and companies use MindGraph for free?",
         "faq.a4": "Yes. Use is free under the AGPL-3.0-or-later, with no licence fees and no subscription. This page does not replace the data protection review in your organisation – it is meant to make it easier.",
         "faq.q5": "Can I keep using my existing notes?",
@@ -1193,6 +1287,7 @@
 
     translations.de["meta.title"] = document.title;
     translations.de["meta.desc"] = document.querySelector('meta[name="description"]').content;
+    translations.de["meta.og"] = document.querySelector('meta[property="og:description"]').content;
 
     let currentLang = 'de';
     try { currentLang = localStorage.getItem('lang') || 'de'; } catch (e) {}
@@ -1231,6 +1326,8 @@
       });
       document.title = translations[lang]["meta.title"] || document.title;
       document.querySelector('meta[name="description"]').content = translations[lang]["meta.desc"] || '';
+      const og = translations[lang]["meta.og"];
+      if (og) document.querySelectorAll('meta[property="og:description"], meta[name="twitter:description"]').forEach(m => { m.content = og; });
       document.querySelectorAll('.modal-close').forEach(b => b.setAttribute('aria-label', lang === 'en' ? 'Close' : 'Schließen'));
       if (APP_VERSION) {
         document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = APP_VERSION; });
