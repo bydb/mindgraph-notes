@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.0] - 2026-10-26
+
+**Im Agent-Tab kannst du jetzt einfach chatten – auf Wunsch mit einer Websuche, die selbst recherchiert.** Schalte oben auf „Chat“ und frag wie in einem gewohnten Chatbot. Mit dem Globus sucht Petrol im Web, liest die passenden Seiten und sucht gezielt weiter, wenn noch etwas fehlt. Die Antwort stützt sich nur auf die gelesenen Seiten und nennt sie als Quellen.
+
+### Hintergrund
+
+- **Chat und Auftrag:** Der Umschalter oben im Agent-Tab trennt beides. Im Chat fragst, formulierst und denkst du laut nach; der Chat liest keine Notizen von selbst. Im Auftrag arbeitet der Agent mit deinen Dateien und Ordnern. Aus einer Chat-Antwort wird mit „Im Auftrag weitermachen …“ ein Auftrag, der den Gesprächsverlauf mitnimmt. Welcher Modus beim Öffnen gilt, stellst du unter Einstellungen → Allgemein ein.
+- **Wie die Websuche arbeitet:** Das Modell entscheidet selbst, wonach es sucht und welche Treffer es liest, höchstens 5 Suchen und 8 Seiten. Es kann nur Treffer des Suchdienstes abrufen, keine Adressen, die es sich selbst ausdenkt. Unter jeder Antwort steht, wonach gesucht wurde, welche Seiten gelesen wurden und welche nicht. Eine Nachfrage wie „such gründlicher“ versteht der Chat im Zusammenhang deiner früheren Webfragen.
+- **Prüfung je Satz:** Jeder Satz wird mit der Seite verglichen, auf die er sich beruft. Markiert werden Sätze ohne Quelle, Zahlen, die nicht in der Seite stehen, und Verneinungen. Das ist ein Wortvergleich, kein Faktencheck. Preise in verschiedenen Schreibweisen („$5,199“ und „$5,199.00“) gelten dabei als gleich.
+- **Weiterfragen:** „Hiermit weiterfragen“ stellt eine Nachfrage an genau die Seiten einer Antwort, ohne neue Suche. „Als Notiz speichern“ übernimmt Antwort, Quellen und die Hinweise der Prüfung.
+- **Voraussetzungen und Grenzen:** Die Websuche braucht das Modul Webrecherche und einen eingerichteten Suchdienst (Tavily, Linkup oder eine eigene SearXNG-Instanz). Die selbstständige Recherche braucht ein Modell, das Werkzeuge aufrufen kann; sonst läuft eine feste Suche, die du in den Einstellungen auch selbst wählen kannst. Mit einem lokalen Modell dauert eine Webantwort ein bis drei Minuten. Mit einem Cloud-Modell gehen deine Frage und die gelesenen Seitenauszüge an dessen Anbieter; das steht vor dem Senden unter dem Eingabefeld.
+
 ## [1.0.1] - 2026-10-22
 
 **Notizbücher vom reMarkable kommen jetzt vollständig an.** Bisher blieb ein importiertes Notizbuch auf dem Stand des ersten Imports – Seiten, die du danach geschrieben hast, fehlten im PDF. Jetzt lädt jeder Import und jedes Öffnen den aktuellen Stand vom Gerät, und die App zeigt dir, wie viele Seiten angekommen sind.
