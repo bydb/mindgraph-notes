@@ -5,8 +5,8 @@ Die Schnittstelle ist undokumentiert. Liefert sie nicht mehr, was erwartet wird,
 bricht das Skript mit einer klaren Meldung ab, statt Treffer zu erfinden.
 
   suche  --standort N --begriffe A B ... [--max 100] --out treffer.json  (sammelt bei Wiederholung)
-  zeige  treffer.json --zielgruppe gs|wf --stichwort fotosynth ... [--ab 1] [--offene]
-  notiz  treffer.json --zielgruppe gs|wf --thema T --kern 1,2 [--rand 3,4] --out liste.md
+  zeige  treffer.json --zielgruppe gs|wf --stichwort fotosynth ... [--ab 1] [--offene] [--oer]
+  notiz  treffer.json --zielgruppe gs|wf --thema T --kern 1,2 [--rand 3,4] [--oer 1,2] --out liste.md
 """
 import argparse, html, http.cookiejar, json, re, sys, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -108,7 +108,7 @@ def details(s, rec):
 
 def cmd_suche(a):
     s = Sitzung(a.standort)
-    alle, gesamt = {}, {}
+    alle, gesamt, hinweise = {}, {}, []
     try:  # weitere Aufrufe sammeln in dieselbe Datei (Zeitlimit je Shell-Befehl)
         alt = json.load(open(a.out, encoding='utf-8'))
         if alt.get('standort') == a.standort:
@@ -120,6 +120,9 @@ def cmd_suche(a):
     for begriff in a.begriffe:
         n = s.suche(begriff)
         gesamt[begriff] = n
+        if n < 10 and re.search(r'ae|oe|ue', begriff.lower()):
+            hinweise.append(f'HINWEIS: "{begriff}" hat nur {n} Treffer. Umlaute als ä/ö/ü schreiben '
+                            f'(z. B. Blüte statt Bluete), falls hier einer gemeint ist, und neu suchen.')
         geholt = 0
         while geholt < min(n, a.max):
             recs = liste_lesen(s.seite(geholt))
@@ -141,6 +144,8 @@ def cmd_suche(a):
     json.dump({'standort': a.standort, 'begriffe': gesamt, 'abgerufen': time.strftime('%Y-%m-%d %H:%M'),
                'medien': recs}, open(a.out, 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
     print(f'OK: {len(recs)} Medien in {a.out} (ohne Adressaten-Feld: {ohne}). Trefferzahlen: {json.dumps(gesamt, ensure_ascii=False)}')
+    for h in hinweise:
+        print(h)
 
 
 def zielgruppen(adr):
@@ -189,6 +194,12 @@ def gruppen(daten, zg):
     return reihen + [[r] for r in offen], oer, andere, len(offen)
 
 
+def oer_liste(daten, zg):
+    """OER (Sodix) der Zielgruppe, feste Reihenfolge - Nummern gelten für zeige und notiz."""
+    oer = [r for r in daten['medien'] if r['id'].startswith('sodix-') and zg in zielgruppen(r.get('adressaten', ''))]
+    return sorted(oer, key=lambda r: (r['titel'].lower(), r['id']))
+
+
 def link(r, standort):
     return f'{BASE}/home?standort={standort}&record={urllib.parse.quote(r["id"])}&src=online'
 
@@ -227,8 +238,19 @@ def cmd_zeige(a):
         rest -= len(z.encode()) + 1
         if rest < 0:
             print(f'... weiter mit --ab {i} (gleiche Stichworte)')
-            break
+            return
         print(z)
+    if a.oer:
+        ol = [(i, r) for i, r in enumerate(oer_liste(d, a.zielgruppe), 1) if not worte or passt(r, worte)]
+        print(f'OER (frei verfügbar, ohne Mediennummer), passend: {len(ol)}. Nummern gelten für "notiz --oer".')
+        for i, r in ol:
+            z = (f'O{i}. {r["titel"][:70]} | {r.get("art","")} | {r.get("adressaten") or "-"} | '
+                 f'{r.get("text","")[:70]}')
+            rest -= len(z.encode()) + 1
+            if rest < 0:
+                print('... OER-Liste gekürzt - Stichworte enger fassen')
+                break
+            print(z)
 
 
 def zelle(s):
@@ -250,7 +272,7 @@ def tabelle(nrn, gs, standort):
 
 def nummern(s, n):
     out = []
-    for x in (s or '').replace(' ', '').split(','):
+    for x in (s or '').replace(' ', '').upper().replace('O', '').split(','):
         if not x:
             continue
         if not x.isdigit() or not 1 <= int(x) <= n:
@@ -273,14 +295,21 @@ def cmd_notiz(a):
          '## Kernauswahl', '', tabelle(kern, gs, st), '']
     if rand:
         t += ['## Grenzfälle', '', tabelle(rand, gs, st), '']
+    ol = oer_liste(d, a.zielgruppe)
+    oer_nr = nummern(a.oer, len(ol))
+    if oer_nr:
+        t += ['## OER-Material (frei verfügbar)', '', '| Titel | Art | Adressaten |', '|---|---|---|']
+        t += [f'| [{zelle(ol[n - 1]["titel"])}]({link(ol[n - 1], st)}) | {zelle(ol[n - 1].get("art", ""))} | '
+              f'{zelle(ol[n - 1].get("adressaten") or "nicht angegeben")} |' for n in oer_nr]
+        t += ['']
     t += ['## Hinweise', '',
-          f'- OER-Treffer (Sodix): {len(oer)}, nicht einzeln aufgeführt.',
+          f'- OER-Treffer (Sodix): {len(oer)}' + (f', davon {len(oer_nr)} oben aufgeführt.' if oer_nr else ', nicht einzeln aufgeführt.'),
           f'- Titel der anderen Zielgruppe ({ZG_NAME["wf" if a.zielgruppe == "gs" else "gs"]}): {andere}, weggelassen.',
           f'- Ohne Adressaten-Feld: {offen}.' if offen else '- Alle aufgeführten Titel haben ein Adressaten-Feld.',
           '- Die Gast-Sitzung zeigt den Katalog, nicht die Lizenz- oder Freischaltlage des eigenen Kontos.',
           '- Mediennummern für die Medienliste: nach dem Anmelden in die Edupool-Suche kopieren.', '']
     open(a.out, 'w', encoding='utf-8').write('\n'.join(t))
-    print(f'OK: {a.out} mit {len(kern)} Kern- und {len(rand)} Grenzfall-Einträgen')
+    print(f'OK: {a.out} mit {len(kern)} Kern-, {len(rand)} Grenzfall- und {len(oer_nr)} OER-Einträgen')
 
 
 def main():
@@ -297,12 +326,14 @@ def main():
     z.add_argument('--ab', type=int, default=1)
     z.add_argument('--stichwort', nargs='*', default=[], help='Wortanfänge, z. B. fotosynth photosynth chlorophyll')
     z.add_argument('--offene', action='store_true', help='auch Einträge ohne Adressaten-Feld zeigen')
+    z.add_argument('--oer', action='store_true', help='passende OER der Zielgruppe zusätzlich zeigen')
     n = sp.add_parser('notiz')
     n.add_argument('datei')
     n.add_argument('--zielgruppe', required=True, choices=['gs', 'wf'])
     n.add_argument('--thema', required=True)
     n.add_argument('--kern', required=True)
     n.add_argument('--rand', default='')
+    n.add_argument('--oer', default='', help='OER-Nummern aus "zeige --oer", z. B. 1,3')
     n.add_argument('--out', default='edupool-liste.md')
     a = p.parse_args()
     try:

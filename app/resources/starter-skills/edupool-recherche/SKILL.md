@@ -68,6 +68,11 @@ Sätze finden nichts.
 füllen die Liste mit Ameisen- und Herzfilmen und verdrängen die passenden Titel.
 Ein Begriff mit mehr als 500 Treffern ist fast immer zu allgemein.
 
+**Umlaute und ß so schreiben, wie sie im Wort stehen** (Blüte, Bestäubung,
+Ernährung), nie als ae/oe/ue/ss umschreiben — der Katalog kennt nur die echte
+Schreibweise (real: „Bestaeubung" 0 Treffer). Meldet das Skript `HINWEIS: …
+Umlaute`, suche den Begriff richtig geschrieben neu.
+
 Rufe die Suche mit **höchstens drei Begriffen pro Befehl** auf und setze
 `timeout_ms` auf 120000. Weitere Aufrufe mit derselben `--out`-Datei sammeln
 dazu, doppelte Treffer werden zusammengeführt:
@@ -144,15 +149,25 @@ Hänge danach eine kurze Einordnung an (`cat >> … <<'MD'`), unter `## Einordnu
 - Was die Kernauswahl abdeckt, wofür sich einzelne Titel eignen (Einstieg,
   Erarbeitung, Wiederholung), was fehlt oder nur in Grenzfällen vorkommt.
 - Reihen als Reihe nennen, nicht jede Folge.
-- Nur Aussagen, die aus Titel, Beschreibung und Adressaten der `zeige`-Liste
-  folgen. Keine Inhalte erfinden, die dort nicht stehen.
+- **Nur Aussagen, die in der `zeige`-Zeile stehen** (Titel, Beschreibung,
+  Adressaten, passende Folgen). Was ein Medium behandelt, nur so weit die
+  Beschreibung es sagt — nicht aus dem Titel weiterdenken („berührt Sauerstoff
+  und Kohlendioxid" steht in keiner Beschreibung des Gase-Checks).
+- **„Was fehlt" nur als Befund über die Trefferliste** („kein Titel für Klasse
+  1–2", „nur zwei Reihen zum Thema"), nie als Vermutung über Bedarfe, die die
+  Liste nicht zeigt (z. B. einzelne Förderschwerpunkte).
 
 Biete die Datei mit `shell_stage_file` als Ergebnis an.
 
 ## Was die Notiz bewusst nicht tut
 
-- **OER-Treffer** (Sodix) werden nur gezählt, nicht aufgelistet. Fragt der Auftrag
-  ausdrücklich danach, nenne sie in der Einordnung zusammengefasst.
+- **OER-Treffer** (Sodix) werden standardmäßig nur gezählt. Verlangt der Auftrag
+  OER („mit OER", „auch freie Materialien"), rufe `zeige … --oer` auf: die
+  passenden OER der Zielgruppe stehen dann unter eigenen Nummern `O1, O2, …`.
+  Wähle die thematisch passenden und übergib sie mit
+  `notiz … --oer 9,14`; die Notiz bekommt den Abschnitt „OER-Material (frei
+  verfügbar)" mit Direktlink, ohne Mediennummer. OER gehören nie in Kern oder
+  Grenzfälle.
 - **Titel der anderen Zielgruppe** werden weggelassen und nur gezählt.
 - **Mediennummer** ist nur die Nummer mit 55 am Anfang. Titel ohne solche Nummer
   (z. B. Studyflix) haben keine Nummer — nicht ergänzen.
