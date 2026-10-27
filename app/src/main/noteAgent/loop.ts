@@ -19,6 +19,7 @@ import { getContextAttachmentInfos, getShellAttachmentPaths } from './contextFil
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { nextSeq, recordToolUse, type AgentRun } from './runRegistry'
 import { chatContextBlock } from './chatContext'
+import { CUT_AFTER_RESULT_NOTE, CUT_TEXT_MESSAGE, MAX_OUTPUT_CUTS, cutToolCallMessage, repeatedCutMessage } from './outputCut'
 
 // 12 statt 8: recherche-lastige Läufe (viele note_read/note_search vor dem Schreiben)
 // brauchen Luft für die Schreib-Iteration plus eine Fehler-Korrektur — real lief ein
@@ -356,6 +357,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   let nudgedForWrite = false
   let nudgedForQuestion = false
   let previousPromptTokens: number | undefined
+  let outputCuts = 0
   // Shell-Läufe brauchen Luft für Erkunden/Schreiben/Korrigieren — dasselbe Budget wie Ordner-Läufe.
   // Rechner-Läufe wie Shell-/Ordner-Läufe: das Ergebnis wird erst geschrieben und DANN
   // noch weitergereicht (öffnen, anhängen, drucken) — das sind Iterationen nach dem Schreiben.
@@ -392,6 +394,38 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     lastText = result.text
     messages.push(result.assistantMessage)
     addToBudget(budget, (result.assistantMessage.content ?? '') + JSON.stringify(result.toolCalls))
+
+    // Ausgabegrenze erreicht (siehe outputCut.ts): abgeschnittene Aufrufe nie ausführen,
+    // dem Modell den wahren Grund nennen, nach MAX_OUTPUT_CUTS Abbrüchen in Folge aufhören.
+    // Auch eine abgeschnittene Antwort OHNE erkannten Aufruf bekommt Rückmeldung — bei Ollama
+    // kann darin ein begonnener zweiter Schreibaufruf stecken (Codex F01).
+    if (result.outputCut) {
+      outputCuts++
+      const names = result.toolCalls.map(c => c.name).join(', ')
+      onStep(nextSeq(run), 'ausgabe', `Fehler: Antwort an der Ausgabegrenze abgeschnitten${names ? ` (${names} nicht ausgeführt)` : ''}`)
+      if (outputCuts >= MAX_OUTPUT_CUTS || iteration >= maxIterations) {
+        // Fertige Ergebnisse gehen nicht verloren: Lauf endet mit Vermerk statt als Fehler.
+        // Im Web-Lauf zählt nur das geschriebene Ergebnis — ein Bild allein erfüllt den Vertrag nicht.
+        const resultDone = run.web ? run.web.wrote : run.results.size > 0
+        if (resultDone) {
+          run.transcript = messages.slice()
+          return { text: withFormatHint(CUT_AFTER_RESULT_NOTE), hitMaxIterations: false, cost: await costOfCalls(callUsages, chatOptions) }
+        }
+        throw failWithHint(repeatedCutMessage(outputCuts))
+      }
+      if (result.toolCalls.length > 0) {
+        // Jeder Aufruf braucht eine Antwort, sonst lehnen OpenAI-kompatible Server den Verlauf ab.
+        for (const call of result.toolCalls) {
+          pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: cutToolCallMessage(call.name) })
+        }
+      } else {
+        pushMessage({ role: 'user', content: CUT_TEXT_MESSAGE })
+      }
+      continue
+    }
+    // Nur Abbrüche IN FOLGE zählen: ein früher und ein später Abbruch mit Fortschritt
+    // dazwischen sind kein „Modell kommt nicht weiter" (Codex F02).
+    outputCuts = 0
 
     if (result.toolCalls.length === 0) {
       // Web-Lauf-Vertrag (0e): „genau EIN Write", nicht „höchstens einer". Stoppt das Modell,

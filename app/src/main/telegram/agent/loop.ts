@@ -111,6 +111,9 @@ function extractTextToolCalls(text: string, allowedTools: Set<string>): ToolCall
   return []
 }
 
+export const TELEGRAM_CUT_REPLY =
+  'Die Antwort des Modells wurde an der Grenze seiner Ausgabelänge abgeschnitten. Es wurde nichts ausgeführt. Bitte die Anfrage kürzer oder in Teilen stellen.'
+
 export async function runAgent(
   userInput: string,
   opts: AgentRunOptions
@@ -135,6 +138,21 @@ export async function runAgent(
     const result = await chatWithTools(messages, tools, { ...opts.chatOptions, telemetryModule: 'telegram' })
     lastBackend = result.backend
     lastText = result.text
+
+    // Ausgabegrenze erreicht: Aufrufe darin sind unvollständig und werden NIE ausgeführt,
+    // auch nicht über den Text-Fallback. Eingefrorenes Modul — deshalb nur die Sperre,
+    // kein Rückmelde-Versuch wie im Notiz-Agenten (noteAgent/outputCut.ts).
+    if (result.outputCut) {
+      console.warn(`[Telegram Agent] iteration=${iterations}: Antwort an der Ausgabegrenze abgeschnitten — nichts ausgeführt`)
+      return {
+        text: TELEGRAM_CUT_REPLY,
+        iterations,
+        toolCallsExecuted,
+        toolCallsDenied,
+        hitMaxIterations: false,
+        backend: result.backend
+      }
+    }
 
     const textToolCalls = result.toolCalls.length === 0
       ? extractTextToolCalls(result.text, opts.allowedTools)

@@ -117,3 +117,37 @@ describe('runAgent — Confirm-Flow für Schreib-Tools', () => {
     expect(result.text).toBe('fertig')
   })
 })
+
+describe('runAgent — abgeschnittene Modellantwort', () => {
+  it('führt einen an der Ausgabegrenze abgeschnittenen Aufruf nicht aus, auch nicht mit Bestätigung', async () => {
+    const registry = new ToolRegistry()
+    const { tool, runSpy } = makeWriteTool()
+    registry.register(tool)
+    mockChat.mockResolvedValueOnce({ ...toolCallTurn(), outputCut: true })
+
+    const result = await runAgent('lege eine Notiz an', { ...baseOpts(registry), requestConfirm: async () => true })
+
+    expect(runSpy).not.toHaveBeenCalled()
+    expect(mockChat).toHaveBeenCalledTimes(1)
+    expect(result.toolCallsExecuted).toBe(0)
+    expect(result.text).toMatch(/abgeschnitten/)
+  })
+
+  it('wertet abgeschnittenen Text nicht über den Text-Fallback als Aufruf aus', async () => {
+    const registry = new ToolRegistry()
+    const { tool, runSpy } = makeWriteTool()
+    registry.register(tool)
+    mockChat.mockResolvedValueOnce({
+      text: '{"name": "note_create", "arguments": {"title": "t"}}',
+      toolCalls: [],
+      assistantMessage: { role: 'assistant', content: '' },
+      backend: 'ollama',
+      outputCut: true
+    })
+
+    const result = await runAgent('lege eine Notiz an', { ...baseOpts(registry), requestConfirm: async () => true })
+
+    expect(runSpy).not.toHaveBeenCalled()
+    expect(result.text).toMatch(/abgeschnitten/)
+  })
+})
