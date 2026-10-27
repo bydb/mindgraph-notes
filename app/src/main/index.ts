@@ -9360,6 +9360,12 @@ ipcMain.handle('show-notification', async (_event, title: string, body: string, 
       }
     })
 
+    // Seit Electron 42 (UNNotification) zeigt macOS Mitteilungen nur für signierte Apps;
+    // unsigniert (Dev-Build) kommt stattdessen 'failed'
+    notification.on('failed', (_e, error) => {
+      console.warn('[Notification] Nicht zugestellt:', title, error)
+    })
+
     notification.show()
     console.log('[Notification] Shown:', title)
     return true
