@@ -140,8 +140,8 @@
     "electron-vite": "^5.0.0",
     "turndown-plugin-gfm": "^1.0.2",
     "typescript": "^6.0.3",
-    "vite": "^7.3.1",
-    "vitest": "^4.1.8"
+    "vite": "^7.3.7",
+    "vitest": "^4.1.12"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.1",
@@ -179,7 +179,7 @@
     "markdown-it-texmath": "^1.0.0",
     "mermaid": "^11.12.2",
     "node-pty": "^1.1.0",
-    "nodemailer": "^10.1.0",
+    "nodemailer": "^10.2.1",
     "pdfjs-dist": "5.4.296",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
