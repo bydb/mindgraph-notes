@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.2] - 2026-10-27
+
+**Der Petrol Agent erstellt Infografiken jetzt als ein fertiges Bild.** Bitte ihn um eine Infografik zu einem Thema, einer Notiz oder einer Recherche, und du bekommst ein Hochformat-Bild mit Überschrift, wenigen Kernaussagen und Zahlen aus der Quelle. Außerdem hängt der Agent nicht mehr minutenlang, wenn ein Modell an die Grenze seiner Antwortlänge stößt.
+
+### Hintergrund
+
+- **Infografik:** Ein neuer Starter-Skill „Infografik“ legt fest, dass das Ergebnis genau ein Bild ist, und gibt Aufbau, Textmenge und Gestaltung vor. Bisher wich der Agent auf eine HTML-Seite aus und lieferte daneben nur ein Bild ohne Beschriftung. In bestehenden Vaults holst du ihn unter Einstellungen → Skills → Starter-Skills mit „Installieren“; vorhandene Skills bleiben unangetastet.
+- **Voraussetzung:** Infografiken brauchen das Modul Bild-Generierung mit eigenem Google-Schlüssel. Fehlt es, sagt der Agent das gleich zu Beginn, statt erst zu recherchieren. Infografiken entstehen in höherer Auflösung als Titelbilder, damit die Schrift lesbar bleibt; das kostet bei Google etwas mehr pro Bild.
+- **Lange Antworten:** Wird eine Antwort an der Längengrenze des Modells abgeschnitten, führt der Agent den unvollständigen Schritt nicht aus. Er bittet das Modell, im verlangten Format kürzer zu schreiben. Passiert das zweimal hintereinander, endet der Lauf mit einer Erklärung; fertige Ergebnisse bleiben erhalten.
+- **Grenzen:** Bildmodelle setzen Text meist, aber nicht immer richtig. Beschriftungen und Zahlen im Bild prüft die App nicht gegen die Quelle – bitte vor der Weitergabe selbst ansehen.
+
 ## [1.1.1] - 2026-10-26
 
 **Webantworten im Chat lesen sich jetzt wie eine Beratung, mit Tabelle, Einordnung und Empfehlung.** Bisher endeten Vergleichsfragen oft mit „lässt sich nicht belegen“. Jetzt stehen Fakten wie Preise, Zahlen und Daten mit Quellennummer da, und Petrol ergänzt eigene Einordnung und Empfehlungen ohne Nummer. Ein Klick auf die Nummer führt zur gelesenen Seite.
