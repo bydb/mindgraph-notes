@@ -58,10 +58,15 @@ nicht; scheitert es, melde die Fehlermeldung.
 
 ## Schritt 2: Suchen
 
-Lege 4 bis 10 Suchbegriffe fest: das Thema, Schreibvarianten (Photosynthese /
-Fotosynthese), Ober- und Unterbegriffe, gängige Fachbegriffe der Zielgruppe.
-Ein Begriff pro Wort oder kurzer Wortgruppe — das Portal sucht nach Wortanfängen,
-ganze Sätze finden nichts.
+Lege 3 bis 6 **themenspezifische** Suchbegriffe fest: das Thema,
+Schreibvarianten (Photosynthese / Fotosynthese), eng zugehörige Fachbegriffe
+(Chlorophyll). Ein Begriff pro Wort — das Portal sucht nach Wortanfängen, ganze
+Sätze finden nichts.
+
+**Keine Allerweltswörter** wie „Pflanzen", „Blatt", „Sauerstoff", „Wasser",
+„Tiere": sie bringen Tausende Treffer zu fremden Themen (real: „Pflanzen" 2280),
+füllen die Liste mit Ameisen- und Herzfilmen und verdrängen die passenden Titel.
+Ein Begriff mit mehr als 500 Treffern ist fast immer zu allgemein.
 
 Rufe die Suche mit **höchstens drei Begriffen pro Befehl** auf und setze
 `timeout_ms` auf 120000. Weitere Aufrufe mit derselben `--out`-Datei sammeln
@@ -80,27 +85,45 @@ Ausgaben und was sie bedeuten:
 
 ## Schritt 3: Sichten
 
+Immer mit `--stichwort` — Wortanfänge des Themas, klein geschrieben, die in
+Titel, Beschreibung oder Fächern vorkommen müssen:
+
 ```
-python3 edupool_suche.py zeige treffer.json --zielgruppe gs
+python3 edupool_suche.py zeige treffer.json --zielgruppe gs --stichwort fotosynth photosynth chlorophyll
 ```
 
-Die Ausgabe ist eine nummerierte Liste nur der angefragten Zielgruppe: Titel,
-Medienart, Laufzeit, Jahr, Mediennummer, Adressaten, Anfang der Beschreibung.
-FWU-Module derselben Produktion sind schon zu einer Zeile `[Reihe: n Teile]`
-zusammengefasst. Bei langer Liste steht am Ende der Befehl für die Fortsetzung
-(`--ab N`) — lies alles, bevor du auswählst.
+Die Ausgabe ist eine nummerierte Liste nur der angefragten Zielgruppe und nur der
+Titel, die zu den Stichworten passen: Titel, Medienart, Laufzeit, Jahr,
+Mediennummer, Adressaten, Anfang der Beschreibung. FWU-Module derselben
+Produktion sind zu einer Zeile `[Reihe: n Teile; passend: …]` zusammengefasst;
+„passend" nennt die Folgen, die das Thema behandeln. Die Nummern sind fest und
+gelten so für `notiz`, auch wenn Lücken in der Zählung sind.
+
+Sind es zu wenige Treffer, ergänze ein Stichwort (z. B. einen Unterbegriff) und
+rufe `zeige` erneut auf. Ohne `--stichwort` nur, wenn das Thema kein eigenes Wort
+hat. Einträge ohne Adressaten-Feld zeigt `--offene`.
+
+**Lies `treffer.json` nicht mit eigenen Befehlen aus** (kein `cat`, kein eigenes
+Python). Die Datei ist groß, jeder Auszug kostet Kontext, und ein voller Kontext
+beendet den Lauf, bevor die Notiz entsteht. Alles Nötige liefert `zeige`.
 
 Die Zuordnung zur Zielgruppe macht das Skript nach dem Adressaten-Feld, nicht
 nach Gefühl: Untergrenze Klasse 1–4 oder „Sonderpädagogische Förderung" →
 Grund- und Förderschule; ab Klasse 5, Berufsbildende Schule, Erwachsenenbildung →
-weiterführend. Spannen wie „Klasse 3–10" erscheinen in beiden Listen. Einträge
-ohne Adressaten-Feld stehen am Ende mit „Adressaten fehlen" — nimm sie höchstens
+weiterführend; „bis Jahrgangsstufe 6" zählt zu beiden. Spannen wie „Klasse 3–10"
+erscheinen in beiden Listen. Einträge ohne erkennbare Zielgruppe (Adressaten
+fehlen, Lehrerfortbildung, „sonstiges") sind ausgeblendet — nimm sie höchstens
 als Grenzfall auf.
 
-Wähle dann nach Titel und Beschreibung aus:
-- **Kern** — passt direkt zum Thema und zur Zielgruppe. In der Regel 5 bis 20.
-- **Grenzfälle** — berührt das Thema nur am Rand oder Adressaten fehlen.
-- Alles andere lässt du weg.
+Wähle dann nach Titel und Beschreibung aus, **nur Nummern aus der gefilterten
+`zeige`-Liste**:
+- **Kern** — behandelt das Thema selbst und passt zur Zielgruppe. Lieber 4 gute
+  als 15 lose. Für Grund- und Förderschule gibt es zu Fachthemen oft nur wenige
+  Titel — dann ist die Liste eben kurz, und die Einordnung sagt das.
+- **Grenzfälle** — berührt das Thema erkennbar am Rand (z. B. eine Reihe, in der
+  nur eine Folge davon handelt).
+- Ein Titel ohne Bezug zum Thema gehört nirgends hin, auch nicht als Grenzfall.
+- Jede Nummer nur einmal.
 
 Von mehreren Fassungen desselben Titels (Film, Online-Medium, „interaktiv")
 nimm in den Kern die, die für die Zielgruppe am brauchbarsten ist, die anderen

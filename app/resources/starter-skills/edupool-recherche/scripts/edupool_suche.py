@@ -5,7 +5,7 @@ Die Schnittstelle ist undokumentiert. Liefert sie nicht mehr, was erwartet wird,
 bricht das Skript mit einer klaren Meldung ab, statt Treffer zu erfinden.
 
   suche  --standort N --begriffe A B ... [--max 100] --out treffer.json  (sammelt bei Wiederholung)
-  zeige  treffer.json --zielgruppe gs|wf [--ab 1]
+  zeige  treffer.json --zielgruppe gs|wf --stichwort fotosynth ... [--ab 1] [--offene]
   notiz  treffer.json --zielgruppe gs|wf --thema T --kern 1,2 [--rand 3,4] --out liste.md
 """
 import argparse, html, http.cookiejar, json, re, sys, time, urllib.parse, urllib.request
@@ -146,8 +146,11 @@ def cmd_suche(a):
 def zielgruppen(adr):
     """Menge aus {'gs','wf'} nach dem Adressaten-Feld; leer = nicht bestimmbar."""
     z = set()
-    for ab, lo, hi in re.findall(r'Klasse\s*(ab\s*)?(\d{1,2})(?:\s*-\s*(\d{1,2}))?', adr):
-        lo = int(lo); hi = 13 if ab else int(hi or lo)
+    for vor, lo, hi in re.findall(r'(?:Klasse|Jahrgang(?:sstufe)?)\s*(ab\s*|bis\s*)?(\d{1,2})(?:\s*-\s*(\d{1,2}))?', adr):
+        if vor.startswith('bis'):
+            lo, hi = 1, int(lo)
+        else:
+            lo = int(lo); hi = 13 if vor else int(hi or lo)
         if lo <= 4:
             z.add('gs')
         if hi >= 5:
@@ -190,25 +193,40 @@ def link(r, standort):
     return f'{BASE}/home?standort={standort}&record={urllib.parse.quote(r["id"])}&src=online'
 
 
-def zeile_kurz(i, g):
+def passt(r, worte):
+    blob = ' '.join((r.get('titel', ''), r.get('text', ''), r.get('faecher', ''))).lower()
+    return any(w in blob for w in worte)
+
+
+def zeile_kurz(i, g, worte):
     r = g[0]
-    reihe = f' [Reihe: {len(g)} Teile]' if len(g) > 1 else ''
+    reihe = ''
+    if len(g) > 1:
+        teile = [x['titel'].split(': ')[-1] for x in g[1:] if worte and passt(x, worte)]
+        reihe = f' [Reihe: {len(g)} Teile' + (f'; passend: {"; ".join(teile)[:90]}' if teile else '') + ']'
     return (f'{i}. {r["titel"][:70]}{reihe} | {r.get("art","")} {r.get("laufzeit","")} {r.get("jahr","")} | '
-            f'Nr {nummer(r) or "-"} | {r.get("adressaten") or "Adressaten fehlen"} | {r.get("text","")[:90]}')
+            f'Nr {nummer(r) or "-"} | {r.get("adressaten") or "Adressaten fehlen"} | {r.get("text","")[:70]}')
 
 
 def cmd_zeige(a):
     d = json.load(open(a.datei, encoding='utf-8'))
     gs, oer, andere, offen = gruppen(d, a.zielgruppe)
-    print(f'Zielgruppe {ZG_NAME[a.zielgruppe]}: {len(gs)} Einträge, andere Zielgruppe: {andere}, OER: {len(oer)}, ohne Adressaten: {offen}')
-    rest = 7000
-    for i, g in enumerate(gs, 1):
+    worte = [w.lower() for w in a.stichwort]
+    erst_offen = len(gs) - offen + 1
+    sicht = [(i, g) for i, g in enumerate(gs, 1)
+             if (a.offene or i < erst_offen) and (not worte or any(passt(x, worte) for x in g))]
+    print(f'Zielgruppe {ZG_NAME[a.zielgruppe]}: {len(gs) - offen} Einträge, davon passend zu {worte or "allem"}: '
+          f'{sum(1 for i, _ in sicht if i < erst_offen)}. Andere Zielgruppe: {andere}, OER: {len(oer)}, '
+          f'ohne Adressaten: {offen}' + ('' if a.offene else ' (ausgeblendet, --offene zeigt sie)') +
+          '. Nummern gelten unverändert für "notiz".')
+    rest = 5000
+    for i, g in sicht:
         if i < a.ab:
             continue
-        z = zeile_kurz(i, g)
+        z = zeile_kurz(i, g, worte)
         rest -= len(z.encode()) + 1
         if rest < 0:
-            print(f'... weiter mit: zeige {a.datei} --zielgruppe {a.zielgruppe} --ab {i}')
+            print(f'... weiter mit --ab {i} (gleiche Stichworte)')
             break
         print(z)
 
@@ -237,7 +255,8 @@ def nummern(s, n):
             continue
         if not x.isdigit() or not 1 <= int(x) <= n:
             raise SystemExit(f'Ungültige Nummer {x!r} - gültig sind 1 bis {n} aus "zeige".')
-        out.append(int(x))
+        if int(x) not in out:
+            out.append(int(x))
     return out
 
 
@@ -245,6 +264,8 @@ def cmd_notiz(a):
     d = json.load(open(a.datei, encoding='utf-8'))
     gs, oer, andere, offen = gruppen(d, a.zielgruppe)
     kern, rand = nummern(a.kern, len(gs)), nummern(a.rand, len(gs))
+    if set(kern) & set(rand):
+        raise SystemExit(f'Nummern in Kern UND Grenzfällen: {sorted(set(kern) & set(rand))} - jede nur einmal.')
     st = d['standort']
     t = [f'# Edupool-Recherche: {a.thema} ({ZG_NAME[a.zielgruppe]})', '',
          f'Edupool Hessen, Standort {st}, Gast-Katalog vom {d["abgerufen"]}. '
@@ -274,6 +295,8 @@ def main():
     z.add_argument('datei')
     z.add_argument('--zielgruppe', required=True, choices=['gs', 'wf'])
     z.add_argument('--ab', type=int, default=1)
+    z.add_argument('--stichwort', nargs='*', default=[], help='Wortanfänge, z. B. fotosynth photosynth chlorophyll')
+    z.add_argument('--offene', action='store_true', help='auch Einträge ohne Adressaten-Feld zeigen')
     n = sp.add_parser('notiz')
     n.add_argument('datei')
     n.add_argument('--zielgruppe', required=True, choices=['gs', 'wf'])
