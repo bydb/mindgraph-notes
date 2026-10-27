@@ -162,8 +162,9 @@ WEBRECHERCHE (für diesen Lauf aktiv):
     ? `
 
 BILD-GENERIERUNG (für diesen Lauf verfügbar):
-- generate_image erzeugt ein Bild (Google Nano Banana, landet als JPEG im Staging). Prompt auf ENGLISCH, max. 50 Wörter, kein Text im Bild. Bei Kinder-/Jugendthemen ein symbolisches, personenfreies Motiv ohne Menschen oder Gesichter wählen.
+- generate_image erzeugt ein Bild (Google Nano Banana, landet als JPEG im Staging). Standard (mode "illustration"): Prompt auf ENGLISCH, max. 50 Wörter, kein Text im Bild. Bei Kinder-/Jugendthemen ein symbolisches, personenfreies Motiv ohne Menschen oder Gesichter wählen.
 - Nur einsetzen, wenn der Auftrag ein Bild verlangt oder es das Ergebnis klar aufwertet (z.B. Titelbild eines Artikels).
+- Verlangt der Auftrag eine INFOGRAFIK, ist das Bild selbst das Ergebnis: generate_image mit mode "infografik" (Beschriftungen im Bild erlaubt, Prompt bis 400 Wörter). Keine HTML-Seite und kein SVG als Ersatz bauen.
 - Reihenfolge: ERST alle Bilder mit generate_image erzeugen, DANN das Ergebnis schreiben — jedes Bild mit exakt dem Dateinamen einbetten, den generate_image gemeldet hat: in einer Notiz (write_note) per ![[dateiname.jpg]], in einer HTML-Seite (write_html) per <img src="dateiname.jpg" alt="…"> ohne Pfad, am besten in einer figure.fig mit figcaption. Bild und Seite landen beim Übernehmen im selben Ordner, der reine Dateiname trägt also.
 - Bild + Ergebnisdatei zählen zusammen als EIN Ergebnis. Nach dem Schreiben ist keine Bild-Einbettung mehr möglich.`
     : ''

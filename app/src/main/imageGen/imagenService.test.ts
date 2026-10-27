@@ -74,6 +74,15 @@ describe('Nano-Banana-Bildgenerierung', () => {
     })
   })
 
+  it('fordert 2K nur an, wenn der Aufrufer es verlangt (Infografik)', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonResponse({
+      steps: [{ type: 'model_output', content: [{ type: 'image', mime_type: 'image/jpeg', data: 'aW1hZ2U=' }] }],
+    }))
+    await generateImage('Infographic', { aspectRatio: '3:4', imageSize: '2K' })
+    const [, init] = vi.mocked(fetch).mock.calls[0]
+    expect(JSON.parse(String(init?.body)).response_format).toEqual(expect.objectContaining({ aspect_ratio: '3:4', image_size: '2K' }))
+  })
+
   it('meldet den Abbruchgrund auch, wenn er auf oberster Ebene steht', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonResponse({
       id: 'int_top_level',

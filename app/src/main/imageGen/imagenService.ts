@@ -133,7 +133,12 @@ export async function deleteImagenKey(): Promise<{ success: boolean }> {
  */
 export async function generateImage(
   prompt: string,
-  options?: { aspectRatio?: '16:9' | '4:3' | '1:1' | '3:4' | '9:16' }
+  options?: {
+    aspectRatio?: '16:9' | '4:3' | '1:1' | '3:4' | '9:16'
+    // 2K nur für Bilder mit Schrift (Infografik): bei 1K sind Beschriftungen in
+    // Hochformat-Grafiken kaum lesbar. Kostet bei Google mehr — deshalb kein Default.
+    imageSize?: '1K' | '2K'
+  }
 ): Promise<ImageGenResult> {
   try {
     const apiKey = await loadImagenKey()
@@ -154,7 +159,7 @@ export async function generateImage(
           type: 'image',
           mime_type: IMAGE_MIME,
           aspect_ratio: options?.aspectRatio ?? '16:9',
-          image_size: '1K',
+          image_size: options?.imageSize ?? '1K',
         },
       }),
       signal: AbortSignal.timeout(120000),

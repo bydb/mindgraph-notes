@@ -40,6 +40,7 @@ import { shellExecuteTool, shellStageFileTool } from './shellTools'
 import { computerMailDraftTool, computerOpenTool, computerPrintTool, computerRevealTool } from './computerTools'
 import { skillActivityId } from '../skillActivityId'
 import { parseDigestArgs, runFolderDigest } from './folderDigest'
+import { IMAGE_MODES, infographicPromptError, parseImageMode } from './imageMode'
 import type { ChatOptions } from '../llm/chatClient'
 import type { CallUsage } from '../../shared/llmCost'
 
@@ -1578,13 +1579,17 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'generate_image',
     description:
-      'Generiert ein Bild mit Google Nano Banana (Cloud, nutzt den hinterlegten API-Key des Nutzers) und legt es als JPEG im Staging ab. Parameter: file_name (Endung .jpg), prompt (ENGLISCHER Bild-Prompt, max. 50 Wörter: Motiv, Stil, Licht konkret beschreiben; KEIN Text im Bild). Bei Themen mit Kindern/Jugendlichen ein symbolisches, personenfreies Motiv wählen — keine Minderjährigen, Personen oder Gesichter darstellen. Optional aspect_ratio ("16:9" | "4:3" | "1:1" | "3:4" | "9:16", Default "16:9"). Das Bild kann in einer Notiz per ![[dateiname.jpg]] eingebettet werden — die Notiz mit write_note NACH diesem Tool erzeugen.',
+      'Generiert ein Bild mit Google Nano Banana (Cloud, nutzt den hinterlegten API-Key des Nutzers) und legt es als JPEG im Staging ab. Parameter: file_name (Endung .jpg), prompt, optional mode und aspect_ratio ("16:9" | "4:3" | "1:1" | "3:4" | "9:16"). ' +
+      'mode "illustration" (Default, Titel- und Stimmungsbilder): ENGLISCHER Prompt, max. 50 Wörter, Motiv/Stil/Licht konkret; KEIN Text im Bild; Default-Format "16:9". ' +
+      'mode "infografik" (das Bild IST das Ergebnis und trägt Information): Text im Bild ist erwünscht. Prompt auf Englisch für Layout und Stil, alle sichtbaren Beschriftungen wörtlich in Anführungszeichen in der Sprache des Nutzers; bis 400 Wörter bzw. 3000 Zeichen; wenige, kurze Beschriftungen; nur Zahlen aus Quelle oder Auftrag. Default-Format "3:4", höhere Auflösung. ' +
+      'Bei Themen mit Kindern/Jugendlichen ein symbolisches, personenfreies Motiv wählen — keine Minderjährigen, Personen oder Gesichter darstellen. Das Bild kann in einer Notiz per ![[dateiname.jpg]] eingebettet werden — die Notiz mit write_note NACH diesem Tool erzeugen.',
     parameters: {
       type: 'object',
       properties: {
         file_name: { type: 'string' },
-        prompt: { type: 'string', description: 'Englischer Bild-Prompt (max. 50 Wörter, kein Text im Bild)' },
-        aspect_ratio: { type: 'string', description: '"16:9" (Default), "4:3", "1:1", "3:4" oder "9:16"' }
+        prompt: { type: 'string', description: 'illustration: englisch, max. 50 Wörter, kein Text im Bild. infografik: Layout englisch, Beschriftungen wörtlich in Anführungszeichen, max. 400 Wörter' },
+        mode: { type: 'string', enum: [...IMAGE_MODES], description: '"illustration" (Default) oder "infografik"' },
+        aspect_ratio: { type: 'string', description: '"16:9" (Default bei illustration), "4:3", "1:1", "3:4" (Default bei infografik) oder "9:16"' }
       },
       required: ['file_name', 'prompt']
     },
@@ -1599,9 +1604,18 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (ctx.run.web?.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus entstehen Bilder nur VOR dem Ergebnis.')
       const RATIOS = ['16:9', '4:3', '1:1', '3:4', '9:16'] as const
       type Ratio = (typeof RATIOS)[number]
-      const aspectRatio: Ratio = RATIOS.includes(args.aspect_ratio as Ratio) ? (args.aspect_ratio as Ratio) : '16:9'
+      // Infografik: Schrift im Bild ist der Zweck. Der Illustrations-Modus bleibt bei
+      // „kein Text" — sonst setzt das Bildmodell Fantasiewörter in jedes Titelbild.
+      // Vorher gab es nur diesen Modus; ein Infografik-Auftrag endete deshalb als
+      // textloses Zierbild plus einer HTML-Seite, die das Ausgabelimit sprengte (27.10.2026).
+      const parsedMode = parseImageMode(args.mode)
+      if ('error' in parsedMode) return err(parsedMode.error)
+      const infographic = parsedMode.mode === 'infografik'
+      const lengthError = infographic ? infographicPromptError(prompt) : null
+      if (lengthError) return err(lengthError)
+      const aspectRatio: Ratio = RATIOS.includes(args.aspect_ratio as Ratio) ? (args.aspect_ratio as Ratio) : (infographic ? '3:4' : '16:9')
       const { generateImage } = await import('../imageGen/imagenService')
-      const res = await generateImage(prompt, { aspectRatio })
+      const res = await generateImage(prompt, { aspectRatio, imageSize: infographic ? '2K' : '1K' })
       if (!res.success || !res.imageBase64) {
         return err(res.error || 'Bildgenerierung fehlgeschlagen')
       }
@@ -1612,7 +1626,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const kind = ext === '.png' ? 'png' : 'jpg'
       const baseName = rawName.replace(/\.(?:png|jpe?g)$/i, '')
       const fileName = sanitizeOutputFileName(`${baseName}${ext}`, ext, ['.jpeg'])
-      return registerStagedResult(ctx, fileName, kind, Buffer.from(res.imageBase64, 'base64'), `Bild ${aspectRatio}, Google Nano Banana`)
+      return registerStagedResult(ctx, fileName, kind, Buffer.from(res.imageBase64, 'base64'), `${infographic ? 'Infografik' : 'Bild'} ${aspectRatio}, Google Nano Banana`)
     }
   })
 
