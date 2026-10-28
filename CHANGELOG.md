@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.4] - 2026-10-28
+
+**Der Petrol Agent kann mit Cloud-Modellen über OpenRouter jetzt deutlich mehr lesen, bevor sein Arbeitsspeicher voll ist.** Bisher rechnete er bei jedem Cloud-Modell mit einem kleinen Kontext und hörte bei längeren Aufträgen mit vielen Notizen, Dateien oder Webseiten nach wenigen Schritten auf, obwohl das Modell viel mehr verkraftet hätte. Jetzt richtet er sich nach der Kontextgröße, die OpenRouter für das gewählte Modell angibt.
+
+### Hintergrund
+
+- **Auslöser:** Mit Claude Haiku über OpenRouter meldete der Agent oft „Arbeitsspeicher voll“ oder las keine weiteren Seiten mehr, obwohl das Modell ein Vielfaches des angenommenen Kontexts hat.
+- **Wie viel:** Der Agent nutzt drei Viertel der angegebenen Kontextgröße, höchstens 128 000 Token und nie weniger als bisher. Im Rechercheweg steht, mit welcher Größe er rechnet.
+- **Laut statt still:** Ist ein Anbieter hinter OpenRouter doch kleiner als angegeben, bricht der Lauf mit einer Meldung ab, statt still Teile des Auftrags zu verlieren. Die Meldung nennt jetzt die Größe, mit der gerechnet wurde.
+- **Kein Warten:** Kennt die App die Kontextgröße noch nicht, wartet der Agent beim Start höchstens drei Sekunden darauf und rechnet sonst wie bisher.
+- **Grenzen:** LLMBase und LM Studio bleiben vorerst beim bisherigen, vorsichtigen Wert. Ein größerer Kontext heißt bei langen Aufträgen auch mehr verarbeitete Token und damit höhere Kosten beim Cloud-Anbieter.
+
 ## [1.1.3] - 2026-10-28
 
 **Der E-Mail-Assistent kann Antwortentwürfe jetzt über einen Cloud-Anbieter schreiben lassen, wenn du das freigibst.** Auf Rechnern mit wenig Arbeitsspeicher und ohne Grafikkarte konnte ein lokal gerechneter Entwurf den ganzen Rechner minutenlang lahmlegen. Jetzt wählst du im Assistenten, ob lokal oder über OpenRouter bzw. LLMBase gerechnet wird, und siehst vor dem Senden, welche Daten hinausgehen. Außerdem nennen Fehlermeldungen von Ollama jetzt den Grund statt nur einer Nummer.
