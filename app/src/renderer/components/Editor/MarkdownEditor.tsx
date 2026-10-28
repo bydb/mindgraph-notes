@@ -73,6 +73,7 @@ import { BrainIcon } from '../BrainIcon'
 import { readClipboardText, writeClipboardText } from '../../utils/clipboard'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 import { useNoteAgentStore, EMPTY_AGENT_SCOPE, type AcceptOpenTarget } from '../../stores/noteAgentStore'
+import { chatModelsOnly } from '../../../shared/chatModels'
 
 
 const markdownCodeLanguages = [
@@ -2322,7 +2323,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         const list = ollama.backend === 'lm-studio'
           ? await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
           : await window.electronAPI.ollamaModels()
-        if (!cancelled && Array.isArray(list)) setAiModels(list)
+        if (!cancelled && Array.isArray(list)) setAiModels(chatModelsOnly(list))
       } catch (e) {
         console.error('[AI-Bar] Modell-Liste laden fehlgeschlagen:', e)
       }

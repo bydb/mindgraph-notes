@@ -25,6 +25,7 @@ import { isCloudModel } from '../../shared/modelCompatibility'
 import { recordLlmRun, trackPendingTelemetry } from './telemetry'
 import { getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
+import { friendlyOllamaError } from '../../shared/ollamaError'
 
 export type ChatBackend = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
 // Die OpenAI-kompatiblen CLOUD-Backends. LM Studio spricht dasselbe Protokoll,
@@ -381,11 +382,7 @@ async function chatViaOllama(messages: ChatMessage[], opts: ChatCallOptions): Pr
     }),
   }, { timeoutMs: opts.timeoutMs ?? 120000, userSignal: opts.signal })
   if (!res.ok) {
-    const body = await res.text()
-    if (res.status === 403 && /cloud/i.test(body)) {
-      throw new Error(`Ollama-Cloud-Modell nicht verfügbar — bist du eingeloggt? Führe \`ollama signin\` im Terminal aus, oder wähle ein lokales Modell. (Details: ${body})`)
-    }
-    throw new Error(`Ollama API ${res.status}: ${body}`)
+    throw new Error(friendlyOllamaError(res.status, await res.text(), model))
   }
   const json = await res.json() as { message?: { content?: string; thinking?: string } } & OllamaTimings
   recordLlmRun(fromOllamaResponse(json, {
@@ -702,11 +699,7 @@ async function chatWithToolsViaOllama(
     }),
   }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
   if (!res.ok) {
-    const body = await res.text()
-    if (res.status === 403 && /cloud/i.test(body)) {
-      throw new Error(`Ollama-Cloud-Modell nicht verfügbar — bist du eingeloggt? Führe \`ollama signin\` im Terminal aus, oder wähle ein lokales Modell. (Details: ${body})`)
-    }
-    throw new Error(`Ollama API ${res.status}: ${body}`)
+    throw new Error(friendlyOllamaError(res.status, await res.text(), model))
   }
   const json = await res.json() as {
     message?: {

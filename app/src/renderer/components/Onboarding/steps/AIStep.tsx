@@ -4,6 +4,7 @@ import { useUIStore } from '../../../stores/uiStore'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../../shared/modelCompatibility'
 import { StepIndicator } from './StepIndicator'
 import { AgentFocusHint } from './AgentFocusHint'
+import { chatModelsOnly } from '../../../../shared/chatModels'
 
 interface AIStepProps {
   onBack: () => void
@@ -65,10 +66,12 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
         const result = await window.electronAPI.ollamaCheck()
         if (result) {
           setOllamaConnected(true)
-          const models = await window.electronAPI.ollamaModels()
-          if (Array.isArray(models) && models.length > 0) {
-            setOllamaModels(models.map((m: { name: string }) => m.name))
-            if (!ollama.selectedModel && models.length > 0) {
+          // Nur Chat-Modelle anbieten und vorwählen — das erste Listenmodell kann ein
+          // Embedding-Modell sein, das beim ersten Chat mit „400“ scheitert.
+          const models = chatModelsOnly(await window.electronAPI.ollamaModels())
+          if (models.length > 0) {
+            setOllamaModels(models.map(m => m.name))
+            if (!ollama.selectedModel) {
               setOllama({ selectedModel: models[0].name, enabled: true, backend: 'ollama' })
             }
           }
@@ -111,9 +114,9 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
       const result = await window.electronAPI.ollamaPullModel(pullModelName)
       if (result.success) {
         setPullProgress(null)
-        const models = await window.electronAPI.ollamaModels()
-        if (Array.isArray(models) && models.length > 0) {
-          setOllamaModels(models.map((m: { name: string }) => m.name))
+        const models = chatModelsOnly(await window.electronAPI.ollamaModels())
+        if (models.length > 0) {
+          setOllamaModels(models.map(m => m.name))
         }
         setOllama({ selectedModel: pullModelName, enabled: true, backend: 'ollama' })
       } else {

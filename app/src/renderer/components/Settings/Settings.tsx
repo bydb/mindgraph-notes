@@ -50,6 +50,7 @@ import {
   saveTemplateConfig,
   generateRandomId
 } from '../../utils/templateEngine'
+import { chatModelsOnly, firstChatModel, isKnownNonChatModel } from '../../../shared/chatModels'
 
 interface SettingsProps {
   isOpen: boolean
@@ -968,7 +969,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const integrationStatus = useIntegrationStatus(isOpen && (activeTab === 'integrations' || activeTab === 'modules'))
   const [ollamaStatus, setOllamaStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
   const [lmstudioStatus, setLmstudioStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking')
-  const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number }>>([])
+  const [ollamaModels, setOllamaModels] = useState<Array<{ name: string; size: number; capabilities?: string[] }>>([])
   const [lmstudioModels, setLmstudioModels] = useState<Array<{ name: string; size: number }>>([])
 
 
@@ -1142,8 +1143,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
         const models = await window.electronAPI.ollamaModels()
         setOllamaModels(models)
         // Wenn Ollama als Backend und noch kein Modell ausgewählt
-        if (ollama.backend === 'ollama' && !ollama.selectedModel && models.length > 0) {
-          setOllama({ selectedModel: models[0].name })
+        // Nicht einfach das erste Modell: das kann ein Embedding-Modell (bge-m3) sein.
+        const firstChat = firstChatModel(models)
+        if (ollama.backend === 'ollama' && !ollama.selectedModel && firstChat) {
+          setOllama({ selectedModel: firstChat })
         }
       }
     } catch {
@@ -1199,7 +1202,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
         const models = await window.electronAPI.ollamaModels()
         setOllamaModels(models)
         if (ollama.selectedModel === modelName) {
-          setOllama({ selectedModel: models.length > 0 ? models[0].name : '' })
+          setOllama({ selectedModel: firstChatModel(models) })
         }
       }
     } catch (err) {
@@ -1575,6 +1578,10 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
               const isLm = ollama.backend === 'lm-studio'
               const backendState = isLm ? lmstudioStatus : ollamaStatus
               const backendModels = isLm ? lmstudioModels : ollamaModels
+              // Modellauswahl für Chat & Module: nur Modelle, die Texte schreiben können.
+              // Die volle Liste bleibt für Zähler und Embedding-Auswahl.
+              const chatModels = chatModelsOnly(backendModels)
+              const selectedIsNonChat = isKnownNonChatModel(ollama.selectedModel, backendModels)
               const backendName = isLm ? 'LM Studio' : 'Ollama'
               const backendTone = backendState === 'connected' ? 'ok' : backendState === 'checking' ? 'checking' : 'off'
               const connected = backendState === 'connected'
@@ -1656,7 +1663,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <ModelPicker
                           value={ollama.selectedModel}
-                          models={backendModels}
+                          models={chatModels}
                           onChange={value => setOllama({ selectedModel: value })}
                           disabled={!ollama.enabled || !connected}
                           placeholder={{ value: '', label: t('settings.selectModel') }}
@@ -1672,6 +1679,9 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                       </div>
                       <ActiveModelStatusBadge model={ollama.selectedModel} />
                       <ModelRamWarning model={ollama.selectedModel} />
+                      {selectedIsNonChat && (
+                        <Note tone="danger">{t('settings.aiTab.nonChatModel', { model: ollama.selectedModel })}</Note>
+                      )}
                     </Row>
                     <ModelMixRamNote />
                     {!isLm && connected && projectRagOn && (() => {
@@ -1707,7 +1717,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                     </Row>
                     <div data-settings-anchor="ai-matrix">
                       <Details title={t('settings.aiTab.compatToggle')} wide defaultOpen={initialAnchor === 'ai-matrix'}>
-                        <ModelCompatibilitySection availableModels={backendModels} />
+                        <ModelCompatibilitySection availableModels={chatModels} />
                       </Details>
                     </div>
                     {!isLm && connected && (
@@ -1942,7 +1952,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
             {activeTab === 'remarkable' && <RemarkableSettingsTab t={t} />}
 
             {/* Email Tab */}
-            {activeTab === 'email' && <EmailSettingsTab t={t} ollamaModels={ollamaModels} />}
+            {activeTab === 'email' && <EmailSettingsTab t={t} ollamaModels={chatModelsOnly(ollamaModels)} />}
 
             {/* Edoobox Tab */}
             {activeTab === 'agents' && <EdooboxSettingsTab t={t} />}

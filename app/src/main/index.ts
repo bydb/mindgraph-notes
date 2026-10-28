@@ -174,6 +174,7 @@ import { runDeepResearch, type DeepResult } from './llm/petrolDeepSearch'
 import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import type { CloudProviderSettings } from '../shared/llmBackend'
+import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
@@ -5808,7 +5809,7 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
         if (!response.ok) {
           const errorText = await response.text()
           console.error('[Ollama] API error:', errorText)
-          throw new Error(`Ollama API Fehler: ${response.status}`)
+          throw new Error(friendlyOllamaError(response.status, errorText, request.model))
         }
 
         const data = await response.json() as { response?: string; done?: boolean } & OllamaTimings
@@ -5900,7 +5901,7 @@ Antworte nur mit dem JSON-Array:`
       })
     })
     if (!response.ok) {
-      return { success: false, error: `Ollama API Fehler: ${response.status}` }
+      return { success: false, error: friendlyOllamaError(response.status, await response.text(), model) }
     }
     const data = await response.json() as { response?: string } & OllamaTimings
     recordLlmRun(fromOllamaResponse(data, { module: 'task-extraction', model, wallMs: Date.now() - startedAt, at: startedAt }))
@@ -6353,7 +6354,7 @@ ipcMain.handle('ollama-embeddings', async (_event, model: string, text: string) 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[Ollama] Embeddings API error:', errorText)
-      throw new Error(`Ollama API Fehler: ${response.status}`)
+      throw new Error(`Ollama-Fehler ${response.status}: ${ollamaErrorDetail(errorText)}`)
     }
 
     const data = await response.json()
@@ -6605,7 +6606,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[Ollama] Chat API error:', errorText)
-      throw new Error(`Ollama API Fehler: ${response.status}`)
+      throw new Error(friendlyOllamaError(response.status, errorText, model))
     }
 
     // Stream verarbeiten
@@ -6746,7 +6747,7 @@ async function streamPetrolWebModel(
       body: JSON.stringify({ model: params.model, messages, stream: true, ...(!isLmStudio && numCtx ? { options: { num_ctx: numCtx } } : {}), ...(!isLmStudio && noThink ? { think: false } : {}) }),
       signal: controller.signal
     })
-    if (!response.ok || !response.body) throw new Error(`${isLmStudio ? 'LM Studio' : 'Ollama'} API Fehler: ${response.status}`)
+    if (!response.ok || !response.body) throw new Error(isLmStudio ? `LM Studio API Fehler: ${response.status}` : friendlyOllamaError(response.status, await response.text().catch(() => ''), params.model))
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
     let full = ''
@@ -7329,7 +7330,7 @@ ipcMain.handle('ollama-generate-image', async (event, request: OllamaImageReques
     if (!response.ok) {
       const errorText = await response.text()
       console.error('[Ollama] Image API error:', errorText)
-      throw new Error(`Ollama API Fehler: ${response.status}`)
+      throw new Error(`Ollama-Fehler ${response.status}: ${ollamaErrorDetail(errorText)}`)
     }
 
     // Stream verarbeiten
@@ -8592,7 +8593,7 @@ ipcMain.handle('project-rag-answer', wrapIpcWithOllamaActivity('project-rag-answ
     if (!response.ok || !response.body) {
       clearTimeout(timeout)
       event.sender.send('project-rag-answer-done')
-      return { success: false, error: `Ollama API Fehler: ${response.status}`, sources: chunks }
+      return { success: false, error: friendlyOllamaError(response.status, await response.text().catch(() => ''), chatModel), sources: chunks }
     }
 
     const reader = response.body.getReader()
@@ -8805,7 +8806,7 @@ ipcMain.handle('vault-rag-answer', async (event, vaultPath: string, query: strin
           signal: controller.signal
         })
         if (!response.ok || !response.body) {
-          const error = `Ollama API Fehler: ${response.status}`
+          const error = friendlyOllamaError(response.status, await response.text().catch(() => ''), chatModel)
           sendDone({ kind: 'error', error })
           return { success: false, requestId, error }
         }
@@ -10443,7 +10444,7 @@ async function quizLlmComplete(
     })
   })
   if (!response.ok) {
-    throw new Error(`Ollama API error: ${response.status}`)
+    throw new Error(friendlyOllamaError(response.status, await response.text().catch(() => ''), model))
   }
   const data = await response.json() as { message?: { content?: string } } & OllamaTimings
   recordLlmRun(fromOllamaResponse(data, { module: 'quiz', model, wallMs: Date.now() - startedAt, at: startedAt }))
@@ -10533,7 +10534,7 @@ CRITICAL: Output EXACTLY ${count} question objects. No markdown fences, no expla
       console.log(`[Quiz] Response received in ${Date.now() - startTime}ms, status: ${response.status}`)
 
       if (!response.ok) {
-        throw new Error(`Ollama API error: ${response.status}`)
+        throw new Error(friendlyOllamaError(response.status, await response.text().catch(() => ''), model))
       }
 
       const data = await response.json() as { message?: { content?: string } } & OllamaTimings
@@ -15165,7 +15166,7 @@ Antworte nur mit dem JSON-Objekt:`
       })
     })
     if (!response.ok) {
-      return { success: false, error: `Ollama API Fehler: ${response.status}` }
+      return { success: false, error: friendlyOllamaError(response.status, await response.text(), model) }
     }
     const data = await response.json() as { response?: string } & OllamaTimings
     recordLlmRun(fromOllamaResponse(data, { module: 'zettel', model, wallMs: Date.now() - startedAt, at: startedAt }))

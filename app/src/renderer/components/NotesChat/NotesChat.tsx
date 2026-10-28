@@ -25,6 +25,7 @@ import texmath from 'markdown-it-texmath'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import mermaid from 'mermaid'
+import { chatModelsOnly } from '../../../shared/chatModels'
 
 mermaid.initialize({
   startOnLoad: false,
@@ -203,6 +204,8 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
         }
 
         setIsBackendAvailable(available)
+        // Nur Modelle, die chatten können — ein Embedding-Modell als Chat-Modell endet in einer 400.
+        modelList = chatModelsOnly(modelList)
         setModels(modelList)
 
         if (available && modelList.length > 0) {
