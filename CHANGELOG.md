@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.3] - 2026-10-28
+
+**Der E-Mail-Assistent kann Antwortentwürfe jetzt über einen Cloud-Anbieter schreiben lassen, wenn du das freigibst.** Auf Rechnern mit wenig Arbeitsspeicher und ohne Grafikkarte konnte ein lokal gerechneter Entwurf den ganzen Rechner minutenlang lahmlegen. Jetzt wählst du im Assistenten, ob lokal oder über OpenRouter bzw. LLMBase gerechnet wird, und siehst vor dem Senden, welche Daten hinausgehen. Außerdem nennen Fehlermeldungen von Ollama jetzt den Grund statt nur einer Nummer.
+
+### Hintergrund
+
+- **Freigabe:** Unter Einstellungen → KI & Modelle → Cloud-Anbieter gibt es die neue Zeile „E-Mail-Assistent“. Beim Einschalten zählt die App auf, was an den Anbieter geht. Ohne Freigabe bleibt alles lokal.
+- **Was hinausgeht:** Standardmäßig nur die Mail mit ihrer Analyse, der bisherige Verlauf mit diesem Kontakt (Betreffs und Kurzfassungen) und das Gespräch im Assistenten. Passende Notizen, Aufgaben, Termine und Veranstaltungsbuchungen gehen nur mit, wenn du den Schalter im Assistenten einschaltest.
+- **Warnung vor dem Hängen:** Ist das lokale Modell für den Arbeitsspeicher knapp bemessen, sagt der Assistent das vor dem Start und bietet den freigegebenen Cloud-Anbieter an. Das ist ein Hinweis, keine Sperre.
+- **Verständliche Ollama-Fehler:** Statt „Ollama API Fehler: 400“ steht da jetzt zum Beispiel, dass das gewählte Modell keine Texte schreiben kann, nicht installiert ist oder dass kein Modell gewählt ist, jeweils mit dem nächsten Schritt.
+- **Nur passende Modelle zur Auswahl:** Chat- und Modul-Auswahlen zeigen keine Embedding- oder Bildmodelle mehr. Ohne gewähltes Modell nimmt die App das erste Modell, das chatten kann, nicht mehr einfach das erste der Liste. Ist bereits ein ungeeignetes Modell eingestellt, weist Einstellungen → KI & Modelle darauf hin.
+- **Edupool-Recherche:** Ein neuer Starter-Skill sucht über die Agent-Shell Medien im Edupool Hessen und legt eine Notiz mit Mediennummern und Direktlinks an. Er braucht die Agent-Shell mit freigegebenem Netz und die Nummer deines Medienzentrums.
+- **Sicherheit:** Electron und weitere Abhängigkeiten sind auf aktuelle Versionen mit geschlossenen Sicherheitslücken aktualisiert.
+- **Grenzen:** Mit Cloud-Anbieter verlassen Mailinhalte, auch die von Dritten, deinen Rechner. Die Speicherwarnung schätzt den Bedarf anhand der Modellgröße und kann danebenliegen.
+
 ## [1.1.2] - 2026-10-27
 
 **Der Petrol Agent erstellt Infografiken jetzt als ein fertiges Bild.** Bitte ihn um eine Infografik zu einem Thema, einer Notiz oder einer Recherche, und du bekommst ein Hochformat-Bild mit Überschrift, wenigen Kernaussagen und Zahlen aus der Quelle. Außerdem hängt der Agent nicht mehr minutenlang, wenn ein Modell an die Grenze seiner Antwortlänge stößt.
