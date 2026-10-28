@@ -12,6 +12,9 @@ import {
   searchWordsFromQuestion,
   offerSearchWords,
   webChatCharBudget,
+  webChatWideLimits,
+  WEB_CHAT_WIDE,
+  WEB_CHAT_CLOUD_BUDGET,
   webChatNumCtx,
   contextLengthFromShow,
   petrolCloudAllowed,
@@ -866,5 +869,27 @@ describe('Runde 9: Zuordnung, Lücken, Cloud-Budget (Codex F65/F66/F69)', () => 
   it('F66: Cloud ohne gemeldetes Fenster bekommt das größere Budget, lokal bleibt es', () => {
     expect(webChatCharBudget(null, true)).toBeGreaterThan(webChatCharBudget(null))
     expect(webChatCharBudget(8192, true)).toBe(webChatCharBudget(8192))
+  })
+})
+
+describe('webChatWideLimits (großer Rahmen bei bekanntem Cloud-Fenster)', () => {
+  it('Haiku/DeepSeek über OpenRouter (128 000 nach Abschlag): gedeckelter großer Rahmen', () => {
+    const l = webChatWideLimits(128_000)!
+    expect(l.totalChars).toBe(WEB_CHAT_WIDE.totalMax)
+    expect(l.sourcesMax).toBe(WEB_CHAT_WIDE.totalMax - WEB_CHAT_WIDE.overhead)
+    expect(l.pageChars).toBeGreaterThan(8_000)
+    expect(l.loopExcerptChars).toBeGreaterThan(3_000)
+  })
+
+  it('mittleres Fenster: Rahmen folgt dem Fenster, mit Antwortreserve', () => {
+    const l = webChatWideLimits(40_000)!
+    expect(l.totalChars).toBe((40_000 - WEB_CHAT_WIDE.answerTokens) * 3)
+    expect(l.totalChars).toBeGreaterThan(WEB_CHAT_CLOUD_BUDGET)
+  })
+
+  it('kleines oder unbrauchbares Fenster: kein großer Rahmen, es bleibt beim Alten', () => {
+    expect(webChatWideLimits(16_000)).toBeNull()
+    expect(webChatWideLimits(0)).toBeNull()
+    expect(webChatWideLimits(Number.NaN)).toBeNull()
   })
 })

@@ -161,7 +161,8 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud, shellLockReason } from '../shared/modelCompatibility'
-import { listCloudModels, chat as llmChat, chatWithTools, streamCloudChat, isCloudChatBackend, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
+import { listCloudModels, chat as llmChat, chatWithTools, streamCloudChat, isCloudChatBackend, catalogContextLength, warmPricingCache, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
+import { resolveContextWindow } from '../shared/contextBudget'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../shared/emailMerge'
@@ -175,7 +176,7 @@ import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/llmBackend'
 import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
-import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
+import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatWideLimits, type WebChatWideLimits, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
@@ -4618,6 +4619,15 @@ ipcMain.handle('note-agent-route-preflight', async (event, params: { model: stri
     const model = params.cloud?.model ?? params.model ?? ''
     const route = await classifyAgentRoute(backend, model)
     const gate = await checkNoteAgentCloudGate(route, params.cloud?.model)
+    // Katalog vorwärmen (Preise + Kontextfenster): sonst bekommt die erste Webfrage der Sitzung
+    // den kleinen Rahmen, weil der kalte Katalogabruf länger als die 3 s Wartezeit dauert
+    // (GUI-Test 28.10.2026). Nur ein GET auf die Modellliste, keine Inhalte.
+    // Nur, wenn dieser Weg für Chat oder Agent freigegeben ist (Codex F12): eine reine Anzeige
+    // soll mit gesperrter Cloud keinen Netzaufruf auslösen.
+    const cloudCleared = gate.ok || petrolCloudAllowed(params.cloud, ((await loadUISettings()).ollama as { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } | undefined))
+    if (backend === 'openrouter' && params.cloud?.model && cloudCleared) {
+      void resolveCloudChatOptions(params.cloud).then(r => { if (r) warmPricingCache(r.chatOptions) }).catch(() => undefined)
+    }
     return { success: true, route, gate }
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -6721,6 +6731,11 @@ function localDateString(d = new Date()): string {
 /** Streamt die Modellphase über den gewählten Weg; `onDelta` bekommt jedes Textstück. */
 const numbersOnly = (t: { missing: string[]; similar: string[] }) => ({ missing: t.missing.filter(x => /^\d/.test(x)), similar: [] })
 
+// Anteil des großen Rahmens für den Werkzeugverlauf der Schleife (Codex F16, Sicherheitsabschlag).
+const LOOP_WIDE_PROMPT_SHARE = 0.6
+// Zuletzt aus dem OpenRouter-Katalog bestätigter großer Rahmen je Modell (nur Speicher, Sitzung).
+const petrolWideByModel = new Map<string, WebChatWideLimits>()
+
 async function streamPetrolWebModel(
   params: PetrolWebParams,
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
@@ -6739,7 +6754,7 @@ async function streamPetrolWebModel(
     if (params.cloud?.model) {
       const cloudResolved = await resolveCloudChatOptions(params.cloud)
       if (!cloudResolved) throw new Error('Cloud ist gewählt, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).')
-      return await streamCloudChat(messages, { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controller.signal, telemetryModule: 'chat' }, onDelta)
+      return await streamCloudChat(messages, { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controller.signal, telemetryModule: 'chat', disableMiddleOut: true }, onDelta)
     }
     const isLmStudio = params.backend === 'lmstudio'
     const url = isLmStudio ? `${getLMStudioUrl(params.lmStudioPort)}/v1/chat/completions` : `${OLLAMA_API_URL}/api/chat`
@@ -6899,8 +6914,30 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     // Kontextfenster des lokalen Modells kennen (F17): Budget und num_ctx richten sich danach.
     const contextTokens = usesLocalOllama ? await ollamaContextLength(params.model) : null
     const cloudRoute = !usesLocalOllama && route.kind === 'cloud'
-    const charBudget = webChatCharBudget(contextTokens, cloudRoute)
-    const pageCap = cloudRoute ? DEEP_LIMITS.maxPagesCloud : DEEP_LIMITS.maxPages
+    // OpenRouter: Fenster aus dem Anbieterkatalog → großer Rahmen (mehr Seitentext je Abruf, mehr
+    // Seiten). Nur OpenRouter, weil nur dort ein Überlauf laut scheitert (Agent: Codex F01).
+    // Höchstens 3 s warten; sonst gilt der bisherige Cloud-Rahmen.
+    let wide: WebChatWideLimits | null = null
+    if (cloudRoute && backend === 'openrouter') {
+      const resolved = await resolveCloudChatOptions(params.cloud)
+      // 8 s statt 3 (Codex F11): der kalte Katalogabruf läuft meist schon seit dem Preflight und
+      // dauert real 2–5 s; abbrechbar bleibt er über das Signal.
+      const catalog = resolved ? await catalogContextLength(resolved.chatOptions, { timeoutMs: 8_000, signal: req.controller.signal }) : null
+      const window = resolveContextWindow('openrouter', undefined, catalog)
+      const model = params.cloud?.model?.trim() ?? ''
+      if (window.source === 'catalog') {
+        wide = webChatWideLimits(window.tokens)
+        if (wide) petrolWideByModel.set(model, wide)
+        else petrolWideByModel.delete(model)
+      } else if (catalog === null) {
+        // Katalog diesmal nicht rechtzeitig (Codex F04): dasselbe Modell behält das zuletzt
+        // bestätigte Fenster, sonst passten große Nachfrage-Auszüge plötzlich nicht mehr.
+        wide = petrolWideByModel.get(model) ?? null
+      }
+    }
+    console.log(`[PetrolWeb] Rahmen ${wide ? `groß (${wide.totalChars} Zeichen, ${wide.maxPages} Seiten)` : 'Standard'}`)
+    const charBudget = wide ? wide.totalChars : webChatCharBudget(contextTokens, cloudRoute)
+    const pageCap = wide ? wide.maxPages : cloudRoute ? DEEP_LIMITS.maxPagesCloud : DEEP_LIMITS.maxPages
     if (req.controller.signal.aborted) return finish({ kind: 'stopped', sources: [], failures: [], notFetched: 0, ...followUpMark })
 
     const today = localDateString()
@@ -6945,7 +6982,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       if (maxPages === 0) {
         return finish({ kind: 'error', error: 'Das Kontextfenster dieses Modells ist zu klein für die gründliche Suche. Nimm die schnelle Suche oder ein Modell mit größerem Fenster.', sources: [], failures: [], notFetched: 0 })
       }
-      const netDeps = defaultWebGatherDeps(webConfig, apiKey)
+      const netDeps = defaultWebGatherDeps(webConfig, apiKey, wide?.pageChars)
       const planCtx = backend === 'ollama' ? webChatNumCtx(6000, contextTokens) : undefined
       const callModel = (msgs: Array<{ role: 'system' | 'user'; content: string }>, signal: AbortSignal) => usesLocalOllama
         ? withOllamaActivity('petrol-web-chat', () => streamPetrolWebModel(params, msgs, signal, () => {}, planCtx, true))
@@ -6962,7 +6999,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
           history,
           total: charBudget,
           sourcesMin: n * DEEP_LIMITS.minExcerpt,
-          sourcesMax: Math.max(WEB_CHAT_SOURCES_MAX, n * 3000)
+          sourcesMax: wide ? wide.sourcesMax : Math.max(WEB_CHAT_SOURCES_MAX, n * 3000)
         },
         prepare,
         f => measure(f),
@@ -7001,6 +7038,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
         } else {
           base = { backend: 'ollama', ollamaModel: params.model, numCtx: loopNumCtx, ollamaThink: false }
         }
+        base = { ...base, disableMiddleOut: true }
         const run = () => chatWithTools(msgs, tools, { ...base, signal, timeoutMs: 120_000, telemetryModule: 'chat' })
         return usesLocalOllama ? withOllamaActivity('petrol-web-chat', run) : run()
       }
@@ -7008,7 +7046,7 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       let researched: DeepResult
       const deepDeadline = usesLocalOllama ? DEEP_LIMITS.deadlineLocalMs : DEEP_LIMITS.deadlineMs
       if (loopOn) {
-        const loopDeadline = usesLocalOllama ? LOOP_LIMITS.deadlineLocalMs : LOOP_LIMITS.deadlineMs
+        const loopDeadline = usesLocalOllama ? LOOP_LIMITS.deadlineLocalMs : wide ? wide.loopDeadlineMs : LOOP_LIMITS.deadlineMs
         const loopStarted = Date.now()
         const looped = await runLoopResearch(question, {
           chat: loopChat, search: netDeps.search, fetchPage: netDeps.fetchPage, sanitize: sanitizeUntrustedText, excerptFor: prepare
@@ -7017,8 +7055,13 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
           deadlineMs: loopDeadline,
           today,
           topics: webTopics.map(tp => tp.text),
+          ...(wide ? { excerptChars: wide.loopExcerptChars, searches: wide.loopSearches, fetches: wide.loopFetches, iterations: wide.loopIterations } : {}),
           // Nur lokal bekannt: Werkzeugverlauf muss in num_ctx passen, mit Platz für die Antwort (F43).
-          ...(params.cloud?.model ? {}
+          // Abschlag (Codex F16): gemessen werden nur Inhalte, nicht Rollen und Werkzeug-Schema, und
+          // Tabellen haben nur ~1,9 statt 3 Zeichen je Token.
+          // Großer Rahmen: der Werkzeugverlauf muss ins Katalogfenster passen (Codex F10) — sonst
+          // scheitert ein knapp „großes“ Modell an 14 × 8000 Zeichen; so endet die Schleife geordnet.
+          ...(params.cloud?.model ? (wide ? { maxPromptChars: Math.floor(wide.totalChars * LOOP_WIDE_PROMPT_SHARE), answerSeesMore: true } : {})
             : backend === 'lmstudio' ? { maxPromptChars: LOOP_LIMITS.lmstudioPromptChars }
             : { maxPromptChars: Math.max(4000, (loopNumCtx - 2048) * WEB_CHAT_CHARS_PER_TOKEN) }),
           onPhase: (phase, detail) => send('petrol-chat-progress', { phase, started: 0, host: detail.host ?? null, query: detail.query ?? null })
@@ -7112,8 +7155,11 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     } else {
       if (!webConfig) return { success: false, error: 'Die Webrecherche ist nicht eingerichtet (Einstellungen → KI & Modelle → Webrecherche).' }
       provenance.searchProvider = WEB_SEARCH_PROVIDER_META[webConfig.provider].label
-      const gathered = await gatherWebSources(query, defaultWebGatherDeps(webConfig, apiKey), {
+      const gathered = await gatherWebSources(query, defaultWebGatherDeps(webConfig, apiKey, wide?.pageChars), {
         signal: req.controller.signal,
+        // Großes Fenster: so viele Seiten wie in der gründlichen Suche (Codex F01). Keine Ersatzabrufe
+        // darüber hinaus: der Suchanbieter liefert ohnehin höchstens 8 Treffer (Codex F14).
+        ...(wide ? { maxUsable: wide.maxPages, maxAttempts: wide.maxPages } : {}),
         onPhase: (phase, detail) => send('petrol-chat-progress', { phase, started: detail.started ?? 0, host: detail.host ?? null })
       })
       markPhase('net')
@@ -7139,16 +7185,17 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
       // Erst kürzen, dann einfrieren (F19): der Auszug ist exakt der Text im Prompt.
       // Themenfragen zählen im Budget mit (Codex F05) — sie stehen im fertigen Systemtext.
       webTopics = sanitizeWebTopics(params.webTopics, sanitizeUntrustedText)
-      const systemChars = buildPetrolWebSystemPrompt([], today, sanitizeUntrustedText, webTopics).length + 200 * WEB_CHAT_MAX_SOURCES
+      const systemChars = buildPetrolWebSystemPrompt([], today, sanitizeUntrustedText, webTopics).length + 200 * (wide ? wide.maxPages : WEB_CHAT_MAX_SOURCES)
       const prepare = (t: string) => prepareWebExcerpt(t, sanitizeUntrustedText)
       // Die Kopfzeilen sind in systemChars nur geschätzt: den fertigen Prompt messen und, falls
       // er über der Grenze liegt, die Quellen um genau den Überhang kürzer einfrieren (F17).
       const frozen = freezeWebSourcesToFit(
         gathered.entries,
-        { systemChars, questionChars: question.length, history, total: charBudget },
+        { systemChars, questionChars: question.length, history, total: charBudget, ...(wide ? { sourcesMax: wide.sourcesMax } : {}) },
         prepare,
         // Die erste Antwort lässt Platz für eine Nachfrage auf dieselben Seiten (kleine Fenster).
-        f => measureWithFollowUpRoom({ sources: f.sources, history: f.history, questionChars: question.length, topics: webTopics, today, sanitize: sanitizeUntrustedText })
+        f => measureWithFollowUpRoom({ sources: f.sources, history: f.history, questionChars: question.length, topics: webTopics, today, sanitize: sanitizeUntrustedText }),
+        wide ? wide.maxPages : WEB_CHAT_MAX_SOURCES
       )
       const attempted = new Set(gathered.entries.map(e => e.candidate.index))
       notFetched = gathered.candidates.filter(c => !attempted.has(c.index)).length

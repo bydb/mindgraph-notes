@@ -59,11 +59,11 @@ export function buildTurndown(): TurndownService {
   return td
 }
 
-function truncate(markdown: string, marker: boolean): { text: string; truncated: boolean; originalChars: number } {
+function truncate(markdown: string, marker: boolean, maxChars = WEB_PAGE_CONTEXT_MAX_CHARS): { text: string; truncated: boolean; originalChars: number } {
   const originalChars = markdown.length
-  if (originalChars <= WEB_PAGE_CONTEXT_MAX_CHARS) return { text: markdown, truncated: false, originalChars }
+  if (originalChars <= maxChars) return { text: markdown, truncated: false, originalChars }
   return {
-    text: markdown.slice(0, WEB_PAGE_CONTEXT_MAX_CHARS) + (marker ? `\n\n[gekürzt — Original ${originalChars} Zeichen]` : ''),
+    text: markdown.slice(0, maxChars) + (marker ? `\n\n[gekürzt — Original ${originalChars} Zeichen]` : ''),
     truncated: true,
     originalChars
   }
@@ -85,7 +85,11 @@ export class PageTooLargeError extends Error {
   }
 }
 
-export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal; markTruncation?: boolean; rejectTruncatedBody?: boolean }): Promise<FetchExtractResult> {
+/**
+ * `maxChars`: Seitentext höchstens so lang (Standard WEB_PAGE_CONTEXT_MAX_CHARS). Nur der
+ * Petrol-Chat mit großem Cloud-Fenster setzt mehr; der Notiz-Agent bleibt beim Standard.
+ */
+export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal; markTruncation?: boolean; rejectTruncatedBody?: boolean; maxChars?: number }): Promise<FetchExtractResult> {
   const res = await safeFetch(url, {
     signal: opts?.signal,
     timeoutMs: WEB_FETCH_TIMEOUT_MS,
@@ -121,7 +125,7 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     markdown = buildTurndown().turndown(parsed.content || '')
   }
 
-  const trimmed = truncate(markdown.trim(), opts?.markTruncation !== false)
+  const trimmed = truncate(markdown.trim(), opts?.markTruncation !== false, opts?.maxChars)
   const record: WebFetchRecord = {
     requestedUrl: url,
     finalUrl: res.finalUrl,

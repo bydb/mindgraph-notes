@@ -49,7 +49,14 @@ export interface WebGatherResult {
 export async function gatherWebSources(
   query: string,
   deps: WebGatherDeps,
-  opts: { signal: AbortSignal; deadlineMs?: number; onPhase?: (phase: WebChatPhase, detail: { started?: number; host?: string }) => void }
+  opts: {
+    signal: AbortSignal
+    deadlineMs?: number
+    /** Brauchbare Seiten / Abrufstarts; fehlt = WEB_CHAT_MAX_SOURCES / WEB_CHAT_MAX_ATTEMPTS. Großes Cloud-Fenster setzt mehr (Codex F01). */
+    maxUsable?: number
+    maxAttempts?: number
+    onPhase?: (phase: WebChatPhase, detail: { started?: number; host?: string }) => void
+  }
 ): Promise<WebGatherResult> {
   const net = new AbortController()
   let timedOut = false
@@ -101,10 +108,13 @@ export async function gatherWebSources(
     result.searchOk = true
     const split = splitSkippedHits(hits)
     result.skipped = split.skipped
-    result.candidates = candidatesFromHits(split.kept)
+    // Genug Kandidaten für die erlaubten Abrufe (Codex F07), sonst blieben Fehlversuche unersetzbar.
+    result.candidates = candidatesFromHits(split.kept, Math.max(8, opts.maxAttempts ?? 0))
     let started = 0
     result.entries = await runFetchQueue(result.candidates, (c) => deps.fetchPage(c.url, net.signal), {
       stopReason,
+      ...(opts.maxUsable ? { maxUsable: opts.maxUsable } : {}),
+      ...(opts.maxAttempts ? { maxAttempts: opts.maxAttempts } : {}),
       onStart: (c) => {
         started++
         result.contactedHosts.push(c.host)
@@ -135,13 +145,14 @@ export function fetchFailReason(err: unknown): WebFetchFailReason {
 }
 
 /** Standard-Abhängigkeiten: Anbieter-Suche und lokaler Abruf über den gepinnten Egress. */
-export function defaultWebGatherDeps(config: WebResearchConfig, apiKey: string | null): WebGatherDeps {
+/** `pageChars`: Seitentext je Abruf, nur bei großem Cloud-Fenster über dem Standard (webChatWideLimits). */
+export function defaultWebGatherDeps(config: WebResearchConfig, apiKey: string | null, pageChars?: number): WebGatherDeps {
   return {
     search: (query, signal) => webSearch(query, { config, apiKey, signal }),
     fetchPage: async (url, signal) => {
       const startedAt = Date.now()
       try {
-        const r = await fetchAndExtract(url, { signal, markTruncation: false, rejectTruncatedBody: true })
+        const r = await fetchAndExtract(url, { signal, markTruncation: false, rejectTruncatedBody: true, ...(pageChars ? { maxChars: pageChars } : {}) })
         // Aufbereitung läuft synchron im Main-Thread — Dauer protokollieren (erst messen, F03).
         console.log(`[PetrolWeb] Seite aufbereitet in ${Date.now() - startedAt} ms (${r.originalChars} Zeichen)`)
         return {

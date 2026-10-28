@@ -51,6 +51,71 @@ export const WEB_CHAT_MIN_NUM_CTX = 8_192
 // ── Kontextfenster (F17, Runde 4) ────────────────────────────────────────────
 
 /**
+ * Großer Rahmen für Cloud-Modelle mit bekanntem Fenster (OpenRouter-Katalog, 28.10.2026).
+ * Vorher galt auch für Modelle mit 200k–1M Token der Rahmen von 40 000 Zeichen: die Schleife
+ * sah 3000 Zeichen je Seite, die Antwort rund 3000 je Seite. Eine Liste weiter unten auf der
+ * Seite („welche Parfüms seit 2023“) kam nie beim Modell an, die Antwort klang trotzdem
+ * vollständig. Die Deckel halten die Kosten je Frage in Grenzen.
+ */
+export const WEB_CHAT_WIDE = {
+  /** Ganzer Prompt höchstens so viele Zeichen (~40–50k Token). */
+  totalMax: 150_000,
+  /** Platz für Systemtext, Verlauf und Frage, der den Quellen nicht zusteht. */
+  overhead: 20_000,
+  /** Seitentext je Abruf (statt WEB_PAGE_CONTEXT_MAX_CHARS = 8000). */
+  pageChars: 20_000,
+  /** So viel sieht das Modell je Abruf in der Recherche-Schleife (statt 3000). */
+  loopExcerptChars: 8_000,
+  /** Höchstens so viele Seiten in der Antwort (statt maxPagesCloud = 6). */
+  maxPages: 8,
+  /**
+   * Recherche-Schleife (statt 5 Suchen / 8 Abrufe / 120 s). Gemessen 28.10.2026 mit gpt-6-luna:
+   * eine Listenfrage endete an der Suchgrenze mit einem von mehreren Einträgen; die ganze
+   * Schleife (13 Aufrufe, Prompt-Cache) kostete rund 0,3 Cent — der Engpass war das Budget.
+   */
+  loopSearches: 8,
+  loopFetches: 14,
+  loopIterations: 20,
+  loopDeadlineMs: 180_000,
+  /** Antwortreserve in Token. */
+  answerTokens: 4_096
+} as const
+
+export interface WebChatWideLimits {
+  totalChars: number
+  sourcesMax: number
+  pageChars: number
+  loopExcerptChars: number
+  maxPages: number
+  loopSearches: number
+  loopFetches: number
+  loopIterations: number
+  loopDeadlineMs: number
+}
+
+/**
+ * Rahmen aus einem BEKANNTEN Fenster in Token (bereits mit Abschlag, siehe
+ * shared/contextBudget.ts `resolveContextWindow` mit Quelle 'catalog'). null, wenn das Fenster
+ * nicht mehr hergibt als der bisherige Cloud-Rahmen — dann bleibt alles beim Alten.
+ */
+export function webChatWideLimits(windowTokens: number): WebChatWideLimits | null {
+  if (!Number.isFinite(windowTokens) || windowTokens <= 0) return null
+  const totalChars = Math.min(WEB_CHAT_WIDE.totalMax, Math.floor((windowTokens - WEB_CHAT_WIDE.answerTokens) * WEB_CHAT_CHARS_PER_TOKEN))
+  if (totalChars <= WEB_CHAT_CLOUD_BUDGET) return null
+  return {
+    totalChars,
+    sourcesMax: totalChars - WEB_CHAT_WIDE.overhead,
+    pageChars: WEB_CHAT_WIDE.pageChars,
+    loopExcerptChars: WEB_CHAT_WIDE.loopExcerptChars,
+    maxPages: WEB_CHAT_WIDE.maxPages,
+    loopSearches: WEB_CHAT_WIDE.loopSearches,
+    loopFetches: WEB_CHAT_WIDE.loopFetches,
+    loopIterations: WEB_CHAT_WIDE.loopIterations,
+    loopDeadlineMs: WEB_CHAT_WIDE.loopDeadlineMs
+  }
+}
+
+/**
  * Zeichengrenze für den ganzen Prompt. Ohne bekanntes Fenster (Cloud, LM Studio) gilt der
  * Startwert; bei bekanntem Fenster passt der Prompt samt Antwortreserve hinein.
  */
