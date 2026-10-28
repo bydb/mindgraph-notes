@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.5] - 2026-10-28
+
+**Die Websuche im Petrol-Chat beantwortet Fragen nach Listen und Vergleichen mit Cloud-Modellen über OpenRouter jetzt deutlich vollständiger.** Bisher sah das Modell von jeder Webseite nur den Anfang. Stand die gesuchte Liste weiter unten, fehlte sie in der Antwort, die trotzdem vollständig klang. Jetzt liest der Chat ganze Seiten, recherchiert länger und sagt ausdrücklich, wenn eine Seite für ihn zu lang war.
+
+### Hintergrund
+
+- **Auslöser:** Eine Frage nach allen neuen Düften eines Parfümeurs seit 2023 lieferte nur einen Duft ohne Jahr, obwohl die Seiten alle drei nannten. Sie standen nur weiter unten.
+- **Wie viel:** Mit OpenRouter-Modellen, deren Kontextgröße bekannt ist, liest der Chat bis zu 20 000 Zeichen je Seite und nutzt bis zu acht Seiten. Die Recherche darf öfter suchen und mehr Seiten abrufen und erfährt nach jeder Suche, wie viel Budget noch frei ist.
+- **Ehrlich bei Lücken:** Ist eine Seite trotzdem gekürzt und fragt man nach einer vollständigen Liste, sagt die Antwort, dass sie unvollständig sein kann, statt Einträge zu ergänzen.
+- **Ohne Gendern:** Antworten im Chat verwenden keine Gendersternchen oder Doppelpunkte mehr, auch wenn die Quelle so schreibt.
+- **Kosten:** Eine ganze Recherche mit einem günstigen Modell kostete in Tests Bruchteile eines Cents. Mit teureren Modellen steigen die Kosten, weil mehr Text gelesen wird.
+- **Grenzen:** PDFs werden weiterhin nicht gelesen. LLMBase, Ollama-Cloud und lokale Modelle arbeiten wie bisher. Manche Websites sperren automatische Abrufe.
+
 ## [1.1.4] - 2026-10-28
 
 **Der Petrol Agent kann mit Cloud-Modellen über OpenRouter jetzt deutlich mehr lesen, bevor sein Arbeitsspeicher voll ist.** Bisher rechnete er bei jedem Cloud-Modell mit einem kleinen Kontext und hörte bei längeren Aufträgen mit vielen Notizen, Dateien oder Webseiten nach wenigen Schritten auf, obwohl das Modell viel mehr verkraftet hätte. Jetzt richtet er sich nach der Kontextgröße, die OpenRouter für das gewählte Modell angibt.
