@@ -144,7 +144,7 @@ function freshScope(): PetrolChatScope {
     draft: '',
     localModel: '',
     cloudProvider: null,
-    webArmed: false,
+    webArmed: useUIStore.getState().petrolWebSticky === true,
     webQuery: null,
     webDeep: false,
     followUp: null,
@@ -255,8 +255,8 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         streaming: '',
         active: !web && !follow && webTopics.length ? { ...opts.run, webTopics: webTopics.length } : opts.run,
         draft: '',
-        // Globus nach jedem Senden aus; das Suchfeld und die Nachfrage starten beim nächsten Mal neu.
-        webArmed: false,
+        // Der Globus bleibt, wie er ist (Nutzerwunsch 28.10.2026: sonst musste man ihn bei jeder
+        // Frage neu anklicken). Suchfeld und Schalter „gründlich“ starten beim nächsten Mal neu.
         webQuery: null,
         webDeep: false,
         followUp: null,
@@ -308,7 +308,11 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
             : r.kind === 'nothing-readable'
               ? { role: 'assistant', content: '', model: opts.run.label, origin: 'web', web: r, at: Date.now() }
               : { role: 'assistant', content: r.error || '', error: true, origin: 'web', web: r, at: Date.now() }
-        patch(id, { messages: [...sc.messages, next], streaming: null, active: null, webProgress: null })
+        // Nachfragen beziehen sich von selbst auf diese Antwort (Nutzerwunsch 28.10.2026): im Chat
+        // ist klar, dass die nächste Frage an die letzte Antwort anschließt. Wirksam wird das nur
+        // bei ausgeschaltetem Globus; der Hinweis über der Eingabe zeigt es und lässt sich wegklicken.
+        const snap = next.web?.kind === 'answer' && !next.error ? next.web.snapshotId : undefined
+        patch(id, { messages: [...sc.messages, next], streaming: null, active: null, webProgress: null, ...(snap ? { followUp: { snapshotId: snap } } : {}) })
         return
       }
       const messages = [...history, { role: 'user' as const, content: question }]
@@ -368,7 +372,8 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
     clear: id => {
       if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
       dropSnapshots(id)
-      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: false, webQuery: null, webDeep: false, followUp: null })
+      // Neues Gespräch startet wie ein neuer Tab mit dem gemerkten Globus (Codex F06).
+      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: useUIStore.getState().petrolWebSticky === true, webQuery: null, webDeep: false, followUp: null })
     },
 
     dispose: id => {

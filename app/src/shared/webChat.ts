@@ -1129,6 +1129,35 @@ function isTableLabelCell(answer: string, pos: number): boolean {
   return line.trimStart().startsWith('|') ? pipesBefore === 1 : pipesBefore === 0
 }
 
+const RANK_HEADER = /^(?:#|nr\.?|no\.?|rang|platz|rank|pos\.?|position)$/i
+
+/** Erste Spalte einer Tabelle, deren Kopf eine Rangspalte benennt? `pos` liegt in einer Datenzeile. */
+function isRankCell(answer: string, pos: number): boolean {
+  const lineStart = answer.lastIndexOf('\n', pos - 1) + 1
+  const line = answer.slice(lineStart, (answer.indexOf('\n', pos) + 1 || answer.length + 1) - 1)
+  if (!line.includes('|')) return false
+  const pipesBefore = (answer.slice(lineStart, pos).match(/\|/g) ?? []).length
+  if (pipesBefore !== (line.trimStart().startsWith('|') ? 1 : 0)) return false
+  // Kopf = Zeile direkt über der Trennzeile (`|---|`) des Blocks; Prosa davor zählt nie (Codex F12).
+  const SEPARATOR = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/
+  let cur = lineStart
+  while (cur > 0) {
+    const prevStart = answer.lastIndexOf('\n', cur - 2) + 1
+    const prev = answer.slice(prevStart, cur - 1)
+    if (!prev.includes('|')) return false
+    if (SEPARATOR.test(prev)) {
+      if (prevStart === 0) return false
+      const headStart = answer.lastIndexOf('\n', prevStart - 2) + 1
+      const header = answer.slice(headStart, prevStart - 1)
+      if (!header.includes('|')) return false
+      const first = header.replace(/^\s*\|/, '').split('|')[0].replace(/[*_`]/g, '').trim()
+      return RANK_HEADER.test(first)
+    }
+    cur = prevStart
+  }
+  return false
+}
+
 /** Fenster für „steht beieinander“: etwa eine Produktkarte oder Tabellenzeile. */
 const NEAR_WINDOW = 300
 
@@ -1170,6 +1199,10 @@ export function sentenceExtras(answer: string, report: CitationReport, excerpts:
   const sourceNumbers = excerpts.map(pageNumbers)
   const askedNumbers = new Set(numberUnits(question).map(numberCore))
   return report.sentences.map((s: SentenceCheck) => {
+    // Rangspalte („1“, „2.“): die Zählung schreibt das Modell selbst, sie ist keine Sachzahl —
+    // auch nicht, wenn die Zelle die Nummer der Zeile erbt (citations.ts). Nur unter einem
+    // Rang-Kopf („#“, „Rang“, „Platz“, „Nr.“), sonst ist „| 8 | GB |“ eine Angabe (Codex F02).
+    if (/^\s*\d{1,3}\.?\s*$/.test(answer.slice(s.start, s.end)) && isRankCell(answer, s.start)) return { missingNumbers: [], negation: false, label: true }
     if (s.refs.length === 0) {
       const text = answer.slice(s.start, s.end)
       const gap = s.status === 'uncited' && isGapStatement(text, question)
@@ -1243,4 +1276,27 @@ export function withWebFootnotes(
   })
   const warnBlock = warnings.length ? `\n> ${labels.warnings}\n${warnings.join('\n')}` : ''
   return `${body}${lines.length ? `\n\n${lines.join('\n')}` : ''}\n\n> ${labels.check}${warnBlock}`
+}
+
+// ── Reine Bestätigungen (Globus bleibt an, Codex F07 aus chat-antwortqualitaet-und-globus.md) ──
+
+// Wörter, aus denen eine reine Bestätigung besteht („Ok, super danke“, „Alles klar“, „Thank you“).
+const ACK_WORDS = new Set([
+  'danke', 'dankeschön', 'dir', 'schön', 'vielen', 'dank', 'merci', 'ok', 'okay', 'super', 'prima', 'toll',
+  'perfekt', 'alles', 'klar', 'passt', 'gut', 'sehr', 'cool', 'top', 'thanks', 'thank', 'you', 'great', 'perfect', 'got', 'it',
+  'lieben', 'herzlichen', 'herzlich', 'besten', 'recht', 'beaucoup', 'much', 'so', 'many'
+])
+// Mindestens eines davon muss vorkommen — „sehr dir“ ist keine Bestätigung.
+const ACK_CORE = new Set(['danke', 'dankeschön', 'dank', 'merci', 'ok', 'okay', 'super', 'prima', 'toll', 'perfekt', 'klar', 'passt', 'gut', 'cool', 'top', 'thanks', 'thank', 'great', 'perfect', 'got'])
+
+/**
+ * „Danke“, „Ok, super“: kein Suchauftrag. Bei dauerhaft eingeschaltetem Globus geht so eine Nachricht
+ * ohne Websuche als normaler Chat hinaus, statt eine Suche und einen Modellaufruf auszulösen. Bewusst
+ * ein kleiner fester Wortschatz und höchstens fünf Wörter, nie mit Fragezeichen — „ok, und der Preis?“ sucht weiter.
+ */
+export function isAcknowledgement(text: string): boolean {
+  // Ziffern gehören zu einer Sachfrage („Super 8“, „Top 10“), nie zu einem Dank (Codex F10).
+  if (/[?？\d]/.test(text)) return false
+  const words = text.toLowerCase().replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean)
+  return words.length > 0 && words.length <= 5 && words.every((w) => ACK_WORDS.has(w)) && words.some((w) => ACK_CORE.has(w))
 }

@@ -30,7 +30,7 @@ import { useIsModuleEnabled } from '../../utils/modules'
 import { buildChatHandover, formatHandoverTranscript } from '../../utils/chatHandover'
 import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META } from '../../../shared/webResearch'
 import { applyPreviousTopic, asksForDeeperSearch, asksForMorePages, offerPreviousTopic, previousWebQuestion } from '../../../shared/webChatDeep'
-import { followUpQuery, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
+import { followUpQuery, isAcknowledgement, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
 import { WebAnswerText, WebCheck, WebDeepLine, WebMarkLegend, WebProvenanceLine, WebSkippedLine, WebSourceList, WebSourcesFold, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 import { chatModelsOnly } from '../../../shared/chatModels'
@@ -289,14 +289,18 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
 
   // `text` gesetzt = „Erneut senden“ einer gescheiterten Frage; der laufende Entwurf bleibt dann
   // stehen (der Store leert den Entwurf beim Senden synchron, deshalb danach zurücklegen).
-  const send = (text?: string, snapshotId?: string) => {
+  const send = (text?: string, snapshotId?: string, retryOf?: PetrolChatMessage) => {
     const question = text ?? draft
     if (!question.trim() || busy || busyElsewhere || !hasModel) return
-    // „Erneut senden“ geht immer ohne Web — eine neue Suche braucht den Globus (bewusst).
-    // Eine Nachfrage geht nur mit, wenn sie ausdrücklich gewählt ist oder am Wiederholen hängt.
-    const withWeb = text === undefined && webOn
-    const followId = withWeb ? undefined : snapshotId ?? (text === undefined ? followUpId ?? undefined : undefined)
-    if (withWeb && (webQueryProblem || webWaitsForRoute)) return
+    // „Erneut senden“ einer gescheiterten Websuche sucht wieder, solange der Globus an ist — der
+    // Globus bleibt seit 28.10.2026 an, sonst käme unter sichtbarem Globus eine Antwort ohne Seiten
+    // (Codex F03). Ohne Globus geht die Wiederholung ohne Web.
+    const retryWeb = text !== undefined && webOn && retryOf?.origin === 'web' && !retryOf.followUp
+    // Reine Bestätigungen („Danke“) lösen bei dauerhaftem Globus keine Suche aus (Codex F07).
+    const withWeb = (text === undefined && webOn && !isAcknowledgement(question)) || retryWeb
+    // Die vorgemerkte Nachfrage gilt nur, wo ihr Hinweis sichtbar ist (followUpActive: Globus aus).
+    const followId = withWeb ? undefined : snapshotId ?? (text === undefined && !webOn ? followUpId ?? undefined : undefined)
+    if (withWeb && (webWaitsForRoute || (!retryWeb && webQueryProblem))) return
     if (followId && (followUpWaits || (text === undefined && followUpMissing))) return
     const keep = text !== undefined ? draft : ''
     stickToBottom.current = true
@@ -306,7 +310,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       lmStudioPort: ollama.lmStudioPort,
       cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null,
       run: { label: activeCloudRoute ? activeCloudRoute.label : model, routeText: selectedRouteText, routeKind: selectedRouteKind, routeKey },
-      web: withWeb ? (webDeep ? { query: question.trim(), deep: true } : { query: webQueryNorm }) : undefined,
+      web: !withWeb ? undefined
+        : retryWeb ? (retryOf!.webDeep || webDeep ? { query: question.trim(), deep: true } : { query: retryOf!.webQuery ?? normalizeQuery(question) })
+          : webDeep ? { query: question.trim(), deep: true } : { query: webQueryNorm },
       followUp: followId ? { snapshotId: followId } : undefined
     })
     if (keep) chat().setDraft(tabId, keep)
@@ -603,7 +609,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       <span>{turn.answer.content ? t('petrolChat.error', { error: turn.answer.content }) : t('petrolChat.errorEmpty')}</span>
                       {/* Sind die Seiten weg, scheitert jede Wiederholung gleich — dann kein Knopf. */}
                       {turn.question && !turn.answer.web?.snapshotGone && (
-                        <button type="button" className="agent-card-btn" onClick={() => send(turn.question!.content, turn.question!.followUpSnapshotId)} disabled={busy || busyElsewhere || !hasModel}>
+                        <button type="button" className="agent-card-btn" onClick={() => send(turn.question!.content, turn.question!.followUpSnapshotId, turn.question!)} disabled={busy || busyElsewhere || !hasModel}>
                           {t('petrolChat.retry')}
                         </button>
                       )}
@@ -733,6 +739,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               onClick={() => {
                 if (!webConfigured) { openSettingsAt('ai', 'ai-webresearch'); return }
                 chat().setWeb(tabId, { webArmed: !webOn, webQuery: null })
+                useUIStore.getState().setPetrolWebSticky(!webOn)
               }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M3 12h18" /><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" /></svg>
@@ -806,7 +813,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                 onChange={e => chat().setWeb(tabId, { webQuery: e.target.value })}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); send() } }}
               />
-              <button type="button" className="petrol-web-query-off" aria-label={t('petrolChat.webQueryOff')} title={t('petrolChat.webQueryOff')} onClick={() => chat().setWeb(tabId, { webArmed: false, webQuery: null })}>
+              <button type="button" className="petrol-web-query-off" aria-label={t('petrolChat.webQueryOff')} title={t('petrolChat.webQueryOff')} onClick={() => { chat().setWeb(tabId, { webArmed: false, webQuery: null }); useUIStore.getState().setPetrolWebSticky(false) }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
               </button>
             </label>
