@@ -8,6 +8,7 @@ import {
   runFetchQueue,
   withWebFootnotes,
   sentenceExtras,
+  isAcknowledgement,
   canonNumber,
   searchWordsFromQuestion,
   offerSearchWords,
@@ -31,7 +32,7 @@ import {
   type WebChatCandidate,
   type WebFetchOutcome
 } from './webChat'
-import { analyzeCitations } from './rag/citations'
+import { analyzeCitations, supportingSources } from './rag/citations'
 
 const ok = (text: string, url = 'https://a.example/'): WebFetchOutcome => ({
   ok: true, title: 'T', finalUrl: url, fetchedAt: '2026-10-24T10:00:00.000Z', text, originalChars: text.length, truncated: false
@@ -803,6 +804,87 @@ describe('Modellwissen und Quellenverweise (26.10.2026)', () => {
     const textOf = (k: number) => answer.slice(report.sentences[k].start, report.sentences[k].end)
     const labels = report.sentences.map((_, k) => k).filter((k) => ex[k].label).map(textOf)
     expect(labels).toEqual(['Modell', 'Preis', 'Jahr'])
+  })
+  it('eine Nummer je Tabellenzeile gilt für alle Zellen der Zeile, die Rangspalte ist ein Etikett', () => {
+    const pages = ['Black Afgano 2009 8.1 3121 Bewertungen', 'Duro 2007 8.1 1330']
+    const answer = '| # | Duft | Jahr | Stimmen |\n|---|---|---|---|\n| 1 | Black Afgano [1] | 2009 | 3121 |\n| 2 | Duro [2] | 2007 | 9999 |'
+    const report = analyzeCitations(answer, pages)
+    const ex = sentenceExtras(answer, report, pages)
+    const at = (t: string) => report.sentences.findIndex((s) => answer.slice(s.start, s.end).trim() === t)
+    expect(report.sentences[at('3121')].refs).toEqual([1])
+    expect(ex[at('3121')].missingNumbers).toEqual([])
+    expect(ex[at('3121')].unsourcedNumbers).toBeUndefined()
+    // geerbte Nummer prüft die Zahl gegen genau diese Seite
+    expect(ex[at('9999')].missingNumbers).toEqual(['9999'])
+    // Rangspalte: weder Modellwissen-Zahl noch Befund
+    expect(ex[at('2')].unsourcedNumbers).toBeUndefined()
+    expect(ex[at('2')].missingNumbers ?? []).toEqual([])
+  })
+  it('Nummer in Inline-Code oder Linkziel belegt die Zeile nicht (Codex F01)', () => {
+    const pages = ['9999']
+    for (const answer of ['| Code | Wert |\n|---|---|\n| `[1]` | 9999 |', '| Link | Wert |\n|---|---|\n| [X](https://x.test/[1]) | 9999 |']) {
+      const report = analyzeCitations(answer, pages)
+      const k = report.sentences.findIndex((s) => answer.slice(s.start, s.end).trim() === '9999')
+      expect(report.sentences[k].refs).toEqual([])
+      expect(sentenceExtras(answer, report, pages)[k].unsourcedNumbers).toEqual(['9999'])
+    }
+  })
+  it('Zeile mit mehreren Quellen vererbt nichts (Codex F05)', () => {
+    const pages = ['P 9999', 'etwas ganz anderes']
+    const answer = '| A | B | C |\n|---|---|---|\n| P [1] | Falsch [2] | 9999 |'
+    const report = analyzeCitations(answer, pages)
+    const k = report.sentences.findIndex((s) => answer.slice(s.start, s.end).trim() === '9999')
+    expect(report.sentences[k].refs).toEqual([])
+    expect(supportingSources(report)).not.toContain(2)
+  })
+  it('Zahl in Spalte eins ohne Rang-Kopf bleibt eine Angabe (Codex F02)', () => {
+    const pages = ['GB']
+    const answer = '| Größe | Einheit |\n|---|---|\n| 8 | GB [1] |'
+    const report = analyzeCitations(answer, pages)
+    const ex = sentenceExtras(answer, report, pages)
+    const k = report.sentences.findIndex((s) => answer.slice(s.start, s.end).trim() === '8')
+    expect(ex[k].label).toBeUndefined()
+    expect(ex[k].missingNumbers).toEqual(['8'])
+  })
+  it('reine Fettzeile ist ein Abschnittstitel, kein Modellwissen (Codex F08)', () => {
+    const answer = 'Black Afgano ist beliebt [1].\n\n**Einordnung**\n\nDas ist eine Einschätzung.'
+    const report = analyzeCitations(answer, ['Black Afgano ist beliebt'])
+    const k = report.sentences.findIndex((s) => answer.slice(s.start, s.end).includes('Einordnung'))
+    expect(report.sentences[k].status).toBe('unchecked')
+    expect(report.summary.uncited).toBe(1)
+  })
+  it('fett gesetzter Tatsachensatz bleibt prüfpflichtig (Codex F09)', () => {
+    const answer = 'Einleitung [1].\n\n**Der Preis beträgt 199 €.**'
+    const pages = ['Einleitung ohne Preis']
+    const report = analyzeCitations(answer, pages)
+    const k = report.sentences.findIndex((s) => answer.slice(s.start, s.end).includes('199'))
+    expect(k).toBeGreaterThanOrEqual(0)
+    expect(report.sentences[k].status).toBe('uncited')
+    expect(sentenceExtras(answer, report, pages)[k].unsourcedNumbers).toEqual(['199 €'])
+  })
+  it('Pipe-Prosa über der Tabelle ist kein Rang-Kopf, echter Rang-Kopf ohne führendes | schon (Codex F12)', () => {
+    const pages = ['Test GB']
+    const fake = 'Rang | früher\nGröße | Einheit\n--- | ---\n8 | GB [1]'
+    let report = analyzeCitations(fake, pages)
+    let k = report.sentences.findIndex((s) => fake.slice(s.start, s.end).trim() === '8')
+    expect(sentenceExtras(fake, report, pages)[k].label).toBeUndefined()
+    const real = 'Rang | Einheit\n--- | ---\n8 | GB [1]'
+    report = analyzeCitations(real, pages)
+    k = report.sentences.findIndex((s) => real.slice(s.start, s.end).trim() === '8')
+    expect(sentenceExtras(real, report, pages)[k].label).toBe(true)
+  })
+  it('reine Bestätigungen sind kein Suchauftrag, Fragen schon (Codex F07)', () => {
+    for (const t of ['Danke', 'danke!', 'Ok, super', 'Alles klar.', 'Vielen Dank 🙂', 'thanks', 'Vielen lieben Dank', 'Herzlichen Dank', 'Merci beaucoup', 'Thank you so much']) expect(isAcknowledgement(t)).toBe(true)
+    for (const t of ['ok, und der Preis?', 'Danke, und welcher ist am günstigsten?', 'Gut oder schlecht?', '', 'Super 8', 'Top 10', 'OK 2026']) expect(isAcknowledgement(t)).toBe(false)
+  })
+  it('ohne Nummer in der Zeile bleibt eine Zahl ohne Quelle', () => {
+    const pages = ['Black Afgano 2009']
+    const answer = '| Duft | Jahr |\n|---|---|\n| Black Afgano | 2009 |'
+    const report = analyzeCitations(answer, pages)
+    const ex = sentenceExtras(answer, report, pages)
+    const k = report.sentences.findIndex((s) => answer.slice(s.start, s.end).trim() === '2009')
+    expect(report.sentences[k].refs).toEqual([])
+    expect(ex[k].unsourcedNumbers).toEqual(['2009'])
   })
   it('Zahl aus dem Seitentitel gilt als Seitenzahl, wenn der Titel mitgegeben wird', () => {
     const pages = ['Raspberry Pi 5 (8 GB RAM), 189,00 €\nIn den Warenkorb']

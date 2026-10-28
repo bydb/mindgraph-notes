@@ -28,6 +28,16 @@ describe('Petrol-Web-Prompt: Seiten sind untrusted (F05)', () => {
     expect(prompt).toMatch(/Erfinde keine fehlenden Einträge/)
   })
 
+  it('erst ordnen, Ergebnis zuerst, Varianten zusammenfassen, Nummer einmal je Tabellenzeile', () => {
+    const prompt = buildPetrolWebSystemPrompt([], '2026-10-28', id)
+    expect(prompt).toMatch(/zuerst das Ergebnis/)
+    expect(prompt).toMatch(/in mehreren Varianten .* EIN Eintrag/)
+    expect(prompt).toMatch(/Nummer nur einmal je Zeile/)
+    expect(prompt).not.toMatch(/in jeder Zelle mit einer Sachangabe/)
+    expect(prompt).toMatch(/Rechne keine neuen Zahlen aus/)
+    expect(prompt).toMatch(/in JEDER Zeile/)
+  })
+
   it('schreibt ohne Gendern, auch wenn die Quelle gendert', () => {
     const prompt = buildPetrolWebSystemPrompt([], '2026-10-28', id)
     expect(prompt).toMatch(/Ohne Gendern: keine Gendersternchen/)

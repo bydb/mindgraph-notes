@@ -354,6 +354,35 @@ function findQuotes(sentence: string): string[] {
   return out
 }
 
+/**
+ * Zwischenzeile wie `**Einordnung**`: eine ganze Zeile nur aus kurzem Fettdruck ohne Quellennummer.
+ * Der Systemtext erlaubt sie statt `#`-Überschriften; sie ist ein Abschnittstitel, keine Aussage
+ * (Codex F08, sonst zählte sie als ungeprüftes Modellwissen).
+ */
+function isBoldLabelLine(text: string, seg: [number, number]): boolean {
+  const lineStart = text.lastIndexOf('\n', seg[0] - 1) + 1
+  const nl = text.indexOf('\n', seg[1])
+  const line = text.slice(lineStart, nl < 0 ? text.length : nl).trim()
+  // Nur eine knappe Bezeichnung: keine Ziffer, kein Satzende, höchstens fünf Wörter. Ein fett gesetzter
+  // Tatsachensatz („**Der Preis beträgt 199 €.**“) bleibt prüfpflichtig (Codex F09).
+  const m = /^(\*\*|__)([^*_\n\[\]]{1,60})\1:?$/.exec(line)
+  if (!m) return false
+  const inner = m[2].trim()
+  return !/\d/.test(inner) && !/[.!?;]$/.test(inner) && inner.split(/\s+/).length <= 5
+}
+
+/** Ausschnitt mit ausgeblendetem Inline-Code und Linkzielen (dort ist `[3]` kein Zitat). */
+function maskedSlice(text: string, start: number, end: number, ranges: ReadonlyArray<[number, number]>): string {
+  let raw = text.slice(start, end)
+  for (const [a, b] of ranges) {
+    if (b <= start || a >= end) continue
+    const from = Math.max(a, start) - start
+    const to = Math.min(b, end) - start
+    raw = raw.slice(0, from) + ' '.repeat(to - from) + raw.slice(to)
+  }
+  return raw
+}
+
 export function analyzeCitations(answer: string, sources: string[], opts: CitationOptions = {}): CitationReport {
   const threshold = opts.supportThreshold ?? DEFAULT_THRESHOLD
   const K = sources.length
@@ -365,20 +394,38 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   const sentenceChecks: SentenceCheck[] = []
   const used = new Set<number>()
 
-  for (const { span: seg, kind: segKind, masked: ranges } of segments(answer)) {
-    if (segKind === 'heading') {
+  const segs = segments(answer)
+  // Tabellenzeile: eine Nummer in einer Zelle gilt für die übrigen Zellen der Zeile. Der Systemtext
+  // verlangt sie einmal je Zeile statt in jeder Zelle — sonst stand hinter jeder Zahl „[2]“, und
+  // ohne Erbe galt jede Zahl der Zeile als „ohne Quelle“ (Nutzertest 28.10.2026).
+  // Gezählt wird erst nach dem Ausblenden (Inline-Code, Linkziele), sonst belegte `[1]` im Code die
+  // Zeile (Codex F01). Geerbt wird nur bei GENAU einer Quelle in der Zeile und ohne ungültige
+  // Nummer: bei mehreren ist unklar, welche eine Zelle stützt (F05).
+  const lineOf = (pos: number): number => answer.lastIndexOf('\n', pos - 1) + 1
+  const rowSeen = new Map<number, { valid: Set<number>; invalid: boolean }>()
+  for (const { span: seg, kind, masked: ranges } of segs) {
+    if (kind !== 'cell') continue
+    const row = rowSeen.get(lineOf(seg[0])) ?? { valid: new Set<number>(), invalid: false }
+    for (const m of maskedSlice(answer, seg[0], seg[1], ranges).matchAll(REF_RE)) {
+      const n = Number(m[1])
+      if (n >= 1 && n <= K) row.valid.add(n)
+      else row.invalid = true
+    }
+    rowSeen.set(lineOf(seg[0]), row)
+  }
+  const rowRef = (pos: number): number[] => {
+    const row = rowSeen.get(lineOf(pos))
+    return row && !row.invalid && row.valid.size === 1 ? [...row.valid] : []
+  }
+
+  for (const { span: seg, kind: segKind, masked: ranges } of segs) {
+    if (segKind === 'heading' || (segKind === 'prose' && isBoldLabelLine(answer, seg))) {
       sentenceChecks.push({ start: seg[0], end: seg[1], refs: [], status: 'unchecked', coverage: null, quotes: [] })
       continue
     }
     for (const [start, end] of sentences(answer, seg)) {
       // Inline-Code innerhalb des Satzes ausblenden (dort ist `[3]` ein Index, kein Zitat).
-      let raw = answer.slice(start, end)
-      for (const [a, b] of ranges) {
-        if (b <= start || a >= end) continue
-        const from = Math.max(a, start) - start
-        const to = Math.min(b, end) - start
-        raw = raw.slice(0, from) + ' '.repeat(to - from) + raw.slice(to)
-      }
+      const raw = maskedSlice(answer, start, end, ranges)
       const localRefs: number[] = []
       let invalid = false
       REF_RE.lastIndex = 0
@@ -394,6 +441,7 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
           invalid = true
         }
       }
+      if (localRefs.length === 0 && !invalid && segKind === 'cell') localRefs.push(...rowRef(start))
       const plain = raw.replace(REF_RE, ' ').trim()
       const normalized = normalizeWs(plain).replace(/[.:!…]+$/g, '').trim()
       const quotes = findQuotes(plain).flatMap((q) => {

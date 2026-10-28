@@ -120,3 +120,31 @@ describe('Petrol-Chat: Nachfrage aus eingefrorenen Auszügen', () => {
     expect(petrolChatSnapshotsDrop).toHaveBeenCalledWith(ID)
   })
 })
+
+describe('Petrol-Chat: Globus bleibt an, Nachfrage knüpft von selbst an (28.10.2026)', () => {
+  it('nach einer Webantwort bleibt der Globus an und die Antwort ist als Nachfrage vorgemerkt', async () => {
+    seed([])
+    usePetrolChatStore.getState().setWeb(ID, { webArmed: true })
+    petrolChatWeb.mockImplementationOnce(async () => ({ success: true, result: { kind: 'answer', answer: 'Physiker [1].', snapshotId: 'snap-9', sources: [], failures: [], notFetched: 0, report: { usedSources: [1], sentences: [] } } }))
+    await usePetrolChatStore.getState().send(ID, 'Wer war Rutherford?', { ...OPTS, web: { query: 'Rutherford' } })
+    const sc = usePetrolChatStore.getState().scope(ID)
+    expect(sc.webArmed).toBe(true)
+    expect(sc.followUp).toEqual({ snapshotId: 'snap-9' })
+  })
+  it('Neues Gespräch startet mit dem gemerkten Globus (Codex F06)', async () => {
+    const { useUIStore } = await import('./uiStore')
+    useUIStore.setState({ petrolWebSticky: true })
+    usePetrolChatStore.getState().clear(ID)
+    expect(usePetrolChatStore.getState().scope(ID).webArmed).toBe(true)
+    useUIStore.setState({ petrolWebSticky: false })
+    usePetrolChatStore.getState().clear(ID)
+    expect(usePetrolChatStore.getState().scope(ID).webArmed).toBe(false)
+  })
+  it('eine fehlgeschlagene Webantwort merkt keine Nachfrage vor', async () => {
+    seed([])
+    usePetrolChatStore.getState().setFollowUp(ID, null)
+    petrolChatWeb.mockImplementationOnce(async () => ({ success: false, error: 'kaputt' }))
+    await usePetrolChatStore.getState().send(ID, 'Wer war Bohr?', { ...OPTS, web: { query: 'Bohr' } })
+    expect(usePetrolChatStore.getState().scope(ID).followUp).toBeNull()
+  })
+})
