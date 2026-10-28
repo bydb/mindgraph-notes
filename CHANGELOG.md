@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.6] - 2026-10-28
+
+**Der Petrol-Chat beantwortet Listenfragen aus der Websuche jetzt geordnet und lässt sich wie ein normales Gespräch weiterführen.** Fragt man nach allen Produkten einer Marke, fasst die Antwort Varianten wie Größen oder Editionen zu einem Eintrag zusammen, nennt das Ergebnis zuerst und ordnet es danach ein. Die Websuche bleibt eingeschaltet, bis man sie ausschaltet, und eine Nachfrage bezieht sich von selbst auf die letzte Antwort.
+
+### Hintergrund
+
+- **Auslöser:** Eine Frage nach allen Düften einer Marke, sortiert nach Beliebtheit, lieferte jede Variante als eigenen Duft und begann mit „keine vollständige Liste gefunden“, obwohl die Seiten alles enthielten.
+- **Geordnete Antworten:** Das Ergebnis steht vorn, die Quellen werden gegeneinander abgeglichen, Varianten stehen gesammelt in einem eigenen Absatz. Zahlen, die auf keiner Seite stehen (etwa selbst gerechnete Summen), schreibt der Chat nicht mehr. Längere Antworten dürfen kurze Zwischenüberschriften haben.
+- **Ruhigere Tabellen:** Die Quellennummer steht einmal pro Zeile statt hinter jeder Zahl. Die Quellenkritik prüft die ganze Zeile gegen diese Quelle.
+- **Globus bleibt an:** Die Websuche schaltet sich nach dem Senden nicht mehr ab. Neue Chats starten so, wie man den Globus zuletzt eingestellt hat. Ein kurzes „Danke“ löst keine Suche aus.
+- **Nachfragen ohne Klick:** Ist die Websuche aus, knüpft die nächste Frage automatisch an die letzte Webantwort und ihre Quellen an, ohne neue Suche. Ein Hinweis über der Eingabe zeigt das und lässt sich wegklicken.
+- **Grenzen:** Mit dauerhaft eingeschaltetem Globus sucht jede Frage im Netz, das dauert länger und kostet beim Suchdienst. Wie gut eine Liste geordnet wird, hängt weiterhin vom gewählten Modell ab.
+
 ## [1.1.5] - 2026-10-28
 
 **Die Websuche im Petrol-Chat beantwortet Fragen nach Listen und Vergleichen mit Cloud-Modellen über OpenRouter jetzt deutlich vollständiger.** Bisher sah das Modell von jeder Webseite nur den Anfang. Stand die gesuchte Liste weiter unten, fehlte sie in der Antwort, die trotzdem vollständig klang. Jetzt liest der Chat ganze Seiten, recherchiert länger und sagt ausdrücklich, wenn eine Seite für ihn zu lang war.
