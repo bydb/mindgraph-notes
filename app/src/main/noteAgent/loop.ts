@@ -7,7 +7,7 @@ import { asksForMindmap } from '../../shared/mindmapIntent'
 import { describeShellGuardrails } from '../../shared/shellGuardrails'
 import { computerVerbLabel, COMPUTER_TOOL_BY_VERB } from '../../shared/computerControl'
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
-import { costOfCalls, warmPricingCache } from '../llm/chatClient'
+import { catalogContextLength, costOfCalls, warmPricingCache } from '../llm/chatClient'
 import type { CallUsage, RunCost } from '../../shared/llmCost'
 import { endsWithQuestion } from '../../shared/agentClosingQuestion'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
@@ -25,6 +25,9 @@ import { CUT_AFTER_RESULT_NOTE, CUT_TEXT_MESSAGE, MAX_OUTPUT_CUTS, cutToolCallMe
 // brauchen Luft für die Schreib-Iteration plus eine Fehler-Korrektur — real lief ein
 // 20-Tool-Call-Lauf mit GLM 5.2 ins Limit, bevor das Ergebnis fertig war.
 const MAX_ITERATIONS = 12
+// So lange darf der Start auf das Kontextfenster aus dem Anbieterkatalog warten (Codex F04).
+// Der Katalog ist meist schon warm (Preise); kalt kostet er sonst bis zu 10 s Startverzug.
+const CATALOG_WAIT_MS = 3_000
 
 // Kontextbudget (Baustein B): Werkzeuge, die nur lesen. Sie werden gesperrt, wenn nur
 // noch Platz für die Antwort bleibt, und ein zu großes Ergebnis wird durch einen kurzen
@@ -339,13 +342,21 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Kontextbudget (Baustein B): vorsichtige Schätzung bis zur ersten Server-Meldung, danach
   // gemeldete Prompt-Token + Schätzung des seither Angehängten. Steuert nur — die harte
   // Grenze bleibt der Überlauf-Wächter unten (looksTruncated).
-  const contextWindow = resolveContextWindow(chatOptions.backend, chatOptions.numCtx)
+  // Cloud: Fenster aus dem Anbieterkatalog (mit Abschlag). Vorher galt pauschal 32 768 —
+  // auch für Modelle mit 200k, der Agent sperrte das Lesen nach wenigen Webseiten.
+  // Höchstens CATALOG_WAIT_MS warten und abbrechbar (Codex F04) — sonst gilt die Annahme.
+  const catalogTokens = await catalogContextLength(chatOptions, { timeoutMs: CATALOG_WAIT_MS, signal: run.abort.signal })
+  if (run.abort.signal.aborted) throw new Error('Abgebrochen')
+  const contextWindow = resolveContextWindow(chatOptions.backend, chatOptions.numCtx, catalogTokens)
+  ctx.contextWindowTokens = contextWindow.tokens
   const budget = createContextBudget(contextWindow.tokens, chatOptions.maxTokens ?? ASSUMED_OUTPUT_RESERVE)
   addToBudget(budget, messages.map(m => m.content ?? '').join('\n'))
   addToBudget(budget, JSON.stringify(tools.map(t => ({ type: 'function', function: t }))))
   ctx.maxResultTokens = () => maxToolResultTokens(budget)
   ctx.chatOptions = chatOptions
-  if (contextWindow.source === 'assumed') {
+  if (contextWindow.source === 'catalog') {
+    onStep(nextSeq(run), 'kontext', `Kontextgröße laut Anbieterkatalog — gerechnet mit ${contextWindow.tokens.toLocaleString('de-DE')} Token`)
+  } else if (contextWindow.source === 'assumed') {
     onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
   }
   const pushMessage = (message: ChatMessage): void => {
@@ -386,7 +397,13 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     // plausibles, auftragsfremdes Ergebnis liefern. Lieber laut abbrechen —
     // gleiche Linie wie „keine stillen Kürzungen" bei den Lese-Budgets.
     if (looksTruncated({ promptTokens: result.promptTokens, previousPromptTokens, sentChars })) {
-      throw new Error(contextTruncationMessage(result.promptTokens!, Math.min(previousPromptTokens ?? Infinity, sentChars / 4), chatOptions.numCtx))
+      // num_ctx geht nur an Ollama — bei Cloud stand es zwar in den Optionen, wurde aber nie gesendet (F03).
+      const isOllama = (chatOptions.backend ?? 'ollama') === 'ollama'
+      throw new Error(contextTruncationMessage(
+        result.promptTokens!, Math.min(previousPromptTokens ?? Infinity, sentChars / 4),
+        isOllama ? chatOptions.numCtx : undefined,
+        contextWindow.source === 'catalog' ? contextWindow.tokens : undefined
+      ))
     }
     if (typeof result.promptTokens === 'number') previousPromptTokens = result.promptTokens
     recordServerPromptTokens(budget, result.promptTokens)

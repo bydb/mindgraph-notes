@@ -68,4 +68,11 @@ describe('contextTruncationMessage', () => {
     expect(msg).toContain('65.536')
     expect(msg).toContain('Maximum des Modells')
   })
+
+  it('Cloud: nennt das Katalog-Budget statt eines angeforderten num_ctx', () => {
+    const msg = contextTruncationMessage(59, 15_000, undefined, 128_000)
+    expect(msg).toContain('128.000')
+    expect(msg).toContain('Katalog')
+    expect(msg).not.toContain('Angefordert')
+  })
 })

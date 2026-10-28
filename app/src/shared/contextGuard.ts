@@ -80,10 +80,14 @@ export function looksTruncated(input: ContextTruncationInput): boolean {
 // Server-Einstellung OLLAMA_CONTEXT_LENGTH ist für diesen Request also wirkungslos.
 // Was wirklich hilft, ist die Konversation zu verkleinern — oder das Modell selbst
 // hat ein kleineres Maximum als angefordert, dann hilft nur ein anderes Modell.
-export function contextTruncationMessage(promptTokens: number, expectedAtLeast: number, requestedCtx?: number): string {
+// `requestedCtx` NUR bei Ollama übergeben — nur dort sendet die App num_ctx wirklich.
+// Bei Cloud nennt `catalogWindow` das aus dem Anbieterkatalog abgeleitete Budget (Codex F03).
+export function contextTruncationMessage(promptTokens: number, expectedAtLeast: number, requestedCtx?: number, catalogWindow?: number): string {
   const window = requestedCtx
     ? `Angefordert waren ${requestedCtx.toLocaleString('de-DE')} Token — wurde trotzdem gekürzt, ist das Maximum des Modells vermutlich kleiner. `
-    : ''
+    : catalogWindow
+      ? `Gerechnet wurde mit ${catalogWindow.toLocaleString('de-DE')} Token aus dem Katalog des Anbieters — der Endpunkt, der diese Anfrage bedient hat, hat vermutlich ein kleineres Fenster. `
+      : ''
   return (
     `Das Kontextfenster reicht für diesen Lauf nicht — die Konversation wurde gekürzt ` +
     `(verarbeitet: ${promptTokens} Token, erwartet mindestens ~${Math.round(expectedAtLeast)}). ` +

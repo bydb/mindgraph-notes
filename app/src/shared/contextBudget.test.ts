@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, linesFittingTokens,
   maxToolResultTokens, recordServerPromptTokens, remainingForInput, resolveContextWindow, usedTokens,
-  ASSUMED_CONTEXT_WINDOW
+  ASSUMED_CONTEXT_WINDOW, CATALOG_WINDOW_MAX
 } from './contextBudget'
 
 // Messwerte vom 05.10.2026 (Ollama prompt_eval_count, qwen3.6/qwen3.8/gemma4) — die Schätzung
@@ -41,6 +41,26 @@ describe('resolveContextWindow', () => {
     for (const backend of ['lmstudio', 'openrouter', 'llmbase']) {
       expect(resolveContextWindow(backend, 131_072)).toEqual({ tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' })
     }
+  })
+
+  it('OpenRouter mit Katalogwert: 75 % davon, gedeckelt', () => {
+    expect(resolveContextWindow('openrouter', undefined, 200_000)).toEqual({ tokens: 128_000, source: 'catalog' })
+    expect(resolveContextWindow('openrouter', undefined, 131_072)).toEqual({ tokens: 98_304, source: 'catalog' })
+    expect(resolveContextWindow('openrouter', undefined, 1_000_000).tokens).toBe(CATALOG_WINDOW_MAX)
+  })
+
+  it('kleiner Katalogwert senkt das Budget nicht unter die Annahme', () => {
+    expect(resolveContextWindow('openrouter', undefined, 8_192)).toEqual({ tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' })
+    expect(resolveContextWindow('openrouter', undefined, 40_000)).toEqual({ tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' })
+  })
+
+  it('ohne oder mit unbrauchbarem Katalogwert, und nie für LM Studio/Ollama', () => {
+    expect(resolveContextWindow('openrouter', undefined, null).source).toBe('assumed')
+    expect(resolveContextWindow('openrouter', undefined, Number.NaN).source).toBe('assumed')
+    expect(resolveContextWindow('lmstudio', undefined, 200_000).source).toBe('assumed')
+    // LLMBase: Überlaufverhalten ungeprüft, kein Schutz gegen stille Kürzung (Codex F01)
+    expect(resolveContextWindow('llmbase', undefined, 200_000).source).toBe('assumed')
+    expect(resolveContextWindow('ollama', 32_768, 200_000)).toEqual({ tokens: 32_768, source: 'num_ctx' })
   })
 })
 
