@@ -173,7 +173,7 @@ import { gatherWebSources, defaultWebGatherDeps } from './llm/petrolWebChat'
 import { runDeepResearch, type DeepResult } from './llm/petrolDeepSearch'
 import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
-import type { CloudProviderSettings } from '../shared/llmBackend'
+import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/llmBackend'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
@@ -6439,7 +6439,7 @@ function chatStreamChannel(chatMode: string, kind: 'chunk' | 'done'): string {
   return `ollama-chat-${kind}`
 }
 
-ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown) => {
+ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat und Petrol-Chat (Agent-Tab) streamen auf eigenen Channels — alle drei
@@ -6545,13 +6545,17 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 
     const allMessages = [systemMessage, ...messages]
 
-    // E-Mail-Chat zieht weit mehr Personenkontext (Kontakt-Historie, Vault-Notiz-Inhalte,
-    // Kalender) als die reine Analyse — der darf NIE in die Cloud. Cloud-Routing für
-    // chatMode 'email' hart blockieren und lokal bleiben, egal was der Renderer anfordert.
-    // Siehe Privacy-Constraint „keine personenbezogenen Daten in die Cloud".
+    // E-Mail-Assistent: Cloud nur mit eigener Freigabe 'email-draft' für genau diesen Anbieter
+    // und dessen eingestelltes Modell — gelesen aus ui-settings.json, nicht aus dem Renderer.
+    // Bis 28.10.2026 hier hart auf lokal gezwungen; auf 8-GB-Rechnern ohne Grafikkarte fror
+    // der Entwurf dann das System ein, ohne Ausweg. Fehlt die Freigabe, gibt es einen Fehler
+    // statt eines stillen lokalen Laufs (der Nutzer hat Cloud gewählt, weil lokal nicht geht).
     if (chatMode === 'email' && cloud?.model) {
-      console.warn('[Ollama] Cloud-Routing für E-Mail-Chat blockiert — bleibt lokal (Personendaten).')
-      cloud = null
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>)) as { ollama?: { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } }
+      if (!isEmailDraftCloudAllowed(cloud, ui.ollama)) {
+        event.sender.send(doneChannel)
+        return { success: false, error: 'Der E-Mail-Assistent ist für diesen Cloud-Anbieter nicht freigegeben (Einstellungen → KI & Modelle → Cloud-Anbieter → „E-Mail-Assistent“).' }
+      }
     }
 
     // Cloud-Routing (OpenRouter/LLMBase) für Notes-Chat: streamt via SSE auf denselben
@@ -6679,10 +6683,10 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
   }
 },
 // Wie bei email-analyze: ein Cloud-Lauf darf den lokalen Vault-Indexer nicht anhalten
-// (Codex F19). Die Prüfung spiegelt die Verzweigung im Handler — der E-Mail-Modus wird
-// dort auf lokal zurückgezwungen (Personendaten), ein dort gesetztes Cloud-Modell wird
-// also nie benutzt und der Lauf zählt weiterhin als lokal.
-(_event, _model, _messages, _context, chatMode, cloud) => !(cloud?.model && chatMode !== 'email')))
+// (Codex F19). Die Prüfung spiegelt die Verzweigung im Handler: mit Cloud-Modell läuft der
+// Aufruf über den Anbieter oder endet (E-Mail-Modus ohne Freigabe) mit einem Fehler —
+// lokal wird in keinem der beiden Fälle gerechnet.
+(_event, _model, _messages, _context, _chatMode, cloud) => !cloud?.model))
 
 // ── Websuche im Petrol-Chat (Stufe 1b, docs/codex-collab/chat-websuche.md) ─────────────
 // Eigener IPC statt Agenten-Loop: die App sucht mit den Suchwörtern, die der Nutzer im Feld

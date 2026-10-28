@@ -361,7 +361,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) =>
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) =>
     ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds, requestId, webTopics),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')

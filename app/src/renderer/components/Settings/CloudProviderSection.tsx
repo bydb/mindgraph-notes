@@ -33,7 +33,8 @@ const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
   'notes-chat': { de: 'Notes Chat', en: 'Notes Chat' },
   'note-edit': { de: 'Notiz bearbeiten (KI)', en: 'Note editing (AI)' },
   'quiz': { de: 'Karteikarten & Quiz', en: 'Flashcards & Quiz' },
-  'note-agent': { de: 'Notiz-Agent (Aufträge mit Vault-Zugriff)', en: 'Note agent (tasks with vault access)' }
+  'note-agent': { de: 'Notiz-Agent (Aufträge mit Vault-Zugriff)', en: 'Note agent (tasks with vault access)' },
+  'email-draft': { de: 'E-Mail-Assistent (Entwurf, Fragen zu einer Mail)', en: 'Email assistant (drafts, questions about an email)' }
 }
 
 type ProviderId = 'openrouter' | 'llmbase'
@@ -159,7 +160,11 @@ export function CloudProviderSection({ provider }: { provider: ProviderId }) {
     if (on) {
       const label = en ? FEATURE_LABELS[f].en : FEATURE_LABELS[f].de
       // eslint-disable-next-line no-alert
-      if (!window.confirm(t('settings.cloud.featureConfirm', { label, provider: meta.name }))) return
+      // Der E-Mail-Assistent schickt Mail-Inhalte Dritter — eigener Text, der genau nennt, was hinausgeht.
+      const question = f === 'email-draft'
+        ? t('settings.cloud.emailDraftConfirm', { provider: meta.name })
+        : t('settings.cloud.featureConfirm', { label, provider: meta.name })
+      if (!window.confirm(question)) return
     }
     const set = new Set(settings.cloudFeatures)
     if (on) set.add(f); else set.delete(f)
