@@ -6,7 +6,11 @@ import { useContactStore } from '../../stores/contactStore'
 import { useEventAgentBridge } from '../../stores/eventAgentBridge'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
-import { buildEmailContext, fetchCalendarEvents, loadMissingNoteContents } from '../../utils/emailContextBuilder'
+import { buildEmailContext, fetchCalendarEvents, loadMissingNoteContents, LEAN_EMAIL_CONTEXT } from '../../utils/emailContextBuilder'
+import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
+import { assessLocalRunRisk } from '../../../shared/localRunRisk'
+import { ModelPicker } from '../Shared/ModelPicker'
+import { Toggle } from '../Settings/SettingsUI'
 import type { CalendarEvent } from '../../../shared/types'
 
 export const EmailAIChatView: React.FC = () => {
@@ -21,6 +25,7 @@ export const EmailAIChatView: React.FC = () => {
     startReply
   } = useEmailStore()
   const { ollama } = useUIStore()
+  const totalRamGb = useUIStore(s => s.systemTotalRamGb)
   const { notes } = useNotesStore()
   const { getContactByEmail } = useContactStore()
   const dashboardOffers = useEventAgentBridge(s => s.offers)
@@ -31,6 +36,20 @@ export const EmailAIChatView: React.FC = () => {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatEmail = aiChatEmailId ? emails.find(e => e.id === aiChatEmailId) : null
+
+  // Cloud nur, wenn „E-Mail-Assistent" beim Anbieter freigegeben ist (der Main prüft das
+  // noch einmal selbst). Wie im Notes-Chat: freigegebener Anbieter ist voreingestellt,
+  // pro Sitzung auf lokal umschaltbar. Mit Cloud geht standardmäßig nur der schlanke
+  // Kontext hinaus (Mail + Verlauf mit dem Kontakt), der Rest nur per Schalter.
+  const cloudRoutes = cloudRoutesForFeature('email-draft', { openrouter: ollama.openrouter, llmbase: ollama.llmbase })
+  const defaultCloudProvider = cloudRoutes[0]?.provider ?? null
+  const [cloudProvider, setCloudProvider] = useState<CloudProviderId | null>(defaultCloudProvider)
+  useEffect(() => { setCloudProvider(defaultCloudProvider) }, [defaultCloudProvider])
+  const activeCloudRoute = cloudProvider ? (cloudRoutes.find(r => r.provider === cloudProvider) ?? null) : null
+  const [shareFullContext, setShareFullContext] = useState(false)
+  const localModel = ollama.selectedModel
+  const localRisk = activeCloudRoute ? null : assessLocalRunRisk(localModel, totalRamGb)
+  const canSend = !!activeCloudRoute || !!localModel
 
   // Kalender-Events laden
   useEffect(() => {
@@ -63,7 +82,7 @@ export const EmailAIChatView: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [aiChatMessages, streamingContent])
 
-  const getContext = useCallback(async () => {
+  const getContext = useCallback(async (lean: boolean) => {
     if (!chatEmail) return ''
     const contact = getContactByEmail(chatEmail.from.address)
     let notesRecord = Object.fromEntries(notes.map(n => [n.id, n]))
@@ -78,13 +97,14 @@ export const EmailAIChatView: React.FC = () => {
       contact,
       notesRecord,
       dashboardOffers,
-      calendarEvents
+      calendarEvents,
+      lean ? LEAN_EMAIL_CONTEXT : {}
     )
   }, [chatEmail, emails, notes, dashboardOffers, getContactByEmail, calendarEvents])
 
   const sendMessage = useCallback(async (text: string) => {
     const userMessage = text.trim()
-    if (!userMessage || isAiChatLoading || !ollama.selectedModel) return
+    if (!userMessage || isAiChatLoading || !canSend) return
 
     setInput('')
     addAiChatMessage({ role: 'user', content: userMessage })
@@ -93,18 +113,20 @@ export const EmailAIChatView: React.FC = () => {
     setStreamingContent('')
 
     try {
-      const context = await getContext()
+      const context = await getContext(!!activeCloudRoute && !shareFullContext)
 
       const messages = [
         ...aiChatMessages.map(m => ({ role: m.role, content: m.content })),
         { role: 'user', content: userMessage }
       ]
 
+      const cloud = activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null
       const result = await window.electronAPI.ollamaChat(
-        ollama.selectedModel,
+        localModel,
         messages,
         context,
-        'email'
+        'email',
+        cloud
       )
       if (!result.success) {
         setIsStreaming(false)
@@ -117,7 +139,7 @@ export const EmailAIChatView: React.FC = () => {
       setAiChatLoading(false)
       addAiChatMessage({ role: 'assistant', content: `Fehler: ${error instanceof Error ? error.message : 'Unbekannter Fehler'}` })
     }
-  }, [isAiChatLoading, ollama.selectedModel, aiChatMessages, addAiChatMessage, setAiChatLoading, getContext])
+  }, [isAiChatLoading, canSend, localModel, activeCloudRoute, shareFullContext, aiChatMessages, addAiChatMessage, setAiChatLoading, getContext])
 
   const handleSend = useCallback(() => {
     sendMessage(input)
@@ -156,13 +178,82 @@ export const EmailAIChatView: React.FC = () => {
 
   return (
     <div className="inbox-aichat">
-      {/* Email context bar */}
-      <div className="inbox-aichat-context">
-        <span className="inbox-aichat-context-label">{t('inbox.aiChat.context')}:</span>
-        <span className="inbox-aichat-context-subject">{chatEmail.subject}</span>
-        <span className="inbox-aichat-context-from">{chatEmail.from.name || chatEmail.from.address}</span>
-      </div>
+      {/* Kopf: worum es geht, womit gerechnet wird und was dabei hinausgeht — eine Karte
+          in der Sprache der Agent-Karte (Modellzeile + Wegmarke), zugeschnitten aufs schmale Panel. */}
+      <div className="inbox-aichat-head">
+        <div className="inbox-aichat-head-mail">
+          <span className="inbox-aichat-head-eyebrow">{t('inbox.aiChat.aboutEmail')}</span>
+          <span className="inbox-aichat-head-subject" title={chatEmail.subject}>{chatEmail.subject}</span>
+          <span className="inbox-aichat-head-from" title={chatEmail.from.address}>{chatEmail.from.name || chatEmail.from.address}</span>
+        </div>
 
+        <div className="inbox-aichat-head-route">
+          <div className="inbox-aichat-head-row">
+            <span className="inbox-aichat-head-label">{t('agentCard.rowModel')}</span>
+            <span className={`agent-card-route ${activeCloudRoute ? 'is-out' : ''}`}>
+              {t(activeCloudRoute ? 'inbox.aiChat.routeCloud' : 'inbox.aiChat.routeLocalMark')}
+            </span>
+          </div>
+          <ModelPicker
+            value={activeCloudRoute ? activeCloudRoute.sentinel : localModel}
+            models={[...cloudRoutes.map(r => ({ name: r.sentinel })), ...(localModel ? [{ name: localModel }] : [])]}
+            onChange={name => setCloudProvider(cloudProviderForSentinel(name))}
+            getLabel={name => cloudRoutes.find(r => r.sentinel === name)?.label ?? name}
+            placeholder={localModel ? undefined : { value: '', label: t('inbox.aiChat.routeLocalNone') }}
+            disabled={isAiChatLoading}
+            ariaLabel={t('agentCard.rowModel')}
+            maxWidth="100%"
+          />
+
+          {activeCloudRoute ? (
+            <>
+              <p className="inbox-aichat-head-note">{t('inbox.aiChat.cloudSends')}</p>
+              <label className="inbox-aichat-head-switch">
+                <Toggle
+                  checked={shareFullContext}
+                  onChange={setShareFullContext}
+                  disabled={isAiChatLoading}
+                />
+                <span>{t('inbox.aiChat.shareFullContext')}</span>
+              </label>
+              <p className="inbox-aichat-head-note is-small">
+                {t(shareFullContext ? 'inbox.aiChat.extrasGo' : 'inbox.aiChat.extrasStay')}
+              </p>
+            </>
+          ) : localRisk && localRisk.risk !== 'ok' ? (
+            <div className={`inbox-aichat-head-warn ${localRisk.risk === 'too-big' ? 'is-severe' : ''}`} role="note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <div className="inbox-aichat-head-warn-body">
+                <span>
+                  {t(localRisk.risk === 'too-big' ? 'inbox.aiChat.localTooBig' : 'inbox.aiChat.localTight', {
+                    model: localModel,
+                    model_gb: String(localRisk.modelRamGb),
+                    total_gb: String(localRisk.totalRamGb)
+                  })}
+                </span>
+                {cloudRoutes.length > 0 ? (
+                  <button
+                    type="button"
+                    className="agent-card-btn"
+                    onClick={() => setCloudProvider(cloudRoutes[0].provider)}
+                    disabled={isAiChatLoading}
+                  >
+                    {t('inbox.aiChat.useProvider', { provider: cloudRoutes[0].label })}
+                  </button>
+                ) : (
+                  <span className="inbox-aichat-head-note is-small">{t('inbox.aiChat.localSetupCloud')}</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <p className="inbox-aichat-head-note">{t('inbox.aiChat.localStays')}</p>
+          )}
+        </div>
+      </div>
       {/* Messages */}
       <div className="inbox-aichat-messages">
         {aiChatMessages.length === 0 && !isStreaming && (
@@ -239,7 +330,7 @@ export const EmailAIChatView: React.FC = () => {
         <button
           className="inbox-aichat-send"
           onClick={handleSend}
-          disabled={isAiChatLoading || !input.trim()}
+          disabled={isAiChatLoading || !input.trim() || !canSend}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />

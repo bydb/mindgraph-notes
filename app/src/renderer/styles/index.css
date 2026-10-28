@@ -14035,37 +14035,6 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   padding: 20px;
 }
 
-.inbox-aichat-context {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  background: var(--bg-secondary);
-  border-radius: var(--radius-sm);
-  font-size: 12px;
-  margin-bottom: 4px;
-  overflow: hidden;
-}
-
-.inbox-aichat-context-label {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.inbox-aichat-context-subject {
-  font-weight: 500;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.inbox-aichat-context-from {
-  color: var(--text-muted);
-  margin-left: auto;
-  white-space: nowrap;
-}
-
 .inbox-aichat-messages {
   flex: 1;
   overflow-y: auto;
@@ -23456,4 +23425,125 @@ body.presentation-mode *::after {
 @container (max-width: 560px) {
   .petrol-chat-list { padding: 10px; }
   .petrol-turn-actions { width: 100%; }
+}
+
+/* E-Mail-Assistent: Kopfkarte (Mail · Modell + Wegmarke · Datenweg).
+   Farben wie die Agent-Karte (--accent-color, --color-warning); Wegmarke = .agent-card-route. */
+.inbox-aichat-head {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+}
+
+.inbox-aichat-head-mail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.inbox-aichat-head-eyebrow,
+.inbox-aichat-head-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.inbox-aichat-head-subject {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.inbox-aichat-head-from {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-aichat-head-route {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px 12px;
+}
+
+.inbox-aichat-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Liste nicht breiter als das Panel — sonst wird sie im schmalen Posteingang seitlich abgeschnitten. */
+.inbox-aichat-head .model-picker-list {
+  max-width: 100%;
+}
+
+.inbox-aichat-head-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.inbox-aichat-head-note.is-small {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.inbox-aichat-head-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.inbox-aichat-head-switch:has(input:disabled) {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.inbox-aichat-head-warn {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, var(--bg-primary));
+  background: color-mix(in srgb, var(--color-warning) 9%, var(--bg-primary));
+  color: color-mix(in srgb, var(--color-warning) 65%, var(--text-primary));
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.inbox-aichat-head-warn > svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.inbox-aichat-head-warn.is-severe {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--bg-primary));
+  background: color-mix(in srgb, var(--color-danger) 9%, var(--bg-primary));
+  color: color-mix(in srgb, var(--color-danger) 70%, var(--text-primary));
+}
+
+.inbox-aichat-head-warn-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
 }

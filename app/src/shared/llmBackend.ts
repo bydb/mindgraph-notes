@@ -65,9 +65,14 @@ export function cloudProviderForSentinel(value: string | null | undefined): Clou
 // Cloud-fähige Features, die KEINE Matrix-Module sind (allgemeine Textarbeit auf
 // Notiz-Inhalten). Bewusst getrennt von ModuleId, damit die Benchmark-/Hard-Lock-
 // Matrix sauber bleibt. Alle sind personenbezogen → in der UI mit ⚠️ + Opt-in.
-export type CloudFeatureId = 'notes-chat' | 'note-edit' | 'quiz' | 'note-agent'
+//
+// 'email-draft' (E-Mail-Assistent in der Inbox: Entwurf, Zusammenfassung, Kontakt-Fragen)
+// war bis 28.10.2026 im Main hart auf lokal gesperrt. Auf 8-GB-Rechnern ohne Grafikkarte
+// fror der lokale Entwurf das System ein, und der Nutzer hatte keinen Ausweg. Jetzt Opt-in
+// wie alle anderen; der Main prüft die Freigabe selbst (`isEmailDraftCloudAllowed`).
+export type CloudFeatureId = 'notes-chat' | 'note-edit' | 'quiz' | 'note-agent' | 'email-draft'
 
-export const CLOUD_CAPABLE_FEATURES: CloudFeatureId[] = ['notes-chat', 'note-edit', 'quiz', 'note-agent']
+export const CLOUD_CAPABLE_FEATURES: CloudFeatureId[] = ['notes-chat', 'note-edit', 'quiz', 'note-agent', 'email-draft']
 
 // Die Provider-Settings (Teil von uiStore.ollama.openrouter bzw. uiStore.ollama.llmbase).
 // EINE Form für beide Provider — divergiert nicht.
@@ -119,6 +124,21 @@ export function canUseCloudForFeature(
 ): boolean {
   if (!isCloudProviderReady(settings)) return false
   return Array.isArray(settings!.cloudFeatures) && settings!.cloudFeatures.includes(feature)
+}
+
+// Main-seitige Prüfung für den E-Mail-Assistenten: Cloud nur, wenn der Nutzer 'email-draft'
+// beim angefragten Anbieter freigegeben hat UND genau dessen eingestelltes Modell angefragt
+// wird. `providers` stammt aus ui-settings.json (vom Main gelesen), nie aus dem Renderer.
+export function isEmailDraftCloudAllowed(
+  cloud: { model?: string; provider?: string } | null | undefined,
+  providers: { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } | undefined
+): boolean {
+  const model = cloud?.model?.trim()
+  if (!model) return false
+  const id: CloudProviderId = cloud?.provider === 'llmbase' ? 'llmbase' : 'openrouter'
+  const settings = providers?.[id]
+  if (!canUseCloudForFeature('email-draft', settings)) return false
+  return settings!.model.trim() === model
 }
 
 // Hilfsform für Renderer-Picker: alle Provider, die `feature` gerade bedienen dürfen —

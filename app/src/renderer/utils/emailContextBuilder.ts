@@ -1,11 +1,22 @@
 import type { EmailMessage, AggregatedContact, Note, CalendarEvent } from '../../shared/types'
 
-interface ContextOptions {
+export interface ContextOptions {
   maxLength?: number
   includeVaultNotes?: boolean
   includeEdooboxEvents?: boolean
   includeContactHistory?: boolean
   includeCalendar?: boolean
+}
+
+/**
+ * Schlanker Kontext für Cloud-Läufe des E-Mail-Assistenten: nur diese Mail, ihre Analyse
+ * und der Verlauf mit dem Kontakt. Vault-Notizen, Aufgaben, Termine und Buchungen (auch die
+ * im Kontakt-Profil) bleiben auf dem Rechner, solange der Nutzer sie nicht zuschaltet.
+ */
+export const LEAN_EMAIL_CONTEXT: ContextOptions = {
+  includeVaultNotes: false,
+  includeEdooboxEvents: false,
+  includeCalendar: false
 }
 
 const STOP_WORDS_DE = new Set([
@@ -243,13 +254,13 @@ export function buildEmailContext(
       `**Quellen:** ${contact.sources.join(', ')}`
     ].filter(Boolean)
 
-    if (contact.edooboxBookings?.length) {
+    if (options.includeEdooboxEvents !== false && contact.edooboxBookings?.length) {
       profileLines.push(`**edoobox-Buchungen:**`)
       for (const b of contact.edooboxBookings) {
         profileLines.push(`- ${b.offerName} (${b.status})`)
       }
     }
-    if (contact.vaultMentions?.length) {
+    if (options.includeVaultNotes !== false && contact.vaultMentions?.length) {
       profileLines.push(`**Erwaehnt in Notizen:**`)
       for (const path of contact.vaultMentions.slice(0, 5)) {
         const title = path.split('/').pop()?.replace('.md', '') || path
@@ -327,7 +338,7 @@ export function buildEmailContext(
   }
 
   // 8. Calendar events — only dates mentioned in the email + surrounding days
-  if (calendarEvents && calendarEvents.length > 0) {
+  if (options.includeCalendar !== false && calendarEvents && calendarEvents.length > 0) {
     // Extract dates mentioned in email (YYYY-MM-DD, DD.MM.YYYY, DD.MM.)
     const emailText = `${email.subject} ${email.bodyText}`
     const dateMatches = new Set<string>()
