@@ -36,6 +36,7 @@ import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../
 import { DEFAULT_COMPUTER_CONTROL, activeComputerVerbs, computerVerbLabel } from '../../../shared/computerControl'
 import { NOTE_AGENT_CLOUD_CONSENT_VERSION, type AgentRoute } from '../../../shared/agentRoute'
 import { asksForMindmap } from '../../../shared/mindmapIntent'
+import { chatModelsOnly } from '../../../shared/chatModels'
 
 interface Props {
   /** Tab-ID — zugleich der Bereich im noteAgentStore. */
@@ -274,7 +275,7 @@ export function AgentView({ tabId }: Props) {
           ? await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
           : await window.electronAPI.ollamaModels()
         if (cancelled) return
-        if (Array.isArray(list)) { setModels(list); setLoadedSource(modelsSource); setModelsFailed(false); setNoLocalModel(n => (n === 'notLoaded' ? false : n)) }
+        if (Array.isArray(list)) { setModels(chatModelsOnly(list)); setLoadedSource(modelsSource); setModelsFailed(false); setNoLocalModel(n => (n === 'notLoaded' ? false : n)) }
         else setModelsFailed(true)
       } catch (e) {
         console.error('[Agent-Tab] Modell-Liste laden fehlgeschlagen:', e)

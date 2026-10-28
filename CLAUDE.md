@@ -199,6 +199,8 @@ Module als verbindbare Bausteine mit **typisierten Ports** auf einem React-Flow-
 - **UI**: `ModelCompatibilitySection` in Settings → KI & Modelle, Aufklapper in der Modelle-Karte (Anker `ai-matrix`); `ActiveModelStatusBadge` unter dem Modell-Picker.
 - **Empirische Grundlage**: `~/dev/brain-model-benchmark/results/`. Aktuelle Werte aus 160 Läufen vom 14.05.2026 (siehe Analyse-Dokument `~/2026/100 - ✅ Projekte/110 - MindGraph-Notes/Modell-Kompatibilitaets-Analyse.md`).
 - **Bei neuen Benchmarks**: Daten in `modelCompatibility.ts` einpflegen, `version` updaten, Analyse-Dokument updaten.
+- **Chat-Auswahlen zeigen nur chatfähige Modelle** (`shared/chatModels.ts`, getestet): `chatModelsOnly` nach Ollamas `capabilities` (`completion`), Reranker/Embedding zusätzlich am Namen; ohne gemeldete Fähigkeiten bleibt ein Modell drin (alte Ollama-Versionen, LM Studio). Automatische Vorauswahl über `firstChatModel`, nie `models[0]` — das erste Listenmodell war real `bge-m3`, jeder Chat endete mit „Ollama API Fehler: 400“ (28.10.2026). Ein gespeichertes ungeeignetes Modell wird in Einstellungen → KI markiert, nicht still getauscht. Die Embedding-Auswahl und der Modellzähler nutzen weiter die volle Liste.
+- **Ollama-Fehler nie als nackte Nummer** (`shared/ollamaError.ts`, `friendlyOllamaError`): Ollama schickt den Grund als `{"error": …}`; die Meldung nennt Modell und nächsten Schritt („kann keine Texte schreiben“, „nicht installiert → ollama pull“, „kein Modell ausgewählt“, Cloud-Login). Neue Ollama-Aufrufe diesen Helfer nutzen.
 
 ### Brain — lokales Tagesgedächtnis
 - Pfad: `main/brain/dailyConsolidation.ts`.

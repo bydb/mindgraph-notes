@@ -33,6 +33,7 @@ import { applyPreviousTopic, asksForDeeperSearch, asksForMorePages, offerPreviou
 import { followUpQuery, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
 import { WebAnswerText, WebCheck, WebDeepLine, WebMarkLegend, WebProvenanceLine, WebSkippedLine, WebSourceList, WebSourcesFold, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
+import { chatModelsOnly } from '../../../shared/chatModels'
 
 interface Props {
   tabId: string
@@ -190,7 +191,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         const list = ollama.backend === 'lm-studio'
           ? await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
           : await window.electronAPI.ollamaModels()
-        if (!cancelled && Array.isArray(list)) setModels(list)
+        if (!cancelled && Array.isArray(list)) setModels(chatModelsOnly(list))
       } catch (e) {
         console.warn('[PetrolChat] Modell-Liste laden fehlgeschlagen:', e)
       }
