@@ -71,6 +71,8 @@ export interface NoteAgentContext {
    * sie — für werkzeuglose Auswertungsaufrufe über DENSELBEN Modellweg wie der Lauf.
    */
   chatOptions?: ChatOptions
+  /** Aufgelöstes Kontextfenster des Laufs in Token (aus loop.ts, inkl. Katalogwert bei Cloud). */
+  contextWindowTokens?: number
   /** Verbrauch zusätzlicher Modellaufrufe eines Werkzeugs in die Lauf-Bilanz (F11). */
   recordUsage?: (usage: CallUsage | null) => void
 }
@@ -630,6 +632,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           senderId: ctx.senderId,
           run: ctx.run,
           chatOptions: ctx.chatOptions,
+          contextWindowTokens: ctx.contextWindowTokens,
           maxResultTokens: ctx.maxResultTokens ?? (() => 8_000),
           recordUsage: ctx.recordUsage ?? (() => {}),
           onStep: summary => ctx.onStep?.('folder_digest', summary)

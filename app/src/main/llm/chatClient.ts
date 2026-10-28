@@ -23,7 +23,7 @@ import {
 } from '../../shared/agentExecutionProfile'
 import { isCloudModel } from '../../shared/modelCompatibility'
 import { recordLlmRun, trackPendingTelemetry } from './telemetry'
-import { getModelPricing } from './cloudPricing'
+import { getModelContextLength, getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
 import { friendlyOllamaError } from '../../shared/ollamaError'
 
@@ -998,6 +998,37 @@ export function warmPricingCache(opts: ChatOptions): void {
   if (!model) return
   const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
   void getModelPricing(backend, CLOUD_PROVIDERS[backend].baseUrl, model, apiKey).catch(() => undefined)
+}
+
+/**
+ * Kontextfenster des Cloud-Modells laut Anbieterkatalog (roh), null bei lokalen Wegen
+ * oder ohne Katalogwert. Teilt sich Abruf und Cache mit den Preisen.
+ */
+export async function catalogContextLength(
+  opts: ChatOptions,
+  wait?: { timeoutMs: number; signal?: AbortSignal }
+): Promise<number | null> {
+  if (!isCloudChatBackend(opts.backend)) return null
+  const backend = opts.backend as CloudChatBackend
+  const model = (backend === 'llmbase' ? opts.llmbaseModel : opts.openrouterModel)?.trim()
+  if (!model) return null
+  const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
+  const lookup = getModelContextLength(backend, CLOUD_PROVIDERS[backend].baseUrl, model, apiKey).catch(() => null)
+  if (!wait) return lookup
+  // Begrenzt warten: Der Abruf läuft im Hintergrund weiter und füllt den Cache für den
+  // nächsten Lauf, dieser rechnet bei Zeitüberschreitung oder Abbruch mit der Annahme.
+  return new Promise<number | null>(resolve => {
+    const timer = setTimeout(() => finish(null), wait.timeoutMs)
+    const onAbort = (): void => finish(null)
+    function finish(value: number | null): void {
+      clearTimeout(timer)
+      wait!.signal?.removeEventListener('abort', onAbort)
+      resolve(value)
+    }
+    if (wait.signal?.aborted) return finish(null)
+    wait.signal?.addEventListener('abort', onAbort, { once: true })
+    void lookup.then(finish)
+  })
 }
 
 export async function costOfCalls(

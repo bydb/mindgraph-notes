@@ -50,6 +50,8 @@ export interface FolderDigestDeps {
   senderId: number
   run: AgentRun
   chatOptions: ChatOptions
+  /** Fenster des Laufs (loop.ts). Fehlt es (Tests), wird es wie bisher bestimmt. */
+  contextWindowTokens?: number
   maxResultTokens: () => number
   recordUsage: (usage: CallUsage | null) => void
   onStep?: (summary: string) => void
@@ -158,7 +160,7 @@ export async function runFolderDigest(args: FolderDigestArgs, deps: FolderDigest
   const { run, chatOptions } = deps
   assertSameRoute(run.route, chatOptions)
   const signal = run.abort.signal
-  const window = resolveContextWindow(chatOptions.backend, chatOptions.numCtx).tokens
+  const window = deps.contextWindowTokens ?? resolveContextWindow(chatOptions.backend, chatOptions.numCtx).tokens
   const packageTokens = Math.min(MAX_PACKAGE_TOKENS, Math.floor((window - PROMPT_OVERHEAD_TOKENS - DIGEST_OUTPUT_TOKENS) * 0.9))
   if (packageTokens < MIN_PACKAGE_TOKENS) {
     return {

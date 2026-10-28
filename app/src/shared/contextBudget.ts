@@ -13,7 +13,7 @@
 // Sie überschätzte in allen Messungen um 8–37 % (Eichtexte) bzw. 15–71 % (Gegenprobe mit
 // CHANGELOG, TS-Code, Journal, englischem Text, auch llama3.1), unterschätzte nie.
 
-/** Fenster, wenn die App die echte Größe nicht kennt (LM Studio, Cloud). */
+/** Fenster, wenn die App die echte Größe nicht kennt (LM Studio, Cloud ohne Katalogwert). */
 export const ASSUMED_CONTEXT_WINDOW = 32_768
 /**
  * Platz, der für die nächste Antwort frei bleiben soll. Bei Cloud-Läufen ist das das
@@ -45,23 +45,54 @@ export function estimateTokens(text: string): number {
   return Math.ceil(letters / 2.9 + digits * 1.4 + punct * 0.65 + newlines)
 }
 
-export type ContextWindowSource = 'num_ctx' | 'assumed'
+export type ContextWindowSource = 'num_ctx' | 'catalog' | 'assumed'
 
 export interface ContextWindow {
   tokens: number
-  /** 'num_ctx' = von der App selbst gesetzt (Ollama), 'assumed' = unbekannt, vorsichtig angenommen. */
+  /**
+   * 'num_ctx' = von der App selbst gesetzt (Ollama), 'catalog' = aus dem Modellkatalog des
+   * Cloud-Anbieters mit Abschlag, 'assumed' = unbekannt, vorsichtig angenommen.
+   */
   source: ContextWindowSource
 }
 
 /**
- * Fenster bestimmen. Nur bei Ollama kennt die App es sicher, weil sie `num_ctx` selbst
- * setzt. LM Studio ignoriert `num_ctx`; bei Cloud-Anbietern ist der Katalogwert kein
- * garantiertes Endpunkt-Fenster (F29/F35) — dort gilt vorsichtig 32 768. Über-Läufe
- * jenseits davon meldet OpenRouter als Fehler (die App schaltet die stille
- * Mitten-Kompression per `transforms: []` ab).
+ * Anteil des Katalogfensters, mit dem gerechnet wird. Der Katalogwert ist kein garantiertes
+ * Endpunkt-Fenster (F29/F35) — einzelne Anbieter hinter OpenRouter haben kleinere. Der
+ * Abschlag fängt das meist ab; den Rest meldet OpenRouter laut als Fehler, weil die App
+ * die stille Mitten-Kompression abschaltet (disableMiddleOut).
  */
-export function resolveContextWindow(backend: string | undefined, numCtx: number | undefined): ContextWindow {
+export const CATALOG_WINDOW_SHARE = 0.75
+/**
+ * Obergrenze, auch wenn der Katalog mehr verspricht (1 Mio. Token): Ein voller Kontext
+ * wird bei jedem Aufruf neu bezahlt, und ein Agent, der so viel liest, sollte vorher
+ * blättern oder verdichten statt alles anzuhängen.
+ */
+export const CATALOG_WINDOW_MAX = 128_000
+
+// Nur OpenRouter (Codex F01): dort schaltet die App die stille Mitten-Kompression ab
+// (`transforms: []`), ein zu großer Prompt scheitert also laut. Für LLMBase ist das
+// Überlaufverhalten nicht belegt — bis zu einer Prüfung am echten Endpunkt bleibt es bei
+// der Annahme, sonst könnte ein Lauf still mit gekürztem Auftrag weiterarbeiten.
+const CATALOG_BACKENDS = new Set(['openrouter'])
+
+/**
+ * Fenster bestimmen. Bei Ollama kennt die App es sicher, weil sie `num_ctx` selbst setzt.
+ * Bei OpenRouter gilt der Katalogwert mit Abschlag und Deckel (`catalogTokens`, aus
+ * cloudPricing.ts). LM Studio ignoriert `num_ctx` und hat keinen Katalog, LLMBase ist
+ * ungeprüft (siehe CATALOG_BACKENDS) — dort und ohne Katalogwert bleibt es bei 32 768. Das Ergebnis ist nie kleiner als diese
+ * Annahme: ein Katalog mit 8k-Modell verkleinert das Budget nicht unter den alten Stand.
+ */
+export function resolveContextWindow(
+  backend: string | undefined,
+  numCtx: number | undefined,
+  catalogTokens?: number | null
+): ContextWindow {
   if ((backend ?? 'ollama') === 'ollama' && numCtx && numCtx > 0) return { tokens: numCtx, source: 'num_ctx' }
+  if (backend && CATALOG_BACKENDS.has(backend) && typeof catalogTokens === 'number' && Number.isFinite(catalogTokens)) {
+    const tokens = Math.min(CATALOG_WINDOW_MAX, Math.floor(catalogTokens * CATALOG_WINDOW_SHARE))
+    if (tokens > ASSUMED_CONTEXT_WINDOW) return { tokens, source: 'catalog' }
+  }
   return { tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' }
 }
 
