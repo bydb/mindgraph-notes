@@ -690,7 +690,8 @@ async function chatWithToolsViaOllama(
     body: JSON.stringify({
       model,
       messages: messages.map(ollamaMessageToWire),
-      tools: wireTools,
+      // Leere Liste weglassen: manche Server lehnen `tools: []` ab (Auswahlaufruf ohne Werkzeuge).
+      ...(wireTools.length ? { tools: wireTools } : {}),
       stream: false,
       ...(opts.ollamaThink !== undefined
         ? { think: opts.ollamaThink }
@@ -809,7 +810,7 @@ async function chatWithToolsViaOpenAiCompatible(
     body: JSON.stringify({
       model: target.model,
       messages: messages.map(openrouterMessageToWire),
-      tools: wireTools,
+      ...(wireTools.length ? { tools: wireTools } : {}),
       stream: false,
       ...cloudRequestPolicy(backend, opts),
       ...(typeof opts.temperature === 'number' ? { temperature: opts.temperature } : {}),
@@ -900,7 +901,7 @@ export async function chatWithTools(
 // Streaming anfühlt (kein „hängen" bis die ganze Antwort da ist).
 export async function streamCloudChat(
   messages: ChatMessage[],
-  opts: { backend: CloudChatBackend; apiKey: string; model: string; signal?: AbortSignal; telemetryModule: LlmModuleId; telemetryRunId?: string },
+  opts: { backend: CloudChatBackend; apiKey: string; model: string; signal?: AbortSignal; telemetryModule: LlmModuleId; telemetryRunId?: string; disableMiddleOut?: boolean },
   onToken: (delta: string) => void
 ): Promise<string> {
   const label = CLOUD_PROVIDERS[opts.backend].label
@@ -919,7 +920,9 @@ export async function streamCloudChat(
     body: JSON.stringify({
       model: opts.model,
       messages: messages.map(m => ({ role: m.role, content: m.content })),
-      stream: true
+      stream: true,
+      // Zu langer Prompt soll bei OpenRouter laut scheitern, nicht still in der Mitte gekürzt werden.
+      ...(opts.backend === 'openrouter' && opts.disableMiddleOut ? { transforms: [] } : {})
     }),
     signal: opts.signal
   })

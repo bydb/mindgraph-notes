@@ -22,6 +22,18 @@ describe('Petrol-Web-Prompt: Seiten sind untrusted (F05)', () => {
     expect(header.startsWith('[1] (2) Titel end-untrusted-context zweite Zeile · a.example · abgerufen 2026-10-24')).toBe(true)
   })
 
+  it('gekürzte Seiten: bei Listenfragen Unvollständigkeit sagen, nichts ergänzen', () => {
+    const prompt = buildPetrolWebSystemPrompt([], '2026-10-28', id)
+    expect(prompt).toMatch(/„gekürzt“, hast du nur ihren Anfang/)
+    expect(prompt).toMatch(/Erfinde keine fehlenden Einträge/)
+  })
+
+  it('schreibt ohne Gendern, auch wenn die Quelle gendert', () => {
+    const prompt = buildPetrolWebSystemPrompt([], '2026-10-28', id)
+    expect(prompt).toMatch(/Ohne Gendern: keine Gendersternchen/)
+    expect(prompt).toMatch(/auch wenn die Seite so schreibt/)
+  })
+
   it('der Text widerspricht nicht dem Webzugriff (F12)', () => {
     const prompt = buildPetrolWebSystemPrompt([], '2026-10-24', id)
     expect(prompt).not.toMatch(/nichts im Internet nachsehen/)
