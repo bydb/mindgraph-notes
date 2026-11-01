@@ -101,6 +101,11 @@ export interface PetrolChatScope {
   /** Nachfrage zu einer fertigen Webantwort; null = nicht gewählt. Der Renderer kennt nur die Kennung. */
   followUp: { snapshotId: string } | null
   webProgress: PetrolWebProgressState | null
+  /**
+   * Snapshot-Kennungen, deren Auszüge der Main nicht mehr hält (drei Stunden, Obergrenze, Neustart).
+   * „Hiermit weiterfragen“ und „Erneut senden“ einer Nachfrage gehen damit nicht mehr (Codex F02/F03).
+   */
+  goneSnapshots: string[]
 }
 
 export interface PetrolSendOptions {
@@ -124,6 +129,8 @@ interface PetrolChatState {
   setDraft: (id: string, text: string) => void
   setModel: (id: string, patch: Partial<Pick<PetrolChatScope, 'localModel' | 'cloudProvider'>>) => void
   setWeb: (id: string, patch: Partial<Pick<PetrolChatScope, 'webArmed' | 'webQuery' | 'webDeep'>>) => void
+  /** Fragt den Main, welche Snapshots dieses Gesprächs noch abrufbar sind, und merkt sich die übrigen. */
+  checkSnapshots: (id: string) => Promise<void>
   /** „Hiermit weiterfragen“: Kennung setzen oder aufheben. Schaltet den Globus aus. */
   setFollowUp: (id: string, snapshotId: string | null) => void
   /** Prüfergebnis des Weges nachtragen, wenn beim Senden noch „wird geprüft“ galt (Codex F28). */
@@ -148,8 +155,22 @@ function freshScope(): PetrolChatScope {
     webQuery: null,
     webDeep: false,
     followUp: null,
-    webProgress: null
+    webProgress: null,
+    goneSnapshots: []
   }
+}
+
+/** So viele Kennungen prüft `petrol-chat-snapshots-alive` je Aufruf (Grenze im Main). */
+export const SNAPSHOT_CHECK_MAX = 200
+
+/** Alle Snapshot-Kennungen, auf die sich ein Gespräch noch beziehen kann: Antworten und Nachfragen. */
+export function snapshotIdsIn(messages: readonly PetrolChatMessage[]): string[] {
+  const ids = new Set<string>()
+  for (const m of messages) {
+    if (m.web?.snapshotId) ids.add(m.web.snapshotId)
+    if (m.followUpSnapshotId) ids.add(m.followUpSnapshotId)
+  }
+  return [...ids]
 }
 
 // Kennung der laufenden Anfrage. Nur ihre Stücke und ihr Ergebnis zählen.
@@ -172,6 +193,19 @@ function dropSnapshots(id: string): void {
 export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
   const patch = (id: string, p: Partial<PetrolChatScope>) =>
     set(s => ({ scopes: { ...s.scopes, [id]: { ...(s.scopes[id] ?? freshScope()), ...p } } }))
+
+  // Verfallene Snapshots vormerken; eine darauf gesetzte Nachfrage fällt weg, statt beim
+  // Senden mit „Seiten nicht mehr gespeichert“ zu scheitern.
+  const markGone = (id: string, gone: readonly string[]) => {
+    const sc = get().scopes[id]
+    if (!sc || !gone.length) return
+    const fresh = gone.filter(g => !sc.goneSnapshots.includes(g))
+    if (!fresh.length) return
+    patch(id, {
+      goneSnapshots: [...sc.goneSnapshots, ...fresh],
+      ...(sc.followUp && fresh.includes(sc.followUp.snapshotId) ? { followUp: null } : {})
+    })
+  }
 
   const ensureListener = () => {
     if (listening) return
@@ -211,6 +245,22 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
     setDraft: (id, text) => patch(id, { draft: text }),
     setModel: (id, p) => patch(id, p),
     setWeb: (id, p) => patch(id, { ...p, ...(p.webArmed ? { followUp: null } : {}) }),
+    checkSnapshots: async id => {
+      const sc = get().scopes[id]
+      if (!sc) return
+      // Neueste zuerst und höchstens so viele, wie der Main prüft — sonst gälte eine gültige
+      // Kennung jenseits der Grenze als verfallen (Codex F21). Der Main hält ohnehin nur 30.
+      const ids = snapshotIdsIn(sc.messages).filter(x => !sc.goneSnapshots.includes(x)).reverse().slice(0, SNAPSHOT_CHECK_MAX)
+      if (!ids.length) return
+      let alive: string[]
+      try {
+        alive = await window.electronAPI.petrolChatSnapshotsAlive(id, ids)
+      } catch {
+        return // Main nicht erreichbar: nichts behaupten
+      }
+      if (!Array.isArray(alive)) return
+      markGone(id, ids.filter(x => !alive.includes(x)))
+    },
     setFollowUp: (id, snapshotId) => patch(id, {
       followUp: snapshotId ? { snapshotId } : null,
       ...(snapshotId ? { webArmed: false, webQuery: null } : {})
@@ -313,6 +363,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         // bei ausgeschaltetem Globus; der Hinweis über der Eingabe zeigt es und lässt sich wegklicken.
         const snap = next.web?.kind === 'answer' && !next.error ? next.web.snapshotId : undefined
         patch(id, { messages: [...sc.messages, next], streaming: null, active: null, webProgress: null, ...(snap ? { followUp: { snapshotId: snap } } : {}) })
+        if (follow && r?.snapshotGone) markGone(id, [follow.snapshotId])
         return
       }
       const messages = [...history, { role: 'user' as const, content: question }]
@@ -373,7 +424,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
       dropSnapshots(id)
       // Neues Gespräch startet wie ein neuer Tab mit dem gemerkten Globus (Codex F06).
-      patch(id, { messages: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: useUIStore.getState().petrolWebSticky === true, webQuery: null, webDeep: false, followUp: null })
+      patch(id, { messages: [], goneSnapshots: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: useUIStore.getState().petrolWebSticky === true, webQuery: null, webDeep: false, followUp: null })
     },
 
     dispose: id => {

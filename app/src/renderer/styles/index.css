@@ -16694,6 +16694,22 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border-color: var(--accent-color);
 }
 
+/* Modellweg unter der Modellwahl; nach außen (Ollama-Cloud, OpenRouter, LLMBase, nicht prüfbar)
+   in der Farbe von .agent-card-route.is-out */
+.notes-chat-route {
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  align-self: flex-start;
+}
+.notes-chat-route.is-out {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--bg-primary));
+  background: color-mix(in srgb, var(--color-warning) 9%, var(--bg-primary));
+  color: color-mix(in srgb, var(--color-warning) 65%, var(--text-primary));
+}
+
 .notes-chat-context-buttons {
   display: flex;
   gap: 4px;

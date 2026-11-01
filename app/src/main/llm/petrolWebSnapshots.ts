@@ -45,6 +45,19 @@ export class WebSnapshotStore {
     return { ...s, sources: s.sources.map(x => ({ ...x })) }
   }
 
+  /**
+   * Welche dieser Kennungen sind für Absender und Bereich noch abrufbar? Snapshots verfallen nach
+   * drei Stunden oder fallen über der Obergrenze heraus — der Renderer sieht das nicht von selbst
+   * und bot „Hiermit weiterfragen“ weiter an (Codex F02, chat-verlauf-notizen-bilder.md).
+   */
+  alive(senderId: number, scopeId: string, ids: readonly string[]): string[] {
+    this.prune()
+    return ids.filter(id => {
+      const s = this.items.get(id)
+      return !!s && s.senderId === senderId && s.scopeId === scopeId
+    })
+  }
+
   /** „Neues Gespräch“ / Tab schließen: alle Snapshots dieses Bereichs weg. */
   dropScope(senderId: number, scopeId: string): void {
     for (const s of [...this.items.values()]) if (s.senderId === senderId && s.scopeId === scopeId) this.items.delete(s.id)

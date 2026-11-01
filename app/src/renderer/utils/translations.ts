@@ -1970,6 +1970,7 @@ const translations = {
     // Notes Chat
     'notesChat.socraticMode': 'Sokratischer Dialog - die KI stellt Rückfragen',
     'notesChat.clearChat': 'Chat leeren',
+    'notesChat.routeUnknown': 'Modellweg nicht prüfbar · Inhalte könnten den Rechner verlassen',
     'notesChat.saveAsNote': 'Als neue Notiz speichern',
     'notesChat.saveAsNoteDone': 'Notiz erstellt',
     'notesChat.appendToNote': 'An aktuelle Notiz anhängen',
@@ -5381,6 +5382,7 @@ const translations = {
     // Notes Chat
     'notesChat.socraticMode': 'Socratic dialogue - AI asks follow-up questions',
     'notesChat.clearChat': 'Clear chat',
+    'notesChat.routeUnknown': 'Model route could not be checked · content may leave the computer',
     'notesChat.saveAsNote': 'Save as new note',
     'notesChat.saveAsNoteDone': 'Note created',
     'notesChat.appendToNote': 'Append to current note',

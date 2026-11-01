@@ -1037,6 +1037,8 @@ export interface ElectronAPI {
   petrolChatAbort: (requestId: string) => Promise<boolean>;
   petrolChatWeb: (params: import('./webChat').PetrolWebRequest) => Promise<{ success: boolean; result?: import('./webChat').WebChatResult; error?: string }>;
   petrolChatSnapshotsDrop: (scopeId: string) => Promise<boolean>;
+  /** Teilmenge der Kennungen, deren eingefrorene Auszüge der Main noch hält (Codex F02). */
+  petrolChatSnapshotsAlive: (scopeId: string, ids: string[]) => Promise<string[]>;
   onPetrolChatProgress: (callback: (p: import('./webChat').PetrolWebProgress) => void) => void;
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)

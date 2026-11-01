@@ -8,6 +8,7 @@ let chunkCb: ((c: { requestId: string; delta: string }) => void) | null = null
 const ollamaChat = vi.fn((..._a: unknown[]) => new Promise<{ success: boolean; response?: string }>(() => { /* läuft, bis gestoppt */ }))
 const petrolChatWeb = vi.fn((..._a: unknown[]) => new Promise(() => { /* läuft */ }))
 const petrolChatSnapshotsDrop = vi.fn(async () => true)
+const petrolChatSnapshotsAlive = vi.fn(async (_scope: string, ids: string[]) => ids)
 
 vi.stubGlobal('window', {
   electronAPI: {
@@ -15,6 +16,7 @@ vi.stubGlobal('window', {
     lmstudioChat: () => new Promise(() => {}),
     petrolChatWeb,
     petrolChatSnapshotsDrop,
+    petrolChatSnapshotsAlive: (scope: string, ids: string[]) => petrolChatSnapshotsAlive(scope, ids),
     petrolChatAbort: async () => {},
     onPetrolChatChunk: (cb: typeof chunkCb) => { chunkCb = cb; return () => {} },
     onPetrolChatProgress: () => () => {}
@@ -146,5 +148,61 @@ describe('Petrol-Chat: Globus bleibt an, Nachfrage knüpft von selbst an (28.10.
     petrolChatWeb.mockImplementationOnce(async () => ({ success: false, error: 'kaputt' }))
     await usePetrolChatStore.getState().send(ID, 'Wer war Bohr?', { ...OPTS, web: { query: 'Bohr' } })
     expect(usePetrolChatStore.getState().scope(ID).followUp).toBeNull()
+  })
+})
+
+describe('Petrol-Chat: verfallene Seiten (Codex F02/F03, chat-verlauf-notizen-bilder.md)', () => {
+  const answerWith = (snap: string, at: number): Msg => ({
+    role: 'assistant', content: 'Physiker [1].', origin: 'web', model: 'qwen', at,
+    web: { kind: 'answer', answer: 'Physiker [1].', snapshotId: snap, sources: [], report: { usedSources: [1], sentences: [] } } as unknown as Msg['web']
+  })
+
+  it('merkt sich, was der Main nicht mehr hält, und hebt eine darauf gesetzte Nachfrage auf', async () => {
+    seed([webExchange[0], answerWith('a'.repeat(32), 2), { role: 'user', content: 'Und?', origin: 'web', followUp: true, followUpSnapshotId: 'b'.repeat(32), at: 3 }])
+    usePetrolChatStore.getState().setFollowUp(ID, 'a'.repeat(32))
+    petrolChatSnapshotsAlive.mockImplementationOnce(async () => [])
+    await usePetrolChatStore.getState().checkSnapshots(ID)
+    const sc = usePetrolChatStore.getState().scope(ID)
+    expect(sc.goneSnapshots.sort()).toEqual(['a'.repeat(32), 'b'.repeat(32)])
+    expect(sc.followUp).toBeNull()
+  })
+
+  it('lässt eine noch abrufbare Nachfrage stehen und fragt Verfallenes nicht erneut ab', async () => {
+    seed([webExchange[0], answerWith('c'.repeat(32), 2), answerWith('d'.repeat(32), 4)])
+    usePetrolChatStore.setState(s => ({ scopes: { ...s.scopes, [ID]: { ...s.scopes[ID], goneSnapshots: ['c'.repeat(32)] } } }))
+    usePetrolChatStore.getState().setFollowUp(ID, 'd'.repeat(32))
+    petrolChatSnapshotsAlive.mockClear()
+    await usePetrolChatStore.getState().checkSnapshots(ID)
+    expect(petrolChatSnapshotsAlive).toHaveBeenCalledWith(ID, ['d'.repeat(32)])
+    expect(usePetrolChatStore.getState().scope(ID).followUp).toEqual({ snapshotId: 'd'.repeat(32) })
+  })
+
+  it('ein „Seiten weg“ aus dem Main markiert die Kennung als verfallen', async () => {
+    seed([webExchange[0], answerWith('e'.repeat(32), 2)])
+    petrolChatWeb.mockImplementationOnce(async () => ({ success: true, result: { kind: 'error', error: 'weg', snapshotGone: true, sources: [], failures: [], notFetched: 0 } }))
+    await usePetrolChatStore.getState().send(ID, 'Was noch?', { ...OPTS, followUp: { snapshotId: 'e'.repeat(32) } })
+    expect(usePetrolChatStore.getState().scope(ID).goneSnapshots).toContain('e'.repeat(32))
+  })
+
+  it('prüft höchstens die neuesten 200 Kennungen und erklärt keine ungeprüfte für verfallen (F21)', async () => {
+    const hex = (n: number) => n.toString(16).padStart(32, '0')
+    seed([webExchange[0], ...Array.from({ length: 205 }, (_, i) => answerWith(hex(i + 1), 10 + i))])
+    usePetrolChatStore.setState(st => ({ scopes: { ...st.scopes, [ID]: { ...st.scopes[ID], goneSnapshots: [] } } }))
+    petrolChatSnapshotsAlive.mockClear()
+    petrolChatSnapshotsAlive.mockImplementationOnce(async () => [hex(205)])
+    await usePetrolChatStore.getState().checkSnapshots(ID)
+    const sent = petrolChatSnapshotsAlive.mock.calls[0][1]
+    expect(sent).toHaveLength(200)
+    expect(sent[0]).toBe(hex(205))
+    const gone = usePetrolChatStore.getState().scope(ID).goneSnapshots
+    expect(gone).toHaveLength(199)
+    expect(gone).not.toContain(hex(1))
+    expect(gone).not.toContain(hex(205))
+  })
+
+  it('Neues Gespräch vergisst die Liste', () => {
+    usePetrolChatStore.setState(s => ({ scopes: { ...s.scopes, [ID]: { ...s.scopes[ID], goneSnapshots: ['f'.repeat(32)] } } }))
+    usePetrolChatStore.getState().clear(ID)
+    expect(usePetrolChatStore.getState().scope(ID).goneSnapshots).toEqual([])
   })
 })
