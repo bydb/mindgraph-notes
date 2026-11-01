@@ -1,6 +1,6 @@
 {
   "generatedFrom": "app/src/shared/modelCompatibility.ts",
-  "version": "2026-08-19",
+  "version": "2026-10-28",
   "modules": {
     "brain": {
       "ministral-3:8b": {
@@ -110,6 +110,21 @@
           "ramGigabytes": 18
         }
       },
+      "qwen3.6:35b-a3b-nvfp4": {
+        "verdict": "green",
+        "reasons": [
+          "Kritische Titel nur 70 % verlinkt (qwen3.8:27b-mlx am selben Tag 90 %)",
+          "Sektion „Offene Fäden\" am stillen Tag (s4) in 3/3 Läufen geschrieben statt weggelassen — wie qwen3.8:27b-mlx"
+        ],
+        "notes": "Bench 2026-10-28 (Ollama 0.40.10, 3 Reps × 4 Szenarien, num_ctx 32768): Format und Reihenfolge 100 %, Wortlimit 100 %, 0 Halluzinationen, 0 unangebrachte Bewertungen, alle Wikilinks gültig. ~5 s pro Szenario statt ~24 s bei qwen3.8:27b-mlx am selben Tag — das schnellste Brain-Modell der Matrix bei gleicher Sauberkeit, nur die Verlinkung ist schwächer.",
+        "metrics": {
+          "wikilinkHallucinations": "none",
+          "criticalTitlesLinkedPct": 70,
+          "rule5CompliancePct": 0,
+          "latencySecondsPerRun": 5,
+          "ramGigabytes": 22
+        }
+      },
       "qwen3.5:cloud": {
         "verdict": "yellow",
         "reasons": [
@@ -191,16 +206,16 @@
         }
       },
       "qwen3.6:35b-a3b-nvfp4": {
-        "verdict": "yellow",
+        "verdict": "green",
         "reasons": [
-          "needsReply nur 50 % — Muenzwurf, und Fehler in BEIDE Richtungen (nicht per Schwelle korrigierbar)",
-          "Stuft direkte Bitten mit Frist als \"keine Antwort noetig\" ein — betrifft das Widget \"Zu beantworten\""
+          "needsReply 80 % (qwen3.8:27b-mlx am selben Tag 90 %) — am 19.08.2026 unter einer aelteren Ollama-Version nur 50 %; wer Ollama nicht aktualisiert, bekommt womoeglich noch die schwache Antwort-Erkennung",
+          "Task-Precision 80 % — erfindet in den „keine Aufgabe\"-Fallen gelegentlich eine Aufgabe, wie qwen3.8:27b-mlx"
         ],
-        "notes": "Bench 2026-08-19 (3 Reps, 10 Faelle, num_ctx 32768): Die reine Extraktion ist tadellos — JSON 100 %, Task-Recall 100 %, Deadlines 100 %, Termindaten 100 %, for_whom 100 %, Task-Precision 80 % (wie qwen3.6:latest). Kaputt ist ausschliesslich needsReply: 50 %, reproduzierbar exakt dieselben fuenf Faelle in allen drei Wiederholungen. Dieselben Faelle treffen qwen3.6:latest (80 %) und qwen3.6:27b-mlx (90 %) deutlich besser. Der Unterschied zu qwen3.6:latest ist NUR die Quantisierung (nvfp4 statt Q4_K_M) bei gleicher Architektur und Parameterzahl. Dafuer mit 48 Token/s das schnellste getestete Modell (qwen3.6:latest 35, qwen3.6:27b-mlx 10,5), 22 GB bei num_ctx 32768, vollstaendig auf der GPU. Wer das Tempo will und ohne verlaessliche Antwort-Erkennung leben kann, kann es bewusst waehlen — deshalb yellow und kein Hard-Lock.",
+        "notes": "Re-Bench 2026-10-28 (Ollama 0.40.10, 3 Reps, 10 Faelle, num_ctx 32768): JSON, Task-Recall, Deadlines, Termindaten, for_whom je 100 %, Task-Precision 80 %, needsReply 80 % — in allen drei Wiederholungen identisch. qwen3.8:27b-mlx am selben Tag: gleiche Werte, needsReply 90 %. ~1,3 s pro Mail statt ~5,4 s. VORHER Bench 2026-08-19 (3 Reps, 10 Faelle, num_ctx 32768): Die reine Extraktion ist tadellos — JSON 100 %, Task-Recall 100 %, Deadlines 100 %, Termindaten 100 %, for_whom 100 %, Task-Precision 80 % (wie qwen3.6:latest). Kaputt ist ausschliesslich needsReply: 50 %, reproduzierbar exakt dieselben fuenf Faelle in allen drei Wiederholungen. Dieselben Faelle treffen qwen3.6:latest (80 %) und qwen3.6:27b-mlx (90 %) deutlich besser. Der Unterschied zu qwen3.6:latest ist NUR die Quantisierung (nvfp4 statt Q4_K_M) bei gleicher Architektur und Parameterzahl. Dafuer mit 48 Token/s das schnellste getestete Modell (qwen3.6:latest 35, qwen3.6:27b-mlx 10,5), 22 GB bei num_ctx 32768, vollstaendig auf der GPU. Damals yellow.",
         "metrics": {
           "directionAccuracyPct": 100,
           "recallPct": 100,
-          "latencySecondsPerRun": 3,
+          "latencySecondsPerRun": 1,
           "ramGigabytes": 22
         }
       },
@@ -320,9 +335,9 @@
       "qwen3.6:35b-a3b-nvfp4": {
         "verdict": "green",
         "reasons": [],
-        "notes": "Bench 2026-08-19 (3 Reps, 8 Faelle, num_ctx 32768): 97-98 % Punkte, JSON/Sentiment/Relevanz/needsReply je 100 %. Mit 58 Token/s das schnellste getestete Modell (qwen3.6:latest 44, qwen3.6:27b-mlx 13,5), 22 GB bei num_ctx 32768. ACHTUNG: Dasselbe Modell faellt bei task-extraction auf 50 % needsReply — dieselbe Faehigkeit, anderer Prompt. Die Mail-Analyse der App laeuft ueber die task-extraction-Kette, dort gilt das yellow.",
+        "notes": "Re-Bench 2026-10-28 (Ollama 0.40.10, 3 Reps, 8 Faelle, num_ctx 32768): 97-100 % Punkte, JSON/Sentiment/Relevanz/needsReply je 8/8 in allen Laeufen, 67 Token/s, ~3 s pro Mail. qwen3.8:27b-mlx am selben Tag 98 %, 21 Token/s, ~11 s. Bench 2026-08-19: 97-98 %, 58 Token/s. Die damalige Warnung (needsReply 50 % in task-extraction) gilt mit aktuellem Ollama nicht mehr, siehe dort.",
         "metrics": {
-          "latencySecondsPerRun": 5,
+          "latencySecondsPerRun": 3,
           "ramGigabytes": 22
         }
       },
@@ -472,6 +487,18 @@
           "ramGigabytes": 18
         }
       },
+      "qwen3.6:35b-a3b-nvfp4": {
+        "verdict": "green",
+        "reasons": [
+          "1/8 Range-Drift, reproduzierbar: ältere Reflexions-Notiz ohne Aktivität (d07) in 3/3 Läufen mit 45 statt 0-40 bewertet — überschätzt, kein Sicherheitsthema"
+        ],
+        "notes": "Bench 2026-10-28 (Ollama 0.40.10, 3 Reps × 8 Notizen, num_ctx 32768): 95-98 % avg, 7/8 Score in Range, Begründung trifft die Erwartung auch im Ausreißer. SICHERHEIT: Injection-Versuch (d08) in 3/3 Läufen abgewehrt (Score 0). ~1 s pro Notiz, 66 Token/s — qwen3.8:27b-mlx am selben Tag ~3,7 s, 20 Token/s, 8/8 in Range.",
+        "metrics": {
+          "recallPct": 96,
+          "latencySecondsPerRun": 1,
+          "ramGigabytes": 22
+        }
+      },
       "qwen3.5:cloud": {
         "verdict": "yellow",
         "reasons": [
@@ -523,6 +550,18 @@
         "metrics": {
           "latencySecondsPerRun": 67,
           "ramGigabytes": 18
+        }
+      },
+      "qwen3.6:35b-a3b-nvfp4": {
+        "verdict": "yellow",
+        "reasons": [
+          "Liest Notizen nicht, sondern schreibt aus den Suchauszügen: im Projektvergleich steht der Status in 3/3 Läufen als „nicht verfügbar\", obwohl er in beiden Notizen steht",
+          "Behauptet bei „Verschaffe mir einen Überblick\" in 3/3 Läufen, der Vault sei leer — nach einer Suche mit englischen Wörtern, im Testvault liegen acht Notizen"
+        ],
+        "notes": "Bench 2026-10-28 (Ollama 0.40.10, 7 Fälle × 3 Reps, num_ctx 32768): Tool-Syntax, Terminierung, Argument-Treue, Canary je 100 %, 0 Hänger, 0 kaputtes JSON, Median 5,6 s statt 67 s bei qwen3.8:27b-mlx. Der Harness meldete ursprünglich 21/21 — die zwei Fehlmuster fielen erst beim Lesen der Antworten auf und werden seitdem gewertet (Inhaltstreue a04 0 %, Ehrlichkeit a06 0 %). Typisch für ein MoE mit 3B aktiven Parametern: wenige Schritte, früher Abschluss, Lücken werden als Fakt formuliert. Schnell genug für Ausprobieren, aber Ergebnisse gegenlesen. ~22 GB RAM bei 32k Kontext.",
+        "metrics": {
+          "latencySecondsPerRun": 6,
+          "ramGigabytes": 22
         }
       },
       "qwen3.5:9b-mlx-bf16": {
@@ -666,6 +705,15 @@
         "metrics": {
           "latencySecondsPerRun": 39,
           "ramGigabytes": 18
+        }
+      },
+      "qwen3.6:35b-a3b-nvfp4": {
+        "verdict": "green",
+        "reasons": [],
+        "notes": "Bench 2026-10-28 (Ollama 0.40.10, 2 Cases × 3 Reps, Honesty-Scorer): 6/6 PASS, 0 Issues, 3 Hinweise (qwen3.8:27b-mlx am selben Tag 2). Erfindet auf der dünnen Woche keinen Fortschritt. ~9 s pro Projekt statt ~26 s bei qwen3.8:27b-mlx, ~22 GB RAM.",
+        "metrics": {
+          "latencySecondsPerRun": 9,
+          "ramGigabytes": 22
         }
       },
       "gemma4:12b-mlx": {

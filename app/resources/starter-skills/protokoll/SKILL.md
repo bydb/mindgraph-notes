@@ -21,6 +21,14 @@ entstehen soll — z. B. für Konferenzen, Dienstbesprechungen oder Teamsitzunge
 5. Erstelle am Ende eine Aufgabenübersicht als Tabelle mit den Spalten
    Aufgabe / Verantwortlich / Frist.
 
+## Form
+
+- Eckdaten als Tabelle mit Kopfzeile `| Angabe | Inhalt |` — jede Tabelle
+  braucht eine Kopfzeile, sonst fehlt in Word die Kopfformatierung.
+- Pro TOP die Bezeichner fett und mit Doppelpunkt: **Diskussion:**,
+  **Beschluss:**, **Aufgaben:**. Fehlt etwas davon, Bezeichner weglassen
+  statt „keine“ zu schreiben — außer beim Beschluss („Kein Beschluss gefasst.“).
+
 ## Regeln
 
 - Ergebnisprotokoll, kein Verlaufsprotokoll: Beschlüsse und Aufgaben stehen im
@@ -28,4 +36,6 @@ entstehen soll — z. B. für Konferenzen, Dienstbesprechungen oder Teamsitzunge
 - Neutraler, sachlicher Ton; keine Wertungen, keine wörtliche Rede außer bei
   ausdrücklichen Beschlussformulierungen.
 - Namen nur so, wie sie in der Quelle stehen — keine Titel oder Rollen erfinden.
+- Kein Gendern mit Sonderzeichen; neutrale Formulierungen wählen
+  (z. B. „Referierende“, „verantwortliche Person“).
 - Offene Punkte gehören in einen eigenen Abschnitt am Ende, nicht in die Beschlüsse.
