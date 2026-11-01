@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.1.7] - 2026-11-01
+
+**Word- und Excel-Dateien, die der Agent erstellt, sehen jetzt fertig aus.** Tabellen landen in Word als echte Tabellen, und ohne eigene Vorlage tragen Überschriften und Tabellenköpfe die MindGraph-Farbe Petrol. Excel-Listen bekommen passende Spaltenbreiten und einen Filter in der Kopfzeile. Das Protokoll setzt die Eckdaten als Tabelle und hebt Diskussion, Beschluss und Aufgaben hervor.
+
+### Hintergrund
+
+- **Auslöser:** Tabellen im Word-Protokoll erschienen als Zeilen mit senkrechten Strichen, und Schrift und Farben passten nicht zur PowerPoint-Vorlage im MindGraph-Stil. Excel-Listen öffneten mit schmalen Standardspalten.
+- **Word:** Arial, Überschriften und Tabellenkopf in Petrol, feine Tabellenlinien. Mit eigener Word-Vorlage (Briefkopf) bleibt die Formatierung neutral, dort gilt das eigene Briefpapier.
+- **Excel:** Die Spaltenbreite richtet sich nach dem Inhalt, die Kopfzeile bekommt einen Autofilter. Das gilt auch für die Blätter „Quellen“ und „Nicht verwertet“.
+- **Protokoll-Skill:** Eckdaten als Tabelle mit Kopfzeile, fette Bezeichner je Tagesordnungspunkt, kein Gendern mit Sonderzeichen. Vorhandene Skills im Vault werden nie überschrieben. Wer das neue Format möchte, löscht den Ordner `Skills/protokoll` und installiert die Starter-Skills neu.
+- **Modelle:** qwen3.6:35b-a3b-nvfp4 wurde mit aktuellem Ollama neu gemessen und ist jetzt auch für die Mail-Analyse geeignet. Mit älteren Ollama-Versionen erkennt es weiterhin schlechter, ob eine Mail eine Antwort braucht.
+
 ## [1.1.6] - 2026-10-28
 
 **Der Petrol-Chat beantwortet Listenfragen aus der Websuche jetzt geordnet und lässt sich wie ein normales Gespräch weiterführen.** Fragt man nach allen Produkten einer Marke, fasst die Antwort Varianten wie Größen oder Editionen zu einem Eintrag zusammen, nennt das Ergebnis zuerst und ordnet es danach ein. Die Websuche bleibt eingeschaltet, bis man sie ausschaltet, und eine Nachfrage bezieht sich von selbst auf die letzte Antwort.
