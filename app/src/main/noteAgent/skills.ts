@@ -4,6 +4,7 @@
 // Entscheidung 11: Write-Skills nehmen strukturierte Daten, nie Binärformate vom LLM.
 
 import { clampResults, formatVaultSearchResult, VAULT_SEARCH_MAX_QUERY } from './vaultSearchFormat'
+import { sheetColumnWidths, autofilterRef } from '../../shared/sheetLayout'
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import { ToolRegistry, type ToolResult } from '../llm/toolRegistry'
@@ -915,9 +916,16 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const fileName = sanitizeOutputFileName(rawName, '.xlsx')
       const XLSX = await import('xlsx')
       const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([columns, ...rows]), 'Tabelle1')
-      if (extraSheet) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(extraSheet.aoa), extraSheet.name)
-      if (sourcesSheet) XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sourcesSheet), 'Quellen')
+      const laidOut = (aoa: unknown[][]) => {
+        const ws = XLSX.utils.aoa_to_sheet(aoa)
+        ws['!cols'] = sheetColumnWidths(aoa)
+        const filter = autofilterRef(aoa)
+        if (filter) ws['!autofilter'] = { ref: filter }
+        return ws
+      }
+      XLSX.utils.book_append_sheet(wb, laidOut([columns, ...rows]), 'Tabelle1')
+      if (extraSheet) XLSX.utils.book_append_sheet(wb, laidOut(extraSheet.aoa), extraSheet.name)
+      if (sourcesSheet) XLSX.utils.book_append_sheet(wb, laidOut(sourcesSheet), 'Quellen')
       const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
       const sourceCount = sourcesSheet && sourcesSheet[0][0] !== 'Hinweis' ? sourcesSheet.length - 1 : 0
       const summary = `${rows.length} Zeilen, ${columns.length} Spalten${extraSheet ? `, Blatt „Nicht verwertet" mit ${extraSheet.aoa.length - 1} Einträgen` : ''}${sourcesSheet ? `, Blatt „Quellen“ mit ${sourceCount} abgerufenen Seiten` : ''}`

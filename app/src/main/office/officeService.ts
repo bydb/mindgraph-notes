@@ -1,6 +1,7 @@
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { getAiProvenance, buildProvenanceNotice } from '../../shared/aiProvenance'
+import { isTableLine, parseMarkdownTable } from '../../shared/markdownTable'
 
 export interface ExcelSheet {
   name: string
@@ -136,7 +137,13 @@ export async function markdownToDocx(markdownContent: string, outputPath: string
 /** Markdown → DOCX-Bytes (ohne Datei). Grundlage für Export und Vorlagen-Modus. */
 export async function markdownToDocxBuffer(markdownContent: string, options?: MarkdownToDocxOptions): Promise<Buffer> {
   const docxLib = await import('docx')
-  const { Document, Packer, Paragraph, HeadingLevel, TextRun, LevelFormat, AlignmentType, ShadingType, BorderStyle } = docxLib
+  const { Document, Packer, Paragraph, HeadingLevel, TextRun, LevelFormat, AlignmentType, ShadingType, BorderStyle, Table, TableRow, TableCell, WidthType } = docxLib
+
+  // MindGraph-Hausstil wie in der PowerPoint-Vorlage „MindGraph Hausstil“: Arial,
+  // Petrol für Überschriften und Tabellenköpfe. Gilt nur ohne Vorlage — im
+  // Vorlagen-Modus ist das Briefpapier des Nutzers maßgeblich, dort bleibt es neutral.
+  const brand = !options?.directHeadings
+  const BRAND = { petrol: '10696B', petrolSoft: 'E4EFEF', ink: '1C1A17', line: 'E4DFD6', muted: '5C574E' }
 
   // Obsidian callout types → German label + fill/border colour. Unknown types
   // fall back to a neutral grey box (see flushQuote).
@@ -206,9 +213,10 @@ export async function markdownToDocxBuffer(markdownContent: string, options?: Ma
   if (fm) body = body.slice(fm[0].length)
 
   const lines = body.split(/\r?\n/)
-  const paragraphs: InstanceType<typeof Paragraph>[] = []
+  const paragraphs: Array<InstanceType<typeof Paragraph> | InstanceType<typeof Table>> = []
   let inCodeBlock = false
   let quoteBuffer: string[] = []
+  let tableBuffer: string[] = []
   let blankRun = 0
 
   // Render the accumulated blockquote/callout lines as a shaded, left-bordered box.
@@ -252,12 +260,57 @@ export async function markdownToDocxBuffer(markdownContent: string, options?: Ma
     paragraphs.push(new Paragraph({ children: [] }))
   }
 
+  // Markdown-Pipe-Tabelle → echte Word-Tabelle. Ohne Trennzeile (`|---|`) ist es keine
+  // Tabelle; dann bleiben die Zeilen Text wie bisher, statt dass wir etwas erraten.
+  // Breite fest in DXA (A4 mit 2,54-cm-Rändern): Prozentbreiten ignoriert Word teils.
+  const flushTable = () => {
+    if (tableBuffer.length === 0) return
+    const buffer = tableBuffer
+    tableBuffer = []
+    const table = parseMarkdownTable(buffer)
+    if (!table) {
+      for (const tl of buffer) paragraphs.push(new Paragraph({ children: buildRuns(tl) }))
+      return
+    }
+    const totalWidth = 9026
+    const colWidth = Math.floor(totalWidth / table.columns)
+    const line = { style: BorderStyle.SINGLE, size: 4, color: brand ? BRAND.line : 'BFBFBF' }
+    const borders = { top: line, bottom: line, left: line, right: line, insideHorizontal: line, insideVertical: line }
+    const alignMap = { left: AlignmentType.LEFT, center: AlignmentType.CENTER, right: AlignmentType.RIGHT }
+    const makeRow = (cells: string[], isHeader: boolean) => new TableRow({
+      tableHeader: isHeader,
+      children: cells.map((cell, i) => new TableCell({
+        width: { size: colWidth, type: WidthType.DXA },
+        margins: { top: 60, bottom: 60, left: 100, right: 100 },
+        ...(isHeader ? { shading: { type: ShadingType.CLEAR, color: 'auto', fill: brand ? BRAND.petrolSoft : 'F2F2F2' } } : {}),
+        children: [new Paragraph({
+          children: buildRuns(cell, isHeader ? { bold: true, ...(brand ? { color: BRAND.petrol } : {}) } : {}),
+          ...(table.align[i] ? { alignment: alignMap[table.align[i] as 'left' | 'center' | 'right'] } : {})
+        })]
+      }))
+    })
+    const rows = [
+      ...(table.header ? [makeRow(table.header, true)] : []),
+      ...table.rows.map(r => makeRow(r, false))
+    ]
+    if (rows.length === 0) return
+    paragraphs.push(new Table({
+      width: { size: totalWidth, type: WidthType.DXA },
+      columnWidths: Array(table.columns).fill(colWidth),
+      borders,
+      rows
+    }))
+    // Abstand, damit der folgende Absatz nicht an der Tabelle klebt.
+    paragraphs.push(new Paragraph({ children: [] }))
+  }
+
   for (const raw of lines) {
     const line = raw.trimEnd()
 
     // Fenced code blocks: toggle on ``` / ```lang, render inner lines verbatim
     // (monospace, no markdown parsing). The fence markers themselves are dropped.
     if (/^\s*```/.test(line)) {
+      flushTable()
       flushQuote()
       inCodeBlock = !inCodeBlock
       continue
@@ -266,6 +319,14 @@ export async function markdownToDocxBuffer(markdownContent: string, options?: Ma
       paragraphs.push(new Paragraph({ children: [new TextRun({ text: raw, font: 'Consolas' })] }))
       continue
     }
+
+    // Tabellenzeilen sammeln, bis der Block endet.
+    if (isTableLine(line)) {
+      flushQuote()
+      tableBuffer.push(line)
+      continue
+    }
+    flushTable()
 
     // Blockquotes / Obsidian callouts: accumulate consecutive `>` lines.
     const q = line.match(/^>\s?(.*)$/)
@@ -282,6 +343,11 @@ export async function markdownToDocxBuffer(markdownContent: string, options?: Ma
       continue
     }
     blankRun = 0
+    // Trennlinie `---` / `***` / `___` als Linie statt als wörtliche Striche.
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      paragraphs.push(new Paragraph({ children: [], border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: brand ? BRAND.line : 'CCCCCC', space: 4 } } }))
+      continue
+    }
     const h = line.match(/^(#{1,6})\s+(.*)$/)
     if (h) {
       const level = h[1].length
@@ -314,7 +380,8 @@ export async function markdownToDocxBuffer(markdownContent: string, options?: Ma
     }
     paragraphs.push(new Paragraph({ children: buildRuns(line) }))
   }
-  // Flush a callout that runs to the end of the document.
+  // Flush a table or callout that runs to the end of the document.
+  flushTable()
   flushQuote()
 
   // KI-Kennzeichnung als abgesetzte Fußzeile am Dokumentende. Der Wortlaut kommt
@@ -327,7 +394,24 @@ export async function markdownToDocxBuffer(markdownContent: string, options?: Ma
     }))
   }
 
+  const headingStyle = (size: number, color: string, before: number) => ({
+    run: { font: 'Arial', size, bold: true, color },
+    paragraph: { spacing: { before, after: 120 }, keepNext: true }
+  })
   const doc = new Document({
+    ...(brand ? {
+      styles: {
+        default: {
+          document: { run: { font: 'Arial', size: 22, color: BRAND.ink }, paragraph: { spacing: { after: 120, line: 288 } } },
+          heading1: headingStyle(36, BRAND.petrol, 0),
+          heading2: headingStyle(28, BRAND.petrol, 360),
+          heading3: headingStyle(24, BRAND.ink, 280),
+          heading4: headingStyle(22, BRAND.ink, 240),
+          heading5: headingStyle(22, BRAND.muted, 240),
+          heading6: headingStyle(22, BRAND.muted, 240)
+        }
+      }
+    } : {}),
     numbering: {
       config: [
         {
