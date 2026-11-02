@@ -163,7 +163,7 @@
     "defuddle": "^0.19.1",
     "docx": "^9.6.1",
     "dompurify": "^3.3.1",
-    "electron-updater": "^6.8.3",
+    "electron-updater": "^6.8.11",
     "grammy": "^1.42.0",
     "highlight.js": "^11.11.1",
     "html-to-image": "^1.11.13",
