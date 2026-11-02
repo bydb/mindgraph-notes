@@ -673,6 +673,8 @@ usw.“ Stand im Code (`main/noteAgent/contextFiles.ts:76-91`, `EXT_TO_KIND`): l
   Rückläufen anhängt, erfährt nicht einmal, welche fehlen.
 - Heutiger Umweg: Vision OCR je PDF von Hand, dann die Begleitnotiz anhängen. Für Bilder gibt es
   keinen Umweg.
+- **Gemischte PDFs** (Textseiten plus eingescannte Anlage): Geprüft wurde nur, ob die ganze Datei
+  40 Zeichen Text hat. Die Scan-Seiten fehlten ohne Hinweis, die Datei galt als gelesen.
 
 **Ziel.** Gescannte PDFs und Bilder in Anhängen und Ordner-Anhängen werden vom Agenten gelesen,
 über dieselbe Texterkennung wie der Vision-OCR-Knopf (`main/visionOcr.ts`, `extractOcrPage`,
@@ -685,6 +687,24 @@ das mit nächstem Schritt („Einstellungen → Integrationen → Vision OCR“)
 Der **erkannte Text** geht danach wie jeder gelesene Inhalt an das Agent-Modell, auch an ein
 Cloud-Modell. Die Karte nennt das unter „Welche Daten wohin gehen“: „Text aus Scans und Bildern
 (auf diesem Rechner erkannt)“. Transparenz statt Sperre, wie bei allen anderen Anhängen.
+
+**13a. Gemischte PDFs: Seiten ohne Textebene (Nutzerentscheidung 02.11.2026).**
+- **Stufe 1 — gebaut, vor Teil 1** (kleiner Ehrlichkeits-Fix, keine Abhängigkeit von Teil 1
+  oder 4): `shared/pdfPageText.ts` (`assemblePdfText`, getestet) prüft jede Seite. Unter
+  `PDF_PAGE_MIN_CHARS` (40 Zeichen ohne Leerraum) steht ein Vermerk an der Seite („kein Text
+  gefunden — leer, Bild oder Scan“ bzw. „kaum Text (N Zeichen)“, vorhandener Text bleibt) und am
+  Ende `[ohne Textebene: Seiten 2, 7–9 von N gelesenen Seiten …]`. `folder_digest` übernimmt das
+  als Teilstatus, die Ordner-Lesung als Status „gelesen (ohne Textebene: …)“. Eine Datei ganz
+  ohne Text wirft wie bisher. Gegenprobe mit echter PDF (Text–Scan–Text) über
+  `extractFileContentRaw`: Seite 2 benannt; reiner Scan und reine Text-PDF unverändert.
+- **Schwelle vorläufig**: 40 Zeichen ist geschätzt, nicht gemessen. Ein Scan mit Stempel oder
+  Seitenzahl als echtem Text liegt meist darunter, eine fast leere Textseite (Kapiteltitel) auch —
+  sie bekommt dann einen harmlosen Vermerk. An echten PDFs messen, bevor die Zahl fest wird.
+- **Stufe 2 — in 4a**: Nur die Seiten mit Vermerk gehen durch `extractOcrPage`, der Rest bleibt
+  auf der Textebene. Die erkannten Seiten tragen „Seite N (Texterkennung)“. Seitenbudget aus
+  Punkt 16 zählt nur diese Seiten. Offen für Codex: Was gilt bei einer Seite mit Textebene, die
+  zusätzlich ein eingescanntes Bild mit Text trägt (Briefkopf als Bild, Tabelle als Grafik)?
+  Stufe 1 erkennt das nicht.
 
 **14. Wo die Seiten gerendert werden.** Der Renderer rendert PDF-Seiten heute per pdfjs auf ein
 Canvas (`PDFViewer.tsx`). Im Main gibt es kein Canvas. Zwei Wege, vor dem Bau zu entscheiden:
@@ -779,6 +799,8 @@ als eigener Punkt mit Messung.
 mit 3b. Vor dem Bau Codex-Prüfung von Punkt 13–19.
 
 ## Status
+
+Rev. 5a, 02.11.2026: Punkt 13a (gemischte PDFs) ergänzt, Stufe 1 gebaut (uncommittet).
 
 Rev. 5, 02.11.2026: Teil 4 (Agent liest Scans und Bilder) aufgenommen, mit Weg A (lokale
 Texterkennung, Punkt 13–17), Weg B (Seitenbild für Vision-Modelle, Punkt 18) und dem Cloud-Bildweg

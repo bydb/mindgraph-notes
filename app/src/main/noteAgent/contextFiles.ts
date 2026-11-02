@@ -23,6 +23,7 @@ import {
   MAX_INVENTORY_DEPTH, MAX_INVENTORY_ENTRIES, type FolderInventory, type FolderRoot
 } from './folderInventory'
 import { estimateTokens, linesFittingTokens } from '../../shared/contextBudget'
+import { assemblePdfText, pdfNoTextNote } from '../../shared/pdfPageText'
 
 export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'folder'
 
@@ -689,33 +690,29 @@ async function extractPdfText(data: Buffer, maxPages = MAX_PDF_PAGES, maxChars =
   const bytes = new Uint8Array(data)
   const doc = await pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise
   try {
-    const pages = Math.min(doc.numPages, maxPages)
-    let out = ''
-    for (let p = 1; p <= pages; p++) {
+    const last = Math.min(doc.numPages, maxPages)
+    const pages: string[] = []
+    let chars = 0
+    for (let p = 1; p <= last; p++) {
       const page = await doc.getPage(p)
       const tc = await page.getTextContent()
+      let text = ''
       let line = ''
       for (const it of tc.items) {
         if (!('str' in it)) continue
         line += it.str
         if (it.hasEOL) {
-          out += line + '\n'
+          text += line + '\n'
           line = ''
         }
       }
-      if (line) out += line + '\n'
-      out += '\n'
-      if (out.length > maxChars) {
-        if (p < doc.numPages) out += `\n[gekürzt: nur die ersten ${p} von ${doc.numPages} Seiten]`
-        return out
-      }
+      if (line) text += line + '\n'
+      pages.push(text)
+      chars += text.length + 1
+      if (chars > maxChars) break
     }
-    // Bekannte Scan-Heuristik (wie remarkable-bookify): ohne Textebene abbrechen statt leer liefern.
-    if (out.replace(/\s/g, '').length < 40) {
-      throw new Error('PDF hat keine Textebene (Scan?) — nur PDFs mit Textinhalt werden unterstützt')
-    }
-    if (doc.numPages > pages) out += `\n[gekürzt: nur die ersten ${pages} von ${doc.numPages} Seiten]`
-    return out
+    // Seiten ohne Textebene werden benannt, eine Datei ganz ohne Text wirft (shared/pdfPageText.ts).
+    return assemblePdfText(pages, doc.numPages)
   } finally {
     await doc.destroy().catch(() => undefined)
   }
@@ -863,7 +860,8 @@ async function readFolderContext(
       }
       used += content.length
       readCount++
-      status.set(f.name, fileTruncated ? 'gelesen (gekürzt)' : 'gelesen')
+      const noText = f.kind === 'pdf' ? pdfNoTextNote(content) : undefined
+      status.set(f.name, [fileTruncated ? 'gelesen (gekürzt)' : 'gelesen', noText ? `(${noText})` : ''].filter(Boolean).join(' '))
       sections.push(`--- Inhalt: ${f.name} ---\n${content}`)
     } catch (e) {
       status.set(f.name, `nicht lesbar (${e instanceof Error ? e.message : String(e)})`)
@@ -1262,8 +1260,9 @@ export async function readFolderSourcesForDigest(
         continue
       }
       const marker = /\[gekürzt:[^\]]*\]/.exec(text)?.[0]
-      const partial = marker
-        ? marker.slice(1, -1)
+      const notes = [marker?.slice(1, -1), f.kind === 'pdf' ? pdfNoTextNote(text) : undefined].filter(Boolean)
+      const partial = notes.length > 0
+        ? notes.join('; ')
         : f.kind === 'pptx' ? 'PowerPoint: nur Text und Notizen, keine Bildinhalte' : undefined
       const skip = opts.admit?.(f.name, text)
       if (skip) {
