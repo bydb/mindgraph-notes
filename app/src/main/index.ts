@@ -176,6 +176,7 @@ import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/llmBackend'
 import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
+import { extractOcrPage } from './visionOcr'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatWideLimits, type WebChatWideLimits, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId, sanitizeSnapshotId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
@@ -9653,49 +9654,7 @@ ipcMain.handle('vision-ocr-extract-page', wrapIpcWithOllamaActivity('vision-ocr'
   }
 
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min per page
-    const startedAt = Date.now()
-
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [{
-          role: 'user',
-          content: `Extract ALL text content from this document page and format it as clean Markdown.
-Rules:
-- Use headings (#, ##, ###) for section titles
-- Use bullet points for lists, numbered lists for sequences
-- Format tables as Markdown tables
-- Use **bold** and *italic* where appropriate
-- For handwritten text, transcribe as accurately as possible
-- For mathematical formulas, use LaTeX notation ($...$)
-- Output ONLY the extracted Markdown content, no preamble or explanation
-- Do NOT use <think> tags or internal reasoning`,
-          images: [base64Image]
-        }],
-        stream: false,
-        think: false,
-        options: { temperature: 0.1 }
-      }),
-      signal: controller.signal
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`)
-    }
-
-    const data = await response.json() as { message?: { content?: string } } & OllamaTimings
-    recordLlmRun(fromOllamaResponse(data, { module: 'vision-ocr', model, wallMs: Date.now() - startedAt, at: startedAt }))
-    const pageText = (data.message?.content || '')
-      .replace(/<think>[\s\S]*?<\/think>/g, '')
-      .trim()
-
-    return { success: true, content: pageText }
+    return await extractOcrPage(OLLAMA_API_URL, base64Image, model, pageNum)
   } catch (error) {
     console.error(`[VisionOCR] Error on page ${pageNum}:`, error)
     return {

@@ -1163,6 +1163,10 @@ export interface ElectronAPI {
     success: boolean;
     content: string;
     error?: string;
+    /** Das Modell wiederholte die Seite; die Wiederholung wurde abgeschnitten. */
+    repeated?: boolean;
+    /** Ausgabegrenze erreicht ohne erkennbare Wiederholung — Seite evtl. unvollständig. */
+    incomplete?: boolean;
   }>;
 
   // Readwise Integration API
