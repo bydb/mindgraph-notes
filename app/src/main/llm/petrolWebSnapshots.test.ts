@@ -37,6 +37,20 @@ describe('WebSnapshotStore', () => {
     expect(store.get(1, 'tab-1', id)).toBeNull()
   })
 
+  it('alive meldet nur gebundene, nicht abgelaufene Kennungen (F02)', () => {
+    let now = 10_000
+    const ids = ['a'.repeat(32), 'b'.repeat(32)]
+    const store = new WebSnapshotStore(() => now, () => ids.shift()!)
+    const early = store.put(1, 'tab-1', [source(1)])
+    now += WEB_SNAPSHOT_TTL_MS / 2
+    const late = store.put(1, 'tab-1', [source(2)])
+    expect(store.alive(1, 'tab-1', [early, late, 'c'.repeat(32)])).toEqual([early, late])
+    expect(store.alive(2, 'tab-1', [early, late])).toEqual([])
+    expect(store.alive(1, 'tab-2', [early, late])).toEqual([])
+    now += WEB_SNAPSHOT_TTL_MS / 2 + 1
+    expect(store.alive(1, 'tab-1', [early, late])).toEqual([late])
+  })
+
   it('behält je Absender nur die neuesten', () => {
     let n = 0
     const store = new WebSnapshotStore(() => ++n, () => n.toString(16).padStart(32, '0'))

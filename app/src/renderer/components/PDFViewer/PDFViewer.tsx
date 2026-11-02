@@ -251,6 +251,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
       const pdfDoc = await pdfjs.getDocument({ data: bytes }).promise
       const totalPages = pdfDoc.numPages
       const pageMarkdowns: string[] = []
+      let extractedPages = 0
 
       // 2. Render each page and send to Ollama
       for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
@@ -275,8 +276,18 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
         // Send to main process → Ollama
         const result = await window.electronAPI.visionOcrExtractPage(base64, visionOcr.model, pageNum)
 
+        // Eine fehlgeschlagene Seite bleibt als Hinweis stehen — sonst fehlt sie
+        // in der Notiz, ohne dass es jemand merkt.
         if (result.success && result.content) {
-          pageMarkdowns.push(result.content)
+          const note = result.repeated
+            ? `> ${t('visionOcr.pageRepeated').replace('{page}', String(pageNum))}\n\n`
+            : result.incomplete
+              ? `> ${t('visionOcr.pageIncomplete').replace('{page}', String(pageNum))}\n\n`
+              : ''
+          pageMarkdowns.push(note + result.content)
+          extractedPages++
+        } else {
+          pageMarkdowns.push(`> ${t('visionOcr.pageFailed').replace('{page}', String(pageNum))}${result.error ? ` (${result.error})` : ''}`)
         }
 
         canvas.remove()
@@ -284,7 +295,7 @@ export const PDFViewer: React.FC<PDFViewerProps> = ({ filePath, fileName, relati
 
       pdfDoc.destroy()
 
-      if (pageMarkdowns.length === 0) {
+      if (extractedPages === 0) {
         setVisionError(t('pdfViewer.noContentExtracted'))
         setVisionExtracting(false)
         return

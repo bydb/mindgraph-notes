@@ -393,6 +393,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // derselben Kennung. Fortschritt auf eigenem Kanal, Textstücke auf petrol-chat-chunk.
   petrolChatWeb: (params: unknown) => ipcRenderer.invoke('petrol-chat-web', params),
   petrolChatSnapshotsDrop: (scopeId: string) => ipcRenderer.invoke('petrol-chat-snapshots-drop', scopeId) as Promise<boolean>,
+  petrolChatSnapshotsAlive: (scopeId: string, ids: string[]) => ipcRenderer.invoke('petrol-chat-snapshots-alive', scopeId, ids) as Promise<string[]>,
   onPetrolChatProgress: (callback: (p: unknown) => void) => {
     ipcRenderer.removeAllListeners('petrol-chat-progress')
     ipcRenderer.on('petrol-chat-progress', (_event, p) => callback(p))

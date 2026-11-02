@@ -10,6 +10,7 @@ import { PanelHeader } from '../Shared/PanelHeader'
 import { ContextAttachmentRow } from '../Shared/ContextAttachmentRow'
 import { cloudRoutesForFeature, cloudProviderForSentinel, type CloudProviderId } from '../../../shared/llmBackend'
 import { isCloudModel } from '../../../shared/modelCompatibility'
+import type { AgentRoute } from '../../../shared/agentRoute'
 import { setAiProvenanceInContent, todayIsoDate } from '../../../shared/aiProvenance'
 import type { NoteAgentAttachment, VaultRagHitDto } from '../../../shared/types'
 import { replaceCitationRefs, supportingSources, type CitationReport, type SentenceCheck } from '../../../shared/rag/citations'
@@ -117,6 +118,28 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
   const [cloudChatProvider, setCloudChatProvider] = useState<CloudProviderId | null>(null)
   useEffect(() => { setCloudChatProvider(defaultCloudProvider) }, [defaultCloudProvider])
   const activeCloudRoute = cloudChatProvider ? (cloudRoutes.find(r => r.provider === cloudChatProvider) ?? null) : null
+  // Modellweg aus dem Main, wie im Petrol-Chat: auch ein Ollama-Modell kann bei ollama.com
+  // rechnen (`:cloud`-Tag oder `remote_host`), obwohl es über den lokalen Port läuft. Dann geht
+  // der Notizkontext hinaus — das muss hier stehen (Codex F18, chat-verlauf-notizen-bilder.md).
+  const routeKey = `${llmSettings.backend}|${selectedModel}|${activeCloudRoute ? `${activeCloudRoute.provider}:${activeCloudRoute.model}` : ''}`
+  const [modelRoute, setModelRoute] = useState<{ key: string; route: AgentRoute | null } | null>(null)
+  useEffect(() => {
+    if (!activeCloudRoute && !selectedModel) return
+    let cancelled = false
+    window.electronAPI.noteAgentRoutePreflight({
+      model: selectedModel,
+      localBackend: llmSettings.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
+      cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null
+    }).then(r => {
+      if (!cancelled) setModelRoute({ key: routeKey, route: r.success && r.route ? r.route : null })
+    }).catch(() => {
+      if (!cancelled) setModelRoute({ key: routeKey, route: null })
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey])
+  const routeSettled = modelRoute?.key === routeKey
+  const cloudRoute = routeSettled && modelRoute.route?.kind === 'cloud' ? modelRoute.route : null
   const [selectedFolder, setSelectedFolder] = useState<string>('')
   const [projectList, setProjectList] = useState<ProjectOption[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
@@ -1142,6 +1165,16 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
                 ariaLabel="Modell"
               />
             </div>
+            {/* Vault und Projekt rechnen im Main erzwungen lokal — dort gilt diese Zeile nicht (Codex F24).
+                Sonst zeigt sie auch „wird geprüft“ und „nicht prüfbar“, nicht nur „Cloud“ (F23);
+                ein geprüft lokales Modell braucht keine Zeile. */}
+            {contextMode !== 'vault' && contextMode !== 'project' && (activeCloudRoute || selectedModel) && (
+              cloudRoute ? <div className="notes-chat-route is-out">{t('agentCard.routeCloud', { provider: cloudRoute.providerLabel })}</div>
+              : !routeSettled ? <div className="notes-chat-route">{t('agentCard.routeChecking')}</div>
+              : !modelRoute.route ? <div className="notes-chat-route is-out">{t('notesChat.routeUnknown')}</div>
+              : modelRoute.route.kind === 'unverified' ? <div className="notes-chat-route">{modelRoute.route.provider === 'lmstudio' ? t('agentCard.routeLmStudio') : t('agentCard.routeLocal', { runtime: 'Ollama' })}</div>
+              : null
+            )}
 
             <div className="notes-chat-context-row">
               <label>Kontext:</label>
@@ -1379,7 +1412,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
                 onDetach={detachFile}
                 disabled={isStreaming}
                 attachError={attachError}
-                cloudSelected={!!activeCloudRoute || isCloudModel(selectedModel)}
+                cloudSelected={contextMode !== 'vault' && (!!activeCloudRoute || !!cloudRoute || isCloudModel(selectedModel))}
               />
             </div>
           )}

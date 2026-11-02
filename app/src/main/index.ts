@@ -176,8 +176,9 @@ import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/llmBackend'
 import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
+import { extractOcrPage } from './visionOcr'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatWideLimits, type WebChatWideLimits, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
-import { WebSnapshotStore, sanitizeScopeId } from './llm/petrolWebSnapshots'
+import { WebSnapshotStore, sanitizeScopeId, sanitizeSnapshotId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
@@ -6569,6 +6570,18 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       }
     }
 
+    // Notiz-Chat und Petrol-Chat: Cloud nur mit der gespeicherten Freigabe 'notes-chat' und genau
+    // dem dort eingestellten Modell — bis 01.11.2026 prüfte das nur der Renderer (Modellauswahl),
+    // der Main nur, ob ein Key da ist (Codex F06, chat-verlauf-notizen-bilder.md). Der Notiz-Chat
+    // schickt Notizinhalte mit, die Websuche des Petrol-Chats prüfte schon richtig.
+    if (chatMode !== 'email' && cloud?.model) {
+      const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>)) as { ollama?: { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } }
+      if (!petrolCloudAllowed(cloud, ui.ollama)) {
+        event.sender.send(doneChannel)
+        return { success: false, error: 'Der Chat ist für diesen Cloud-Anbieter oder dieses Modell nicht (mehr) freigegeben (Einstellungen → KI & Modelle → Cloud-Anbieter → „Notes Chat“).' }
+      }
+    }
+
     // Cloud-Routing (OpenRouter/LLMBase) für Notes-Chat: streamt via SSE auf denselben
     // Channels. Nur aktiv, wenn der Renderer es per zweitem Opt-in (canUseCloudForFeature)
     // angefordert hat — Key kommt aus safeStorage, verlässt nie den Renderer.
@@ -6831,6 +6844,17 @@ ipcMain.handle('petrol-chat-snapshots-drop', (event, scopeId: unknown) => {
   if (!scope) return false
   webSnapshots.dropScope(event.sender.id, scope)
   return true
+})
+
+// Welche Snapshot-Kennungen dieses Gesprächs sind noch abrufbar (Codex F02/F03)? Antwortet nur
+// mit einer Teilmenge der übergebenen Kennungen, nie mit Auszügen.
+ipcMain.handle('petrol-chat-snapshots-alive', (event, scopeId: unknown, ids: unknown) => {
+  if (!isTrustedSender(event)) return []
+  const scope = sanitizeScopeId(scopeId)
+  if (!scope || !Array.isArray(ids)) return []
+  // Grenze = SNAPSHOT_CHECK_MAX im petrolChatStore; der Renderer schickt nie mehr (Codex F21).
+  const clean = ids.slice(0, 200).map(sanitizeSnapshotId).filter((v): v is string => !!v)
+  return webSnapshots.alive(event.sender.id, scope, clean)
 })
 
 ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
@@ -7337,11 +7361,15 @@ ipcMain.handle('vision-ocr-models', async () => {
       signal: AbortSignal.timeout(5000)
     })
     if (!response.ok) return []
-    const data = await response.json()
-    const visionPatterns = ['llava', 'minicpm', 'qwen2-vl', 'qwen2.5-vl', 'qwen2.5vl', 'qwen3', 'pixtral', 'bakllava', 'moondream', 'cogvlm', 'phi3-vision', 'phi-3-vision', 'glm-ocr', 'olmocr', 'gemma3', 'gemma4', 'internvl']
-    return data.models?.filter((m: { name: string }) =>
-      visionPatterns.some(p => m.name.toLowerCase().includes(p))
-    ).map((m: { name: string; size: number }) => ({ name: m.name, size: m.size })) || []
+    // Nur lokale Modelle (Codex F25): Cloud-Tag oder remote_host fliegt raus. Meldet Ollama
+    // Fähigkeiten, entscheidet `vision`; nur bei alten Versionen ohne Angabe das Namensmuster.
+    const visionPatterns = ['llava', 'minicpm', 'qwen2-vl', 'qwen2.5-vl', 'qwen2.5vl', 'qwen3', 'pixtral', 'bakllava', 'moondream', 'cogvlm', 'phi3-vision', 'phi-3-vision', 'glm-ocr', 'olmocr', 'deepseek-ocr', 'gemma3', 'gemma4', 'internvl']
+    return parseOllamaModels(await response.json())
+      .filter(m => !m.remoteHost && !m.remoteModel && !isModelIsCloud(m.name))
+      .filter(m => m.capabilities
+        ? m.capabilities.includes('vision') && m.capabilities.includes('completion')
+        : visionPatterns.some(p => m.name.toLowerCase().includes(p)))
+      .map(m => ({ name: m.name, size: m.size }))
   } catch (error) {
     console.error('[VisionOCR] Error fetching vision models:', error)
     return []
@@ -9611,53 +9639,22 @@ ipcMain.handle('docling-convert-pdf', async (_event, pdfPath: string, baseUrl?: 
 })
 
 // ============ VISION OCR PDF EXTRACTION (Ollama Vision Models) ============
-ipcMain.handle('vision-ocr-extract-page', async (_event, base64Image: string, model: string, pageNum: number) => {
+// Läuft als Ollama-Vordergrund: sonst rechnet der Vault-Indexer parallel zur Bild-Texterkennung
+// (Codex F16, chat-verlauf-notizen-bilder.md).
+// Nur lokale Modelle (Codex F25, Nutzerentscheidung 01.11.2026): ein Ollama-Cloud-Modell
+// (`:cloud`, `remote_host`) läuft über denselben Port, schickte aber jede PDF-Seite an ollama.com.
+// Bei der Texterkennung wählt niemand bewusst Cloud — deshalb hier Sperre statt Hinweis.
+ipcMain.handle('vision-ocr-extract-page', wrapIpcWithOllamaActivity('vision-ocr', async (_event, base64Image: string, model: string, pageNum: number) => {
   console.log(`[VisionOCR] Extracting page ${pageNum} with model ${model}`)
 
   try {
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min per page
-    const startedAt = Date.now()
+    await resolveLocalModel(model)
+  } catch (err) {
+    return { success: false, content: '', error: `Die Texterkennung läuft nur mit Modellen auf diesem Rechner. ${describeLocalModelError(err)}` }
+  }
 
-    const response = await fetch(`${OLLAMA_API_URL}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model,
-        messages: [{
-          role: 'user',
-          content: `Extract ALL text content from this document page and format it as clean Markdown.
-Rules:
-- Use headings (#, ##, ###) for section titles
-- Use bullet points for lists, numbered lists for sequences
-- Format tables as Markdown tables
-- Use **bold** and *italic* where appropriate
-- For handwritten text, transcribe as accurately as possible
-- For mathematical formulas, use LaTeX notation ($...$)
-- Output ONLY the extracted Markdown content, no preamble or explanation
-- Do NOT use <think> tags or internal reasoning`,
-          images: [base64Image]
-        }],
-        stream: false,
-        think: false,
-        options: { temperature: 0.1 }
-      }),
-      signal: controller.signal
-    })
-
-    clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      throw new Error(`Ollama API error: ${response.status}`)
-    }
-
-    const data = await response.json() as { message?: { content?: string } } & OllamaTimings
-    recordLlmRun(fromOllamaResponse(data, { module: 'vision-ocr', model, wallMs: Date.now() - startedAt, at: startedAt }))
-    const pageText = (data.message?.content || '')
-      .replace(/<think>[\s\S]*?<\/think>/g, '')
-      .trim()
-
-    return { success: true, content: pageText }
+  try {
+    return await extractOcrPage(OLLAMA_API_URL, base64Image, model, pageNum)
   } catch (error) {
     console.error(`[VisionOCR] Error on page ${pageNum}:`, error)
     return {
@@ -9666,7 +9663,7 @@ Rules:
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
-})
+}, (_event, _image, model) => typeof model === 'string' && !isModelIsCloud(model)))
 
 // ============ LANGUAGETOOL GRAMMAR/SPELL CHECK API ============
 const LANGUAGETOOL_DEFAULT_URL = 'http://localhost:8010'

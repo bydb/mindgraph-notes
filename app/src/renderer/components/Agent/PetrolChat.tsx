@@ -16,7 +16,7 @@ import MarkdownIt from 'markdown-it'
 import { useUIStore } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useNoteAgentStore } from '../../stores/noteAgentStore'
-import { usePetrolChatStore, type PetrolChatMessage } from '../../stores/petrolChatStore'
+import { snapshotIdsIn, usePetrolChatStore, type PetrolChatMessage } from '../../stores/petrolChatStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
@@ -99,6 +99,22 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const localModel = scope?.localModel ?? ''
   const busy = activeScope === tabId
   const busyElsewhere = !!activeScope && activeScope !== tabId
+  const goneSnapshots = scope?.goneSnapshots ?? EMPTY_IDS
+  // Eingefrorene Seiten verfallen im Main (drei Stunden, Obergrenze, Neustart). Beim Öffnen, bei
+  // Fensterfokus und alle fünf Minuten nachfragen — sonst bot der Knopf „Hiermit weiterfragen“
+  // Seiten an, die es nicht mehr gab (Codex F02/F03, chat-verlauf-notizen-bilder.md).
+  const snapshotCount = useMemo(() => snapshotIdsIn(messages).length, [messages])
+  useEffect(() => {
+    if (!snapshotCount) return
+    const check = () => { void chat().checkSnapshots(tabId) }
+    check()
+    const timer = window.setInterval(check, 5 * 60 * 1000)
+    window.addEventListener('focus', check)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', check)
+    }
+  }, [tabId, snapshotCount])
 
   // Websuche: Modul + Einrichtung wie auf der Auftragskarte (dieselbe Konfiguration).
   const webModule = useIsModuleEnabled('web-research')
@@ -500,7 +516,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         {msg.content.trim() && <button type="button" className="agent-card-btn" onClick={() => void copy(msg)}>{copiedAt === msg.at ? t('petrolChat.copied') : t('petrolChat.copy')}</button>}
         {vaultPath && msg.content.trim() && <button type="button" className="agent-card-btn" onClick={() => void saveAsNote(msg)}>{savedAt === msg.at ? t('petrolChat.saved') : t('petrolChat.saveNote')}</button>}
         {msg.web?.snapshotId && msg.web.kind === 'answer' && !msg.stopped && (
-          <button
+          goneSnapshots.includes(msg.web.snapshotId) ? (
+            <button type="button" className="agent-card-btn" disabled title={t('petrolChat.followUpGoneTitle')}>{t('petrolChat.askWithSourcesGone')}</button>
+          ) : <button
             type="button"
             className="agent-card-btn"
             aria-pressed={followUpId === msg.web.snapshotId}
@@ -608,13 +626,13 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     <div className="petrol-turn-error">
                       <span>{turn.answer.content ? t('petrolChat.error', { error: turn.answer.content }) : t('petrolChat.errorEmpty')}</span>
                       {/* Sind die Seiten weg, scheitert jede Wiederholung gleich — dann kein Knopf. */}
-                      {turn.question && !turn.answer.web?.snapshotGone && (
+                      {turn.question && !turn.answer.web?.snapshotGone && !(turn.question.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId)) && (
                         <button type="button" className="agent-card-btn" onClick={() => send(turn.question!.content, turn.question!.followUpSnapshotId, turn.question!)} disabled={busy || busyElsewhere || !hasModel}>
                           {t('petrolChat.retry')}
                         </button>
                       )}
                     </div>
-                    {turn.answer.web?.snapshotGone && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
+                    {(turn.answer.web?.snapshotGone || (turn.question?.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId))) && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
                     {turn.answer.web?.deep && <div className="petrol-web-block"><WebDeepLine deep={turn.answer.web.deep} /></div>}
                     {turn.answer.web?.basis?.kind === 'snapshot' && (
                       <div className="petrol-web-muted">{t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) })}</div>
@@ -955,3 +973,4 @@ function ChatGlyph({ icon }: { icon: ChatIcon }) {
 }
 
 const EMPTY_MESSAGES: PetrolChatMessage[] = []
+const EMPTY_IDS: string[] = []
