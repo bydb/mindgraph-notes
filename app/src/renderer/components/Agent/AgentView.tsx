@@ -376,7 +376,7 @@ export function AgentView({ tabId }: Props) {
   }
 
   // Zielordner-Picker
-  const vaultEntries = useContextVaultFiles()
+  const vaultEntries = useContextVaultFiles({ images: true })
   const [targetPickerOpen, setTargetPickerOpen] = useState(false)
   const [targetQuery, setTargetQuery] = useState('')
   const targetWrapRef = useRef<HTMLDivElement>(null)
@@ -764,6 +764,7 @@ export function AgentView({ tabId }: Props) {
                 disabled={busy}
                 attachError={scope.attachError}
                 cloudSelected={false}
+                allowImages
               />
               {docsMissing && <span className={firstGap === 'docs' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(docsHint)}</span>}
               {!docsMissing && scope.attachments.length === 0 && <span className="agent-card-help">{t('agentCard.docsHelp')}</span>}

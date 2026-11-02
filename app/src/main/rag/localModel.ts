@@ -38,6 +38,8 @@ export interface LocalModel {
   /** Exakt aufgelöster Name aus der Liste (z.B. `bge-m3:latest`). */
   name: string
   digest: string
+  /** Fähigkeiten laut Ollama (`vision`, `completion` …); fehlt bei alten Ollama-Versionen. */
+  capabilities?: string[]
 }
 
 type FetchFn = (input: string, init?: RequestInit) => Promise<Response>
@@ -114,7 +116,7 @@ export async function resolveLocalModel(name: string, opts: LocalModelOptions = 
   if (!m.digest) {
     throw new LocalModelError('no-digest', wanted, `Ollama meldet für „${m.name}" keinen Digest — Identität nicht prüfbar`)
   }
-  return { name: m.name, digest: m.digest }
+  return { name: m.name, digest: m.digest, capabilities: m.capabilities }
 }
 
 /** Nutzerfreundliche Meldung mit nächstem Schritt. */

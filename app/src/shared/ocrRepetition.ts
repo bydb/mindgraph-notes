@@ -15,6 +15,12 @@
 export const OCR_LOOP_MIN_RUN = 300
 /** Fenster, über das ein Wiederholungsbeginn gesucht wird. */
 const WINDOW = 60
+/**
+ * Ab so vielen gleichen Zeilen ohne Buchstaben/Ziffern am Ende gilt die Ausgabe als
+ * hängengeblieben. Real (02.11.2026, glm-ocr, Testseite mit zwei Zeilen): nach der Seite und
+ * einer Kopie Hunderte Zeilen ```, bis zur Ausgabegrenze — der Wortvergleich sieht darin nichts.
+ */
+export const OCR_JUNK_RUN = 12
 
 interface Normalized {
   text: string
@@ -71,8 +77,25 @@ function findLoopStart(norm: string, minRun: number, lenient: boolean): number {
   return -1
 }
 
+/** Beginn einer Reihe gleicher Zeilen ohne Text am Ende (mindestens `OCR_JUNK_RUN`), sonst -1. */
+function trailingJunkStart(lines: string[]): number {
+  let end = lines.length
+  while (end > 0 && !lines[end - 1].trim()) end--
+  if (end === 0) return -1
+  const last = lines[end - 1].trim()
+  if (/[\p{L}\p{N}]/u.test(last)) return -1
+  let i = end - 1
+  let count = 0
+  while (i >= 0 && (lines[i].trim() === last || !lines[i].trim())) {
+    if (lines[i].trim()) count++
+    i--
+  }
+  return count >= OCR_JUNK_RUN ? i + 1 : -1
+}
+
 /** Während des Streamens: wiederholt sich die Ausgabe bereits? */
 export function looksLikeOcrLoop(raw: string, minRun = OCR_LOOP_MIN_RUN): boolean {
+  if (trailingJunkStart(raw.split('\n')) >= 0) return true
   return findLoopStart(normalizeWithMap(raw).text, minRun, false) >= 0
 }
 
@@ -90,6 +113,12 @@ export interface OcrTrimResult {
 export function trimOcrRepetition(raw: string, minRun = OCR_LOOP_MIN_RUN): OcrTrimResult {
   let text = raw.trim()
   let trimmed = false
+  const lines = text.split('\n')
+  const junk = trailingJunkStart(lines)
+  if (junk >= 0) {
+    text = lines.slice(0, junk).join('\n').trimEnd()
+    trimmed = true
+  }
   // Mehrere Durchgänge: Wird mitten in der zweiten Kopie abgebrochen, steht nach
   // dem ersten Schnitt noch deren Anfang am Ende (in der App real, 02.11.2026).
   for (let pass = 0; pass < 4; pass++) {

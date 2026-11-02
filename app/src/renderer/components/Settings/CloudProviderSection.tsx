@@ -9,7 +9,7 @@
 // vorsichtige Hinweis in der Karte — eine Zusage, die wir nicht prüfen können, geben wir nicht.
 
 import { useEffect, useState } from 'react'
-import { useUIStore } from '../../stores/uiStore'
+import { setChatImageConsentDurable, useUIStore } from '../../stores/uiStore'
 import {
   CLOUD_CAPABLE_FEATURES,
   isCloudProviderReady,
@@ -21,6 +21,7 @@ import { useTranslation } from '../../utils/translations'
 import openrouterLogo from '../../assets/model-vendors/openrouter.svg'
 import llmbaseLogo from '../../assets/model-vendors/llmbase.svg'
 import { ExternalLink } from '../Shared/ExternalLink'
+import { CHAT_IMAGE_CLOUD_CONSENT_VERSION } from '../../../shared/chatImageGate'
 import { Card, ServiceHead, IconTile, Row, Note, Toggle, Select, Button, SecretField, TextInput } from './SettingsUI'
 
 // Preis-Etikett des Modell-Pickers. Stand bis 28.08.2026 fest auf Deutsch in
@@ -87,6 +88,8 @@ export function CloudProviderSection({ provider }: { provider: ProviderId }) {
   const en = useUIStore(s => s.language) === 'en'
   const ollama = useUIStore(s => s.ollama)
   const setOllama = useUIStore(s => s.setOllama)
+  const chatImageConsent = useUIStore(s => s.chatImageCloudConsent)
+  const imageConsentSaving = useUIStore(s => s.chatImageConsentSaving)
   const settings: CloudProviderSettings = ollama[provider]
   const meta = PROVIDERS[provider]
 
@@ -252,6 +255,23 @@ export function CloudProviderSection({ provider }: { provider: ProviderId }) {
               />
             </Row>
           ))}
+          {/* Bilder sind eine eigene Datenart (Rev. 7 Punkt 22): eigene Zustimmung, der Main prüft sie. */}
+          <Row label={t('settings.cloud.chatImages')} hint={t('settings.cloud.chatImagesHint', { provider: meta.name })} htmlFor={`${provider}-chat-images`} disabled={featuresLocked || !settings.cloudFeatures.includes('notes-chat')}>
+            <Toggle
+              id={`${provider}-chat-images`}
+              checked={(chatImageConsent?.[provider] ?? 0) >= CHAT_IMAGE_CLOUD_CONSENT_VERSION}
+              disabled={featuresLocked || !settings.cloudFeatures.includes('notes-chat') || imageConsentSaving}
+              onChange={v => {
+                // eslint-disable-next-line no-alert
+                if (v && !window.confirm(t('settings.cloud.chatImagesConfirm', { provider: meta.name }))) return
+                // Gilt erst nach bestätigtem Speichern, sonst springt der Schalter zurück (Codex F43/F54).
+                void setChatImageConsentDurable(provider, v ? CHAT_IMAGE_CLOUD_CONSENT_VERSION : 0).then(ok => {
+                  // eslint-disable-next-line no-alert
+                  if (!ok) window.alert(t('settings.cloud.chatImagesSaveFailed'))
+                })
+              }}
+            />
+          </Row>
         </>
       )}
     </Card>

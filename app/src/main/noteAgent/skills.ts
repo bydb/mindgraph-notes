@@ -41,6 +41,7 @@ import { shellExecuteTool, shellStageFileTool } from './shellTools'
 import { computerMailDraftTool, computerOpenTool, computerPrintTool, computerRevealTool } from './computerTools'
 import { skillActivityId } from '../skillActivityId'
 import { parseDigestArgs, runFolderDigest } from './folderDigest'
+import type { OcrReadContext } from '../ocr/agentOcr'
 import { IMAGE_MODES, infographicPromptError, parseImageMode } from './imageMode'
 import type { ChatOptions } from '../llm/chatClient'
 import type { CallUsage } from '../../shared/llmCost'
@@ -135,7 +136,10 @@ function formatFolderManifest(manifest: FolderManifest): string {
   const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`
   const day = (ms: number) => new Date(ms).toISOString().slice(0, 10)
   const fileLines = manifest.files.map(f => {
-    const head = `- ${f.name} (${f.kind}, ${kb(f.sizeBytes)}, geändert ${day(f.mtimeMs)})${f.problem ? ` — ${f.problem}` : ''}`
+    // Bilder gehen durch die lokale Texterkennung: das Modell soll sehen, dass das Zeit
+    // und Budget kostet, statt alle Bilder „mal eben“ einzeln zu öffnen (Rev. 7 Punkt 24).
+    const ocrNote = f.kind === 'image' && !f.problem ? ' — Bild: Text wird per Texterkennung gelesen (einige Sekunden je Bild)' : ''
+    const head = `- ${f.name} (${f.kind}, ${kb(f.sizeBytes)}, geändert ${day(f.mtimeMs)})${f.problem ? ` — ${f.problem}` : ocrNote}`
     if (!f.sheets?.length) return head
     return [head, ...f.sheets.map(s => `    Blatt "${s.name}": ${s.rows} Zeilen, ${s.cols} Spalten`)].join('\n')
   })
@@ -369,6 +373,12 @@ async function registerStagedResult(
   }
 }
 
+/** Lauf-Kontext für die Texterkennung von Bildern; fehlt ohne Lauf-Zustand (Tests). */
+export function ocrContextFor(ctx: NoteAgentContext): OcrReadContext | undefined {
+  if (!ctx.run.ocr) return undefined
+  return { state: ctx.run.ocr, signal: ctx.run.abort.signal, onStep: m => ctx.onStep?.('texterkennung', m) }
+}
+
 export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   const registry = new ToolRegistry<NoteAgentContext>()
   registry.register(shellExecuteTool)
@@ -393,7 +403,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const infos = getContextAttachmentInfos(ctx.senderId, ctx.run.attachmentIds)
       const info = infos.find(i => i.name === name) || infos.find(i => i.name.toLowerCase() === name.toLowerCase())
       if (!info) return err(`Anhang "${name}" nicht gefunden. Verfügbar: ${infos.map(i => i.name).join(', ') || '(keine)'}`)
-      const res = await readAttachmentRaw(ctx.senderId, info.id, ctx.run.instruction)
+      const res = await readAttachmentRaw(ctx.senderId, info.id, ctx.run.instruction, ocrContextFor(ctx))
       ctx.run.sources.add(info.name)
       // Stil-Block einer angehängten Seite sichern, bevor er durch den Modellkontext
       // läuft — write_html setzt ihn wieder ein, falls das Modell ihn weglässt.
@@ -491,7 +501,8 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           sheet: typeof args.sheet === 'string' ? args.sheet : undefined,
           offset: typeof args.offset === 'number' ? args.offset : undefined,
           maxRows: typeof args.max_rows === 'number' ? args.max_rows : undefined,
-          maxTokens: ctx.maxResultTokens?.()
+          maxTokens: ctx.maxResultTokens?.(),
+          ocr: ocrContextFor(ctx)
         })
         ctx.run.sources.add(`${res.folderName}/${res.fileName}`)
         ctx.run.folderReads.set(res.folderName, (ctx.run.folderReads.get(res.folderName) ?? 0) + 1)

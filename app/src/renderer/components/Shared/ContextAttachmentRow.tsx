@@ -23,6 +23,8 @@ interface Props {
   // Entscheidung 7 im Plan, der Nutzer entscheidet).
   cloudSelected: boolean
   extra?: ReactNode
+  /** Nur im Agent-Auftrag: Bilder anbieten (Texterkennung). */
+  allowImages?: boolean
 }
 
 export const FolderGlyph = ({ size = 11 }: { size?: number }) => (
@@ -55,10 +57,11 @@ const FORMAT_KEYS = [
   'aiBar.context.formatsPptx',
   'aiBar.context.formatsText',
   'aiBar.context.formatsHtml',
+  'aiBar.context.formatsImage',
   'aiBar.context.formatsFolder'
 ] as const
 
-function ContextFormatsInfo() {
+function ContextFormatsInfo({ images = false }: { images?: boolean }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -102,7 +105,7 @@ function ContextFormatsInfo() {
         >
           <div className="ai-bar-context-formats-title">{t('aiBar.context.formatsTitle')}</div>
           <ul className="ai-bar-context-formats-list">
-            {FORMAT_KEYS.map(k => <li key={k}>{t(k)}</li>)}
+            {FORMAT_KEYS.filter(k => images || k !== 'aiBar.context.formatsImage').map(k => <li key={k}>{t(k)}</li>)}
           </ul>
           <p className="ai-bar-context-formats-note">{t('aiBar.context.formatsNot')}</p>
           <p className="ai-bar-context-formats-note">{t('aiBar.context.formatsLimits')}</p>
@@ -112,9 +115,9 @@ function ContextFormatsInfo() {
   )
 }
 
-export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected, extra }: Props) {
+export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected, extra, allowImages }: Props) {
   const { t } = useTranslation()
-  const vaultFiles = useContextVaultFiles()
+  const vaultFiles = useContextVaultFiles({ images: allowImages })
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerQuery, setPickerQuery] = useState('')
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -198,7 +201,7 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
             </div>
           )}
         </div>
-        <ContextFormatsInfo />
+        <ContextFormatsInfo images={allowImages} />
         {attachments.map(a => (
           <span key={a.id} className="ai-bar-chip ai-bar-context-chip">
             <span className="ai-bar-context-chip-name" title={a.name}>

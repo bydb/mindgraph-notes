@@ -761,6 +761,12 @@ interface UIState {
    *  (shared/agentRoute NOTE_AGENT_CLOUD_CONSENT_VERSION). Der Main liest sie selbst. */
   noteAgentCloudConsentVersion: number
   setNoteAgentCloudConsentVersion: (version: number) => void
+  /** Zustimmung „Bilder an Cloud-Anbieter senden“ im Petrol-Chat, je Anbieter die Version
+   *  (shared/chatImageGate CHAT_IMAGE_CLOUD_CONSENT_VERSION). Der Main liest sie selbst. */
+  chatImageCloudConsent: { openrouter?: number; llmbase?: number }
+  /** Nicht persistiert: eine Änderung der Bild-Zustimmung wird gerade gespeichert (Codex F54). */
+  chatImageConsentSaving: boolean
+  setChatImageCloudConsent: (provider: 'openrouter' | 'llmbase', version: number) => void
   semanticScholarEnabled: boolean
   zoteroEnabled: boolean
 
@@ -1116,6 +1122,8 @@ const defaultState = {
   webResearchConfig: null,
   imageGenerationEnabled: false,
   noteAgentCloudConsentVersion: 0,
+  chatImageCloudConsent: {},
+  chatImageConsentSaving: false,
   semanticScholarEnabled: true,
   zoteroEnabled: true,
 
@@ -1333,7 +1341,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolWebSticky', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolWebSticky', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1456,6 +1464,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   }),
   setImageGenerationEnabled: (enabled) => set({ imageGenerationEnabled: enabled }),
   setNoteAgentCloudConsentVersion: (version) => set({ noteAgentCloudConsentVersion: version }),
+  setChatImageCloudConsent: (provider, version) => set((st) => ({ chatImageCloudConsent: { ...st.chatImageCloudConsent, [provider]: version } })),
   setWebResearchConfig: (config) => set({ webResearchConfig: config }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),
   toggleTaskExcludedFolder: (folderPath) => set((state) => {
@@ -2051,6 +2060,26 @@ function saveSettingsDebounced(): void {
  * geschrieben hat — wer danach etwas tut, das der Main aus ui-settings.json liest (Cloud-
  * Zustimmung des Notiz-Agenten), muss bei `false` zurückrollen statt weiterzumachen (Codex F21).
  */
+/**
+ * Bild-Zustimmung ändern und erst nach bestätigtem Speichern gelten lassen (Codex F43/F54):
+ * der Main liest sie aus ui-settings.json. Scheitert das Schreiben, springt der Wert zurück;
+ * solange es läuft, sperrt der Chat das Senden von Bildern.
+ */
+export async function setChatImageConsentDurable(provider: 'openrouter' | 'llmbase', version: number): Promise<boolean> {
+  const st = useUIStore.getState()
+  const previous = st.chatImageCloudConsent?.[provider] ?? 0
+  useUIStore.setState({ chatImageConsentSaving: true })
+  st.setChatImageCloudConsent(provider, version)
+  let ok = false
+  try {
+    ok = await flushUISettings()
+  } finally {
+    if (!ok) useUIStore.getState().setChatImageCloudConsent(provider, previous)
+    useUIStore.setState({ chatImageConsentSaving: false })
+  }
+  return ok
+}
+
 export async function flushUISettings(): Promise<boolean> {
   if (!settingsInitialized) return false
   if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }

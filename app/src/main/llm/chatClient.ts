@@ -23,7 +23,7 @@ import {
 } from '../../shared/agentExecutionProfile'
 import { isCloudModel } from '../../shared/modelCompatibility'
 import { recordLlmRun, trackPendingTelemetry } from './telemetry'
-import { getModelContextLength, getModelPricing } from './cloudPricing'
+import { getModelContextLength, getModelImageInput, getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
 import { friendlyOllamaError } from '../../shared/ollamaError'
 
@@ -51,6 +51,9 @@ export interface ChatMessage {
   tool_calls?: ToolCall[]                 // nur auf assistant
   tool_call_id?: string                   // OpenRouter braucht das auf tool-Antworten
   tool_name?: string                      // nur auf tool (Ollama)
+  // Nur Petrol-Chat, nur user: aufbereitete JPEGs (base64), vom Main geprüft
+  // (shared/chatImageGate.ts). Nur streamCloudChat setzt sie als `image_url` um.
+  images?: string[]
 }
 
 export interface ToolDefinition {
@@ -899,6 +902,15 @@ export async function chatWithTools(
 // Streamt Token für Token via onToken-Callback und liefert am Ende den
 // Gesamttext. Für Notes-Chat & Co., damit Cloud sich wie das lokale Ollama-
 // Streaming anfühlt (kein „hängen" bis die ganze Antwort da ist).
+/** Text, oder bei Bildern die OpenAI-Teileliste (Text zuerst, dann `image_url` als data-URL). */
+export function cloudContent(m: Pick<ChatMessage, 'content' | 'images'>): string | Array<Record<string, unknown>> {
+  if (!m.images?.length) return m.content
+  return [
+    { type: 'text', text: m.content },
+    ...m.images.map(b64 => ({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${b64}` } }))
+  ]
+}
+
 export async function streamCloudChat(
   messages: ChatMessage[],
   opts: { backend: CloudChatBackend; apiKey: string; model: string; signal?: AbortSignal; telemetryModule: LlmModuleId; telemetryRunId?: string; disableMiddleOut?: boolean },
@@ -919,7 +931,7 @@ export async function streamCloudChat(
     headers: cloudHeaders(opts.backend, opts.apiKey),
     body: JSON.stringify({
       model: opts.model,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: messages.map(m => ({ role: m.role, content: cloudContent(m) })),
       stream: true,
       // Zu langer Prompt soll bei OpenRouter laut scheitern, nicht still in der Mitte gekürzt werden.
       ...(opts.backend === 'openrouter' && opts.disableMiddleOut ? { transforms: [] } : {})
@@ -1032,6 +1044,16 @@ export async function catalogContextLength(
     wait.signal?.addEventListener('abort', onAbort, { once: true })
     void lookup.then(finish)
   })
+}
+
+/** Nimmt das Cloud-Modell Bilder an (Katalog)? 'unknown' bei lokalen Wegen oder ohne Angabe. */
+export async function catalogImageInput(opts: ChatOptions): Promise<'yes' | 'no' | 'unknown'> {
+  if (!isCloudChatBackend(opts.backend)) return 'unknown'
+  const backend = opts.backend as CloudChatBackend
+  const model = (backend === 'llmbase' ? opts.llmbaseModel : opts.openrouterModel)?.trim()
+  if (!model) return 'unknown'
+  const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
+  return getModelImageInput(backend, CLOUD_PROVIDERS[backend].baseUrl, model, apiKey).catch(() => 'unknown' as const)
 }
 
 export async function costOfCalls(

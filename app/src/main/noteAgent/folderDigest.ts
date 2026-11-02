@@ -192,7 +192,9 @@ export async function runFolderDigest(args: FolderDigestArgs, deps: FolderDigest
       return date ? 'Filter: Zeitraum' : 'ohne Datum (Zeitraum-Filter)'
     },
     // Pakete werden nie ganz voll — etwas Luft, die echte Grenze prüft die Paketzahl unten.
-    maxTotalTokens: Math.floor(MAX_DIGEST_MAP_CALLS * packageTokens * 1.25)
+    maxTotalTokens: Math.floor(MAX_DIGEST_MAP_CALLS * packageTokens * 1.25),
+    // Bilder per Texterkennung, mit demselben Budget und Zwischenspeicher wie die übrigen Werkzeuge.
+    ...(run.ocr ? { ocr: { state: run.ocr, signal, onStep: deps.onStep } } : {})
   })
   if (read.stoppedAt) {
     return {

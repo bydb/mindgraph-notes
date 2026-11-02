@@ -18,10 +18,36 @@ export interface OcrPageResult {
   incomplete?: boolean
 }
 
-export async function extractOcrPage(ollamaUrl: string, base64Image: string, model: string, pageNum: number): Promise<OcrPageResult> {
+export interface OcrPageOptions {
+  /** Abbruch von außen (Agent-Lauf, Nutzer). Wirkt bis in den laufenden Aufruf. */
+  signal?: AbortSignal
+  /** Zeitgrenze je Seite, Standard 2 Minuten. */
+  timeoutMs?: number
+}
+
+/**
+ * Nicht direkt aufrufen: die Prüfung „lokales Vision-Modell“ sitzt im gemeinsamen Einstieg
+ * `main/ocr/localOcr.ts` (Codex F28). Ausnahme ist das Messskript.
+ */
+export async function extractOcrPage(ollamaUrl: string, base64Image: string, model: string, pageNum: number, opts: OcrPageOptions = {}): Promise<OcrPageResult> {
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 min per page
+  // Timer und Abbruch-Weiterleitung werden im äußeren finally aufgeräumt, auch wenn schon
+  // fetch scheitert (Codex F31).
+  const timeoutId = setTimeout(() => controller.abort(), opts.timeoutMs ?? 120000)
+  const onOuterAbort = (): void => controller.abort()
+  if (opts.signal?.aborted) controller.abort()
+  opts.signal?.addEventListener('abort', onOuterAbort, { once: true })
+  try {
+    return await runOcrRequest(ollamaUrl, base64Image, model, pageNum, controller, opts.signal)
+  } finally {
+    clearTimeout(timeoutId)
+    opts.signal?.removeEventListener('abort', onOuterAbort)
+  }
+}
+
+async function runOcrRequest(ollamaUrl: string, base64Image: string, model: string, pageNum: number, controller: AbortController, outer?: AbortSignal): Promise<OcrPageResult> {
   const startedAt = Date.now()
+  if (outer?.aborted) throw new Error('Abgebrochen')
 
   // Gestreamt, damit eine Wiederholungsschleife (glm-ocr unter Ollama 0.40)
   // nach dem zweiten Durchgang abgebrochen wird statt erst an der Ausgabegrenze.
@@ -52,13 +78,14 @@ Rules:
   })
 
   if (!response.ok || !response.body) {
-    clearTimeout(timeoutId)
     throw new Error(friendlyOllamaError(response.status, await response.text().catch(() => ''), model))
   }
 
   let raw = ''
   let looped = false
   let hitLimit = false
+  // Ohne abschließendes `done` ist der Stream abgerissen: Teiltext gilt nie als vollständig (F31).
+  let sawDone = false
   let timings: OllamaTimings = {}
   let checkedAt = 0
   const decoder = new TextDecoder()
@@ -78,6 +105,7 @@ Rules:
         if (chunk.error) throw new Error(chunk.error)
         raw += chunk.message?.content ?? ''
         if (chunk.done) {
+          sawDone = true
           timings = chunk
           hitLimit = chunk.done_reason === 'length'
           break read
@@ -94,11 +122,11 @@ Rules:
     }
   } catch (err) {
     // Den eigenen Abbruch nach erkannter Schleife nicht als Fehler werten.
-    if (!looped) throw err
+    if (!looped) throw outer?.aborted ? new Error('Abgebrochen') : err
   } finally {
-    clearTimeout(timeoutId)
     reader.cancel().catch(() => {})
   }
+  if (outer?.aborted) throw new Error('Abgebrochen')
 
   recordLlmRun(fromOllamaResponse(timings, { module: 'vision-ocr', model, wallMs: Date.now() - startedAt, at: startedAt }))
   let pageText = raw.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
@@ -114,5 +142,5 @@ Rules:
     return { success: false, content: '', error: 'Das Modell hat für diese Seite keinen Text geliefert.' }
   }
   // Ausgabegrenze ohne erkennbare Wiederholung: die Seite kann unvollständig sein.
-  return { success: true, content: pageText, repeated, incomplete: hitLimit && !repeated }
+  return { success: true, content: pageText, repeated, incomplete: (hitLimit && !repeated) || (!sawDone && !looped) }
 }

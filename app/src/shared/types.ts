@@ -1024,10 +1024,11 @@ export interface ElectronAPI {
   }>;
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) => Promise<{
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>, images?: Array<{ id: string; dataBase64: string }>) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
+    imageDelivery?: Record<string, import('./chatImages').ChatImageDelivery>;
   }>;
   onOllamaChatChunk: (callback: (chunk: string) => void) => void;
   onOllamaChatDone: (callback: () => void) => void;
@@ -1089,10 +1090,11 @@ export interface ElectronAPI {
     customPrompt?: string;
     timestamp?: string;
   }>;
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'petrol', port?: number, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) => Promise<{
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode?: 'direct' | 'socratic' | 'grill' | 'petrol', port?: number, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>, images?: Array<{ id: string; dataBase64: string }>) => Promise<{
     success: boolean;
     response?: string;
     error?: string;
+    imageDelivery?: Record<string, import('./chatImages').ChatImageDelivery>;
   }>;
   lmstudioEmbeddings: (model: string, text: string, port?: number) => Promise<{
     success: boolean;
@@ -1159,6 +1161,12 @@ export interface ElectronAPI {
 
   // Vision OCR (Ollama Vision Models)
   visionOcrModels: () => Promise<{ name: string; size: number }[]>;
+  petrolChatImageOcr: (requestId: string, images: Array<{ id: string; dataBase64: string }>) => Promise<{
+    success: boolean
+    error?: string
+    results: Array<{ id: string; text: string; error?: string; incomplete?: boolean }>
+  }>
+  petrolChatImageOcrAbort: (requestId: string) => Promise<boolean>
   visionOcrExtractPage: (base64Image: string, model: string, pageNum: number) => Promise<{
     success: boolean;
     content: string;

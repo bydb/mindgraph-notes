@@ -206,3 +206,59 @@ describe('Petrol-Chat: verfallene Seiten (Codex F02/F03, chat-verlauf-notizen-bi
     expect(usePetrolChatStore.getState().scope(ID).goneSnapshots).toEqual([])
   })
 })
+
+describe('Petrol-Chat: Bilder (Rev. 7 Punkt 20)', () => {
+  const img = (id: string) => ({ v: 1 as const, id, name: `${id}.jpg`, mime: 'image/jpeg' as const, width: 10, height: 10, byteLength: 3, dataBase64: `B64${id}` })
+
+  it('schickt Verweise und nur die Bytes der mitgehenden Bilder, nie den Dateinamen', async () => {
+    seed([
+      { role: 'user', content: 'a', images: [img('i1'), img('i2')], at: 1 },
+      { role: 'assistant', content: 'x', at: 2 },
+      { role: 'user', content: 'b', images: [img('i3')], at: 3 },
+      { role: 'assistant', content: 'y', at: 4 }
+    ])
+    void usePetrolChatStore.getState().send(ID, 'Und jetzt?', { ...OPTS, images: [img('i4')] })
+    await Promise.resolve()
+    const [, messages, , , , , , , wire] = ollamaChat.mock.calls[0] as unknown as [unknown, Array<{ content: string; imageIds?: string[] }>, unknown, unknown, unknown, unknown, unknown, unknown, Array<{ id: string; dataBase64: string }>]
+    expect(messages.map(m => m.imageIds ?? [])).toEqual([['i2'], [], ['i3'], [], ['i4']])
+    expect(messages[0].content).toContain('Die Antwort darauf beruht auf dem Bild')
+    expect(wire.map(w => w.id).sort()).toEqual(['i2', 'i3', 'i4'])
+    expect(JSON.stringify(ollamaChat.mock.calls[0])).not.toContain('.jpg')
+    expect(last().images?.[0].id).toBe('i4')
+  })
+
+  it('Bild mit Websuche wird nicht gesendet', async () => {
+    seed([])
+    await usePetrolChatStore.getState().send(ID, 'Was ist das?', { ...OPTS, images: [img('i9')], web: { query: 'x' } })
+    expect(petrolChatWeb).not.toHaveBeenCalled()
+    expect(ollamaChat).not.toHaveBeenCalled()
+  })
+
+  it('Stopp behält den Hinweis auf nicht mitgeschickte ältere Bilder (F57)', async () => {
+    seed([
+      { role: 'user', content: 'a', images: [img('i1'), img('i2'), img('i3')], at: 1 },
+      { role: 'assistant', content: 'x', at: 2 }
+    ])
+    void usePetrolChatStore.getState().send(ID, 'Und?', OPTS)
+    await Promise.resolve()
+    const req = ollamaChat.mock.calls[0][6] as string
+    chunkCb?.({ requestId: req, delta: 'Teil' })
+    usePetrolChatStore.getState().stop(ID)
+    expect(last()).toMatchObject({ role: 'assistant', stopped: true, imagesDropped: 1 })
+  })
+
+  it('Empfänger sammeln sich an der Bildmarke; weggelassene Verlaufsbilder mit Grund (02.11.2026)', async () => {
+    seed([
+      { role: 'user', content: 'a', images: [img('h1')], imageDelivery: { h1: { kind: 'image', route: 'local', target: 'qwen' } }, imageRecipients: { h1: ['qwen'] }, at: 1 },
+      { role: 'assistant', content: 'x', at: 2 }
+    ])
+    ollamaChat.mockImplementationOnce(async () => ({ success: true, response: 'ok', imageDelivery: { h1: { kind: 'image', route: 'cloud', target: 'OpenRouter · m' } } }))
+    await usePetrolChatStore.getState().send(ID, 'Und?', OPTS)
+    const q = usePetrolChatStore.getState().scope(ID).messages[0]
+    expect(q.imageRecipients?.h1).toEqual(['qwen', 'OpenRouter · m'])
+
+    ollamaChat.mockImplementationOnce(async () => ({ success: true, response: 'ok', imageDelivery: { h1: { kind: 'history-dropped', reason: 'nicht freigegeben' } } }))
+    await usePetrolChatStore.getState().send(ID, 'Noch was?', OPTS)
+    expect(last()).toMatchObject({ role: 'assistant', imagesWithheld: { count: 1, reason: 'nicht freigegeben' } })
+  })
+})

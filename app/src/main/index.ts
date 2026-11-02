@@ -161,7 +161,12 @@ import { runWorkflow, type RunnerServices, type SeedEmail } from './workflows/ru
 import { matchEmailToProjects, gateProjectMatch } from '../shared/projectMatch'
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked, isCloudModel as isModelIsCloud, shellLockReason } from '../shared/modelCompatibility'
-import { listCloudModels, chat as llmChat, chatWithTools, streamCloudChat, isCloudChatBackend, catalogContextLength, warmPricingCache, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
+import { hasImageConsent, prepareChatImageRequest } from './llm/chatImageRequest'
+import { localOcrModel, ocrImageLocal } from './ocr/localOcr'
+import { createAgentOcrState } from './ocr/agentOcr'
+import { CHAT_IMAGE_MAX_PER_MESSAGE, checkChatImagesWire } from '../shared/chatImages'
+import { ollamaNumCtxForImages } from '../shared/chatImageGate'
+import { listCloudModels, chat as llmChat, chatWithTools, streamCloudChat, isCloudChatBackend, catalogContextLength, catalogImageInput, warmPricingCache, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
 import { resolveContextWindow } from '../shared/contextBudget'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './email/store'
 import { getDeviceId } from './deviceId'
@@ -176,7 +181,6 @@ import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
 import { DEEP_LIMITS, checkQuestionTerms, maxPagesForPlace } from '../shared/webChatDeep'
 import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/llmBackend'
 import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
-import { extractOcrPage } from './visionOcr'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatWideLimits, type WebChatWideLimits, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId, sanitizeSnapshotId } from './llm/petrolWebSnapshots'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
@@ -4436,7 +4440,7 @@ ipcMain.handle('ollama-delete-model', async (_event, modelName: string) => {
 // der Freigabe-Akt (gleiche Logik wie open-vault) — der Renderer kann sich keine
 // Freigaben selbst erteilen.
 const NOTE_AGENT_FILE_FILTERS = [
-  { name: 'Dokumente', extensions: ['xlsx', 'xls', 'docx', 'pptx', 'pdf', 'md', 'markdown', 'txt', 'csv', 'html', 'htm'] }
+  { name: 'Dokumente und Bilder', extensions: ['xlsx', 'xls', 'docx', 'pptx', 'pdf', 'md', 'markdown', 'txt', 'csv', 'html', 'htm', 'png', 'jpg', 'jpeg'] }
 ]
 const noteAgentCleanupHooked = new Set<number>()
 
@@ -4927,6 +4931,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     const releaseStayAwake = acquireStayAwake('Notiz-Agent-Lauf')
     void (async () => {
       try {
+        // Texterkennung für Bilder (Rev. 7 Punkt 24): Schalter und Modell aus der Main-Kopie
+        // der Einstellungen, ein Seitenbudget und ein Zwischenspeicher für den ganzen Lauf.
+        run.ocr = createAgentOcrState({ visionOcr: (await loadUISettings().catch(() => ({} as Record<string, unknown>))).visionOcr })
         if (params.shellAccess === true) {
           // Schutzgrenzen aus der Main-Kopie der Einstellungen — nie aus den Renderer-Params.
           const guardrails = normalizeShellGuardrails((await loadUISettings().catch(() => ({} as Record<string, unknown>))).agentShell)
@@ -6451,7 +6458,7 @@ function chatStreamChannel(chatMode: string, kind: 'chunk' | 'done'): string {
   return `ollama-chat-${kind}`
 }
 
-ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown) => {
+ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown, images?: unknown) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat und Petrol-Chat (Agent-Tab) streamen auf eigenen Channels — alle drei
@@ -6555,7 +6562,37 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       content: promptContent
     }
 
-    const allMessages = [systemMessage, ...messages]
+    // Bilder (Petrol-Chat, Rev. 7 Punkt 22): Bytes, Verlaufsregel, Weg und Freigabe prüft der
+    // Main am wirklichen Request, bevor ein Bild in eine Anbieter-Nutzlast geht (Codex F40).
+    const imageProvider: 'openrouter' | 'llmbase' = cloud?.provider === 'llmbase' ? 'llmbase' : 'openrouter'
+    const imageReq = await prepareChatImageRequest({
+      mode: chatMode,
+      web: false,
+      messages,
+      images,
+      ollamaModel: model,
+      cloud: cloud?.model ? { provider: imageProvider, model: cloud.model.trim() } : null,
+      consent: (await loadUISettings().catch(() => ({} as Record<string, unknown>))).chatImageCloudConsent,
+      cloudCatalog: async () => {
+        const resolved = await resolveCloudChatOptions(cloud)
+        if (!resolved) return { vision: 'unknown' as const, contextLength: null }
+        // Katalog höchstens 3 s abwarten (wie beim Agenten); danach gilt „unbekannt“ bzw. 32 768.
+        const [vision, contextLength] = await Promise.all([
+          Promise.race([catalogImageInput(resolved.chatOptions), new Promise<'unknown'>(r => setTimeout(() => r('unknown'), 3000))]),
+          catalogContextLength(resolved.chatOptions, { timeoutMs: 3000 })
+        ])
+        return { vision, contextLength }
+      }
+    })
+    if (imageReq.kind === 'rejected') {
+      event.sender.send(doneChannel)
+      return { success: false, error: imageReq.error, imageDelivery: imageReq.delivery }
+    }
+    const imageDelivery = imageReq.kind === 'ok' ? imageReq.delivery : undefined
+    const turns: Array<{ role: string; content: string; images?: string[] }> = imageReq.kind === 'ok'
+      ? imageReq.messages.map(m => ({ role: m.role, content: m.content, ...(m.images.length ? { images: m.images } : {}) }))
+      : messages.map(m => ({ role: m.role, content: m.content }))
+    const allMessages: Array<{ role: string; content: string; images?: string[] }> = [systemMessage, ...turns]
 
     // E-Mail-Assistent: Cloud nur mit eigener Freigabe 'email-draft' für genau diesen Anbieter
     // und dessen eingestelltes Modell — gelesen aus ui-settings.json, nicht aus dem Renderer.
@@ -6591,20 +6628,30 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
         event.sender.send(doneChannel)
         return { success: false, error: 'Cloud ist für Notes-Chat aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).' }
       }
+      // Bild-Zustimmung unmittelbar vor dem Versand erneut lesen (Codex F43): zwischen der
+      // ersten Prüfung und hier liegt bis zu 3 s Katalogabfrage — ein Widerruf gilt sofort.
+      if (imageReq.kind === 'ok' && imageReq.messages.some(m => m.images.length > 0)) {
+        const fresh = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+        if (!hasImageConsent(fresh.chatImageCloudConsent, imageProvider)) {
+          event.sender.send(doneChannel)
+          const reason = 'Die Freigabe für Bilder an diesen Anbieter wurde zurückgenommen. Nichts wurde gesendet.'
+          return { success: false, error: reason, imageDelivery: Object.fromEntries(Object.keys(imageReq.delivery).map(id => [id, { kind: 'rejected' as const, reason }])) }
+        }
+      }
       const controllerC = new AbortController()
       const timeoutC = setTimeout(() => controllerC.abort(), 300000)
       linkPetrolAbort(petrolReq, controllerC)
       try {
         const full = await streamCloudChat(
-          allMessages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant', content: m.content })),
+          allMessages.map(m => ({ role: m.role as 'system' | 'user' | 'assistant', content: m.content, ...(m.images ? { images: m.images } : {}) })),
           { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controllerC.signal, telemetryModule: chatMode === 'email' ? 'mail-summary' : 'chat' },
           sendChunk
         )
         event.sender.send(doneChannel)
-        return { success: true, response: full }
+        return { success: true, response: full, imageDelivery }
       } catch (err) {
         event.sender.send(doneChannel)
-        return { success: false, error: err instanceof Error ? err.message : 'Cloud-Provider-Fehler' }
+        return { success: false, error: err instanceof Error ? err.message : 'Cloud-Provider-Fehler', imageDelivery }
       } finally {
         clearTimeout(timeoutC)
       }
@@ -6625,7 +6672,9 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
         // Petrol-Chat für Alltagsfragen: verdecktes Nachdenken aus. Gemessen (25.10.2026,
         // docs/codex-collab/chat-alltagsfragen-messung.md): qwen3.8:27b erstes Wort 7,3 s → 0,5 s
         // (Median, 12 Fragen), Antworten nicht schlechter. Modelle ohne Thinking ignorieren das Feld.
-        ...(chatMode === 'petrol' ? { think: false } : {})
+        ...(chatMode === 'petrol' ? { think: false } : {}),
+        // Mit Bildern: Kontext selbst setzen, sonst schneidet Ollama still vorne ab.
+        ...(imageReq.kind === 'ok' && imageReq.imageTokens > 0 ? { options: { num_ctx: ollamaNumCtxForImages(allMessages.reduce((n, m) => n + m.content.length, 0), imageReq.imageTokens) } } : {})
       }),
       signal: controller.signal
     })
@@ -6691,7 +6740,8 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 
     return {
       success: true,
-      response: fullResponse
+      response: fullResponse,
+      imageDelivery
     }
   } catch (error) {
     console.error('[Ollama] Chat error:', error)
@@ -7665,10 +7715,18 @@ ipcMain.handle('lmstudio-generate', async (event, request: LMStudioRequest) => {
 })
 
 // Chat mit Kontext (für Notes Chat) - LM Studio Version
-ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown) => {
+ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown, images?: unknown) => {
   console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
   const chunkChannel = chatStreamChannel(chatMode, 'chunk')
   const doneChannel = chatStreamChannel(chatMode, 'done')
+  // Bilder gehen in 1.2 nicht an LM Studio (Rev. 7). Ein Verweis auf ein Bild wird abgelehnt,
+  // sonst antwortete das Modell, als hätte es das Bild gesehen.
+  const imageReq = await prepareChatImageRequest({ mode: chatMode, web: false, messages, images, lmstudio: true })
+  if (imageReq.kind === 'rejected') {
+    event.sender.send(doneChannel)
+    return { success: false, error: imageReq.error, imageDelivery: imageReq.delivery }
+  }
+  messages = messages.map(m => ({ role: m.role, content: m.content }))
   if (chatMode === 'petrol') {
     context = ''
     contextAttachmentIds = undefined
@@ -9644,26 +9702,59 @@ ipcMain.handle('docling-convert-pdf', async (_event, pdfPath: string, baseUrl?: 
 // Nur lokale Modelle (Codex F25, Nutzerentscheidung 01.11.2026): ein Ollama-Cloud-Modell
 // (`:cloud`, `remote_host`) läuft über denselben Port, schickte aber jede PDF-Seite an ollama.com.
 // Bei der Texterkennung wählt niemand bewusst Cloud — deshalb hier Sperre statt Hinweis.
-ipcMain.handle('vision-ocr-extract-page', wrapIpcWithOllamaActivity('vision-ocr', async (_event, base64Image: string, model: string, pageNum: number) => {
-  console.log(`[VisionOCR] Extracting page ${pageNum} with model ${model}`)
-
+ipcMain.handle('vision-ocr-extract-page', async (_event, base64Image: string, _model: string, pageNum: number) => {
+  // Modell, Lokal-Prüfung und Vordergrund-Anmeldung sitzen im gemeinsamen Einstieg (Codex F28).
+  // Das Modell aus dem Renderer wird nicht benutzt; maßgeblich ist ui-settings.json.
+  if (typeof base64Image !== 'string' || !base64Image) return { success: false, content: '', error: 'Kein Seitenbild.' }
   try {
-    await resolveLocalModel(model)
-  } catch (err) {
-    return { success: false, content: '', error: `Die Texterkennung läuft nur mit Modellen auf diesem Rechner. ${describeLocalModelError(err)}` }
-  }
-
-  try {
-    return await extractOcrPage(OLLAMA_API_URL, base64Image, model, pageNum)
+    return await ocrImageLocal(base64Image, { settings: await loadUISettings().catch(() => ({})), pageNum: Number(pageNum) || 1 })
   } catch (error) {
     console.error(`[VisionOCR] Error on page ${pageNum}:`, error)
-    return {
-      success: false,
-      content: '',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
+    return { success: false, content: '', error: error instanceof Error ? error.message : 'Unknown error' }
   }
-}, (_event, _image, model) => typeof model === 'string' && !isModelIsCloud(model)))
+})
+
+// Chat: „Text aus dem Bild lesen“ (Rev. 7 Punkt 22/23). Dieselben Byte-Prüfungen wie beim
+// Senden, dann lokale Erkennung je Bild. Der Text geht sichtbar ins Eingabefeld, nie still ans Modell.
+// Je Fenster höchstens eine Erkennung zugleich; Kennung an den Absender gebunden (Codex F48).
+const petrolOcrControllers = new Map<number, { requestId: string; controller: AbortController }>()
+ipcMain.handle('petrol-chat-image-ocr', async (event, requestId: unknown, images: unknown) => {
+  const senderId = event.sender.id
+  // Ohne gültige Kennung kein Lauf: sonst ließe er sich nicht mehr abbrechen (Codex F58).
+  if (typeof requestId !== 'string' || !/^[\w-]{1,80}$/.test(requestId)) return { success: false, error: 'Ungültige Anfrage.', results: [] }
+  if (petrolOcrControllers.has(senderId)) return { success: false, error: 'Es läuft bereits eine Texterkennung.', results: [] }
+  // Sofort belegen, vor dem ersten await — sonst rutscht eine zweite Anfrage in die Lücke.
+  const controller = new AbortController()
+  petrolOcrControllers.set(senderId, { requestId, controller })
+  // Fenster zu: Erkennung beenden, statt Ollama minutenlang weiterrechnen zu lassen (F58).
+  const sender = event.sender
+  const onGone = (): void => controller.abort()
+  sender.once('destroyed', onGone)
+  const results: Array<{ id: string; text: string; error?: string; incomplete?: boolean }> = []
+  try {
+    const checked = checkChatImagesWire(images, CHAT_IMAGE_MAX_PER_MESSAGE)
+    if ('error' in checked) return { success: false, error: checked.error, results: [] }
+    const settings = await loadUISettings().catch(() => ({}))
+    const chosen = localOcrModel(settings)
+    if ('error' in chosen) return { success: false, error: chosen.error, results: [] }
+    for (let i = 0; i < checked.images.length; i++) {
+      const img = checked.images[i]
+      const r = await ocrImageLocal(img.dataBase64, { settings, pageNum: i + 1, signal: controller.signal })
+      results.push(r.success ? { id: img.id, text: r.content, ...(r.incomplete ? { incomplete: true } : {}) } : { id: img.id, text: '', error: r.error })
+    }
+    return { success: true, results }
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err), results }
+  } finally {
+    if (!sender.isDestroyed()) sender.removeListener('destroyed', onGone)
+    if (petrolOcrControllers.get(senderId)?.controller === controller) petrolOcrControllers.delete(senderId)
+  }
+})
+ipcMain.handle('petrol-chat-image-ocr-abort', (event, requestId: unknown) => {
+  const cur = petrolOcrControllers.get(event.sender.id)
+  if (cur && typeof requestId === 'string' && cur.requestId === requestId) cur.controller.abort()
+  return true
+})
 
 // ============ LANGUAGETOOL GRAMMAR/SPELL CHECK API ============
 const LANGUAGETOOL_DEFAULT_URL = 'http://localhost:8010'

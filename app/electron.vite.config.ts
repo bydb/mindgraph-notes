@@ -43,7 +43,8 @@ export default defineConfig({
       rollupOptions: {
         input: {
           index: resolve(__dirname, 'index.html'),
-          transport: resolve(__dirname, 'transport.html')
+          transport: resolve(__dirname, 'transport.html'),
+          pdfraster: resolve(__dirname, 'pdfraster.html')
         }
       }
     },
