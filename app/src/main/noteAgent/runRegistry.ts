@@ -49,6 +49,8 @@ export interface PublicAgentResult {
   sources: string[]
 }
 
+import type { AgentOcrState } from '../ocr/agentOcr'
+
 export interface AgentRun {
   runId: string
   senderId: number
@@ -128,6 +130,9 @@ export interface AgentRun {
   // lang und ändert sich nicht. Die Seite rendert dann komplett ohne Layout (real
   // aufgetreten, 01.09.2026). write_html setzt ihn deterministisch wieder ein.
   htmlSourceStyles?: string
+  // Texterkennung für Bilder in Anhängen (main/ocr/agentOcr.ts): Einstellungen beim Start,
+  // Seitenbudget und Zwischenspeicher je Inhalt — gemeinsam für alle Lesewerkzeuge (F32).
+  ocr?: AgentOcrState
   // Gesprächsverlauf am Ende eines erfolgreichen Laufs — Grundlage für „Antworten und
   // weitermachen“ (Folgelauf mit allem bisher Gelesenen). Nur Main-seitig, nie an den Renderer.
   transcript?: ChatMessage[]

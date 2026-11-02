@@ -240,3 +240,56 @@ describe('Lesen nach Kontextbudget', () => {
     }
   })
 })
+
+describe('Bilder im Ordner (Rev. 7 Punkt 24)', () => {
+  it('liest ein Bild nur mit Lauf-Kontext, dann über die Texterkennung — in allen Lesewegen', async () => {
+    const { createAgentOcrState } = await import('../ocr/agentOcr')
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mindgraph-context-images-'))
+    const senderId = 731_050
+    try {
+      const folder = path.join(root, 'Rücklauf')
+      await fs.mkdir(folder)
+      await fs.writeFile(path.join(folder, 'foto.jpg'), Buffer.from([0xff, 0xd8, 1, 2, 3]))
+      await fs.writeFile(path.join(folder, 'notiz.md'), 'Begleittext', 'utf8')
+      const reg = await registerContextFolder(senderId, folder, false)
+      if (!reg.ok) throw new Error(reg.error)
+      const ids = [reg.attachment.id]
+
+      await expect(readFolderFile(senderId, ids, 'Rücklauf', 'foto.jpg')).rejects.toThrow(/nur in einem Agent-Auftrag/)
+
+      const calls: string[] = []
+      const ocr = {
+        state: createAgentOcrState({ visionOcr: { enabled: true, model: 'glm-ocr' } }),
+        prepare: () => 'B64',
+        ocr: async (b64: string) => { calls.push(b64); return { success: true, content: 'Teilnehmer: 23' } }
+      }
+      const single = await readFolderFile(senderId, ids, 'Rücklauf', 'foto.jpg', { ocr })
+      expect(single.content).toContain('Teilnehmer: 23')
+      expect(single.content).toContain('per Texterkennung')
+
+      const whole = await readAttachmentRaw(senderId, reg.attachment.id, '', ocr)
+      expect(whole.content).toContain('Teilnehmer: 23')
+      expect(whole.content).toContain('Begleittext')
+      // Derselbe Inhalt wird nur einmal erkannt, auch über einen anderen Leseweg.
+      expect(calls).toHaveLength(1)
+    } finally {
+      clearContextAttachments(senderId)
+      await fs.rm(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('Frist für pdfjs-Schritte (Codex F55)', () => {
+  it('ein Schritt, der nie fertig wird, endet an der Frist; Abbruch sofort', async () => {
+    const { withPdfDeadline, PdfDeadlineError } = await import('./contextFiles')
+    const never = new Promise<never>(() => {})
+    const t0 = Date.now()
+    await expect(withPdfDeadline(never, Date.now() + 50)).rejects.toBeInstanceOf(PdfDeadlineError)
+    expect(Date.now() - t0).toBeLessThan(1000)
+    const ac = new AbortController()
+    const p = withPdfDeadline(never, Date.now() + 60_000, ac.signal)
+    ac.abort()
+    await expect(p).rejects.toThrow('Abgebrochen')
+    await expect(withPdfDeadline(Promise.resolve(7), Date.now() + 1000)).resolves.toBe(7)
+  })
+})

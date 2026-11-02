@@ -449,6 +449,229 @@ Status: [OFFEN]
 Rev. 3 sagt, der Main „erhält die Basis je Verlaufseintrag“ und prüft danach den gefilterten Verlauf. Der bisherige Chat nimmt aber `messages` und `context` als Renderer-Parameter an (`app/src/main/index.ts:6453-6455`) und reicht `allMessages` an den Modellweg weiter (`app/src/main/index.ts:6597-6600,6617-6623`). Ein ausgelassenes oder falsches `basis.notes` wäre aus einem freien Antworttext nicht rekonstruierbar; ein Main-Check derselben gelieferten Metadaten kann die behauptete Herkunft daher nicht belegen. Gerade die nach F06 geforderte Cloud-Grenze darf nicht von einem Renderer-Feld abhängen.
 Vorschlag: Verlauf und Basis im Main als eine Einheit führen oder die Einträge vor dem Cloud-Senden gegen Main-gehaltene Gesprächsdaten binden; aktuelle Notizdateien dort erneut prüfen.
 
+### Runde 4
+
+### F28 — Der OCR-Helper selbst erzwingt kein lokales Modell
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:783-789
+Status: [OFFEN]
+`extractOcrPage` akzeptiert eine beliebige URL und einen beliebigen Modellnamen und sendet das Seitenbild sofort (`app/src/main/visionOcr.ts:21-52`). Nur der heutige PDF-Viewer-IPC prüft davor `resolveLocalModel` (`app/src/main/index.ts:9647-9657`). Punkt 13 will den Helper zusätzlich direkt aus Agent-Werkzeugen nutzen; wer dort nur `extractOcrPage` aufruft, umgeht die einzige Datenschutzgrenze. Die Modellauflösung darf zudem nicht bloß einmal je Lauf erfolgen: `resolveLocalModel` kann seine Modellliste 15 Sekunden cachen (`app/src/main/rag/localModel.ts:53-65,94-117`).
+Vorschlag: Einen gemeinsamen Main-seitigen OCR-Einstieg bauen, der das Modell aus `ui-settings.json` liest, unmittelbar vor jedem Bild mit frischen Ollama-Metadaten als lokal und visionfähig prüft und erst dann `extractOcrPage` aufruft. Agent und Viewer benutzen denselben Einstieg.
+
+### F29 — Reine Scan-PDFs haben keinen Seitenvermerk für Stufe 2
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:791-807
+Status: [OFFEN]
+Stufe 2 will „nur die Seiten mit Vermerk“ durch OCR schicken. Bei einer PDF ganz ohne Textebene wirft `assemblePdfText` jedoch **vor** der Erzeugung von Seitenvermerken (`app/src/shared/pdfPageText.ts:39-50`; Test `app/src/shared/pdfPageText.test.ts:28-30`); `extractPdfText` gibt nur den zusammengesetzten String zurück (`app/src/main/noteAgent/contextFiles.ts:686-715`). Der reine Scan erreicht die geplante Seitenauswahl also nicht.
+Vorschlag: Die Extraktion zuerst als strukturierte Seitenliste mit Text, Seitenzahl und OCR-Bedarf zurückgeben; OCR darauf anwenden und erst danach den Gesamttext bilden. „Ganz ohne Text“ erst nach erfolgloser OCR als Fehler behandeln.
+
+### F30 — Seitenstatus steckt im Text und kann beim Kürzen verschwinden
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:791-807,817-826
+Status: [OFFEN]
+Die Zusammenfassung fehlender Textseiten steht **am Ende** des Strings (`app/src/shared/pdfPageText.ts:55-60`). Die Ordnerlesung kürzt auf 6000 Zeichen bzw. das Restbudget und ruft `pdfNoTextNote` erst danach auf (`app/src/main/noteAgent/contextFiles.ts:850-864`); so wird eine gemischte PDF unter Umständen als bloß „gelesen (gekürzt)“ geführt, obwohl Scanseiten fehlen. `read_context_file` kann außerdem nur Zeilenfenster des Strings liefern (`app/src/main/noteAgent/contextFiles.ts:653-674`). Ein Seitenvermerk ist kein belastbarer Statuskanal für OCR-Fehler, Budgetende und nicht gerenderte Seiten.
+Vorschlag: Seitenstatus und Abdeckung getrennt vom gekürzten Modelltext führen; Datei-/Werkzeugrückgabe soll gelesene, erkannte, übersprungene, fehlgeschlagene und nicht erreichte Seiten ausdrücklich zählen.
+
+### F31 — OCR hat keinen Agent-Abbruch und Erfolg ohne Stream-Ende
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:828-836
+Status: [OFFEN]
+`extractOcrPage` erzeugt nur seinen eigenen Zwei-Minuten-Controller und nimmt kein `AbortSignal` des Agent-Laufs an (`app/src/main/visionOcr.ts:21-28,51-52`), während der Agent einen eigenen Abbruchcontroller besitzt (`app/src/main/noteAgent/runRegistry.ts:205-209`; `app/src/main/noteAgent/loop.ts:332-335`). Bei 40 Seiten kann der nominelle Seitenetat somit bis zu 80 Minuten OCR bedeuten; ein Nutzerabbruch stoppt einen laufenden OCR-Aufruf nicht. Endet der Antwortstream ohne `done`-Chunk, liefert der Helper vorhandenen Teiltext trotzdem als `success: true`, ohne `incomplete` zu setzen (`app/src/main/visionOcr.ts:67-84,103-117`). Schlägt schon `fetch` fehl, liegt das `clearTimeout` außerhalb eines umschließenden `finally` (`app/src/main/visionOcr.ts:22-28,67-101`).
+Vorschlag: Lauf-Signal und ein echtes Laufzeitbudget bis zum Fetch durchreichen, Timer in einem äußeren `finally` aufräumen und fehlendes Stream-Ende als unvollständig/Fehler kennzeichnen. Fehlgeschlagene Seiten im Lauf-Protokoll einzeln ausweisen.
+
+### F32 — Die OCR-Anbindung deckt nicht alle Agent-Leser ab
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:779-781,817-826
+Status: [OFFEN]
+Punkt 15 nennt `read_context_file`, das Ziel aber auch direkte Anhänge und ganze Ordner. Ein direkter Anhang läuft über `readAttachmentRaw` (`app/src/main/noteAgent/contextFiles.ts:226-241`), eine einzelne Ordnerdatei über `read_context_file` (`app/src/main/noteAgent/contextFiles.ts:653-674`) und `folder_digest` liest alle passenden Dateien nochmals über `readFolderSourcesForDigest` (`app/src/main/noteAgent/contextFiles.ts:1208-1257`; `app/src/main/noteAgent/folderDigest.ts:175-217`). Ohne gemeinsame OCR-Strecke kann derselbe Scan je nach Werkzeug gelesen, als Fehler gemeldet oder still nur teilweise verarbeitet werden; der geplante Hash-Cache im Staging muss alle Wege teilen.
+Vorschlag: OCR unterhalb aller drei Leser an die gemeinsame Dateiextraktion anbinden, mit Run-ID, Inhalts-Hash, Seitenbudget und Seitenstatus als gemeinsamem Ergebnis. `folder_digest` und `read_attachment` gezielt mit Scan-PDF und Bild testen.
+
+### F33 — Ein PDF-Exportfenster ist noch kein sicherer Seitenrenderer
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:809-815
+Status: [OFFEN]
+Der angeführte BrowserWindow-Pfad lädt derzeit erzeugtes HTML aus einer Temp-Datei und ruft `printToPDF` auf (`app/src/main/index.ts:9112-9118,9315-9345`); er rendert keine Seite einer fremden PDF zu OCR-Pixeln. Der heutige PDF-Viewer rendert im normalen Renderer auf Canvas (`app/src/renderer/components/PDFViewer/PDFViewer.tsx:259-276`). Für 4a braucht das versteckte Fenster daher einen neuen, isolierten PDF-Byte-Transfer, Seitenwahl, Pixelrückgabe und Abbruch; für 4b brauchen auch Fotos im Main Dekodierung, EXIF-Drehung und Neukodierung, obwohl Punkt 14 dort „nur Verkleinern“ annimmt.
+Vorschlag: Vor 4a/4b einen kleinen Main-zu-Isolat-Raster-Prototyp mit einer echten Scan-PDF und einem gedrehten Foto prüfen; keine Vault-Pfade oder beliebige Skripte ins Fenster geben, Fenster und Bytes bei Abbruch freigeben.
+
+### F34 — LLMBase bietet Bildfähigkeiten im Katalog an
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:873-876
+Status: [OFFEN]
+`cloudPricing.ts` liest heute nur Preis und Kontextfenster (`app/src/main/llm/cloudPricing.ts:43-54`), und auch `listCloudModels` verwirft zusätzliche Katalogfelder (`app/src/main/llm/chatClient.ts:1079-1096`). Das OpenRouter-Feld `architecture.input_modalities` ist in der [offiziellen Models-API](https://openrouter.ai/docs/api/api-reference/models/get-models) belegt. Die [LLMBase-Modelldokumentation](https://llmbase.ai/docs/inference/model-discovery/) belegt ebenfalls `input_modalities` und `supported_input_image_media_types` aus `/v1/models?metadata=true`. Ein kostenpflichtiger „Probeaufruf je Modell“ ist daher weder die erste noch eine zuverlässige Fähigkeitsprüfung für JPEG.
+Vorschlag: Beide Katalogformate getrennt parsen und für das konkrete Modell `image` sowie `image/jpeg` verlangen; fehlende/unklare Angaben als unbekannt anzeigen und nur nach ausdrücklicher Entscheidung einen Probeaufruf mit Testbild erwägen.
+
+### F35 — Drei Bildseiten sichern das 32k-Kontextbudget nicht
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:883-889
+Status: [OFFEN]
+`resolveContextWindow` ignoriert LLMBase-Katalogwerte bewusst und setzt 32768 an, selbst wenn ein Modell weniger Kontext hätte (`app/src/shared/contextBudget.ts:73-97`); die derzeitige Schätzung zählt nur Textzeichen (`app/src/shared/contextBudget.ts:33-46`; `app/src/main/noteAgent/loop.ts:348-365`). Der Bildpreis im Kontext hängt von Modell und Aufbereitung ab; „höchstens 3 Seiten“ beweist weder, dass Prompt plus Werkzeuge plus Bilder hineinpassen, noch dass das Modell alle Bilder verarbeitet. LLMBase dokumentiert `context_length` je Modell im [Katalog](https://llmbase.ai/docs/inference/model-discovery/), während die App ihn bereits abfragt, aber für dieses Backend nicht verwendet (`app/src/main/llm/chatClient.ts:1010-1019`).
+Vorschlag: Bildanteil separat budgetieren und vor jedem Aufruf die tatsächlich zusammengestellte multimodale Nutzlast prüfen; bei LLMBase den Katalogwert mindestens als **obere** Grenze nutzen und unbekannte Bildkosten/Überläufe sichtbar als Fehler behandeln.
+
+### F36 — Agent-Cloud-Bildweg hat in 1.2 kein Werkzeug
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:866-882,901-910
+Status: [OFFEN]
+Punkt 19 koppelt Agent-Bilder an Punkt 18 (`view_context_page`), Rev. 6 verspricht Agent-Bilder über Cloud, schließt aber 4c/Punkt 18 ausdrücklich aus. Im echten Agent-Loop gibt es derzeit nur textliefernde `read_attachment`/`read_context_file`-Werkzeuge (`app/src/main/noteAgent/loop.ts:231-240`; `app/src/main/llm/chatClient.ts:45-54,772-812`). Die gemeinsame Erweiterung des Cloud-Clients allein erzeugt keine Bildteile in einer Agent-Nachricht. 4a/4b liefern laut Punkt 13 nur OCR-Text; ein Cloud-Agent sieht damit in 1.2 kein Bild.
+Vorschlag: Entweder Agent-Bildinput aus dem 1.2-Versprechen nehmen oder einen ausdrücklich begrenzten Bildlieferweg samt Werkzeug, Bildbudget und Zustimmung in 1.2 aufnehmen. OCR-Text und „Bild vom Modell gesehen“ getrennt anzeigen.
+
+### F37 — Ollama-Cloud-Vision fällt zwischen 3a und 3b
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:643-654,866-882,901-910
+Status: [OFFEN]
+3a verlangt `resolveLocalModel` und lehnt dadurch `:cloud` sowie `remote_host` ab (`app/src/main/rag/localModel.ts:94-117`); 3b/Punkt 19 beschreiben nur OpenRouter und LLMBase. Ein Ollama-Cloud-Modell kann dennoch `vision` melden, und derselbe lokale Port kann extern rechnen (`app/src/main/rag/localModel.ts:1-10`; `app/src/main/index.ts:6617-6624`). Der Entwurf sagt weder, ob solche Modelle für Bilder ausdrücklich unzulässig bleiben, noch wie die Bildzustimmung und die Anzeige bei einer Unterstützung aussehen würden.
+Vorschlag: Für 1.2 Ollama-Cloud-Bilder sichtbar ablehnen **oder** sie als eigenen Cloud-Bildweg mit derselben Main-seitigen Zustimmung und Umfangsanzeige wie OpenRouter/LLMBase spezifizieren; `vision` allein nie als Lokalbeweis verwenden.
+
+### F38 — `images` mit `bytes` ist noch kein tragfähiger Nachrichtenvertrag
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:597-613,912-917
+Status: [OFFEN]
+Der vorgeschlagene Eintrag `{ id, mime, width, height, bytes }` sagt nicht, ob ein Bild in dieser Anfrage wirklich ans Modell ging, als OCR-Text ersetzt, wegen fehlender Fähigkeit abgewiesen oder in Folgefragen erneut gesendet wurde. Genau diese Zustände unterscheiden Teil 3 und Rev. 2; der heutige Chat-Verlauf besteht aus reinen Textnachrichten (`app/src/renderer/stores/petrolChatStore.ts:28-60`; `app/src/main/llm/chatClient.ts:45-54`). Ein großes `bytes`-Feld direkt je Nachricht lässt außerdem die spätere Trennung von verschlüsseltem `chat.json` und `media/` aus Teil 1 offen.
+Vorschlag: Jetzt einen versionierten Laufzeitvertrag für Bildreferenz, aufbereitete Binärdaten, Sendestatus/Route und OCR-Herkunft definieren; Persistenz-DTO und Medienabbildung als getrennte Projektion festhalten. Darauf 3a, 3b und Teil 1 aufbauen.
+
+### F39 — Reihenfolge 1.2 muss Bildvertrag und OCR-Infrastruktur vorziehen
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:895-910,912-917
+Status: [OFFEN]
+Rev. 6 zieht Bilder vor Teil 1, nennt aber nur Funktionsblöcke, keine Abhängigkeiten. Der Chat benötigt zuerst Bildzustand und Request-Form (`app/src/renderer/stores/petrolChatStore.ts:28-60`; `app/src/main/index.ts:6454,6598-6600`); 4b kann vorhandenes `extractOcrPage` auf Bilder anwenden, während 4a zusätzlich einen Main-seitigen PDF-Rasterweg braucht (`app/src/main/visionOcr.ts:21-52`; `app/src/main/noteAgent/contextFiles.ts:686-715`; `app/src/main/index.ts:9112-9118`). Punkt 19 hängt schließlich an Katalogfähigkeit, Main-Zustimmung und demselben multimodalen Client (`app/src/main/llm/cloudPricing.ts:43-54`; `app/src/main/llm/chatClient.ts:573-591,772-812,902-927`). Ohne diese Reihenfolge droht ein halbfertiger Agent-Bildweg oder ein Datenvertrag, den Teil 1 erneut ändern muss.
+Vorschlag: (1) Bildnachricht und Aufbereitung, (2) 3a lokal, (3) Cloud-Fähigkeit/Zustimmung und 3b, (4) gemeinsamer Agent-OCR-Einstieg mit Abbruch/Budget, (5) 4b Bilder, (6) PDF-Raster und 4a; Agent-Cloud-Bildinput erst nach Entscheidung zu F36.
+
+### F40 — Bildzustimmung braucht ein Main-Gate am wirklichen Payload
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:877-882
+Status: [OFFEN]
+Punkt 19 fordert eine zusätzliche Zustimmung je Funktion, legt aber nicht fest, wer sie vor dem Versand prüft. Die heutigen Main-Gates entscheiden nur nach Cloud-Route bzw. Textfreigabe (`app/src/main/index.ts:4596-4612,4793-4798,6573-6583`); die Chat- und Agent-Clients schicken derzeit ohnehin nur Text (`app/src/main/llm/chatClient.ts:45-54,790-812,917-927`). Sobald dort `image_url` ergänzt wird, muss der Main am **tatsächlichen** multimodalen Request prüfen, ob Bildbytes vorliegen, welche Funktion/Route sie sendet und ob genau dafür die gespeicherte Bildzustimmung gilt. Eine bloße Karte oder ein Renderer-Flag würde die neue Datenart nicht schützen.
+Vorschlag: Einen zentralen Main-seitigen Bild-Gate für Chat und Agent definieren; erst danach die Bildteile in die Provider-Nutzlast umwandeln. Ohne Zustimmung ausdrücklich OCR-Text oder eine sichtbare Ablehnung wählen, nie still ein Bild weglassen.
+
+### F41 — Textreiche PDF-Seiten können dennoch ungelesene Scanbilder enthalten
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:791-807,901-910
+Status: [OFFEN]
+Die vorhandene Stufe 1 markiert eine Seite nur bei weniger als 40 sichtbaren Textzeichen (`app/src/shared/pdfPageText.ts:10-18,39-52`). Stufe 2 schickt nur markierte Seiten zur OCR. Ein Brief mit normalem Text und eingescanntem Formular oder einer Grafik-Tabelle auf derselben Seite überschreitet die Schwelle, wird als vollständig gelesen behandelt und gelangt in 1.2 nicht zum Bildmodell; 4c ist ausdrücklich ausgeschlossen. Umgekehrt kann eine wirklich leere Seite Budget verbrauchen, weil sie ebenfalls markiert wird. Der Entwurf benennt das Problem, entscheidet aber den Status solcher Seiten nicht.
+Vorschlag: Nicht behaupten, textreiche Seiten seien visuell vollständig gelesen. Für 1.2 entweder eine explizite „ganze Seite per OCR prüfen“-Option mit Budget anbieten oder bei PDFs mit gemischtem Inhalt sichtbar „Bilder auf Textseiten nicht geprüft“ ausweisen; leere Seiten separat erkennen.
+
+### Runde 5
+
+### F42 — JPEG-Prüfung lässt Metadaten und fremde Nutzbytes durch
+Schwere: hoch
+ADR-Stelle: app/src/shared/chatImages.ts:65
+Status: [OFFEN]
+`inspectJpeg` gibt nach SOF und wenigen weiteren Headersegmenten zurück, ohne Scan, EOI oder angehängte Bytes zu prüfen (`app/src/shared/chatImages.ts:81-100`). Es markiert nur APP1/APP13 als Metadaten (`app/src/shared/chatImages.ts:79,93`); APP2/COM und Bytes nach EOI dürfen beliebige Kameradaten oder andere private Inhalte tragen. `checkChatImagesWire` reicht anschließend die **unveränderte** Base64-Nutzlast weiter (`app/src/shared/chatImages.ts:140-145`), die `cloudContent` als Data-URL an den Anbieter sendet (`app/src/main/llm/chatClient.ts:906-910,929-939`). Damit kann ein manipulierter Renderer die Zusage „ohne Ortsangaben und Kameradaten“ umgehen; die Main-Prüfung beweist kein neu kodiertes JPEG (`app/src/renderer/utils/i18n/petrolChat.ts:31-32`). Die Tests erzeugen nur kurze synthetische JPEGs mit APP1 vor/nach SOF (`app/src/shared/chatImages.test.ts:9-19,25-38`).
+Vorschlag: Im Main selbst dekodieren und zu einem frischen JPEG kodieren oder ein vollständig geparstes JPEG ohne zusätzliche Segmente/Trailer verlangen; APP2, COM, nachgelagertes APP1 und Bytes nach EOI gezielt testen.
+
+### F43 — Widerruf der Bildfreigabe wirkt nicht vor dem nächsten Upload
+Schwere: hoch
+ADR-Stelle: app/src/main/index.ts:6575
+Status: [OFFEN]
+Der Bildschalter ändert zunächst nur den Renderer-Store (`app/src/renderer/components/Settings/CloudProviderSection.tsx:257-267`; `app/src/renderer/stores/uiStore.ts:1464`); dessen Speicherung ist um 300 ms verzögert (`app/src/renderer/stores/uiStore.ts:2043-2048,2066-2081`). Der Main liest die alte Zustimmung aus `ui-settings.json` vor der bis zu dreisekündigen Katalogabfrage (`app/src/main/index.ts:6568-6584`). Nach einem sichtbaren Widerruf kann daher noch ein Bild mit der vorherigen Zustimmung freigegeben und später verschickt werden (`app/src/main/index.ts:6631-6639`). Umgekehrt scheitert ein sofortiger Versand nach „Bilder freigeben“ am noch alten Plattenstand. Der Bildschalter nutzt `flushUISettings` nicht, obwohl diese Funktion für genau solche Main-Gates vorgesehen ist (`app/src/renderer/stores/uiStore.ts:2050-2063`).
+Vorschlag: Bildzustimmung synchron und mit bestätigtem Speichererfolg ändern; unmittelbar vor dem Cloud-Fetch erneut gegen die aktuelle Main-Kopie prüfen und einen Widerruf während des Preflights berücksichtigen.
+
+### F44 — Unbekannte OpenRouter-Bildfähigkeit wird als Versandfreigabe behandelt
+Schwere: hoch
+ADR-Stelle: app/src/shared/chatImageGate.ts:73
+Status: [OFFEN]
+`getModelImageInput` liefert bei Katalogfehler oder fehlendem Modell/Feld `unknown` (`app/src/main/llm/cloudPricing.ts:92-105,108-120`); der Handler erzeugt denselben Wert nach drei Sekunden Timeout (`app/src/main/index.ts:6576-6584`). Das Cloud-Gate sperrt nur `vision === 'no'` und lässt `unknown` für **OpenRouter und LLMBase** durch (`app/src/shared/chatImageGate.ts:73-85`), obwohl Rev. 7 für OpenRouter ein belegtes `architecture.input_modalities: image` verlangt (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1074-1079`). Die Bilder gehen damit bei einer nicht verifizierten OpenRouter-Fähigkeit bereits im ersten Request hinaus; ein Provider-Fehler kommt erst danach. Auch bei positivem `image`-Wert prüft der Parser kein JPEG-Medienformat (`app/src/main/llm/cloudPricing.ts:46-59`).
+Vorschlag: OpenRouter bei `unknown` fail-closed behandeln; für LLMBase die beschlossene Ausnahme ausdrücklich separat führen und unterstützte JPEG-Eingabe prüfen, soweit der Katalog sie nennt.
+
+### F45 — OCR akzeptiert unbekannte lokale Vision-Fähigkeit
+Schwere: mittel
+ADR-Stelle: app/src/main/ocr/localOcr.ts:45
+Status: [OFFEN]
+Der gemeinsame OCR-Einstieg lehnt ein Modell ohne `vision` nur dann ab, **wenn** `capabilities` überhaupt vorhanden sind (`app/src/main/ocr/localOcr.ts:45-49`). `resolveLocalModel` kennzeichnet fehlende Fähigkeiten ausdrücklich als möglich (`app/src/main/rag/localModel.ts:37-43,119`). Danach geht das Seitenbild an `/api/chat` (`app/src/main/ocr/localOcr.ts:53-55`; `app/src/main/visionOcr.ts:54-76`). Das verletzt die Rev.-7-Zusage einer frischen Vision-Prüfung vor jeder Seite (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1098-1105`); der Chat-Bildweg lehnt denselben unbekannten Zustand korrekt ab (`app/src/shared/chatImageGate.ts:58-64`). Der OCR-Test deckt nur explizites Nicht-Vision ab (`app/src/main/ocr/localOcr.test.ts:19-27`).
+Vorschlag: Fehlende `capabilities` im OCR-Einstieg ablehnen und diesen Fall testen.
+
+### F46 — Erkannter Bildtext verliert seine Herkunft vor späteren Cloud-Fragen
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/Agent/PetrolChat.tsx:260
+Status: [OFFEN]
+Der OCR-Ausweg schreibt den erkannten Text als gewöhnlichen Entwurf (`app/src/renderer/components/Agent/PetrolChat.tsx:260-270`); beim Senden wird daraus nur `content`, ohne maschinenlesbare OCR-Herkunft (`app/src/renderer/stores/petrolChatStore.ts:314-319,386-402`). Spätere Fragen übernehmen diesen Inhalt über `chatHistoryForModel` (`app/src/renderer/utils/chatHistory.ts:19-24`; `app/src/renderer/stores/petrolChatStore.ts:292-293,334-345`). Ein Wechsel auf OpenRouter/LLMBase schickt ihn als Text, auch über den Web-Antwortweg (`app/src/main/index.ts:6949-6952,7289-7293,6792-6810`), ohne die Bildzustimmung zu prüfen; dort gilt nur die allgemeine `notes-chat`-Freigabe (`app/src/main/index.ts:6972-6975`). Das direkte Bild/Web-Verbot schützt nur die aktuelle Bild-Nutzlast (`app/src/renderer/stores/petrolChatStore.ts:296-298`). Der Nutzer sieht den OCR-Text beim ersten Senden, aber die spätere Weitergabe des Foto-Inhalts im Verlauf wird nicht gesondert ausgewiesen.
+Vorschlag: OCR-Herkunft im Nachrichtenvertrag erhalten; bei Cloud- oder Web-Folgefragen bildabgeleiteten Verlauf ausdrücklich anzeigen und zur Auswahl stellen oder ohne neue Freigabe aus dem Verlauf nehmen.
+
+### F47 — Fremde PDF wird vor dem Rasterfenster im Main geparst und ist dort nicht abbrechbar
+Schwere: hoch
+ADR-Stelle: app/src/main/noteAgent/contextFiles.ts:713
+Status: [OFFEN]
+`extractPdfText` ruft `pdfjs.getDocument`, `getTextContent` und `getOperatorList` im Main auf, bevor das abgeschottete Rasterfenster startet (`app/src/main/noteAgent/contextFiles.ts:713-753,762-765`). In dieser Phase gibt es weder Agent-Abbruchprüfung noch Seitenfrist; beim `folder_digest` sind bis zu 500 Seiten pro PDF erlaubt (`app/src/main/noteAgent/contextFiles.ts:1264,1343-1344`). Die Aussage, die fremde PDF werde in einem Sandbox-Prozess geparst, gilt daher nur für das **zweite** Parsen im Rasterfenster (`app/src/main/ocr/pdfRaster.ts:5-9,41-49`; `app/src/renderer/pdfRaster/pdfRaster.ts:26-30`). Ein defektes oder aufwendiges PDF kann den Main schon vor der ersten abbrechbaren Rasterseite blockieren.
+Vorschlag: Text- und Operator-Extraktion ebenfalls in einen isolierten, abbrechbaren Prozess verlagern oder zumindest harte Zeit-/Seiten-/Laufgrenzen um den Main-Parser setzen; große und defekte PDFs im Test einbeziehen.
+
+### F48 — 40 Seiten begrenzen Aufrufe, nicht die Laufzeit oder parallele OCR
+Schwere: hoch
+ADR-Stelle: app/src/main/ocr/agentOcr.ts:17
+Status: [OFFEN]
+Das Agent-Budget zählt 40 OCR-Aufrufe (`app/src/main/ocr/agentOcr.ts:17-31,77-92`), jeder darf aber bis zu 120 Sekunden laufen (`app/src/main/visionOcr.ts:24-25,32-45`), zusätzlich bis zu 60 Sekunden je Raster-Operation (`app/src/main/ocr/pdfRaster.ts:16-17,109-118`). Ohne Laufzeitdeckel kann ein Auftrag theoretisch deutlich über eine Stunde nur mit OCR beschäftigt sein. Der Chat-IPC legt für jede OCR-Anfrage einen eigenen Controller an und serialisiert oder begrenzt parallele Aufrufe nicht (`app/src/main/index.ts:9709-9731`); gleiche `requestId` überschreiben einander im globalen Map, und ein Abort ist nicht an den Absender gebunden (`app/src/main/index.ts:9716-9718,9733-9735`). Die UI erlaubt zwar nur einen Lauf, der Main erzwingt das nicht (`app/src/renderer/components/Agent/PetrolChat.tsx:253-255`).
+Vorschlag: Zeit- und Parallelitätsbudget Main-seitig pro Absender/Lauf setzen, OCR-Anfragen eindeutig an den Sender binden und doppelte Kennungen ablehnen; Gesamtabbruch gegen laufendes und wartendes Raster testen.
+
+### F49 — Alter Fensterstart kann ein neues Rasterfenster schließen
+Schwere: mittel
+ADR-Stelle: app/src/main/ocr/pdfRaster.ts:62
+Status: [OFFEN]
+Bei einem Timeout/Abbruch schließt `withTimeout` das globale Fenster (`app/src/main/ocr/pdfRaster.ts:74-83`). Der ursprüngliche `load`/`ready`-Promise lebt weiter; sein `ready.catch(() => closeRasterWindow())` schließt **ohne Identitätsprüfung** das jeweils aktuelle globale Fenster (`app/src/main/ocr/pdfRaster.ts:62-71`). Ist der alte Fensterstart später fehlgeschlagen und hat ein Folgeauftrag bereits ein neues Fenster geöffnet, zerstört der alte Catch den neuen Auftrag. Die Queue serialisiert Aufträge, verhindert diese späte Promise-Reaktion aber nicht (`app/src/main/ocr/pdfRaster.ts:107-126`). Ein Test für Timeout während des Fensterstarts und sofortigen Folgelauf fehlt (keine `pdfRaster`-Tests im Stand).
+Vorschlag: Catch/Timeout nur das zugehörige `BrowserWindow` schließen lassen; nach Abbruch jeden alten Promise und jede Fensterkennung gegen den aktuellen Lauf prüfen.
+
+### F50 — PDF-Abdeckung wird wieder aus untrusted Text erraten
+Schwere: hoch
+ADR-Stelle: app/src/main/noteAgent/contextFiles.ts:789
+Status: [OFFEN]
+`assemblePdfPages` erzeugt zwar `PdfCoverage` getrennt vom Text (`app/src/shared/pdfPageText.ts:48-73,124-131`), `extractPdfText` verwirft die Struktur sofort mit `.text` (`app/src/main/noteAgent/contextFiles.ts:784-789`). Ordner- und Digest-Status suchen anschließend per `lastIndexOf` nach Zeichenfolgen wie `[Texterkennung:` **im gesamten PDF-Text** (`app/src/shared/pdfPageText.ts:150-170`; `app/src/main/noteAgent/contextFiles.ts:931-946,1344-1353`). Eine PDF, deren Textebene selbst einen solchen String enthält, kann somit OCR-/Fehlseitenstatus vortäuschen; Kürzungswege kopieren diese gefundenen Strings weiter (`app/src/main/noteAgent/contextFiles.ts:684-689`). Rev. 7 versprach gerade eine vom Modelltext getrennte Abdeckung (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1116-1122`).
+Vorschlag: `PdfCoverage` durch die Leser bis zu Manifest, Digest und UI tragen; Textvermerke nur aus dieser Struktur erzeugen, nie als Statusquelle wieder einlesen.
+
+### F51 — Frühe Bildablehnung hat keinen Bildstatus und keinen OCR-Ausweg
+Schwere: mittel
+ADR-Stelle: app/src/main/llm/chatImageRequest.ts:68
+Status: [OFFEN]
+Wenn die Main-Byteprüfung ein Bild wegen Metadaten, Größe oder ungültigem JPEG ablehnt, ruft `prepareChatImageRequest` `reject` **ohne IDs** auf und liefert eine leere `imageDelivery` (`app/src/main/llm/chatImageRequest.ts:62-69`). Der Store hängt zwar die leere Map an die Frage (`app/src/renderer/stores/petrolChatStore.ts:412-415`), die Bildmarke zeigt dann keinen „nicht gesendet“-Status (`app/src/renderer/components/Agent/PetrolChat.tsx:682-688`). Der versprochene Knopf „Text aus dem Bild lesen“ erscheint nur bei `kind === 'rejected'` (`app/src/renderer/components/Agent/PetrolChat.tsx:713-716`). Der Nutzer sieht bloß den allgemeinen Fehler, obwohl die Frage mit Bild im Verlauf bleibt.
+Vorschlag: Bereits aus den gültig lesbaren IDs der Wire-Eingabe für jede frühe Ablehnung einen Status zurückgeben; bei unlesbaren Bytes die ganze Frage sichtbar als abgelehnt markieren und OCR nur anbieten, wenn das Bild sicher dekodiert werden kann.
+
+### F52 — Release-kritische Grenzen sind nur mit Mocks oder gar nicht getestet
+Schwere: mittel
+ADR-Stelle: app/src/main/llm/chatImageRequest.test.ts:15
+Status: [OFFEN]
+Die Bild-Gate-Tests prüfen einen synthetischen JPEG-Header und gemockte Modellauflösung/Katalogantworten (`app/src/shared/chatImages.test.ts:9-21,25-54`; `app/src/main/llm/chatImageRequest.test.ts:5-13,20-47`). Die OCR-Tests ersetzen Extraktion bzw. Bildvorbereitung durch Fakes (`app/src/main/ocr/localOcr.test.ts:19-35`; `app/src/main/ocr/agentOcr.test.ts:5-8,11-45`). Für den tatsächlichen `ollama-chat`/`lmstudio-chat`-IPC, Widerruf während des Katalog-Preflights, verstecktes Rasterfenster und gemischte PDF mit Abbruch gibt es damit keinen automatisierten Gegenbeleg; der Status nennt den echten Cloud-Bildweg und das 12-Bilder-Prüfset selbst noch offen (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1140-1145,1164-1172`).
+Vorschlag: Vor 1.2 gezielte Integrationstests an den genannten Grenzen und den angekündigten Cloud-/Bild-Gegenproben durchführen; insbesondere Metadaten-Trailer, OCR-Abbruch und Folgelauf nach Raster-Timeout prüfen.
+
+### F53 — Weggelassene Verlaufsbilder sind nur für das Modell sichtbar markiert
+Schwere: mittel
+ADR-Stelle: app/src/shared/chatImages.ts:218
+Status: [OFFEN]
+`planImageHistory` hängt den Vermerk „Bild nicht mehr mitgeschickt“ an den **ausgehenden** Nachrichtentext (`app/src/shared/chatImages.ts:214-223`). Der Store sendet diese geplanten Nachrichten, behält im sichtbaren Verlauf aber `before` mit den ursprünglichen Fragen/Bildmarken (`app/src/renderer/stores/petrolChatStore.ts:386-402,412-421`). `ChatImageDelivery` kennt zwar `history-dropped` (`app/src/shared/chatImages.ts:37-42`), der Main meldet aber nur gesendete IDs (`app/src/main/llm/chatImageRequest.ts:111-117`), und die Oberfläche zeigt nur den alten Bildstatus (`app/src/renderer/components/Agent/PetrolChat.tsx:682-688`). Der Nutzer kann bei einer Folgefrage nicht erkennen, welche älteren Bilder das Modell gerade nicht mehr sah, obwohl Rev. 7 den Vermerk als sichtbare Verlaufsregel festlegt (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1065-1066`).
+Vorschlag: Für jede Anfrage die weggelassenen IDs aus dem Main zurückmelden und den Hinweis beim betreffenden Bild bzw. bei der aktuellen Antwort sichtbar machen; den Status des ursprünglichen Versands getrennt behalten.
+
+### Runde 6
+
+### F54 — F43: Sichtbarer Widerruf kann vor dem Speichern noch überholt werden
+Schwere: hoch
+ADR-Stelle: app/src/renderer/components/Settings/CloudProviderSection.tsx:263
+Status: [OFFEN]
+Der Bildfreigabe-Schalter in den Einstellungen und der Freigabe-Knopf im Petrol-Chat setzen zuerst den Renderer-Store und starten `flushUISettings()` ohne dessen Ergebnis abzuwarten oder bei Schreibfehler zurückzurollen (`app/src/renderer/components/Settings/CloudProviderSection.tsx:263-269`; `app/src/renderer/components/Agent/PetrolChat.tsx:853-857`). `flushUISettings` reiht den Schreibvorgang zudem hinter schon laufende Saves ein (`app/src/renderer/stores/uiStore.ts:2003-2026,2055-2063`). Der Main prüft vor `streamCloudChat` zwar erneut, liest aber nur den bis dahin gespeicherten Plattenstand (`app/src/main/index.ts:6631-6647`). Nach sichtbarem Widerruf kann eine reine Textfolgefrage sofort gesendet werden, weil die UI-Sperre nur neue Entwurfsbilder betrachtet (`app/src/renderer/components/Agent/PetrolChat.tsx:279-284,378-383`); der Store hängt aber bis zu zwei ältere Bildnachrichten an (`app/src/renderer/stores/petrolChatStore.ts:386-403`). Bei verzögerter oder fehlgeschlagener Speicherung kann der Main dafür noch die alte Zustimmung lesen und die Verlaufsbilder hochladen. Der neue Main-Check schließt das F43-Fenster also nicht vollständig.
+Vorschlag: Den Zustimmungswechsel bis zur bestätigten Speicherung als „wird geändert“ behandeln, Senden mit tatsächlichen ausgehenden Bildern einschließlich Verlauf dabei sperren und bei `false` den UI-Wert zurückrollen; Widerruf außerdem Main-seitig sofort registrieren, damit ein laufender Preflight ihn sieht.
+
+### F55 — F47: Die PDF-Frist bricht keine einzelne Parser-Operation ab
+Schwere: hoch
+ADR-Stelle: app/src/main/noteAgent/contextFiles.ts:728
+Status: [OFFEN]
+Die 60-Sekunden-Uhr startet erst **nach** `pdfjs.getDocument(...).promise` und wird nur am Beginn der nächsten Seite geprüft (`app/src/main/noteAgent/contextFiles.ts:724-740`). `doc.getPage`, `page.getTextContent`, `page.getOperatorList` und `doc.destroy` werden ohne Timeout oder Abbruchsignal abgewartet (`app/src/main/noteAgent/contextFiles.ts:741-769`). Ein einzelner hängender Parser-Schritt kann daher den Main weit länger als 60 Sekunden belegen; ein Agent-Stopp greift erst an der nächsten Schleifenprüfung. Die Antwort zu F47 verspricht „hört nach 60 s auf“ (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1192-1194`), was der Code nicht erzwingt.
+Vorschlag: Die PDF-Parserarbeit in einen abbrechbaren Prozess verlagern oder echte, durchgesetzte Fristen um Dokumentöffnung und Seitenoperationen setzen; mindestens einen blockierenden Einzelseitenfall testen.
+
+### F56 — F50: Gesamtbudget schneidet strukturierte PDF-Vermerke erneut ab
+Schwere: mittel
+ADR-Stelle: app/src/main/noteAgent/contextFiles.ts:1254
+Status: [OFFEN]
+Der neue `ExtractMeta` transportiert PDF-Vermerke tatsächlich getrennt vom Dateiinhalt (`app/src/main/noteAgent/contextFiles.ts:703-708,805-807`). Im Leser für mehrere Kontextanhänge werden diese Vermerke gegebenenfalls nach dem Datei-Limit angehängt (`app/src/main/noteAgent/contextFiles.ts:1243-1250`), **danach** kürzt aber das kumulative `remainingBefore` den ganzen String erneut und hängt nur einen allgemeinen Gesamtbudget-Hinweis an (`app/src/main/noteAgent/contextFiles.ts:1254-1264`). Eine gemischte PDF kann dadurch im Notiz-Chat wieder ohne Hinweis auf ungelesene Scan-Seiten oder unvollständige OCR beim Modell landen; die Rückgabe meldet nur `truncated`, keine Abdeckung (`app/src/main/noteAgent/contextFiles.ts:1206-1209,1264`). Das ist ein noch offener Weg von F50, obwohl `pdfCoverageNotes` selbst nicht mehr aus fremdem Text liest.
+Vorschlag: Nach der **letzten** Kürzung einen knappen, budgetierten Vermerk aus `ExtractMeta` anfügen und die Abdeckung zusätzlich strukturiert im Leseergebnis halten.
+
+### F57 — F53: Beim Stopp verschwindet der Hinweis auf fehlende Verlaufsbilder
+Schwere: mittel
+ADR-Stelle: app/src/renderer/stores/petrolChatStore.ts:420
+Status: [OFFEN]
+`imagesDropped` wird nur auf eine erfolgreich abgeschlossene Antwort geschrieben (`app/src/renderer/stores/petrolChatStore.ts:420-423`). Stoppt der Nutzer während des Streams, bleibt eine bereits erzeugte Teilantwort sichtbar, wird aber ohne `imagesDropped` gespeichert (`app/src/renderer/stores/petrolChatStore.ts:426-455`). Die Oberfläche zeigt den Hinweis ausschließlich bei diesem Feld der Antwort (`app/src/renderer/components/Agent/PetrolChat.tsx:774-781`). Gerade bei einer Teilantwort über ältere Bilder ist somit wieder unsichtbar, welche Bilder das Modell nicht erhielt; F53 ist nur für fertige Antworten behoben.
+Vorschlag: Die Zahl bereits beim Versand an der laufenden Frage/Anfrage speichern und beim Stopp in die Teilantwort übernehmen.
+
+### F58 — F48: Chat-OCR läuft nach Fensterende weiter; ungültige Kennung wird ersetzt
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:9720
+Status: [OFFEN]
+Die neue Map begrenzt die OCR auf eine Anfrage je `senderId` und schützt den Abort vor fremden Fenstern (`app/src/main/index.ts:9720-9726,9746-9749`). Es gibt aber keinen `destroyed`-Handler für den Absender; beim Schließen des Fensters läuft die OCR bis zu vier Bilder nacheinander weiter, jeweils mit bis zu 120 Sekunden Standardfrist (`app/src/main/index.ts:9734-9743`; `app/src/main/visionOcr.ts:24-25,32-41`). Der IPC akzeptiert zudem eine nicht-stringförmige Kennung und speichert dafür `''`, während der Abort nur eine Stringkennung annimmt (`app/src/main/index.ts:9726,9746-9749`). Ein Abbruch mit der ursprünglichen ungültigen Kennung erreicht den Lauf nicht; die weiterlaufende OCR hält Ollama unnötig im Vordergrund (`app/src/main/ocr/localOcr.ts:57-65`).
+Vorschlag: Kennung vor Belegung validieren, beim `sender.destroyed` den Controller abbrechen und den Listener im `finally` entfernen.
+
 ## Claude-Antwort
 
 ### Runde 1 (01.11.2026)
@@ -798,7 +1021,298 @@ als eigener Punkt mit Messung.
 4b Bilder (Weg A), 4c Seitenbild für lokale Vision-Modelle (Punkt 18), danach Punkt 19 zusammen
 mit 3b. Vor dem Bau Codex-Prüfung von Punkt 13–19.
 
+### Rev. 6 — Bilder zuerst, für Release 1.2 (Nutzerentscheidung 02.11.2026)
+
+**Entscheidung.** Die Bilderunterstützung kommt VOR Teil 1 und geht zusammen in Release 1.2.
+Umfang „lokal + Cloud“:
+- **3a** Bilder im Petrol-Chat über lokale Vision-Modelle (Ollama).
+- **3b + Punkt 19** Bilder über OpenRouter und LLMBase, für Chat und Agent, mit eigener
+  Bild-Zustimmung.
+- **4a + 4b** Der Agent liest gescannte PDF-Seiten (inkl. Stufe 2 von 13a) und Bilder per lokaler
+  Texterkennung (Punkt 13–17).
+- **Nicht in 1.2:** 4c (Weg B, Seitenbild an das Agent-Modell, Punkt 18), Teil 1 und 2.
+
+**Was das für F15 heißt.** F15 verlangte den Datenvertrag (Teil 1) vor der Bild-UX, damit das
+Speicherformat Bilder von Anfang an kennt. Heute speichert der Petrol-Chat gar nichts
+(`renderer/stores/petrolChatStore.ts:1-19`), Bilder leben also nur im Speicher des Tabs, wie
+jeder andere Verlauf. Vorschlag: Die Bildnachricht bekommt schon jetzt die Form, die Rev. 2
+Punkt 1 für `StoredChatMessage` vorsieht (`images: [{ id, mime, width, height, bytes }]`, nur
+aufbereitete Bytes), damit Teil 1 sie später nur noch schreibt. Gespeichert wird in 1.2 nichts.
+
+**Anker für die Prüfung (Cloud-Bildweg, neu).**
+- Chat-Aufruf: `main/index.ts:6454` (`ollama-chat`, Parameter `messages` nur `{role, content: string}`),
+  Petrol-Zweig `:6463`, LM Studio `:7668`.
+- Cloud-Client: `main/llm/chatClient.ts:47` (`content: string`), Nachrichtenabbildung `:585`,
+  `:641-648`, `:777-791`. Bilder kennt der Client nicht.
+- OpenRouter-Katalog: `main/llm/cloudPricing.ts:43-51` liest nur `pricing` und `context_length`.
+  Ein Feld für Eingabearten (in Punkt 19 als `architecture.input_modalities` angenommen) wird
+  heute nicht gelesen; der Name ist **nicht** am echten Katalog geprüft.
+- Agent-Lesen: `main/noteAgent/contextFiles.ts` (`EXT_TO_KIND`, `extractPdfText` mit
+  `shared/pdfPageText.ts` seit Stufe 1 von 13a), Texterkennung `main/visionOcr.ts`
+  (`extractOcrPage`), Aufruf heute nur aus `main/index.ts` (`vision-ocr-extract-page`).
+
+### Runde 4 (02.11.2026)
+
+Alle 14 Befunde gegen den Code geprüft. 13 tragen, F34 teilweise (OpenRouter in der offiziellen
+Doku bestätigt, LLMBase-Doku antwortet mit 403, wird am echten Zugang geprüft). Nutzer hat
+freigegeben: F30 sofort beheben, Empfehlungen zu F36/F37/F41 übernehmen, Rest als Rev. 7,
+Bau in der Reihenfolge aus F39.
+
+- **F28 [ADRESSIERT, Plan]** Rev. 7 Punkt 23: ein gemeinsamer OCR-Einstieg im Main, Prüfung vor
+  jeder Seite mit frischen Metadaten. Viewer, Chat und Agent nutzen nur ihn.
+- **F29 [ADRESSIERT, Plan]** Rev. 7 Punkt 25: Seitenliste statt fertigem String, „ohne Text“
+  erst nach erfolgloser Erkennung.
+- **F30 [ADRESSIERT, Code]** Der Vermerk wird jetzt vor dem Kürzen gelesen
+  (`contextFiles.ts`, Ordner-Lesung) bzw. nach dem Kürzen wieder angehängt
+  (`keepPdfNoTextNote` in `shared/pdfPageText.ts`, getestet), an allen fünf Lesestellen:
+  Ordner-Lesung, direkter Anhang, `read_context_file`, `extractFileContentRaw`,
+  `readContextBlock`. Gleiche Lücke bestand bei den Einzeldatei-Wegen (15 000 Zeichen). Der
+  strukturierte Seitenstatus aus dem Vorschlag kommt mit Rev. 7 Punkt 25.
+- **F31 [ADRESSIERT, Plan]** Rev. 7 Punkt 23.
+- **F32 [ADRESSIERT, Plan]** Rev. 7 Punkt 24: Erkennung unterhalb von
+  `extractContentFromBuffer`, also für alle drei Leser.
+- **F33 [ADRESSIERT, Plan]** Rev. 7 Punkt 25: Seitenraster ist neue Arbeit, erst Prototyp.
+  Punkt 14 (a) „wie bookPdf.ts“ war falsch begründet.
+- **F34 [ADRESSIERT, Plan]** Rev. 7 Punkt 21.
+- **F35 [ADRESSIERT, Plan]** Rev. 7 Punkt 21: Bildkosten in Token schätzen und prüfen.
+- **F36 [ADRESSIERT, Entscheidung]** Nutzerentscheidung 02.11.2026: In 1.2 bekommt der Agent
+  aus Bildern und Scans nur lokal erkannten Text, auch mit Cloud-Modell. Bildeingabe an
+  Cloud-Modelle gibt es in 1.2 nur im Chat. Punkt 19 (Agent-Teil) wandert mit Punkt 18 nach 1.2.
+- **F37 [ADRESSIERT, Entscheidung]** Ollama-Cloud-Modelle bekommen in 1.2 keine Bilder, sichtbar
+  abgelehnt mit „Bilder nur lokal oder über OpenRouter/LLMBase“.
+- **F38 [ADRESSIERT, Plan]** Rev. 7 Punkt 20.
+- **F39 [ADRESSIERT, Plan]** Rev. 7 Reihenfolge übernimmt den Vorschlag.
+- **F40 [ADRESSIERT, Plan]** Rev. 7 Punkt 22.
+- **F41 [ADRESSIERT, Entscheidung]** Nutzerentscheidung 02.11.2026: keine Erkennung von
+  Textseiten in 1.2, aber sichtbarer Vermerk „Bilder auf Textseiten nicht geprüft“, wenn eine
+  Textseite Bilder enthält; leere Seiten werden getrennt erkannt (Rev. 7 Punkt 25).
+
+### Rev. 7 — Bauplan für 1.2 (02.11.2026, nach Runde 4)
+
+Ersetzt die Reihenfolge aus Rev. 5/6. Umfang: 3a, 3b (nur Chat), 4a, 4b. Nicht in 1.2: 4c,
+Punkt 18, Agent-Teil von Punkt 19, Teil 1, Teil 2, LM Studio mit Bildern.
+
+**20. Bildvertrag (F38).** `shared/chatImages.ts`, Version `CHAT_IMAGE_CONTRACT = 1`.
+- Laufzeit: `ChatImage { v: 1, id, name, mime: 'image/jpeg', width, height, byteLength, dataBase64 }`.
+  Nur aufbereitete Bytes. `name` ist reine Anzeige und geht nie an ein Modell; das Modell sieht
+  „Bild 1“, „Bild 2“.
+- Zustellung je Bild und Anfrage, vom Main zurückgemeldet:
+  `ChatImageDelivery = { kind: 'image', route: 'local' | 'cloud', target } | { kind: 'ocr', model }
+  | { kind: 'rejected', reason }`. Die Frage trägt `images` und `imageDelivery`.
+- Folgefragen (Rev. 2 Punkt 7): höchstens zwei Bilder gehen im Verlauf mit, ältere werden durch
+  „[Bild … nicht mehr mitgeschickt]“ ersetzt. Der Main zählt das selbst nach, nicht nur der
+  Renderer.
+- Gespeichert wird in 1.2 nichts. Teil 1 bildet `dataBase64` später auf `media/<id>.jpg` ab
+  (eigene Projektion `StoredChatImage`, ohne Bytes im JSON).
+- Aufbereitung im Renderer: `createImageBitmap(..., { imageOrientation: 'from-image' })`, lange
+  Seite höchstens 1600 px, JPEG 0,85. HEIC wird abgelehnt. Höchstens 4 Bilder je Nachricht,
+  Eingabe höchstens 25 MB je Bild.
+
+**21. Fähigkeit und Kosten (F34, F35, F37).**
+- Ollama: `vision` + `completion` aus den Ollama-Angaben, nach `resolveLocalModel`. Cloud-Tag oder
+  `remote_host` → abgelehnt (F37).
+- OpenRouter: `architecture.input_modalities` enthält `image`, gecacht mit den Preisen
+  (`cloudPricing.ts`). LLMBase: Katalog am echten Zugang prüfen; ohne Angabe gilt „unbekannt“,
+  das Bild geht dann mit, und ein Fehler wird verständlich übersetzt, nie still ohne Bild.
+- Kosten: je Bild `ceil(Breite × Höhe / 750)` Token (Schätzung nach Anthropic-Formel, bei 1600 px
+  höchstens rund 2 700). Summe der Bilder einer Anfrage höchstens 50 % des Fensters. Für LLMBase
+  gilt weiter die Annahme 32 768, also höchstens rund 16 000 Token Bilder. Darüber lehnt der Main
+  ab, die Marke nennt den Grund.
+
+**22. Bild-Prüfstelle im Main (F40).** Pure Entscheidung in `shared/chatImageGate.ts`
+(`decideChatImageRoute`, getestet), aufgerufen im `ollama-chat`-Handler, bevor ein Bild in eine
+Anbieter-Nutzlast umgewandelt wird. Prüft am wirklichen Request:
+- Bytes: JPEG-Kennung, keine EXIF-Daten, Maße aus dem JPEG-Kopf höchstens 1600 px, Größe.
+- Modus: nur `petrol`. Websuche (Globus) nimmt keine Bilder an.
+- Weg: lokal geprüft + Vision; oder OpenRouter/LLMBase mit `notes-chat`-Freigabe, genau diesem
+  Modell UND der Bild-Zustimmung `chatImageCloudConsentVersion ≥ CHAT_IMAGE_CLOUD_CONSENT_VERSION`
+  (uiStore, Main liest `ui-settings.json`). Zustimmung auf der Bildmarke oder in Einstellungen →
+  Cloud-Anbieter, Text nennt „Fotos können Personen, Räume und Unterschriften zeigen“.
+- Sonst: Ablehnung mit Grund, nie stilles Weglassen. Ausweg auf der Marke: „Text aus dem Bild
+  lesen“ (lokale Erkennung, Punkt 23), der erkannte Text steht sichtbar in der Nachricht.
+- An Antworten zu Bildern steht „Bildinhalt vom Modell gelesen, nicht geprüft“.
+
+**23. Gemeinsamer OCR-Einstieg (F28, F31).** `main/ocr/localOcr.ts`:
+- liest Modell und Schalter aus `ui-settings.json` (`visionOcr`), nie aus Parametern;
+- vor JEDER Seite `resolveLocalModel` ohne Cache und Vision-Prüfung;
+- meldet Ollama-Vordergrund an (Indexer pausiert);
+- reicht ein `AbortSignal` bis zum `fetch` durch, Timer in einem äußeren `finally`;
+- ein Stream ohne `done` gilt als `incomplete`, nie als vollständig;
+- Viewer-Knopf (`vision-ocr-extract-page`), Chat-Ausweg und Agent rufen nur diesen Einstieg.
+  `extractOcrPage` wird nicht mehr direkt importiert (Test prüft die Importe).
+
+**24. Agent liest Bilder (4b, F32).** Neue Art `image` (`.png`, `.jpg`, `.jpeg`, `.webp`) in
+`EXT_TO_KIND`. Die Erkennung hängt an `extractContentFromBuffer` über einen optionalen
+Lauf-Kontext `{ signal, budget, cache }`; damit nutzen direkter Anhang, `read_context_file` und
+`folder_digest` dieselbe Strecke. Ohne Lauf-Kontext (Notiz-Chat-Anhänge) bleibt es beim heutigen
+„nicht unterstützt“. Bild im Main verkleinern über `nativeImage` (kein Canvas nötig); ob es die
+EXIF-Drehung anwendet, wird beim Bau gemessen. Budget 40 Seiten je Lauf, Cache je Inhalts-Hash
+im Lauf. Manifest nennt Bilder mit „Texterkennung nötig“. Rückgabe: „per Texterkennung gelesen,
+kann Lesefehler enthalten“.
+
+**25. Agent liest Scans (4a, F29, F30, F33, F41).**
+- `extractPdfPages` liefert eine Seitenliste `{ n, text, chars, hasImages }`. Seiten unter der
+  Schwelle MIT Bild → Erkennung; ohne Text und ohne Bild → „leer“, kostet kein Budget.
+- Abdeckung als Struktur `PdfCoverage { textPages, ocrPages, ocrFailed, emptyPages, notReached,
+  imagesOnTextPages }`, getrennt vom Modelltext; Ordner-Status und `folder_digest` lesen sie,
+  nicht den String. „Ganz ohne Text“ erst nach erfolgloser Erkennung.
+- `imagesOnTextPages > 0` → Vermerk „Bilder auf Textseiten nicht geprüft“ (F41).
+- Seitenraster: erst ein Prototyp (verstecktes Fenster mit pdfjs 5.4.296 und Canvas, ohne
+  Preload, `isEvalSupported: false`), gemessen an Zeit, Speicher und Ergebnis. Scheitert er,
+  kommt 4a nicht in 1.2; 4b und der Seitenvermerk bleiben.
+
+**Reihenfolge (F39).**
+1. Bildvertrag + Aufbereitung (Punkt 20).
+2. 3a: Bilder im Chat lokal (Punkt 21 Ollama, 22).
+3. Cloud-Fähigkeit, Bild-Zustimmung, 3b (Punkt 21, 22, Erweiterung `chatClient.ts`).
+4. Gemeinsamer OCR-Einstieg + Chat-Ausweg „Text aus dem Bild lesen“ (Punkt 23).
+5. 4b Bilder im Agenten (Punkt 24).
+6. PDF-Raster-Prototyp, dann 4a (Punkt 25).
+Vor dem Release: Prüfset mit 12 Bildern (Teil 3) an den installierten Vision-Modellen. Eine
+Modellempfehlung im Hinweis erst danach.
+
+### Runde 5 (02.11.2026) — Prüfung des gebauten Codes
+
+Alle 12 Befunde gegen den Code geprüft; 11 tragen, F46 nicht. Nutzer hat freigegeben: alles außer
+F46, F47 in kleiner Form.
+
+- **F42 [ADRESSIERT, Code]** Der Main kodiert jedes Bild vor dem Versand neu (`nativeImage`,
+  `chatImageRequest.ts` `reencode`), die echten Maße zählen danach. In der App geprüft: JPEG mit
+  angehängten Fremdbytes nach dem Bildende → neu kodiert gesendet, richtig gelesen.
+- **F43 [ADRESSIERT, Code]** Bildschalter in Einstellungen und an der Bildmarke rufen
+  `flushUISettings`; der Main liest die Zustimmung unmittelbar vor dem Cloud-Versand erneut und
+  lehnt bei Widerruf ab („Nichts wurde gesendet“).
+- **F44 [ADRESSIERT, Code]** OpenRouter mit `vision: unknown` → abgelehnt (`unknown-capabilities`);
+  LLMBase bleibt die benannte Ausnahme. Medienformat-Prüfung aus dem Katalog nicht gebaut (Feld
+  unbelegt).
+- **F45 [ADRESSIERT, Code]** `ocrImageLocal` lehnt fehlende Fähigkeitsangabe ab; Test.
+- **F46 [ABGELEHNT]** Erkannter Text steht sichtbar im Eingabefeld und wird vom Nutzer selbst
+  abgeschickt; danach ist er Text wie jeder getippte. Schon das erste Senden an die Cloud braucht
+  nur die Chat-Freigabe. Sonderbehandlung im Verlauf widerspräche „Transparenz statt Sperre“.
+- **F47 [ADRESSIERT, klein]** Formulierung in `pdfRaster.ts` und `CLAUDE.md` korrigiert (nur das
+  Rastern läuft abgeschottet); `extractPdfText` prüft den Abbruch je Seite und hört nach 60 s auf
+  (Rest als „gekürzt“). Textebene in einen eigenen Prozess verlagern: offen, nach 1.2.
+- **F48 [ADRESSIERT, Code]** Zeitbudget 15 min je Lauf (`AGENT_OCR_TIME_BUDGET_MS`), Seitenfrist =
+  Restzeit; Chat-OCR je Fenster genau eine, Abbruch nur mit passender Kennung desselben Fensters.
+  Beim Prüfen in der App gefunden: Belegung lag hinter dem ersten `await`, eine zweite Anfrage
+  rutschte durch — jetzt vor dem ersten `await`, in der App erneut geprüft.
+- **F49 [ADRESSIERT, Code]** `closeIfCurrent`: ein später Fehler schließt nur sein Fenster.
+  Kein automatischer Test (BrowserWindow in vitest nicht verfügbar).
+- **F50 [ADRESSIERT, Code]** Vermerke und Status nur aus der Abdeckung (`pdfCoverageNotes`,
+  `ExtractMeta.pdfNotes`), Text-Parser `pdfNoTextNote`/`pdfNotes`/`keepPdfNoTextNote` entfernt;
+  Test: PDF mit „[Texterkennung: …]“ im Text erzeugt keinen Vermerk.
+- **F51 [ADRESSIERT, Code]** Frühe Ablehnung meldet jede Bildkennung als „rejected“; Test und
+  in der App geprüft.
+- **F52 [TEILWEISE]** Tests für F42/F44/F45/F48/F50/F51 ergänzt; echte Wege in der Dev-App geprüft
+  (Neukodierung, Ablehnungen, OCR-Sperre). Offen: Cloud-Bildweg am echten Anbieter, Prüfset.
+- **F53 [ADRESSIERT, Code]** Antwort zeigt „N ältere Bilder gingen nicht mehr mit“.
+
+### Runde 6 (02.11.2026) — Nachprüfung
+
+Alle fünf Befunde tragen; Nutzer hat alle freigegeben. F46-Ablehnung von Codex nicht beanstandet.
+
+- **F54 [ADRESSIERT, Code]** `setChatImageConsentDurable` (uiStore): Zustimmung gilt erst nach
+  bestätigtem Schreiben, bei Fehlschlag Rücksprung und Hinweis; währenddessen Schalter gesperrt
+  und im Chat kein Senden, sobald Entwurf oder Verlauf Bilder enthält.
+- **F55 [ADRESSIERT, Code]** `withPdfDeadline` um `getDocument`, `getPage`, `getTextContent`,
+  `getOperatorList` (Restfrist aus 60 s, Abbruchsignal), `destroy` höchstens 5 s abgewartet; Frist
+  vor der ersten Seite → eigene Fehlermeldung statt „keine Textebene“. Test mit einem nie fertigen
+  Schritt. Grenze im Code und in CLAUDE.md benannt: ein den Main blockierender Schritt ist so
+  nicht hart abbrechbar (eigener Prozess nach 1.2).
+- **F56 [ADRESSIERT, Code]** `readContextBlock`: PDF-Vermerke nach der letzten Kürzung, Platz
+  dafür vom Gesamtbudget reserviert.
+- **F57 [ADRESSIERT, Code]** Zahl der nicht mitgeschickten Bilder hängt am laufenden Auftrag und
+  geht beim Stopp in die Teilantwort; Test.
+- **F58 [ADRESSIERT, Code]** Chat-OCR lehnt ungültige Kennungen ab und bricht beim Schließen des
+  Fensters ab (`destroyed`), Listener wird im `finally` entfernt.
+
+Prüfrunden damit beendet (Nutzerentscheidung). Offen vor Release: Nutzerabnahme, Cloud-Bildweg am
+echten Anbieter, Prüfset.
+
 ## Status
+
+Prüfset (02.11.2026, 12 synthetische Bilder, am Rechner erzeugt, über den echten Chat-Weg mit
+Main-Prüfung und Neukodierung; Fakten per Textabgleich, Bild ohne Text = ehrliches „kein Text“):
+
+| Bild | gemma4:e4b-mlx | ministral-3:8b | qwen3-vl:8b | qwen3.5:4b | qwen3.8:27b-mlx |
+|---|---|---|---|---|---|
+| 01-rechnung | 3/3 8s | 3/3 9s | 3/3 26s | 3/3 7s | 3/3 27s |
+| 02-tabelle | 8/8 4s | 8/8 5s | 8/8 103s | 8/8 4s | 8/8 17s |
+| 03-formular | 1/1 3s | 1/1 3s | 1/1 8s | 1/1 4s | 1/1 13s |
+| 04-handschrift | 3/3 3s | 3/3 4s | 3/3 15s | 3/3 4s | 3/3 12s |
+| 05-whiteboard | 3/3 3s | 3/3 4s | 3/3 18s | 3/3 5s | 3/3 12s |
+| 06-diagramm | 2/2 3s | 2/2 4s | 2/2 10s | 2/2 4s | 2/2 15s |
+| 07-kleinschrift | 1/1 3s | 1/1 4s | 1/1 47s | 1/1 4s | 1/1 12s |
+| 08-kontrast | 1/1 3s | 1/1 4s | 1/1 14s | 1/1 4s | 1/1 16s |
+| 09-gedreht | 1/1 3s | 1/1 4s | 1/1 13s | 1/1 4s | 1/1 12s |
+| 10-ohnetext | ✓ 2s | ✓ 4s | ✓ 11s | ✓ 4s | ✓ 13s |
+| 11-zweispaltig | 1/1 3s | 1/1 4s | 1/1 19s | 1/1 4s | 1/1 12s |
+| 12-screenshot | 1/1 6s | 0/1 8s | 1/1 17s | 1/1 7s | 1/1 25s |
+| **voll richtig** | **12/12** | **11/12** | **12/12** | **12/12** | **12/12** |
+| Fakten | 25/25 | 24/25 | 25/25 | 25/25 | 25/25 |
+| Zeit gesamt | 41 s | 55 s | 302 s | 52 s | 186 s |
+
+Alle fünf lokalen Modelle lesen das Set (fast) fehlerfrei, auch Handschrift-Schrift, schwachen
+Kontrast, 90°-Drehung; keines erfand Text im Foto ohne Text. Unterschied ist vor allem Zeit:
+gemma4:e4b-mlx und qwen3.5:4b um 3–8 s je Bild, qwen3-vl:8b bis 103 s (Tabelle). Das Set ist zu
+sauber, um Modelle zu trennen — echte Handyfotos (Schatten, Schräge, Unschärfe) fehlen. Deshalb
+KEIN Eintrag in modelCompatibility.ts und keine Modellempfehlung in der App (Regel „erst messen“);
+nächster Schritt dafür: Set mit echten, nicht personenbezogenen Fotos. Testaufbau-Fehler beim ersten
+Lauf: sips-JPEG mit EXIF → vom Main korrekt abgelehnt, im Fenster neu kodiert nachgelaufen.
+
+Abnahme in der Dev-App (02.11.2026, über CDP, Computer-Use lieferte keinen Bildschirm): Bild im Chat
+lokal (qwen3.8:27b-mlx, richtig), Cloud-Bildweg am echten Anbieter (OpenRouter, Haiku 5.5, Testbild,
+richtig, nach sichtbarer Freigabe), Widerruf sofort in der Datei und Textfrage mit Verlaufsbildern
+danach abgelehnt, „Stattdessen Text daraus lesen“ (hochkant gespeichertes Foto, richtig), Agent mit
+Ordner aus zwei Fotos und zwei PDFs (alle Werte richtig, Zwischenspeicher griff). Dabei gefunden und
+behoben: Anhangsuche und Dateidialog boten keine Bilder an, Infotext nannte Bilder und Scans noch als
+„nicht lesbar“; Bilder jetzt nur im Agent-Auftrag angeboten (`useContextVaultFiles({ images })`).
+Nachgezogen (Nutzerentscheidung 02.11.2026): Bildmarke sammelt alle Empfänger
+(`imageRecipients`); lehnt der Weg nur Verlaufsbilder ab, geht die Textfrage ohne sie, die Antwort
+nennt den Grund (`imagesWithheld`). Vermerk fürs Modell neu (`imageOmittedNote`): Haiku las das alte
+„nicht mitgeschickt“ als „nie ein Bild“ und erklärte die richtige Antwort für erfunden. In der App
+geprüft. Offen: Prüfset, Commit/PR/Release.
+
+Runde 6 (02.11.2026): F54–F58 umgesetzt, Prüfrunden beendet.
+
+Runde 5 (02.11.2026): 11 von 12 Befunden umgesetzt, F46 abgelehnt. Offen vor Release: Prüfset, Cloud-Bildweg am echten Anbieter, Nutzerabnahme.
+
+Rev. 7, 02.11.2026: Runde 4 beantwortet, F30 im Code behoben, Bauplan für 1.2 mit Reihenfolge aus F39.
+Gebaut (uncommittet): Schritt 1–3 — Bildvertrag (`shared/chatImages.ts`), Prüfstelle
+(`shared/chatImageGate.ts`, `main/llm/chatImageRequest.ts`), Bilder im Petrol-Chat lokal und über
+OpenRouter/LLMBase mit eigener Zustimmung (Bildmarke + Einstellungen → Cloud-Anbieter). In der
+Dev-App geprüft: Chromium-JPEG ohne APP1, qwen3.5:4b liest Testrechnung richtig, Ablehnung bei
+Ollama-Cloud (Tag und `remote_host`), Modell ohne Vision, fehlenden Bytes, falschem Modus.
+Cloud-Bildweg nicht am echten Anbieter geprüft.
+Schritt 4 gebaut (uncommittet): `main/ocr/localOcr.ts` als einziger Einstieg (Modell aus
+ui-settings.json, frische Lokal-/Vision-Prüfung je Seite, Vordergrund, Abbruchsignal; Test
+verbietet andere Importe von `extractOcrPage`). `visionOcr.ts`: äußeres finally, Signal bis
+fetch, Stream ohne `done` = unvollständig (F31). PDF-Knopf nutzt den Einstieg und ignoriert das
+Modell aus dem Renderer. Chat: „Stattdessen Text daraus lesen“ an der Bildzeile und „Text aus
+dem Bild lesen“ an abgelehnten Bildfragen, Text als „Bild n“ sichtbar im Eingabefeld, abbrechbar.
+Beim Prüfen gefunden und behoben: glm-ocr hing auf einer kurzen Seite in Endloszeilen ```
+(50 s bis zur Ausgabegrenze, der Wortvergleich sah nichts) — `ocrRepetition.ts` erkennt jetzt
+≥ 12 gleiche Zeilen ohne Text am Ende (`OCR_JUNK_RUN`), danach 1,9 s und sauberer Text.
+Schritt 5 gebaut (uncommittet): Art `image` (JPEG, PNG; WebP/HEIC bewusst nicht, `nativeImage`
+öffnet sie nicht verlässlich). `main/ocr/agentOcr.ts`: Lauf-Zustand (Einstellungen beim Start,
+40 Bilder/Seiten, Zwischenspeicher je sha256), Verkleinern auf 1600 px über `nativeImage`.
+**`nativeImage` wendet die EXIF-Drehung nicht an** (gemessen) — `shared/imageOrientation.ts`
+liest den Tag und dreht die Pixel selbst (getestet, alle 8 Fälle). Lauf-Kontext geht an
+`read_attachment`, `read_context_file` und `folder_digest`; ohne ihn (Notiz-Chat) „nur im
+Agent-Auftrag lesbar“. Systemtext nennt Bilder samt Prüfhinweis bzw. „nicht eingerichtet“,
+Manifest markiert Bilder, Datenwege-Karte nennt erkannten Bildtext. Echter Lauf (qwen3.8:27b-mlx,
+Foto mit Pixeln hochkant + Orientation 6): Nummer und Betrag richtig, Ergebnis mit Prüfhinweis.
+Schritt 6 gebaut (uncommittet): Prototyp verstecktes Fenster bestanden (gemischte Test-PDF:
+erste Seite 0,34 s inkl. Fensterstart, danach 35–63 ms je Seite, Fenster ~140–200 MB, schließt
+nach 60 s Leerlauf) → 4a in 1.2. `extractPdfText` liefert Seiten mit Bildangabe (Operatorliste),
+rastert Seiten ohne Text mit Bild und erkennt sie über `ocrForAgent` (Budget/Cache des Laufs);
+`assemblePdfPages` führt Abdeckung (erkannt, fehlgeschlagen, Budget, leer, ungelesen, Bilder auf
+Textseiten) und wirft erst, wenn nach der Erkennung kein Text da ist (F29). Echter Lauf
+(qwen3.8:27b-mlx): gemischte PDF Seite 2 und reine Scan-PDF gelesen, Liste korrekt, zweite
+Erkennung aus dem Zwischenspeicher. Offen vor Release: Prüfset 12 Bilder, Cloud-Bildweg am
+echten Anbieter, Codex-Nachprüfung von Rev. 7.
+
+Rev. 6, 02.11.2026: Bilder (3a, 3b, 4a, 4b, Punkt 19) vor Teil 1, Ziel Release 1.2. Codex-Runde 4 zu Teil 4, Punkt 19 und Rev. 6.
 
 Rev. 5a, 02.11.2026: Punkt 13a (gemischte PDFs) ergänzt, Stufe 1 gebaut (uncommittet).
 

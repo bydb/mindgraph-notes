@@ -361,8 +361,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('ollama-rerank-pair', model, query, document) as Promise<{ success: boolean; score?: number; error?: string }>,
 
   // Ollama Chat für Notes Chat
-  ollamaChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) =>
-    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds, requestId, webTopics),
+  ollamaChat: (model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>, images?: Array<{ id: string; dataBase64: string }>) =>
+    ipcRenderer.invoke('ollama-chat', model, messages, context, chatMode, cloud, contextAttachmentIds, requestId, webTopics, images),
   onOllamaChatChunk: (callback: (chunk: string) => void) => {
     ipcRenderer.removeAllListeners('ollama-chat-chunk')
     ipcRenderer.on('ollama-chat-chunk', (_event, chunk) => callback(chunk))
@@ -471,8 +471,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     port?: number
     contextAttachmentIds?: string[]
   }) => ipcRenderer.invoke('lmstudio-generate', request),
-  lmstudioChat: (model: string, messages: Array<{ role: string; content: string }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port?: number, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>) =>
-    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds, requestId, webTopics),
+  lmstudioChat: (model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port?: number, contextAttachmentIds?: string[], requestId?: string, webTopics?: Array<{ text: string; clipped: boolean }>, images?: Array<{ id: string; dataBase64: string }>) =>
+    ipcRenderer.invoke('lmstudio-chat', model, messages, context, chatMode, port, contextAttachmentIds, requestId, webTopics, images),
   lmstudioEmbeddings: (model: string, text: string, port?: number) =>
     ipcRenderer.invoke('lmstudio-embeddings', model, text, port),
   lmstudioEmbeddingModels: (port?: number) => ipcRenderer.invoke('lmstudio-embedding-models', port),
@@ -510,6 +510,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   visionOcrModels: () => ipcRenderer.invoke('vision-ocr-models'),
   visionOcrExtractPage: (base64Image: string, model: string, pageNum: number) =>
     ipcRenderer.invoke('vision-ocr-extract-page', base64Image, model, pageNum),
+  petrolChatImageOcr: (requestId: string, images: Array<{ id: string; dataBase64: string }>) =>
+    ipcRenderer.invoke('petrol-chat-image-ocr', requestId, images),
+  petrolChatImageOcrAbort: (requestId: string) => ipcRenderer.invoke('petrol-chat-image-ocr-abort', requestId),
 
   // Readwise Integration API
   readwiseCheck: (apiKey: string) => ipcRenderer.invoke('readwise-check', apiKey),

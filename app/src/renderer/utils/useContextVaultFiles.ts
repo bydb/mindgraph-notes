@@ -7,6 +7,10 @@ import { useNotesStore } from '../stores/notesStore'
 import type { FileEntry } from '../../shared/types'
 
 const SUPPORTED = /\.(xlsx|xls|docx|pptx|pdf|md|markdown|txt|csv|html|htm)$/i
+// Bilder (JPEG, PNG) liest nur der Agent-Auftrag, per lokaler Texterkennung (main/ocr/agentOcr.ts).
+// Notiz-Chat und Umschreib-Vorschlag haben keine Erkennung — dort ein Bild anzubieten, hieße
+// eine Anfrage, die mit Fehler endet.
+const IMAGES = /\.(png|jpe?g)$/i
 
 export interface ContextVaultFile {
   relPath: string
@@ -14,7 +18,8 @@ export interface ContextVaultFile {
   isFolder: boolean
 }
 
-export function useContextVaultFiles(): ContextVaultFile[] {
+export function useContextVaultFiles(opts: { images?: boolean } = {}): ContextVaultFile[] {
+  const images = opts.images === true
   const fileTree = useNotesStore(s => s.fileTree)
   return useMemo(() => {
     const out: ContextVaultFile[] = []
@@ -24,12 +29,12 @@ export function useContextVaultFiles(): ContextVaultFile[] {
           // Ordner-Kontext (Stufe 1): Ordner sind selbst anhängbar (Manifest + Prioritätslesen).
           out.push({ relPath: e.path, name: e.name, isFolder: true })
           if (e.children) walk(e.children)
-        } else if (SUPPORTED.test(e.name)) {
+        } else if (SUPPORTED.test(e.name) || (images && IMAGES.test(e.name))) {
           out.push({ relPath: e.path, name: e.name, isFolder: false })
         }
       }
     }
     walk(fileTree)
     return out
-  }, [fileTree])
+  }, [fileTree, images])
 }

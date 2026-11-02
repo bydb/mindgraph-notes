@@ -92,4 +92,15 @@ describe('trimOcrRepetition', () => {
     const page = `${PAGE}\n\nDie Kosten betragen pro Schüler 24,95 Euro, insgesamt 3.742,50 Euro`
     expect(trimOcrRepetition(`${page}\n${page}\n${page}`)).toEqual({ text: page, trimmed: true })
   })
+
+  it('schneidet Endlosreihen leerer Fences samt kurzer Kopie ab (glm-ocr, 02.11.2026)', () => {
+    const raw = 'Rechnung Nr. 4711\nBetrag: 238,50 EUR\n```markdown\nRechnung Nr. 4711\nBetrag: 238,50 EUR\n```\n' + '```\n'.repeat(300)
+    expect(looksLikeOcrLoop(raw)).toBe(true)
+    expect(trimOcrRepetition(raw)).toEqual({ text: 'Rechnung Nr. 4711\nBetrag: 238,50 EUR', trimmed: true })
+  })
+
+  it('lässt eine echte Trennlinien-Folge unter der Schwelle stehen', () => {
+    const raw = 'Kapitel\n' + '---\n'.repeat(5) + 'Ende'
+    expect(looksLikeOcrLoop(raw)).toBe(false)
+  })
 })

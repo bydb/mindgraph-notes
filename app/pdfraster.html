@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- Verstecktes Fenster: PDF-Seiten für die Texterkennung zu Bildern rendern (main/ocr/pdfRaster.ts).
+         Kein Netz, keine Bilder von außen, nur eigene Skripte und der pdfjs-Worker. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self' blob:; connect-src 'self' data:; img-src 'self' data: blob:" />
+    <title>PDF-Raster</title>
+  </head>
+  <body>
+    <script type="module" src="/src/renderer/pdfRaster/pdfRaster.ts"></script>
+  </body>
+</html>

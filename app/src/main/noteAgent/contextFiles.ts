@@ -23,9 +23,11 @@ import {
   MAX_INVENTORY_DEPTH, MAX_INVENTORY_ENTRIES, type FolderInventory, type FolderRoot
 } from './folderInventory'
 import { estimateTokens, linesFittingTokens } from '../../shared/contextBudget'
-import { assemblePdfText, pdfNoTextNote } from '../../shared/pdfPageText'
+import { appendPdfNotes, assemblePdfPages, PDF_PAGE_MIN_CHARS, type PdfPageInput } from '../../shared/pdfPageText'
+import { AgentOcrBudgetError, agentOcrUnavailable, ocrForAgent, ocrImageForAgent, type OcrReadContext } from '../ocr/agentOcr'
+import { rasterPdfPages } from '../ocr/pdfRaster'
 
-export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'folder'
+export type ContextFileKind = 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'image' | 'folder'
 
 export interface ContextAttachmentInfo {
   id: string
@@ -88,7 +90,13 @@ const EXT_TO_KIND: Record<string, ContextFileKind> = {
   // korrigiert werden kann. Ohne sie gab es keinen Weg zurück — der Agent konnte
   // seine eigene Seite nicht lesen und musste sie aus dem Gedächtnis neu bauen.
   '.html': 'html',
-  '.htm': 'html'
+  '.htm': 'html',
+  // Bilder liest nur der Agent, per lokaler Texterkennung (Rev. 7 Punkt 24). Ohne Lauf-
+  // Kontext (Notiz-Chat) meldet der Leser sie als nicht lesbar statt sie zu überspringen.
+  // WebP/HEIC fehlen bewusst: Electrons nativeImage öffnet nur JPEG und PNG verlässlich.
+  '.png': 'image',
+  '.jpg': 'image',
+  '.jpeg': 'image'
 }
 
 export function contextKindFromFilename(name: string): ContextFileKind | null {
@@ -226,18 +234,21 @@ export async function getShellAttachmentPaths(senderId: number, ids: string[]): 
 export async function readAttachmentRaw(
   senderId: number,
   id: string,
-  instruction = ''
+  instruction = '',
+  ocr?: OcrReadContext
 ): Promise<{ name: string; content: string; truncated: boolean }> {
   const entry = registryBySender.get(senderId)?.get(id)
   if (!entry) throw new Error('Anhang nicht (mehr) registriert')
   if (entry.kind === 'folder') {
-    const res = await readFolderContext(entry, instruction, MAX_CHARS_TOTAL, true)
+    const res = await readFolderContext(entry, instruction, MAX_CHARS_TOTAL, true, ocr)
     return { name: entry.name, content: res.content, truncated: res.truncated }
   }
-  let content = hygieneText(await extractContent(entry)).trim()
-  if (!content) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
-  const truncated = content.length > MAX_CHARS_PER_FILE
-  if (truncated) content = content.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]'
+  const meta: ExtractMeta = {}
+  const full = hygieneText(await extractContent(entry, ocr, meta)).trim()
+  if (!full) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
+  const truncated = full.length > MAX_CHARS_PER_FILE
+  let content = truncated ? full.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]' : full
+  if (truncated && meta.pdfNotes) content = appendPdfNotes(content, meta.pdfNotes)
   return { name: entry.name, content, truncated }
 }
 
@@ -576,6 +587,8 @@ export interface ReadFolderFileOptions {
    * werden. Ohne Angabe gelten nur die festen Grenzen.
    */
   maxTokens?: number
+  /** Lauf-Kontext für Bilder (Texterkennung). Ohne ihn sind Bilder nicht lesbar. */
+  ocr?: OcrReadContext
 }
 
 // Platz für Überschriften und Blätter-Hinweise neben dem eigentlichen Inhalt.
@@ -607,6 +620,8 @@ export async function readFolderFile(
   const offset = Math.max(1, Math.floor(opts.offset ?? 1))
   let content: string
   let truncated = false
+  /** PDF-Vermerke aus der Abdeckung, damit sie das Kürzen und Blättern überstehen. */
+  const meta: ExtractMeta = {}
 
   if (info.kind === 'xlsx') {
     const data = await parseExcel(buf)
@@ -650,7 +665,7 @@ export async function readFolderFile(
     }
     content = parts.join('\n\n')
   } else {
-    const full = hygieneText(await extractContentFromBuffer(info.kind, buf)).trim()
+    const full = hygieneText(await extractContentFromBuffer(info.kind, buf, undefined, opts.ocr, info.name, meta)).trim()
     if (!full) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
     const lines = full.split('\n')
     let maxLines = Math.max(1, Math.floor(opts.maxRows ?? DEFAULT_LINES_TEXT))
@@ -671,6 +686,7 @@ export async function readFolderFile(
     content = content.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht — kleineren Bereich per offset/max_rows anfordern]'
     truncated = true
   }
+  if (truncated && meta.pdfNotes) content = appendPdfNotes(content, meta.pdfNotes)
   return { folderName: entry.name, fileName: info.name, content, truncated }
 }
 
@@ -683,19 +699,86 @@ function hygieneText(text: string): string {
     .replace(/[\u202A-\u202E\u2066-\u2069]/g, '')
 }
 
-async function extractPdfText(data: Buffer, maxPages = MAX_PDF_PAGES, maxChars = MAX_CHARS_PER_FILE): Promise<string> {
+/**
+ * Angaben neben dem Text, die nicht aus dem (untrusted) Dateiinhalt zurückgelesen werden
+ * dürfen (Codex F50): bei PDFs die Vermerke zu Abdeckung, Erkennung und Kürzung.
+ */
+interface ExtractMeta {
+  pdfNotes?: string[]
+}
+
+/**
+ * Lesezeit der Textebene im Main (Codex F47/F55). Jeder einzelne pdfjs-Schritt wird mit der
+ * Restzeit und dem Abbruchsignal umgeben: danach wartet die App nicht mehr, gibt das Dokument
+ * frei und meldet den Rest als gekürzt. Grenze: ein Schritt, der den Main selbst blockiert,
+ * lässt sich so nicht hart abbrechen — das geht erst mit dem Lesen in einem eigenen Prozess.
+ */
+const PDF_PARSE_BUDGET_MS = 60_000
+
+export class PdfDeadlineError extends Error {}
+
+export function withPdfDeadline<T>(p: Promise<T>, until: number, signal?: AbortSignal): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const ms = until - Date.now()
+    if (ms <= 0) return reject(new PdfDeadlineError('Zeitgrenze'))
+    if (signal?.aborted) return reject(new Error('Abgebrochen'))
+    const timer = setTimeout(() => done(() => reject(new PdfDeadlineError('Zeitgrenze'))), ms)
+    const onAbort = (): void => done(() => reject(new Error('Abgebrochen')))
+    signal?.addEventListener('abort', onAbort, { once: true })
+    function done(fn: () => void): void {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      fn()
+    }
+    p.then(v => done(() => resolve(v)), e => done(() => reject(e)))
+  })
+}
+
+/** Lange Seite der Seitenbilder für die Texterkennung. */
+const PDF_OCR_MAX_SIDE = 1600
+
+async function extractPdfText(
+  data: Buffer,
+  maxPages = MAX_PDF_PAGES,
+  maxChars = MAX_CHARS_PER_FILE,
+  ocr?: OcrReadContext,
+  label = 'PDF',
+  meta?: ExtractMeta
+): Promise<string> {
   // Legacy-ESM-Build läuft im Electron-Main ohne Canvas (gleiches Muster wie pdfReflow).
   const pdfjs: typeof import('pdfjs-dist') = await import('pdfjs-dist/legacy/build/pdf.mjs')
   // Kopie statt View: pdfjs übernimmt (transferiert) den Speicher des Arrays.
   const bytes = new Uint8Array(data)
-  const doc = await pdfjs.getDocument({ data: bytes, isEvalSupported: false }).promise
+  const until = Date.now() + PDF_PARSE_BUDGET_MS
+  const signal = ocr?.signal
+  const task = pdfjs.getDocument({ data: bytes, isEvalSupported: false })
+  let doc: Awaited<typeof task.promise>
   try {
+    doc = await withPdfDeadline(task.promise, until, signal)
+  } catch (e) {
+    void task.destroy().catch(() => undefined)
+    if (e instanceof PdfDeadlineError) throw new Error(`PDF ließ sich nicht in ${PDF_PARSE_BUDGET_MS / 1000} s öffnen`)
+    throw e
+  }
+  const imageOps = new Set([pdfjs.OPS.paintImageXObject, pdfjs.OPS.paintInlineImageXObject, pdfjs.OPS.paintImageMaskXObject, pdfjs.OPS.paintImageXObjectRepeat])
+  const pages: PdfPageInput[] = []
+  let totalPages = 0
+  let timedOut = false
+  try {
+    totalPages = doc.numPages
     const last = Math.min(doc.numPages, maxPages)
-    const pages: string[] = []
     let chars = 0
     for (let p = 1; p <= last; p++) {
-      const page = await doc.getPage(p)
-      const tc = await page.getTextContent()
+      // Jeder Schritt mit Restzeit und Abbruch (F47/F55). Zeitgrenze = Rest gilt als gekürzt.
+      let page: Awaited<ReturnType<typeof doc.getPage>>
+      let tc: Awaited<ReturnType<typeof page.getTextContent>>
+      try {
+        page = await withPdfDeadline(doc.getPage(p), until, signal)
+        tc = await withPdfDeadline(page.getTextContent(), until, signal)
+      } catch (e) {
+        if (e instanceof PdfDeadlineError) { timedOut = true; break }
+        throw e
+      }
       let text = ''
       let line = ''
       for (const it of tc.items) {
@@ -707,21 +790,80 @@ async function extractPdfText(data: Buffer, maxPages = MAX_PDF_PAGES, maxChars =
         }
       }
       if (line) text += line + '\n'
-      pages.push(text)
+      // Bilder auf der Seite: entscheidet „Scan“ gegen „leer“ und den Vermerk für Textseiten (F41).
+      // Braucht kein Canvas, nur die Operatorliste.
+      let hasImages: boolean | undefined
+      try {
+        const ops = await withPdfDeadline(page.getOperatorList(), until, signal)
+        hasImages = ops.fnArray.some(fn => imageOps.has(fn))
+      } catch (e) {
+        if (signal?.aborted) throw e
+        hasImages = undefined
+      }
+      page.cleanup()
+      pages.push({ text, hasImages })
       chars += text.length + 1
       if (chars > maxChars) break
     }
-    // Seiten ohne Textebene werden benannt, eine Datei ganz ohne Text wirft (shared/pdfPageText.ts).
-    return assemblePdfText(pages, doc.numPages)
   } finally {
-    await doc.destroy().catch(() => undefined)
+    // Freigeben, aber nicht unbegrenzt darauf warten.
+    await Promise.race([doc.destroy().catch(() => undefined), new Promise(r => setTimeout(r, 5_000))])
   }
+
+  if (timedOut && pages.length === 0) throw new Error(`PDF ließ sich nicht in ${PDF_PARSE_BUDGET_MS / 1000} s lesen`)
+
+  // Stufe 2 (Rev. 7 Punkt 25): Seiten ohne Textebene mit Bild gehen durch die lokale
+  // Texterkennung — nur im Agent-Auftrag, mit dem Budget des Laufs.
+  const off = ocr ? agentOcrUnavailable(ocr.state) : 'Texterkennung gibt es nur im Agent-Auftrag'
+  const candidates = pages
+    .map((pg, i) => ({ pg, n: i + 1 }))
+    .filter(({ pg }) => pg.text.replace(/\s/g, '').length < PDF_PAGE_MIN_CHARS && pg.hasImages !== false)
+  if (ocr && !off && candidates.length) {
+    const wanted = new Set(candidates.map(c => c.n))
+    try {
+      await rasterPdfPages(data, [...wanted], PDF_OCR_MAX_SIDE, async r => {
+        const pg = pages[r.page - 1]
+        try {
+          const res = await ocrForAgent(Buffer.from(r.jpeg, 'base64'), `${label} S. ${r.page}`, ocr, { jpeg: r.jpeg })
+          pg.ocr = { text: res.content, ...(res.incomplete ? { incomplete: true } : {}) }
+        } catch (e) {
+          if (ocr.signal?.aborted) throw e
+          if (e instanceof AgentOcrBudgetError) return false
+          pg.ocr = { error: e instanceof Error ? e.message : String(e) }
+        }
+      }, ocr.signal)
+    } catch (e) {
+      if (ocr.signal?.aborted) throw e
+      const msg = `Seitenbild nicht erzeugt (${e instanceof Error ? e.message : String(e)})`
+      for (const n of wanted) if (!pages[n - 1].ocr) pages[n - 1].ocr = { error: msg }
+    }
+    // Was nach erschöpftem Budget übrig blieb, wird als solches benannt.
+    for (const n of wanted) if (!pages[n - 1].ocr) pages[n - 1].ocr = { budget: true }
+  }
+  // Seiten ohne Textebene werden benannt, eine Datei ganz ohne Text wirft (shared/pdfPageText.ts).
+  // Scheitert die ganze Datei, soll die Meldung sagen, warum die Erkennung nicht half.
+  const firstOcrError = pages.map(p => p.ocr).find((o): o is { error: string } => !!o && 'error' in o)?.error
+  const budgetHit = pages.some(p => p.ocr && 'budget' in p.ocr)
+  const hint = off ?? firstOcrError ?? (budgetHit ? 'Budget der Texterkennung für diesen Lauf erschöpft' : undefined)
+  const assembled = assemblePdfPages(pages, totalPages, hint ? `${hint.replace(/\.$/, '')}.` : undefined)
+  if (meta) meta.pdfNotes = assembled.notes
+  return assembled.text
 }
 
 // Inhalt aus bereits gelesenen Bytes extrahieren. Ordner-Dateien kommen über den
 // geprüften Deskriptor (readFileInFolder) hierher; der Pfad wird nicht erneut geöffnet.
-async function extractContentFromBuffer(kind: ContextFileKind, buf: Buffer, pdfLimits?: { maxPages: number; maxChars: number }): Promise<string> {
+async function extractContentFromBuffer(
+  kind: ContextFileKind,
+  buf: Buffer,
+  pdfLimits?: { maxPages: number; maxChars: number },
+  ocr?: OcrReadContext,
+  label = 'Bild',
+  meta?: ExtractMeta
+): Promise<string> {
   switch (kind) {
+    case 'image':
+      if (!ocr) throw new Error('Bilder liest die App nur in einem Agent-Auftrag per Texterkennung')
+      return ocrImageForAgent(buf, label, ocr)
     case 'xlsx': {
       const data = await parseExcel(buf)
       const parts: string[] = []
@@ -749,7 +891,7 @@ async function extractContentFromBuffer(kind: ContextFileKind, buf: Buffer, pdfL
         .join('\n\n')
     }
     case 'pdf':
-      return pdfLimits ? extractPdfText(buf, pdfLimits.maxPages, pdfLimits.maxChars) : extractPdfText(buf)
+      return extractPdfText(buf, pdfLimits?.maxPages, pdfLimits?.maxChars, ocr, label, meta)
     case 'html': {
       // Zurückgegeben wird NUR der selbst verfasste Teil, nicht das ganze Dokument:
       // genau das erwartet write_html als body_html zurück. Das Gerüst der App
@@ -765,10 +907,10 @@ async function extractContentFromBuffer(kind: ContextFileKind, buf: Buffer, pdfL
 }
 
 // Einzel-Anhänge (Dateien, keine Ordner): kanonisch prüfen, dann lesen.
-async function extractContent(entry: AttachmentEntry): Promise<string> {
+async function extractContent(entry: AttachmentEntry, ocr?: OcrReadContext, meta?: ExtractMeta): Promise<string> {
   // C01: kanonischen Pfad UNMITTELBAR vor dem Read auflösen/prüfen und daraus lesen.
   const src = await assertEntryReadable(entry)
-  return extractContentFromBuffer(entry.kind, await fs.readFile(src))
+  return extractContentFromBuffer(entry.kind, await fs.readFile(src), undefined, ocr, entry.name, meta)
 }
 
 // Wörter (≥4 Zeichen) aus der Nutzer-Anweisung — priorisieren Dateien im Ordner,
@@ -800,7 +942,8 @@ async function readFolderContext(
   entry: AttachmentEntry,
   instruction: string,
   budget: number,
-  withToolHints = false
+  withToolHints = false,
+  ocr?: OcrReadContext
 ): Promise<{ content: string; truncated: boolean }> {
   const { files: all, inv } = await listSupportedFolderFiles(entry)
   if (all.length === 0) {
@@ -842,11 +985,14 @@ async function readFolderContext(
       continue
     }
     try {
-      let content = hygieneText(await extractContentFromBuffer(f.kind, await readFolderBuffer(entry, f))).trim()
+      const meta: ExtractMeta = {}
+      let content = hygieneText(await extractContentFromBuffer(f.kind, await readFolderBuffer(entry, f), undefined, ocr, f.name, meta)).trim()
       if (!content) {
         status.set(f.name, 'übersprungen (leer)')
         continue
       }
+      // Status aus der Abdeckung, nicht aus dem gekürzten Text (F30/F50).
+      const noText = meta.pdfNotes?.length ? meta.pdfNotes.join('; ') : undefined
       let fileTruncated = false
       if (content.length > MAX_CHARS_PER_FOLDER_FILE) {
         content = content.slice(0, MAX_CHARS_PER_FOLDER_FILE) + '\n[gekürzt: Datei-Budget im Ordner erreicht]'
@@ -860,7 +1006,6 @@ async function readFolderContext(
       }
       used += content.length
       readCount++
-      const noText = f.kind === 'pdf' ? pdfNoTextNote(content) : undefined
       status.set(f.name, [fileTruncated ? 'gelesen (gekürzt)' : 'gelesen', noText ? `(${noText})` : ''].filter(Boolean).join(' '))
       sections.push(`--- Inhalt: ${f.name} ---\n${content}`)
     } catch (e) {
@@ -1094,12 +1239,11 @@ export async function extractFileContentRaw(absPath: string): Promise<string> {
   const maxBytes = kind === 'md' || kind === 'txt' || kind === 'csv' || kind === 'html' ? MAX_BYTES_TEXT : MAX_BYTES_BINARY
   if (st.size > maxBytes) throw new Error(`${name} ist zu groß`)
   const entry: AttachmentEntry = { id: '', name, kind, insideVault: true, sizeBytes: st.size, absPath }
-  let content = hygieneText(await extractContent(entry)).trim()
-  if (!content) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
-  if (content.length > MAX_CHARS_PER_FILE) {
-    content = content.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]'
-  }
-  return content
+  const meta: ExtractMeta = {}
+  const full = hygieneText(await extractContent(entry, undefined, meta)).trim()
+  if (!full) throw new Error('Datei ist leer oder enthält keinen lesbaren Text')
+  if (full.length <= MAX_CHARS_PER_FILE) return full
+  return appendPdfNotes(full.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]', meta.pdfNotes ?? [])
 }
 
 export interface ContextReadResult {
@@ -1133,13 +1277,14 @@ export async function readContextBlock(senderId: number, ids: string[], instruct
       let content: string
       let truncated: boolean
       let label: string
+      const meta: ExtractMeta = {}
       if (entry.kind === 'folder') {
         const res = await readFolderContext(entry, instruction, remainingBefore)
         content = res.content
         truncated = res.truncated
         label = `Ordner: ${entry.name}`
       } else {
-        content = hygieneText(await extractContent(entry)).trim()
+        content = hygieneText(await extractContent(entry, undefined, meta)).trim()
         if (!content) {
           files.push({ id, name: entry.name, chars: 0, truncated: false, error: 'Datei ist leer oder enthält keinen lesbaren Text' })
           continue
@@ -1149,10 +1294,15 @@ export async function readContextBlock(senderId: number, ids: string[], instruct
         label = `Datei: ${entry.name}`
       }
 
-      if (content.length > remainingBefore) {
-        content = content.slice(0, remainingBefore) + '\n[gekürzt: Gesamtbudget erreicht]'
+      // PDF-Vermerke erst nach der LETZTEN Kürzung anhängen, sonst schneidet das Gesamtbudget
+      // sie wieder ab (Codex F56). Sie haben Vorrang vor dem Text davor.
+      const notes = truncated || content.length > remainingBefore ? (meta.pdfNotes ?? []) : []
+      const notesLen = appendPdfNotes('', notes).length
+      if (content.length + notesLen > remainingBefore) {
+        content = content.slice(0, Math.max(0, remainingBefore - notesLen)) + '\n[gekürzt: Gesamtbudget erreicht]'
         truncated = true
       }
+      content = appendPdfNotes(content, truncated ? notes : [])
       total += content.length
 
       const token = randomBytes(4).toString('hex')
@@ -1218,6 +1368,8 @@ export async function readFolderSourcesForDigest(
     admit?: (relPath: string, text: string) => string | undefined
     /** Summe der behaltenen Texte in Token; darüber endet das Lesen (Speicherschutz, F47). */
     maxTotalTokens?: number
+    /** Lauf-Kontext für Bilder (Texterkennung). */
+    ocr?: OcrReadContext
   } = {}
 ): Promise<DigestReadResult> {
   const entry = requireFolderEntry(senderId, ids, folderName)
@@ -1254,13 +1406,15 @@ export async function readFolderSourcesForDigest(
     }
     try {
       const buf = await readFolderBuffer(entry, f)
-      const text = hygieneText(await extractContentFromBuffer(f.kind, buf, { maxPages: DIGEST_PDF_MAX_PAGES, maxChars: DIGEST_PDF_MAX_CHARS })).trim()
+      const meta: ExtractMeta = {}
+      const text = hygieneText(await extractContentFromBuffer(f.kind, buf, { maxPages: DIGEST_PDF_MAX_PAGES, maxChars: DIGEST_PDF_MAX_CHARS }, opts.ocr, f.name, meta)).trim()
       if (!text) {
         items.push({ relPath: f.name, kind: f.kind, error: 'leer oder ohne lesbaren Text' })
         continue
       }
-      const marker = /\[gekürzt:[^\]]*\]/.exec(text)?.[0]
-      const notes = [marker?.slice(1, -1), f.kind === 'pdf' ? pdfNoTextNote(text) : undefined].filter(Boolean)
+      // PDF: Vermerke aus der Abdeckung (F50). Andere Formate: Kürzungsvermerk des eigenen Parsers.
+      const marker = f.kind === 'pdf' ? undefined : /\[gekürzt:[^\]]*\]/.exec(text)?.[0]
+      const notes = [marker?.slice(1, -1), ...(meta.pdfNotes ?? [])].filter(Boolean)
       const partial = notes.length > 0
         ? notes.join('; ')
         : f.kind === 'pptx' ? 'PowerPoint: nur Text und Notizen, keine Bildinhalte' : undefined

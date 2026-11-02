@@ -3,6 +3,7 @@
 // und ohne Text-Fallback für Tool-Calls: das Capability-Gate lässt nur Modelle mit
 // nativen Tool-Calls in den Loop (Plan F07 — Capability sauber getrennt von Qualität).
 
+import { AGENT_OCR_PAGE_BUDGET, agentOcrUnavailable } from '../ocr/agentOcr'
 import { asksForMindmap } from '../../shared/mindmapIntent'
 import { describeShellGuardrails } from '../../shared/shellGuardrails'
 import { computerVerbLabel, COMPUTER_TOOL_BY_VERB } from '../../shared/computerControl'
@@ -183,6 +184,7 @@ BILD-GENERIERUNG (für diesen Lauf verfügbar):
 
 WAS DU MIT DEN DATEI-WERKZEUGEN LESEN KANNST${run.shell ? ' (zusätzlich steht die freigegebene Shell zur Verfügung)' : ' (vollständige Liste — kein anderer Weg)'}:
 - Vom Nutzer angehängte Dateien und Ordner: Excel, Word, PowerPoint, PDF, Markdown, Text, CSV, HTML${folders.length ? ' (Ordner über list_context_folder und read_context_file)' : ''}.
+- Bilder (JPEG, PNG) in Anhängen und Ordnern${run.ocr && !agentOcrUnavailable(run.ocr) ? ` liest die App per Texterkennung auf diesem Rechner (höchstens ${AGENT_OCR_PAGE_BUDGET} je Lauf): du bekommst nur den erkannten Text, nicht das Bild. Er kann Lesefehler enthalten — Zahlen, Namen und Beträge daraus im Ergebnis als „aus Texterkennung, bitte prüfen“ kennzeichnen. Grafiken, Fotos ohne Text und Layout siehst du nicht` : ` kannst du in diesem Lauf NICHT lesen (Texterkennung nicht eingerichtet: Einstellungen → Integrationen → Vision OCR). Sag das dem Nutzer, statt den Inhalt zu raten`}.
 - Eine angehängte HTML-Seite kommt als Artikel-Inhalt zurück — genau in der Form, die write_html als body_html erwartet. So korrigierst du eine früher erzeugte Seite: anhängen, lesen, verbessert erneut mit write_html schreiben.
 - Notizen im Vault über ${run.vaultSearch ? 'vault_search (Suche nach Bedeutung), ' : ''}note_search und note_read — note_read liest ausschließlich .md.
 Fehlt dir eine Datei, dann sage dem Nutzer, dass er sie als Kontext anhängen muss. Behaupte NIE, ein Format sei grundsätzlich nicht lesbar.

@@ -20,6 +20,9 @@ interface CacheEntry {
   byModel: Map<string, ModelPricing>
   // Kontextfenster laut Katalog (context_length) — derselbe Abruf, kein zweiter Request.
   contextByModel: Map<string, number>
+  // Bildeingabe laut Katalog: OpenRouter `architecture.input_modalities`, LLMBase laut Codex F34
+  // `input_modalities` auf oberster Ebene (dort noch nicht am echten Zugang geprüft).
+  imageInputByModel: Map<string, boolean>
 }
 
 const cache = new Map<CloudChatBackend, CacheEntry>()
@@ -40,9 +43,10 @@ async function refresh(backend: CloudChatBackend, baseUrl: string, apiKey: strin
     signal: AbortSignal.timeout(10000)
   })
   if (!res.ok) throw new Error(`Preiskatalog ${backend}: ${res.status}`)
-  const json = await res.json() as { data?: Array<{ id?: string; pricing?: unknown; context_length?: unknown }> }
+  const json = await res.json() as { data?: Array<{ id?: string; pricing?: unknown; context_length?: unknown; input_modalities?: unknown; architecture?: { input_modalities?: unknown } }> }
   const byModel = new Map<string, ModelPricing>()
   const contextByModel = new Map<string, number>()
+  const imageInputByModel = new Map<string, boolean>()
   for (const m of json.data ?? []) {
     if (!m.id) continue
     const pricing = parseModelPricing(m.pricing)
@@ -50,8 +54,10 @@ async function refresh(backend: CloudChatBackend, baseUrl: string, apiKey: strin
     if (typeof m.context_length === 'number' && Number.isFinite(m.context_length) && m.context_length > 0) {
       contextByModel.set(m.id, m.context_length)
     }
+    const modalities = m.architecture?.input_modalities ?? m.input_modalities
+    if (Array.isArray(modalities)) imageInputByModel.set(m.id, modalities.includes('image'))
   }
-  cache.set(backend, { fetchedAt: Date.now(), byModel, contextByModel })
+  cache.set(backend, { fetchedAt: Date.now(), byModel, contextByModel, imageInputByModel })
 }
 
 /**
@@ -81,6 +87,22 @@ export async function getModelContextLength(
 ): Promise<number | null> {
   await ensureCatalog(backend, baseUrl, apiKey)
   return cache.get(backend)?.contextByModel.get(model) ?? null
+}
+
+/**
+ * Nimmt das Modell Bilder an? 'unknown', wenn der Katalog nicht erreichbar ist oder für
+ * das Modell keine Eingabearten nennt — dann geht das Bild mit und ein Fehler des Anbieters
+ * wird gemeldet, nie still ohne Bild weiter (Rev. 7 Punkt 21).
+ */
+export async function getModelImageInput(
+  backend: CloudChatBackend,
+  baseUrl: string,
+  model: string,
+  apiKey?: string
+): Promise<'yes' | 'no' | 'unknown'> {
+  await ensureCatalog(backend, baseUrl, apiKey)
+  const v = cache.get(backend)?.imageInputByModel.get(model)
+  return v === undefined ? 'unknown' : v ? 'yes' : 'no'
 }
 
 async function ensureCatalog(backend: CloudChatBackend, baseUrl: string, apiKey: string | undefined): Promise<void> {

@@ -13,7 +13,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import MarkdownIt from 'markdown-it'
-import { useUIStore } from '../../stores/uiStore'
+import { setChatImageConsentDurable, useUIStore } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useNoteAgentStore } from '../../stores/noteAgentStore'
 import { snapshotIdsIn, usePetrolChatStore, type PetrolChatMessage } from '../../stores/petrolChatStore'
@@ -34,6 +34,9 @@ import { followUpQuery, isAcknowledgement, lastSentWebQuery, looksConversational
 import { webTopicQuestions } from '../../utils/chatHistory'
 import { WebAnswerText, WebCheck, WebDeepLine, WebMarkLegend, WebProvenanceLine, WebSkippedLine, WebSourceList, WebSourcesFold, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 import { chatModelsOnly } from '../../../shared/chatModels'
+import { CHAT_IMAGE_MAX_PER_MESSAGE, type ChatImage } from '../../../shared/chatImages'
+import { CHAT_IMAGE_CLOUD_CONSENT_VERSION } from '../../../shared/chatImageGate'
+import { prepareChatImage } from '../../utils/chatImagePrep'
 
 interface Props {
   tabId: string
@@ -96,6 +99,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const messages = scope?.messages ?? EMPTY_MESSAGES
   const streaming = scope?.streaming ?? null
   const draft = scope?.draft ?? ''
+  const draftImages = scope?.draftImages ?? EMPTY_IMAGES
   const localModel = scope?.localModel ?? ''
   const busy = activeScope === tabId
   const busyElsewhere = !!activeScope && activeScope !== tabId
@@ -221,6 +225,68 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const pickerValue = activeCloudRoute ? activeCloudRoute.sentinel : model
   const hasModel = !!activeCloudRoute || !!model
 
+  // Bilder (Rev. 7 Punkt 20–22): aufbereitet im Renderer, geprüft im Main. Die Zeile über der
+  // Eingabe sagt vor dem Senden, wohin die Bilder gehen oder warum nicht.
+  const imageConsent = useUIStore(s => s.chatImageCloudConsent)
+  const imageConsentSaving = useUIStore(s => s.chatImageConsentSaving)
+  // Bilder im Verlauf gehen bei Folgefragen mit (höchstens zwei). Während eine Änderung der
+  // Bild-Zustimmung gespeichert wird, ist Senden mit Bildern gesperrt (Codex F54).
+  const historyHasImages = messages.some(m => m.role === 'user' && !!m.images?.length)
+  const [imageError, setImageError] = useState<string | null>(null)
+  const [imageDragOver, setImageDragOver] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const addImages = async (files: File[]) => {
+    const pics = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name))
+    if (!pics.length) return
+    setImageError(null)
+    const room = CHAT_IMAGE_MAX_PER_MESSAGE - chat().scope(tabId).draftImages.length
+    const errors: string[] = []
+    if (pics.length > room) errors.push(t('petrolChat.imageTooMany', { n: CHAT_IMAGE_MAX_PER_MESSAGE }))
+    const ready: ChatImage[] = []
+    for (const f of pics.slice(0, Math.max(0, room))) {
+      const r = await prepareChatImage(f)
+      if ('error' in r) errors.push(r.error)
+      else ready.push(r)
+    }
+    if (errors.length) setImageError(errors.join(' '))
+    if (ready.length) chat().setDraftImages(tabId, [...chat().scope(tabId).draftImages, ...ready].slice(0, CHAT_IMAGE_MAX_PER_MESSAGE))
+  }
+  // „Text aus dem Bild lesen“ (Rev. 7 Punkt 23): lokale Erkennung, Ergebnis sichtbar im
+  // Eingabefeld. Als „Bild n“, nie mit Dateinamen (Rev. 2 Punkt 7).
+  const ocrModule = useIsModuleEnabled('vision-ocr')
+  const [ocrRun, setOcrRun] = useState<string | null>(null)
+  const imagesToText = async (imgs: ChatImage[], baseText: string, fromDraft: boolean) => {
+    if (ocrRun || !imgs.length) return
+    const req = `ocr-${Date.now().toString(36)}`
+    setOcrRun(req)
+    setImageError(null)
+    try {
+      const r = await window.electronAPI.petrolChatImageOcr(req, imgs.map(i => ({ id: i.id, dataBase64: i.dataBase64 })))
+      if (!r.results.length) { setImageError(r.error ?? t('petrolChat.ocrNothing')); return }
+      const blocks = r.results.map(x => {
+        const n = imgs.findIndex(i => i.id === x.id) + 1
+        return x.error
+          ? t('petrolChat.ocrBlockFailed', { n, error: x.error })
+          : `${t('petrolChat.ocrBlockHead', { n })}${x.incomplete ? ` ${t('petrolChat.ocrIncomplete')}` : ''}\n${x.text}`
+      })
+      chat().setDraft(tabId, [baseText.trim(), ...blocks].filter(Boolean).join('\n\n'))
+      const read = new Set(r.results.filter(x => !x.error).map(x => x.id))
+      if (fromDraft) chat().setDraftImages(tabId, chat().scope(tabId).draftImages.filter(i => !read.has(i.id)))
+      if (r.error) setImageError(r.error)
+      requestAnimationFrame(() => inputRef.current?.focus())
+    } catch (e) {
+      setImageError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setOcrRun(null)
+    }
+  }
+  const imageProviderLabel = activeCloudRoute ? (activeCloudRoute.provider === 'llmbase' ? 'LLMBase' : 'OpenRouter') : ''
+  const imageNeedsConsent = !!activeCloudRoute && (imageConsent?.[activeCloudRoute.provider] ?? 0) < CHAT_IMAGE_CLOUD_CONSENT_VERSION
+  const imageBlock: 'web' | 'lmstudio' | 'consent' | null = !draftImages.length ? null
+    : webOn ? 'web'
+      : !activeCloudRoute && ollama.backend === 'lm-studio' ? 'lmstudio'
+        : imageNeedsConsent ? 'consent' : null
+
   // Modellweg aus dem Main — dieselbe Einstufung wie auf der Auftragskarte (lokal nur
   // nach Prüfung der Ollama-Metadaten). Das Zustimmungs-Gate des Agenten gilt hier nicht.
   const routeKey = `${ollama.backend}|${model}|${activeCloudRoute ? `${activeCloudRoute.provider}:${activeCloudRoute.model}` : ''}`
@@ -307,7 +373,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // stehen (der Store leert den Entwurf beim Senden synchron, deshalb danach zurücklegen).
   const send = (text?: string, snapshotId?: string, retryOf?: PetrolChatMessage) => {
     const question = text ?? draft
-    if (!question.trim() || busy || busyElsewhere || !hasModel) return
+    if (!question.trim() || busy || busyElsewhere || !hasModel || ocrRun) return
+    if (imageConsentSaving && (draftImages.length > 0 || historyHasImages || !!retryOf?.images?.length)) return
     // „Erneut senden“ einer gescheiterten Websuche sucht wieder, solange der Globus an ist — der
     // Globus bleibt seit 28.10.2026 an, sonst käme unter sichtbarem Globus eine Antwort ohne Seiten
     // (Codex F03). Ohne Globus geht die Wiederholung ohne Web.
@@ -315,7 +382,10 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     // Reine Bestätigungen („Danke“) lösen bei dauerhaftem Globus keine Suche aus (Codex F07).
     const withWeb = (text === undefined && webOn && !isAcknowledgement(question)) || retryWeb
     // Die vorgemerkte Nachfrage gilt nur, wo ihr Hinweis sichtbar ist (followUpActive: Globus aus).
-    const followId = withWeb ? undefined : snapshotId ?? (text === undefined && !webOn ? followUpId ?? undefined : undefined)
+    const images = text === undefined ? draftImages : retryOf?.images ?? []
+    // Eine Frage zum Bild geht ohne eingefrorene Seiten (Bild und Web nie zusammen).
+    const followId = withWeb || images.length ? undefined : snapshotId ?? (text === undefined && !webOn ? followUpId ?? undefined : undefined)
+    if (images.length && (withWeb || (text === undefined && imageBlock))) return
     if (withWeb && (webWaitsForRoute || (!retryWeb && webQueryProblem))) return
     if (followId && (followUpWaits || (text === undefined && followUpMissing))) return
     const keep = text !== undefined ? draft : ''
@@ -329,9 +399,11 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       web: !withWeb ? undefined
         : retryWeb ? (retryOf!.webDeep || webDeep ? { query: question.trim(), deep: true } : { query: retryOf!.webQuery ?? normalizeQuery(question) })
           : webDeep ? { query: question.trim(), deep: true } : { query: webQueryNorm },
-      followUp: followId ? { snapshotId: followId } : undefined
+      followUp: followId ? { snapshotId: followId } : undefined,
+      ...(images.length ? { images } : {})
     })
     if (keep) chat().setDraft(tabId, keep)
+    if (text === undefined && images.length) { chat().setDraftImages(tabId, []); setImageError(null) }
   }
 
   const applyChip = (text: string) => {
@@ -612,6 +684,19 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                         <span className="petrol-turn-webq">{t('petrolChat.webDeepSentUntilStop', { queries: turn.question.webSentQueries.map(q => `„${q}“`).join(', ') })}</span>
                       )}
                     </span>
+                    {!!turn.question.images?.length && (
+                      <span className="petrol-turn-images">
+                        {turn.question.images.map(img => {
+                          const d = turn.question!.imageDelivery?.[img.id]
+                          const to = turn.question!.imageRecipients?.[img.id] ?? (d?.kind === 'image' ? [d.target] : [])
+                          return (
+                            <span key={img.id} className={`petrol-img-chip ${d?.kind === 'rejected' && !to.length ? 'is-rejected' : ''}`} title={to.length ? `${img.name} · ${t('petrolChat.imageSentTo', { target: to.join(', ') })}` : d?.kind === 'rejected' ? `${img.name} · ${t('petrolChat.imageNotSent')}` : img.name}>
+                              <img src={`data:image/jpeg;base64,${img.dataBase64}`} alt={img.name} />
+                            </span>
+                          )
+                        })}
+                      </span>
+                    )}
                     {turn.question.followUp
                       ? <span className="petrol-turn-webbadge">{t('petrolChat.followUpBadge')}</span>
                       : turn.question.webDeep ? <span className="petrol-turn-webbadge">{t('petrolChat.webDeepBadge')}</span>
@@ -631,6 +716,11 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                           {t('petrolChat.retry')}
                         </button>
                       )}
+                      {ocrModule && turn.question?.images?.length && turn.question.images.some(img => turn.question!.imageDelivery?.[img.id]?.kind === 'rejected') ? (
+                        <button type="button" className="agent-card-btn" onClick={() => void imagesToText(turn.question!.images!, turn.question!.content, false)} disabled={!!ocrRun || busy || busyElsewhere}>
+                          {ocrRun ? t('petrolChat.ocrRunning') : t('petrolChat.ocrReadText')}
+                        </button>
+                      ) : null}
                     </div>
                     {(turn.answer.web?.snapshotGone || (turn.question?.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId))) && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
                     {turn.answer.web?.deep && <div className="petrol-web-block"><WebDeepLine deep={turn.answer.web.deep} /></div>}
@@ -690,6 +780,15 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                 ) : turn.answer ? (
                   <>
                     <div className="petrol-turn-a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.answer.content) }} />
+                    {!!turn.answer.imagesWithheld && (
+                      <div className="petrol-web-block"><div className="petrol-web-muted">{t(turn.answer.imagesWithheld.count === 1 ? 'petrolChat.imagesWithheldOne' : 'petrolChat.imagesWithheld', { n: turn.answer.imagesWithheld.count, reason: turn.answer.imagesWithheld.reason })}</div></div>
+                    )}
+                    {!!turn.answer.imagesDropped && (
+                      <div className="petrol-web-block"><div className="petrol-web-muted">{t(turn.answer.imagesDropped === 1 ? 'petrolChat.imagesDroppedOne' : 'petrolChat.imagesDropped', { n: turn.answer.imagesDropped })}</div></div>
+                    )}
+                    {turn.question?.images?.some(img => turn.question!.imageDelivery?.[img.id]?.kind === 'image') && (
+                      <div className="petrol-web-block"><div className="petrol-web-muted">{t('petrolChat.imageNotChecked')}</div></div>
+                    )}
                     {answerFoot(turn.answer)}
                   </>
                 ) : isLive && webProgress ? (
@@ -732,8 +831,62 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         </div>
       )}
 
-      <div className="petrol-chat-compose">
+      <div
+        className={`petrol-chat-compose ${imageDragOver ? 'is-dragover' : ''}`}
+        onDragOver={e => { if (!busy && [...e.dataTransfer.items].some(i => i.kind === 'file')) { e.preventDefault(); setImageDragOver(true) } }}
+        onDragLeave={() => setImageDragOver(false)}
+        onDrop={e => {
+          setImageDragOver(false)
+          if (busy || !e.dataTransfer.files.length) return
+          e.preventDefault()
+          void addImages([...e.dataTransfer.files])
+        }}
+      >
+        {!!draftImages.length && (
+          <div className="petrol-draft-images">
+            {draftImages.map(img => (
+              <span key={img.id} className="petrol-img-chip" title={img.name}>
+                <img src={`data:image/jpeg;base64,${img.dataBase64}`} alt={img.name} />
+                <button type="button" className="petrol-img-remove" aria-label={t('petrolChat.imageRemove')} title={t('petrolChat.imageRemove')} onClick={() => chat().setDraftImages(tabId, draftImages.filter(x => x.id !== img.id))}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {(!!draftImages.length || imageError) && !busy && (
+          <div className="petrol-web-line">
+            {imageError && <span className="petrol-web-line-warn">{imageError}</span>}
+            {imageBlock === 'web' ? <span className="petrol-web-line-warn">{t('petrolChat.imageNoWeb')}</span>
+              : imageBlock === 'lmstudio' ? <span className="petrol-web-line-warn">{t('petrolChat.imageNoLmStudio')}</span>
+                : imageBlock === 'consent' ? (
+                  <>
+                    <span>{t('petrolChat.imageConsentAsk', { provider: imageProviderLabel })}</span>
+                    <button type="button" className="agent-card-link-btn" disabled={imageConsentSaving} onClick={() => { void setChatImageConsentDurable(activeCloudRoute!.provider, CHAT_IMAGE_CLOUD_CONSENT_VERSION).then(ok => { if (!ok) setImageError(t('settings.cloud.chatImagesSaveFailed')) }) }}>
+                      {t('petrolChat.imageConsentGrant', { provider: imageProviderLabel })}
+                    </button>
+                  </>
+                )
+                  : draftImages.length ? <span>{activeCloudRoute ? t('petrolChat.imageToCloud', { route: activeCloudRoute.label }) : t('petrolChat.imageToLocal', { model })}</span> : null}
+            {!!draftImages.length && (ocrRun ? (
+              <>
+                <span>{t('petrolChat.ocrRunning')}</span>
+                <button type="button" className="agent-card-link-btn" onClick={() => void window.electronAPI.petrolChatImageOcrAbort(ocrRun)}>{t('petrolChat.ocrCancel')}</button>
+              </>
+            ) : ocrModule ? (
+              <button type="button" className="agent-card-link-btn" title={t('petrolChat.ocrInsteadHint')} onClick={() => void imagesToText(draftImages, draft, true)}>{t('petrolChat.ocrInstead')}</button>
+            ) : imageBlock ? <span className="petrol-web-muted">{t('petrolChat.ocrOff')}</span> : null)}
+          </div>
+        )}
         <div className="petrol-chat-input">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif,image/heic,.heic"
+            multiple
+            hidden
+            onChange={e => { const files = [...(e.target.files ?? [])]; e.target.value = ''; void addImages(files) }}
+          />
           <textarea
             ref={inputRef}
             rows={empty ? 3 : 1}
@@ -742,10 +895,28 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             aria-label={t('petrolChat.placeholder')}
             title={t('petrolChat.sendKeys')}
             onChange={e => chat().setDraft(tabId, e.target.value)}
+            onPaste={e => {
+              const files = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'))
+              if (!files.length) return
+              e.preventDefault()
+              void addImages(files)
+            }}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
             }}
           />
+          {!busy && (
+            <button
+              type="button"
+              className="petrol-chat-globe"
+              aria-label={t('petrolChat.imageAttach')}
+              title={t('petrolChat.imageAttach')}
+              disabled={busyElsewhere || draftImages.length >= CHAT_IMAGE_MAX_PER_MESSAGE}
+              onClick={() => fileRef.current?.click()}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5" /></svg>
+            </button>
+          )}
           {webModule && !busy && (
             <button
               type="button"
@@ -780,7 +951,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
             </button>
           ) : (
-            <button type="button" className="petrol-chat-send" onClick={() => send()} disabled={!draft.trim() || busyElsewhere || !hasModel || (webOn && (!!webQueryProblem || webWaitsForRoute)) || followUpWaits || followUpMissing} aria-label={webWaitsForRoute || followUpWaits ? t('petrolChat.webSendChecking') : t('petrolChat.send')} title={webWaitsForRoute || followUpWaits ? t('petrolChat.webSendChecking') : t('petrolChat.send')}>
+            <button type="button" className="petrol-chat-send" onClick={() => send()} disabled={!draft.trim() || busyElsewhere || !hasModel || !!imageBlock || !!ocrRun || (imageConsentSaving && (draftImages.length > 0 || historyHasImages)) || (webOn && (!!webQueryProblem || webWaitsForRoute)) || followUpWaits || followUpMissing} aria-label={webWaitsForRoute || followUpWaits ? t('petrolChat.webSendChecking') : t('petrolChat.send')} title={webWaitsForRoute || followUpWaits ? t('petrolChat.webSendChecking') : t('petrolChat.send')}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
             </button>
           )}
@@ -974,3 +1145,4 @@ function ChatGlyph({ icon }: { icon: ChatIcon }) {
 
 const EMPTY_MESSAGES: PetrolChatMessage[] = []
 const EMPTY_IDS: string[] = []
+const EMPTY_IMAGES: ChatImage[] = []
