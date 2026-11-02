@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.0] - 2026-11-02
+
+**Der Chat im Agent-Tab versteht jetzt Bilder, und der Agent liest Fotos und eingescannte PDFs.** Ein Foto, Screenshot oder Scan lässt sich anhängen, einfügen oder hineinziehen und dann befragen, mit einem lokalen Modell auf dem eigenen Rechner oder auf ausdrücklichen Wunsch über OpenRouter oder LLMBase. Im Auftrag liest der Agent Bilder und eingescannte PDF-Seiten per Texterkennung auf diesem Rechner und kennzeichnet, welche Werte daraus stammen.
+
+### Hintergrund
+
+- **Auslöser:** Bisher konnte der Chat nur Text verarbeiten, und der Agent übersprang Bilder in Ordnern ohne Hinweis. Eingescannte PDFs brachen mit „keine Textebene“ ab, gemischte PDFs galten als vollständig gelesen, obwohl die Scan-Seiten fehlten.
+- **Bilder im Chat:** Lokal gehen Bilder nur an Ollama-Modelle, die Bilder verstehen; die App prüft vor dem Senden, dass das Modell wirklich auf diesem Rechner rechnet. Vorher wird jedes Bild gedreht, verkleinert und ohne Ortsangaben und Kameradaten neu gespeichert. An OpenRouter oder LLMBase gehen Bilder nur mit einer eigenen Freigabe je Anbieter, die sich in den Einstellungen jederzeit zurücknehmen lässt. Unter jeder Antwort zu einem Bild steht, dass der Bildinhalt vom Modell gelesen und nicht geprüft ist.
+- **Text aus dem Bild lesen:** Versteht das gewählte Modell keine Bilder, liest die Texterkennung den Text heraus und setzt ihn sichtbar ins Eingabefeld. Gesendet wird dann nur dieser Text.
+- **Agent:** Bilder (JPEG, PNG) und Scan-Seiten in PDFs werden per Texterkennung auf diesem Rechner gelesen. An das Modell geht nur der erkannte Text, auch bei Cloud-Modellen. Je Auftrag gelten höchstens 40 Seiten oder Bilder und 15 Minuten. Seiten, die nicht gelesen werden konnten, und Bilder auf Textseiten werden ausdrücklich benannt.
+- **Texterkennung zuverlässiger:** Sie läuft nur noch mit Modellen auf diesem Rechner, lässt sich abbrechen und erkennt, wenn ein Modell in Wiederholungen hängt. Eine kurze Seite, die vorher bis zur Zeitgrenze lief, ist jetzt in wenigen Sekunden fertig.
+- **Chat mit Cloud-Modellen:** Die Freigabe für Cloud-Anbieter prüft jetzt die App selbst, bevor etwas gesendet wird. „Hiermit weiterfragen“ zeigt an, wenn die Seiten einer älteren Webantwort nicht mehr gespeichert sind.
+- **Grenzen:** HEIC- und WebP-Bilder werden nicht gelesen; iPhone-Fotos dafür als JPEG exportieren. Mit LM Studio und Ollama-Cloud-Modellen gehen keine Bilder. Zahlen aus Bildern und Scans sollten vor der Verwendung geprüft werden.
+
 ## [1.1.7] - 2026-11-01
 
 **Word- und Excel-Dateien, die der Agent erstellt, sehen jetzt fertig aus.** Tabellen landen in Word als echte Tabellen, und ohne eigene Vorlage tragen Überschriften und Tabellenköpfe die MindGraph-Farbe Petrol. Excel-Listen bekommen passende Spaltenbreiten und einen Filter in der Kopfzeile. Das Protokoll setzt die Eckdaten als Tabelle und hebt Diskussion, Beschluss und Aufgaben hervor.
