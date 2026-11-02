@@ -74,4 +74,22 @@ describe('trimOcrRepetition', () => {
     expect(out.text.endsWith('```')).toBe(true)
     expect(out.text.split('```').length - 1).toBe(2)
   })
+
+  it('entfernt auch den Anfang einer abgebrochenen zweiten Kopie (Abbruch beim Streamen)', () => {
+    const intro = 'Deutschsprachige Kurzskala zur Messung des Konstrukts Need for Cognition NFC-K\n\nDie folgenden Aussagen können mehr oder weniger auf Sie zutreffen. Bitte geben Sie bei jeder Aussage an, inwieweit diese im Allgemeinen auf Sie zutrifft.'
+    const page = `${intro}\n\n| Aussage | 1 | 2 | 3 |\n| --- | --- | --- | --- |\n| Es genügt mir einfach die Antwort zu kennen. | 1 | 2 | 3 |\n| Ich habe es gern, wenn mein Leben voller kniffliger Aufgaben ist. | 1 | 2 | 3 |\n\nZusammenstellung sozialwissenschaftlicher Items und Skalen (ZIS)`
+    const raw = `${page}\n\`\`\`markdown\n${intro}\n\`\`\`\n${page}\n${page.slice(0, 250)}`
+    expect(trimOcrRepetition(raw)).toEqual({ text: page, trimmed: true })
+  })
+
+  it('entfernt einen ```markdown-Neubeginn am Ende, der vorn so nicht stand', () => {
+    const body = 'Kurzskala Need for Cognition\nNFC-K\n\nHanna Beißert, M. Köhler, M. Rempel, Constanze Beierlein\n\nZitierung\nBeißert, H., Köhler, M., Rempel, M., & Beierlein, C. (2015). Kurzskala Need for Cognition NFC-K.'
+    const raw = `${body}\n\`\`\`markdown\ngesis\nLeibniz-Institut\nfür Sozialwissenschaften\n\n${body}\n\`\`\`\n\`\`\`markdown\ngesis\nLeibniz-Institut\n\n${body}`
+    expect(trimOcrRepetition(raw)).toEqual({ text: body, trimmed: true })
+  })
+
+  it('kürzt keine Fußzeile, die eine Zeile aus der Seitenmitte wiederholt', () => {
+    const page = `${PAGE}\n\nDie Kosten betragen pro Schüler 24,95 Euro, insgesamt 3.742,50 Euro`
+    expect(trimOcrRepetition(`${page}\n${page}\n${page}`)).toEqual({ text: page, trimmed: true })
+  })
 })

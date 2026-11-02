@@ -66,7 +66,7 @@ function findLoopStart(norm: string, minRun: number, lenient: boolean): number {
     let k = WINDOW
     while (q + k < norm.length && norm[q + k] === norm[r + k]) k++
     if (k >= minRun) return q
-    if (lenient && (q + k === norm.length || (k >= 2 * WINDOW && k >= q / 2))) return q
+    if (lenient && k >= 2 * WINDOW && (q + k === norm.length || k >= q / 2)) return q
   }
   return -1
 }
@@ -88,16 +88,49 @@ export interface OcrTrimResult {
  * normal beendete Seite bleibt unangetastet.
  */
 export function trimOcrRepetition(raw: string, minRun = OCR_LOOP_MIN_RUN): OcrTrimResult {
+  let text = raw.trim()
+  let trimmed = false
+  // Mehrere Durchgänge: Wird mitten in der zweiten Kopie abgebrochen, steht nach
+  // dem ersten Schnitt noch deren Anfang am Ende (in der App real, 02.11.2026).
+  for (let pass = 0; pass < 4; pass++) {
+    const cut = repeatCut(text, minRun)
+    if (cut < 0) break
+    text = dropTrailingFences(text.slice(0, cut))
+    trimmed = true
+  }
+  if (!trimmed) return { text, trimmed: false }
+  return { text: closeFences(dropRestartBlock(text)), trimmed: true }
+}
+
+function repeatCut(raw: string, minRun: number): number {
   const { text: norm, map } = normalizeWithMap(raw)
   const q = findLoopStart(norm, minRun, true)
-  if (q < 0) return { text: raw.trim(), trimmed: false }
-
+  if (q < 0) return -1
   let cut = map[q]
   // Markup vor dem ersten Wort der Kopie (`<table><tr><td>`, `- `, `# `) gehört zur Kopie.
   const lineStart = raw.lastIndexOf('\n', cut - 1) + 1
   if (!/[\p{L}\p{N}]/u.test(raw.slice(lineStart, cut).replace(/<[^>]*>/g, ''))) cut = lineStart
+  return cut
+}
 
-  return { text: closeFences(dropTrailingFences(raw.slice(0, cut))), trimmed: true }
+/**
+ * Ein ```markdown-Block am Ende einer Schleifen-Ausgabe ist der Neubeginn, auch
+ * wenn sein Text vorn nicht wörtlich stand (Seite 1 begann ohne Kopfzeile, die
+ * Kopie mit). Nur nach erkannter Schleife angewandt.
+ */
+function dropRestartBlock(text: string): string {
+  const lines = text.split('\n')
+  for (let i = lines.length - 1; i > 0; i--) {
+    if (/^\s*```(markdown|md)\s*$/i.test(lines[i])) {
+      const inner = lines.slice(i + 1).filter(l => !/^\s*```\s*$/.test(l))
+      // Nur wenn danach höchstens ein schließender Fence folgt, also wirklich das Ende.
+      if (lines.slice(i + 1).filter(l => /^\s*```/.test(l)).length <= 1 && inner.length <= 40) {
+        return lines.slice(0, i).join('\n').trimEnd()
+      }
+      break
+    }
+  }
+  return text
 }
 
 /** Offene ```markdown-Zeilen am Ende stammen vom Neubeginn. */

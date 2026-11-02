@@ -11,6 +11,8 @@ Nutzer von jedem Chat erwarten.
    einer Notiz fragen will, muss in den Auftrag wechseln oder in den Notiz-Chat im rechten Panel.
 3. **Bilder verstehen.** Ein Foto vom Whiteboard, ein abfotografiertes Formular, ein Screenshot.
    Heute geht das nur über den Umweg Vision-OCR.
+4. **Der Agent liest Scans und Bilder** (ergänzt 02.11.2026, Rev. 5). Heute liest er PDFs nur
+   mit Textebene und Bilder gar nicht, auch nicht in angehängten Ordnern.
 
 Gesucht ist ein **Entwurf mit Reihenfolge**, kein Code. Codex prüft adversarial, besonders
 Datenschutz, Speicherort, Verhalten bei Cloud-Wegen und die Annahmen über Ollama. Keine Code-Edits,
@@ -167,7 +169,8 @@ Vision. Ergebnis als eigenes Modul `vision-chat` in `modelCompatibility.ts`, ers
 Empfehlung im Hinweis.
 
 **Nicht in Teil 3:** Bilder im Agenten (`read_context_file`), PDF-Scans im Chat, Videos. PDFs
-laufen weiter über die vorhandene OCR.
+laufen weiter über die vorhandene OCR. Bilder im Agenten: Teil 4 (Rev. 5). Der Cloud-Bildweg aus
+3b wird mit dem Agenten zusammen gebaut, siehe Punkt 19.
 
 ### Reihenfolge
 
@@ -658,7 +661,129 @@ Freigaben (Punkt 4/5/8). Eine vom Renderer gelieferte Herkunft gibt es nicht meh
 nachzieht. Folge für den Umfang: Teil 1 enthält damit den Umzug des Petrol-Verlaufs in den Main
 (Streaming-Kanal, Abbruch und Snapshot-Bindung bleiben, Kennung = Gesprächs-ID).
 
+### Rev. 5 — Teil 4: Der Agent liest Scans und Bilder (02.11.2026, Nutzerwunsch)
+
+**Anlass.** Nutzer: „Ich dachte, der Agent kann jetzt auch PDF in einem Ordner lesen und Bilder
+usw.“ Stand im Code (`main/noteAgent/contextFiles.ts:76-91`, `EXT_TO_KIND`): lesbar sind
+`.xlsx/.xls`, `.docx`, `.pptx`, `.pdf`, `.md`, `.txt`, `.csv`, `.html`.
+- **PDF nur mit Textebene** (`contextFiles.ts:690-716`, pdfjs `getTextContent`). Ein Scan endet
+  mit „PDF hat keine Textebene (Scan?)“.
+- **Bilder gar nicht**: Sie zählen im Manifest nur als „N nicht unterstützte Dateien
+  übersprungen“ (`contextFiles.ts:883`), ohne Namen. Wer einen Ordner mit Fotos von
+  Rückläufen anhängt, erfährt nicht einmal, welche fehlen.
+- Heutiger Umweg: Vision OCR je PDF von Hand, dann die Begleitnotiz anhängen. Für Bilder gibt es
+  keinen Umweg.
+
+**Ziel.** Gescannte PDFs und Bilder in Anhängen und Ordner-Anhängen werden vom Agenten gelesen,
+über dieselbe Texterkennung wie der Vision-OCR-Knopf (`main/visionOcr.ts`, `extractOcrPage`,
+mit Wiederholungsschutz seit 02.11.2026).
+
+**13. Nur lokal, wie beim Knopf (F25).** Die Erkennung läuft ausschließlich über ein lokales
+Ollama-Modell (`resolveLocalModel`, Modell aus `ui-settings.json` → `visionOcr.model`, nie aus
+den Run-Parametern). Fehlt ein lokales Vision-Modell oder ist Vision OCR aus, meldet das Werkzeug
+das mit nächstem Schritt („Einstellungen → Integrationen → Vision OCR“), nie stilles Überspringen.
+Der **erkannte Text** geht danach wie jeder gelesene Inhalt an das Agent-Modell, auch an ein
+Cloud-Modell. Die Karte nennt das unter „Welche Daten wohin gehen“: „Text aus Scans und Bildern
+(auf diesem Rechner erkannt)“. Transparenz statt Sperre, wie bei allen anderen Anhängen.
+
+**14. Wo die Seiten gerendert werden.** Der Renderer rendert PDF-Seiten heute per pdfjs auf ein
+Canvas (`PDFViewer.tsx`). Im Main gibt es kein Canvas. Zwei Wege, vor dem Bau zu entscheiden:
+(a) verstecktes `BrowserWindow` mit pdfjs, wie `remarkable/bookPdf.ts` es für `printToPDF`
+schon tut; (b) ein natives Canvas-Paket. Vorschlag (a): keine neue Abhängigkeit, dieselbe
+pdfjs-Version (5.4.296, exakt verankert). Bilder brauchen kein Rendern, nur Verkleinern auf die
+eingestellte Seitenbreite und EXIF-Drehung (siehe Punkt 7: `createImageBitmap` mit
+`imageOrientation 'from-image'`, HEIC abgelehnt).
+
+**15. Werkzeug und Manifest.**
+- `read_context_file` erkennt „PDF ohne Textebene“ und Bilder (`.png`, `.jpg`, `.jpeg`, `.webp`,
+  `.tif`) und ruft die Erkennung auf. Neue Art `image` in `EXT_TO_KIND`.
+- Das Manifest (`list_context_folder`) **nennt** Bilder und Scans mit „Scan, N Seiten,
+  Texterkennung nötig (ca. M s)“, statt sie in der Übersprungen-Zahl zu verstecken.
+- Die Rückgabe trägt die Seitenhinweise aus `extractOcrPage` (Wiederholung entfernt,
+  unvollständig, fehlgeschlagen) und die Kennzeichnung „per Texterkennung gelesen, kann
+  Lesefehler enthalten“. Bei Zahlen aus Scans soll das Ergebnis darauf hinweisen.
+- Ergebnis je Datei per Inhalts-Hash im Staging des Laufs zwischenspeichern: Ein zweites Lesen
+  derselben Datei kostet keine zweite Erkennung.
+
+**16. Grenzen und Zeit.** Eine Seite braucht lokal 2–11 s (Messung 02.11.2026), ein Ordner mit
+60 eingescannten Rückläufen also Minuten. Deshalb:
+- Seitenbudget je Lauf, z. B. 40 Seiten, sichtbar gemeldet, nie still gekürzt.
+- Die Erkennung zählt als Ollama-Vordergrund und pausiert den Vault-Indexer
+  (`wrapIpcWithOllamaActivity`-Logik, F16).
+- Fortschritt im Lauf-Protokoll („Texterkennung Seite 3/12 · Rücklauf_07.pdf“).
+- Bei einem lokalen Agent-Modell laufen Erkennung und Agent auf derselben Maschine
+  nacheinander. Zwei Modelle im Speicher können auf 8–16 GB eng werden; `assessLocalRunRisk`
+  prüfen, bevor die Erkennung startet.
+
+**17. `collect_table` bleibt beim Bisherigen.** Tabellen aus Fotos zusammenführen ist ein eigener,
+späterer Schritt. Erkannter Markdown-Tabellentext ist zu unzuverlässig, um ihn ungeprüft in eine
+Excel-Zusammenführung zu kippen.
+
+**18. Weg B: Das Agent-Modell sieht die Seite selbst (4c, ergänzt 02.11.2026).** Punkt 13–17
+(Weg A) liefert nur Text. Diagramme, Fotos, Whiteboard-Pfeile und Layout gehen verloren. Versteht
+das Agent-Modell Bilder, soll es die Seite als Bild bekommen können.
+- **Messung 02.11.2026** (App-Weg `extractOcrPage`, 6 Seiten × 2): `qwen3.8:27b-mlx` meldet
+  `vision` und liest so genau wie glm-ocr (Testseiten fehlerfrei, alle Zahlen, Kreuz im Formular
+  erkannt, Artikelseite 96 % der Wörter), aber langsamer (4–27 s je Seite, erste bis 54 s).
+  Das Modell kann es, die App gibt ihm heute nur kein Bild.
+- **Werkzeug:** `view_context_page({ file, page })` liefert die gerenderte Seite bzw. das Bild als
+  Bildanhang der Werkzeugantwort. Nur freigeschaltet, wenn das Agent-Modell Bilder versteht
+  (Ollama: `vision` in `/api/tags`; Cloud siehe Punkt 19). Sonst fehlt das Werkzeug, und Weg A
+  bleibt der einzige.
+- **Nur lokal in 4c.** Punkt 13 bleibt: Ohne eigene Freigabe verlässt kein Bild den Rechner. Bei
+  einem Cloud-Agenten fehlt `view_context_page`, bis Punkt 19 gebaut ist.
+- **Kontext:** Ein Bild kostet viel mehr Kontext als sein Text. Bildbudget je Lauf (z. B. 8
+  Seiten), sichtbar gemeldet. Der Prompt sagt: erst `read_context_file` (Text), Bild nur, wenn
+  der Auftrag Grafik, Layout oder Foto betrifft oder der Text als unvollständig markiert ist.
+- **Verlauf:** Wie im Chat (Punkt 11): Ein Bild geht nur in der Runde ans Modell, in der es
+  abgerufen wurde. Danach steht im Verlauf „[Seite 3 von Rücklauf_07.pdf angesehen]“ plus die
+  eigene Auswertung. Sonst kodiert Ollama jedes Bild in jedem Schritt neu.
+- **Ehrliche Anzeige:** Aussagen aus Bildern stehen im Ergebnis als „vom Modell im Bild gelesen,
+  nicht geprüft“. Zahlen daraus nie als belegt.
+- **Vorteil auf kleinen Rechnern:** Mit einem Vision-fähigen Agent-Modell braucht es kein zweites
+  Modell (glm-ocr) im Speicher.
+
+**19. Bilder über Cloud-Anbieter (OpenRouter, LLMBase), für Chat (3b) und Agent.** Anlass:
+Frage des Nutzers, was der Agent mit Haiku über LLMBase kann. Antwort heute: dasselbe wie lokal,
+nur Text. Claude-Modelle verstehen Bilder und PDFs, aber `main/llm/` schickt auf Cloud-Wegen nur
+Text-`content`, kein `image_url` (geprüft 02.11.2026).
+- **Eine gemeinsame Erweiterung** des Cloud-Clients für Chat (3b) und Agent (Punkt 18): Nachricht
+  als Liste aus Text- und Bildteilen (OpenAI-Format `image_url` mit `data:`-URL). Bild vorher
+  aufbereiten wie in Teil 3: lange Seite höchstens 1600 px, JPEG, ohne EXIF.
+- **Fähigkeit prüfen:** OpenRouter meldet im Katalog die Eingabearten (`architecture.input_modalities`
+  bzw. `modality`), gecacht wie die Preise in `cloudPricing.ts`. LLMBase hat dafür keinen
+  belegten Katalog. Dort Bild nur nach einmaligem Probeaufruf je Modell, sonst Fehler
+  verständlich übersetzen. Nie still ohne Bild weitermachen.
+- **Eigene Freigabe für Bilder.** Die vorhandenen Freigaben (`notes-chat`, `note-agent`) decken
+  Text. Bilder sind eine neue Datenart: Fotos zeigen Personen, Räume, Dokumente mit Unterschrift.
+  Deshalb eine eigene Zustimmung „Bilder an <Anbieter> senden“ je Funktion (Chat, Agent), mit
+  Versionszähler wie `NOTE_AGENT_CLOUD_CONSENT_VERSION`. Die Karte nennt unter „Welche Daten
+  wohin gehen“: „Bilder und Seitenbilder aus Anhängen“. Ohne Zustimmung gilt Weg A: lokal
+  erkannter Text geht hinaus, kein Bild.
+- **Kontextfenster:** Bei LLMBase rechnet die App pauschal mit 32 768 Token
+  (`shared/contextBudget.ts:17`, `ASSUMED_CONTEXT_WINDOW`, weil für LLMBase nicht belegt ist, dass
+  ein Überlauf laut scheitert, Codex F01 in `agent-cloud-kontextfenster.md`). Bilder fressen dieses
+  Fenster schnell. Bildbudget bei LLMBase deshalb kleiner (z. B. 3 Seiten je Lauf), bis der
+  Überlauf-Nachweis für LLMBase da ist. OpenRouter nutzt das Katalogfenster wie heute.
+- **Kosten:** Bildeingaben kosten bei den Anbietern extra. Die Arbeitsbilanz zählt sie über die
+  gemeldeten Token mit, die Karte nennt vor dem Start die Zahl der Bildseiten.
+
+**Bewusst nicht in Teil 4:** PDFs als ganze Datei an Cloud-Modelle schicken (Claude kann das
+nativ). Das umginge Seitenbudget, lokale Erkennung und Anzeige je Seite. Wenn überhaupt, später
+als eigener Punkt mit Messung.
+
+**Reihenfolge.** Teil 4 hängt nicht am Datenvertrag aus Teil 1 und könnte vorgezogen werden.
+**Nutzerentscheidung 02.11.2026: nicht vorziehen**, Teil 4 kommt nach Teil 1–3. Er braucht nur
+`extractOcrPage` (vorhanden) und Punkt 14. Innerhalb von Teil 4: 4a gescannte PDFs (Weg A),
+4b Bilder (Weg A), 4c Seitenbild für lokale Vision-Modelle (Punkt 18), danach Punkt 19 zusammen
+mit 3b. Vor dem Bau Codex-Prüfung von Punkt 13–19.
+
 ## Status
+
+Rev. 5, 02.11.2026: Teil 4 (Agent liest Scans und Bilder) aufgenommen, mit Weg A (lokale
+Texterkennung, Punkt 13–17), Weg B (Seitenbild für Vision-Modelle, Punkt 18) und dem Cloud-Bildweg
+für Chat und Agent (Punkt 19). Noch ungeprüft. Reihenfolge entschieden: Teil 1 zuerst, Teil 4
+nicht vorgezogen. Offen: Codex-Runde zu Punkt 13–19.
 
 Rev. 4, 01.11.2026. Im Code behoben (uncommittet): F02, F03, F06, F16, F18 (Anzeige), F21,
 F23, F24, F25. Prüfrunden beendet (Nutzerentscheidung). Nächster Schritt: Teil 1 —
