@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.1] - 2026-11-04
+
+**Der Chat im Agent-Tab ist ruhiger und zeigt beim Antworten, was er gerade tut.** Das Eingabefeld sitzt unten, Modell und Datenweg stehen direkt daneben, und während einer Antwort erscheint gut lesbar der aktuelle Schritt, etwa „Suche bei Tavily …“ oder „Seiten abrufen …“, mit mitlaufender Zeit. Neu ist außerdem der Skill „Veranstaltungsjournal“: Er macht aus einem Programmablauf ein Teilnehmenden-Heft im A5-Format, das sich auch als A4-Broschüre zum Falten und Heften drucken lässt.
+
+### Hintergrund
+
+- **Auslöser Chat:** Der leere Chat wirkte wie ein Formular. Eingabe, Recherche-Hinweis, Beispiele und Modellwahl standen in einer großen Karte oben, darunter blieb die Fläche leer. Den Fortschritt einer Websuche sah man nur klein in der Fußzeile.
+- **Neuer Aufbau:** Leer zeigt der Chat eine kurze Einladung, die drei Beispiele als leise Zeile und darunter eine einzige Eingabefläche mit Bild, Websuche, Modell und Senden. Wohin eine Frage geht, auf diesen Rechner oder in die Cloud, steht vor dem Senden am Feld. In der schmalen Ansicht stehen Modell und Datenweg in einer eigenen Zeile, die Modellliste passt in den Bereich. Nach jeder Antwort steht die Dauer neben dem Modell.
+- **Veranstaltungsjournal:** Der Skill folgt einem Bauplan aus der Fortbildungspraxis. Eine Leitfrage rahmt das Heft, die Seiten führen vom eigenen Nachdenken über das Gespräch zu zweit bis zur Arbeit in der Gruppe. Jede Phase hat eine eigene Farbe, und jede Aufgabe sagt, ob die Notizen privat bleiben, zum Austausch dienen oder geteilt werden. Der Skill ist mitgeliefert und steht im Skill-Katalog.
+- **Drucken:** Das Journal ist eine HTML-Seite. Oben schaltet man zwischen A5-Einzelseiten und „Broschüre A4“ um. Die Broschüre legt je zwei Seiten in Heftreihenfolge auf einen A4-Querbogen. Gedruckt wird beidseitig mit Wenden an der kurzen Kante, danach wird der Stapel gefaltet und mittig geheftet.
+- **Grenzen:** Der Verlauf zeigt Antworten vorerst weiter als Karten; Fragen als Blasen und eine kürzere Recherche-Zeile folgen. Einen QR-Code erzeugt das Journal nicht, dafür gibt es ein Feld zum Einkleben. Bereits vorhandene Skills im Vault werden nicht überschrieben; das Veranstaltungsjournal kommt über Einstellungen → Skills → Starter-Skills oder den Katalog dazu, ohne bestehende Skills anzutasten.
+
 ## [1.2.0] - 2026-11-02
 
 **Der Chat im Agent-Tab versteht jetzt Bilder, und der Agent liest Fotos und eingescannte PDFs.** Ein Foto, Screenshot oder Scan lässt sich anhängen, einfügen oder hineinziehen und dann befragen, mit einem lokalen Modell auf dem eigenen Rechner oder auf ausdrücklichen Wunsch über OpenRouter oder LLMBase. Im Auftrag liest der Agent Bilder und eingescannte PDF-Seiten per Texterkennung auf diesem Rechner und kennzeichnet, welche Werte daraus stammen.
