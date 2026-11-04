@@ -360,7 +360,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     const el = inputRef.current
     if (!el) return
     el.style.height = 'auto'
-    el.style.height = `${Math.min(el.scrollHeight, 220)}px`
+    // +2 px: ohne Puffer rundet die Zeilenhöhe unter die Inhaltshöhe und eine Mini-Bildlaufleiste erscheint.
+    el.style.height = `${Math.min(el.scrollHeight + 2, 220)}px`
   }, [draft, messages.length === 0])
   // Mitscrollen, solange man unten ist — wer hochgescrollt hat, wird nicht zurückgerissen.
   const stickToBottom = useRef(true)
@@ -576,10 +577,11 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const lastTurn = turns[turns.length - 1]
   const routeClass = routeKind === 'local' ? '' : routeKind === 'cloud' ? 'is-out' : 'is-muted'
 
-  const answerFoot = (msg: PetrolChatMessage) => (
+  // Dauer = Antwort fertig (msg.at) minus Frage gesendet (since) — wie „Dauer: 17 Sek.“ bei Codex.
+  const answerFoot = (msg: PetrolChatMessage, since?: number) => (
     <div className="petrol-turn-foot">
       <span className="petrol-turn-model">
-        {[msg.model, msg.stopped ? t('petrolChat.stopped') : '', msg.webTopicsUsed ? t('petrolChat.topicOnlyLabel') : ''].filter(Boolean).join(' · ')}
+        {[msg.model, formatDuration(since, msg.at, t), msg.stopped ? t('petrolChat.stopped') : '', msg.webTopicsUsed ? t('petrolChat.topicOnlyLabel') : ''].filter(Boolean).join(' · ')}
       </span>
       {/* Ein gestopptes Web-Bruchstück ist ungeprüft (F23): nicht kopieren, nicht speichern,
           nicht in einen Auftrag übernehmen — sonst landet ein erfundener Halbsatz im Vault.
@@ -650,9 +652,10 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   )
 
   return (
-    // Dieselbe Karte wie der Auftrag (.agent-card): Verlauf, Eingabe und Modellzeile sind
-    // Abschnitte darin (Codex-Optikprüfung F03/F14, docs/codex-collab/chat-optik.md).
-    <div className={`agent-card petrol-chat ${empty ? 'is-empty' : 'has-turns'}`}>
+    // Gesprächsform statt Formularkarte (docs/codex-collab/chat-wie-codex.md F01/F04, Nutzer
+    // 04.11.2026): Verlauf bzw. ruhiger Einstieg oben, Eingabe mit Modell/Bild/Web/Senden unten.
+    // Kopf, Umschalter, ModelPicker und Wegmarken bleiben mit dem Auftrag geteilt.
+    <div className={`petrol-chat ${empty ? 'is-empty' : 'has-turns'}`}>
       {runPhase !== 'idle' && (
         <div className="petrol-chat-taskhint">
           <span>{t(runPhase === 'running' ? 'petrolChat.taskRunning' : 'petrolChat.taskWaiting')}</span>
@@ -737,7 +740,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     <WebSkippedLine skipped={turn.answer.web.skipped} />
                     <WebProvenanceLine p={turn.answer.web.provenance} />
                   </div>
-                  {answerFoot(turn.answer)}
+                  {answerFoot(turn.answer, turn.question?.at)}
                   </>
                 ) : turn.answer?.origin === 'web' ? (
                   <>
@@ -775,7 +778,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       )}
                       <div className="petrol-web-muted">{turn.answer.web?.snapshotId ? t('petrolChat.webFollowUpChoice') : t('petrolChat.webFollowUp')}</div>
                     </div>
-                    {answerFoot(turn.answer)}
+                    {answerFoot(turn.answer, turn.question?.at)}
                   </>
                 ) : turn.answer ? (
                   <>
@@ -789,13 +792,22 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     {turn.question?.images?.some(img => turn.question!.imageDelivery?.[img.id]?.kind === 'image') && (
                       <div className="petrol-web-block"><div className="petrol-web-muted">{t('petrolChat.imageNotChecked')}</div></div>
                     )}
-                    {answerFoot(turn.answer)}
+                    {answerFoot(turn.answer, turn.question?.at)}
                   </>
                 ) : isLive && webProgress ? (
                   <>
-                    {streaming
-                      ? <WebAnswerText answer={streaming} anchor={`petrol-live-${tabId}`} />
-                      : <div className="petrol-turn-a"><div className="petrol-msg-wait" aria-label={t('petrolChat.waiting')}><span /><span /><span /></div></div>}
+                    {/* Was Petrol gerade tut, gut sichtbar an der entstehenden Antwort (Nutzer 04.11.2026,
+                        Vorbild Codex: „recherchiert …“) — vorher stand die Phase klein in der Fußzeile. */}
+                    <LiveStatus
+                      since={turn.question?.at}
+                      text={webProgress.phase === 'plan' ? t('petrolChat.webPhasePlan')
+                        : webProgress.phase === 'pick' ? t('petrolChat.webPhasePick')
+                        : webProgress.phase === 'search' && webProgress.queries?.length ? t('petrolChat.webPhaseSearchQuery', { provider: webProvider, query: webProgress.queries[webProgress.queries.length - 1] })
+                        : webProgress.phase === 'search' ? t('petrolChat.webPhaseSearch', { provider: webProvider })
+                        : webProgress.phase === 'fetch' ? t('petrolChat.webPhaseFetch', { n: webProgress.hosts.length })
+                        : streaming ? t('petrolChat.writing') : t('petrolChat.webPhaseModel', { n: webProgress.sources?.length ?? 0 })}
+                    />
+                    {streaming && <WebAnswerText answer={streaming} anchor={`petrol-live-${tabId}`} />}
                     {turn.question?.followUp && <div className="petrol-web-muted">{t('petrolChat.followUpNoSearch')}</div>}
                     {webProgress.sources && webProgress.sources.length > 0 && (
                       <div className="petrol-web-block">
@@ -804,30 +816,44 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     )}
                     <div className="petrol-turn-foot">
                       <span className="petrol-turn-model">{active?.label ?? ''}</span>
-                      <span className="petrol-turn-model">
-                        {webProgress.phase === 'plan' ? t('petrolChat.webPhasePlan')
-                          : webProgress.phase === 'pick' ? t('petrolChat.webPhasePick')
-                          : webProgress.phase === 'search' && webProgress.queries?.length ? t('petrolChat.webPhaseSearchQuery', { provider: webProvider, query: webProgress.queries[webProgress.queries.length - 1] })
-                          : webProgress.phase === 'search' ? t('petrolChat.webPhaseSearch', { provider: webProvider })
-                          : webProgress.phase === 'fetch' ? t('petrolChat.webPhaseFetch', { n: webProgress.hosts.length })
-                          : streaming ? t('petrolChat.writing') : t('petrolChat.webPhaseModel', { n: webProgress.sources?.length ?? 0 })}
-                      </span>
                     </div>
                   </>
                 ) : isLive ? (
                   <>
-                    {streaming
-                      ? <div className="petrol-turn-a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderMarkdown(streaming) }} />
-                      : <div className="petrol-turn-a"><div className="petrol-msg-wait" aria-label={t('petrolChat.waiting')}><span /><span /><span /></div></div>}
+                    <LiveStatus since={turn.question?.at} text={streaming ? t('petrolChat.writing') : `${t('petrolChat.waiting')} …`} />
+                    {streaming && <div className="petrol-turn-a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderMarkdown(streaming) }} />}
                     <div className="petrol-turn-foot">
                       <span className="petrol-turn-model">{active?.label ?? ''}</span>
-                      <span className="petrol-turn-model">{t('petrolChat.writing')}</span>
                     </div>
                   </>
                 ) : null}
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Leerer Chat: eine Einladung in der freien Fläche, darunter die Beispiele als leise Zeile
+          (Nutzer: Beispiele beibehalten). Ein Klick füllt nur den Entwurf. */}
+      {empty && (
+        <div className="petrol-chat-hero">
+          <p className="petrol-chat-hero-title">{t('petrolChat.emptyTitle')}</p>
+        </div>
+      )}
+      {empty && (
+        <div className="petrol-chat-examples" role="group" aria-label={t('agentCard.examplesTitle')}>
+          {CHAT_EXAMPLES.map(ex => (
+            <button
+              key={ex.title}
+              type="button"
+              className="petrol-chat-example"
+              title={`${t(ex.from)} → ${t(ex.to)}`}
+              onClick={() => applyChip(t(ex.text))}
+            >
+              <span className="petrol-chat-example-icon" aria-hidden="true"><ChatGlyph icon={ex.icon} /></span>
+              {t(ex.title)}
+            </button>
+          ))}
         </div>
       )}
 
@@ -905,6 +931,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send() }
             }}
           />
+        </div>
+        <div className="petrol-chat-tools">
           {!busy && (
             <button
               type="button"
@@ -946,6 +974,24 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               {t(deeperAsk ? 'petrolChat.webDeeperTakeTopic' : 'petrolChat.webDeepAddTopic')}
             </button>
           )}
+          <span className="petrol-chat-tools-gap" />
+          {/* Modell und Weg direkt an der Eingabe (F01/F03): Empfänger ist vor dem Senden sichtbar. */}
+          <span className="petrol-chat-model">
+            <ModelPicker
+              value={pickerValue}
+              models={[...cloudRoutes.map(r => ({ name: r.sentinel })), ...models]}
+              onChange={name => {
+                const provider = cloudProviderForSentinel(name)
+                if (provider) chat().setModel(tabId, { cloudProvider: provider })
+                else chat().setModel(tabId, { cloudProvider: null, localModel: name })
+              }}
+              getLabel={name => cloudRoutes.find(r => r.sentinel === name)?.label ?? name}
+              disabled={busy}
+              ariaLabel={t('petrolChat.modelLabel')}
+              maxWidth={260}
+            />
+            {hasModel && <span className={`agent-card-route ${routeClass}`}>{routeText}</span>}
+          </span>
           {busy ? (
             <button type="button" className="petrol-chat-send is-stop" onClick={() => chat().stop(tabId)} aria-label={t('petrolChat.stop')} title={t('petrolChat.stop')}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
@@ -1050,61 +1096,20 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               : t('petrolChat.webNotRemembered')}
           </div>
         )}
-        {(!webOn || busy || webQueryOpen || webWaitsForRoute) && (
-          <span className="agent-card-help">{webWaitsForRoute ? t('petrolChat.webSendChecking') : t('petrolChat.sendKeys')}</span>
-        )}
         {saveError && <div className="petrol-chat-note is-error">{saveError}</div>}
         {!hasModel && <div className="petrol-chat-note">{t('petrolChat.noModel')}</div>}
         {busyElsewhere && <div className="petrol-chat-note">{t('petrolChat.busyElsewhere')}</div>}
       </div>
 
-      {/* Beispiele nur im leeren Zustand, wie auf der Auftragskarte: ein Klick füllt nur den Text. */}
-      {empty && (
-        <div className="agent-card-examples">
-          <span className="agent-card-eyebrow">{t('agentCard.examplesTitle')}</span>
-          <div className="agent-card-examples-grid">
-            {CHAT_EXAMPLES.map(ex => (
-              <button key={ex.title} type="button" className="agent-card-example" onClick={() => applyChip(t(ex.text))}>
-                <span className="agent-card-example-icon" aria-hidden="true"><ChatGlyph icon={ex.icon} /></span>
-                <span className="agent-card-example-body">
-                  <span className="agent-card-example-title">{t(ex.title)}</span>
-                  <span className="agent-card-example-meta">
-                    {t(ex.from)} <span aria-hidden="true">&rarr;</span> <span className="is-accent">{t(ex.to)}</span>
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Modell + Weg wie in der Auftragskarte: beschriftete Zeile, Weg als Marke. */}
-      {/* „Neues Gespräch“ ist eine Gesprächsaktion und steht deshalb hier, nicht an der Eingabe (F15). */}
-      <div className={`agent-card-row ${empty ? 'is-two-col' : ''}`}>
-        <span className="agent-card-label">{t('agentCard.rowModel')}</span>
-        <div className="agent-card-value">
-          <ModelPicker
-            value={pickerValue}
-            models={[...cloudRoutes.map(r => ({ name: r.sentinel })), ...models]}
-            onChange={name => {
-              const provider = cloudProviderForSentinel(name)
-              if (provider) chat().setModel(tabId, { cloudProvider: provider })
-              else chat().setModel(tabId, { cloudProvider: null, localModel: name })
-            }}
-            getLabel={name => cloudRoutes.find(r => r.sentinel === name)?.label ?? name}
-            disabled={busy}
-            ariaLabel={t('petrolChat.modelLabel')}
-            maxWidth={360}
-          />
-          {hasModel && (
-            <div className="agent-card-tags">
-              <span className={`agent-card-route ${routeClass}`}>{routeText}</span>
-              <span className="agent-card-route is-muted">{t('petrolChat.noNotes')}</span>
-            </div>
-          )}
-        </div>
+      {/* Fußzeile: Tastenhilfe, Zusage „liest keine Notizen“ und „Neues Gespräch“ (F15 aus chat-optik.md). */}
+      <div className="petrol-chat-foot">
+        {/* Schmal blendet CSS die Tastenhilfe aus (sonst bricht die Zeile um); sie bleibt als Tooltip. */}
+        <span title={t('petrolChat.sendKeys')}>
+          {(!webOn || busy || webQueryOpen || webWaitsForRoute) && <span className="petrol-chat-foot-keys">{webWaitsForRoute ? t('petrolChat.webSendChecking') : t('petrolChat.sendKeys')} · </span>}
+          {t('petrolChat.noNotes')}
+        </span>
         {!empty && (
-          <button type="button" className="agent-card-btn" onClick={() => chat().clear(tabId)}>{t('petrolChat.newChat')}</button>
+          <button type="button" className="agent-card-link-btn" onClick={() => chat().clear(tabId)}>{t('petrolChat.newChat')}</button>
         )}
       </div>
     </div>
@@ -1141,6 +1146,31 @@ function ChatGlyph({ icon }: { icon: ChatIcon }) {
     case 'idea': return <svg {...common}><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/></svg>
     case 'explain': return <svg {...common}><path d="M4 5h16v11H9l-5 4z"/><path d="M10 9.5a2 2 0 1 1 2.6 1.9c-.4.1-.6.5-.6.9v.2M12 14.5h.01"/></svg>
   }
+}
+
+/** Statuszeile einer entstehenden Antwort: Schritt als Text (wird angesagt) plus mitlaufende Sekunden (nicht angesagt). */
+function LiveStatus({ text, since }: { text: string; since?: number }) {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const secs = since ? Math.max(0, Math.round((now - since) / 1000)) : null
+  return (
+    <div className="petrol-live-status" role="status" aria-live="polite">
+      <span className="petrol-live-dot" aria-hidden="true" />
+      <span>{text}</span>
+      {secs !== null && <span className="petrol-live-time" aria-hidden="true">· {secs} s</span>}
+    </div>
+  )
+}
+
+/** „17 s“ / „2 min 5 s“ — leer bei fehlenden oder unplausiblen Zeitstempeln (älterer Verlauf, über 1 h). */
+function formatDuration(since: number | undefined, end: number | undefined, t: (k: TranslationKey, p?: Record<string, string | number>) => string): string {
+  if (!since || !end || end < since) return ''
+  const total = Math.round((end - since) / 1000)
+  if (total > 3600) return ''
+  return total < 60 ? t('petrolChat.durationSec', { s: total }) : t('petrolChat.durationMin', { m: Math.floor(total / 60), s: total % 60 })
 }
 
 const EMPTY_MESSAGES: PetrolChatMessage[] = []

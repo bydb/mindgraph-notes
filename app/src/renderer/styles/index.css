@@ -21483,7 +21483,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 .agent-card-logo img { border-radius: 50%; object-fit: cover; }
 .agent-card-head-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.agent-card-tagline { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--accent-color); }
+.agent-card-tagline { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary); }
 .agent-card-task-top { display: flex; gap: 10px; align-items: flex-start; }
 .agent-card-input {
   flex: 1;
@@ -23171,7 +23171,9 @@ body.presentation-mode *::after {
   .agent-card-tagline { min-height: calc(3 * 1.45em); -webkit-line-clamp: 3; }
 }
 
-.agent-view.is-chat { overflow: hidden; }
+/* Normal scrollt nur der Verlauf. Wird die Eingabe höher als der Platz (niedriges Fenster, langer Entwurf,
+   Bild- und Web-Hinweise), scrollt die ganze Fläche, damit Senden/Stopp erreichbar bleiben (chat-wie-codex.md F07). */
+.agent-view.is-chat { overflow-x: hidden; overflow-y: auto; }
 .agent-view-inner.is-chat { height: 100%; padding-bottom: 16px; }
 
 /* Gemeinsame Aktionsknöpfe (Auftrag und Chat): Akzent- und Primärvariante, sichtbarer Fokus. */
@@ -23186,26 +23188,52 @@ body.presentation-mode *::after {
 .agent-card-btn.is-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .agent-card-link-btn:focus-visible { outline: none; border-radius: 4px; box-shadow: 0 0 0 3px var(--focus-ring); }
 
-/* Die Karte bleibt im Chat einspaltig (die Auftragskarte wird ab 1000 px zweispaltig). */
-.agent-card.petrol-chat { display: flex; flex-direction: column; min-height: 0; }
-.agent-card.petrol-chat.has-turns { flex: 1; }
-.agent-card.petrol-chat > :first-child { border-top-left-radius: 14px; border-top-right-radius: 14px; }
-.agent-card.petrol-chat > :last-child { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
+/* Chat als Gesprächsfläche statt Formularkarte (docs/codex-collab/chat-wie-codex.md F01/F04/F05,
+   Nutzerentscheidung 04.11.2026). Einstieg bzw. Verlauf füllt die Höhe, die Eingabe ist EINE
+   Fläche unten; Einstieg, Beispiele, Eingabe und Fußzeile teilen eine Lesebreite von 800 px. */
+.petrol-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 12px; }
+.agent-view-inner.is-chat > .petrol-chat { max-width: none; }
+.petrol-chat > * { width: 100%; max-width: 800px; margin-inline: auto; box-sizing: border-box; }
+.petrol-chat > .petrol-chat-list { max-width: none; }
+.petrol-chat-hero { flex: 1 1 auto; min-height: 0; padding: 12px 0; display: flex; align-items: center; justify-content: center; }
+.petrol-chat-hero-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); text-align: center; }
+.petrol-chat-examples { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.petrol-chat-example {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border-radius: 999px;
+  border: 1px solid var(--border-color); background: var(--bg-primary);
+  font: inherit; font-size: 13px; color: var(--text-secondary); cursor: pointer;
+}
+.petrol-chat-example:hover { color: var(--text-primary); background: var(--bg-hover); }
+.petrol-chat-example:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.petrol-chat-example-icon { display: inline-flex; color: var(--text-muted); }
+.petrol-chat-example-icon svg { width: 15px; height: 15px; }
+.petrol-chat-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px;
+  margin-top: -4px; padding: 0 6px;
+  font-size: 11.5px; line-height: 1.45; color: var(--text-secondary);
+}
+.petrol-chat-foot .agent-card-link-btn { font-size: 11.5px; }
+/* Schmal (Nutzer 04.11.2026: „zu viel Leerraum“, „Fußzeile bricht um“): Einladung und Beispiele rücken
+   direkt über die Eingabe, die Fußzeile zeigt nur die Zusage zu Notizen. */
+@container (max-width: 640px) {
+  .petrol-chat-hero { align-items: flex-end; padding-bottom: 4px; }
+  .petrol-chat-foot-keys { display: none; }
+}
 
 .petrol-chat-taskhint {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 9px 16px;
   font-size: 12.5px; color: var(--text-primary);
   background: color-mix(in srgb, var(--accent-color) 6%, var(--bg-primary));
-  border-bottom: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-subtle); border-radius: 10px;
 }
 
-/* Verlauf: getönte Fläche wie „Zum Ausprobieren“, darin je Wechsel eine weiße Karte. */
+/* Verlauf auf neutraler Fläche; die Wechsel-Karten bleiben bis Schritt 2 (chat-wie-codex.md F02). */
 .petrol-chat-list {
   flex: 1; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; gap: 12px;
-  padding: 14px 16px;
-  background: var(--bg-secondary);
+  padding: 4px 0 8px;
 }
 .petrol-turn {
   width: 100%; max-width: 760px; margin-inline: auto; flex-shrink: 0;
@@ -23292,10 +23320,42 @@ body.presentation-mode *::after {
 .petrol-msg-wait span:nth-child(3) { animation-delay: 0.3s; }
 @keyframes petrol-wait { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 0.9; } }
 @media (prefers-reduced-motion: reduce) { .petrol-msg-wait span { animation: none; opacity: 0.6; } }
+/* Statuszeile der entstehenden Antwort (Nutzer 04.11.2026, Vorbild Codex): Schritt gut lesbar oben, Zeit leise. */
+.petrol-live-status {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  padding: 12px 14px 4px;
+  font-size: 13.5px; line-height: 1.5; color: var(--text-secondary);
+}
+.petrol-live-status + .petrol-turn-foot { margin-top: 8px; }
+.petrol-live-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  background: var(--accent-color); animation: petrol-wait 1.2s infinite ease-in-out;
+}
+.petrol-live-time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .petrol-live-dot { animation: none; opacity: 0.7; } }
 
-/* Eingabe = Abschnitt wie .agent-card-task: ohne eigenen Rahmen, gleiche Schrift. */
-.petrol-chat-compose { display: flex; flex-direction: column; gap: 7px; padding: 13px 16px 10px; flex-shrink: 0; }
-.agent-card.petrol-chat.has-turns .petrol-chat-compose { border-top: 1px solid var(--border-subtle); }
+/* Eingabe = eine Fläche unten: Text oben, Werkzeuge (Bild, Web, Modell, Senden) in der Zeile darunter. */
+.petrol-chat-compose {
+  display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+  padding: 12px 12px 10px 16px;
+  border: 1px solid var(--border-color); border-radius: 16px;
+  background: var(--bg-primary); box-shadow: var(--shadow-md);
+}
+.petrol-chat-compose:focus-within { border-color: color-mix(in srgb, var(--accent-color) 45%, var(--border-color)); }
+.petrol-chat-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.petrol-chat-tools-gap { flex: 1; }
+.petrol-chat-model { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.petrol-chat-model .agent-card-route { white-space: nowrap; }
+/* Modellliste (F08): an der ganzen Modellgruppe ausgerichtet (Feld + Wegmarke), rechtsbündig, nie breiter
+   als die Agent-Fläche (100cqw = .agent-view-inner). Schmal steht die Gruppe als erste Zeile links, die Liste
+   öffnet dann linksbündig — so ragt sie in keiner Breite über den Rand. */
+.petrol-chat-model { position: relative; }
+.petrol-chat-model .model-picker { position: static; }
+.petrol-chat-model .model-picker-list { left: auto; right: 0; max-width: min(560px, calc(100cqw - 48px)); }
+@container (max-width: 640px) {
+  .petrol-chat-model { order: -1; flex-basis: 100%; }
+  .petrol-chat-model .model-picker-list { left: 0; right: auto; }
+}
 .petrol-chat-compose.is-dragover { background: color-mix(in srgb, var(--accent-color) 7%, transparent); outline: 1px dashed color-mix(in srgb, var(--accent-color) 55%, transparent); outline-offset: -4px; }
 /* Bilder im Chat (Rev. 7): Marken als kleine Vorschau, abgelehnte gedimmt mit roter Kante. */
 .petrol-draft-images, .petrol-turn-images { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -23331,9 +23391,9 @@ body.presentation-mode *::after {
 .petrol-chat-globe {
   width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--border-color); background: var(--bg-primary); color: var(--text-secondary); cursor: pointer;
+  border: 1px solid transparent; background: transparent; color: var(--text-secondary); cursor: pointer;
 }
-.petrol-chat-globe:hover:not(:disabled) { color: var(--text-primary); border-color: var(--accent-color); }
+.petrol-chat-globe:hover:not(:disabled) { color: var(--text-primary); background: var(--bg-hover); }
 .petrol-chat-globe:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
 .petrol-chat-globe.is-on {
   color: var(--accent-color); border-color: var(--accent-color);
@@ -23347,7 +23407,7 @@ body.presentation-mode *::after {
   background: color-mix(in srgb, var(--accent-color) 5%, var(--bg-primary));
 }
 .petrol-web-query-row { display: flex; align-items: center; gap: 8px; }
-.petrol-web-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 11.5px; line-height: 1.45; color: var(--accent-color); }
+.petrol-web-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
 .petrol-web-line .agent-card-link-btn { font-size: 11.5px; }
 .petrol-web-query-label { font-size: 12px; font-weight: 600; color: var(--text-primary); flex-shrink: 0; }
 .petrol-web-query-row input {
