@@ -672,6 +672,287 @@ Status: [OFFEN]
 Die neue Map begrenzt die OCR auf eine Anfrage je `senderId` und schützt den Abort vor fremden Fenstern (`app/src/main/index.ts:9720-9726,9746-9749`). Es gibt aber keinen `destroyed`-Handler für den Absender; beim Schließen des Fensters läuft die OCR bis zu vier Bilder nacheinander weiter, jeweils mit bis zu 120 Sekunden Standardfrist (`app/src/main/index.ts:9734-9743`; `app/src/main/visionOcr.ts:24-25,32-41`). Der IPC akzeptiert zudem eine nicht-stringförmige Kennung und speichert dafür `''`, während der Abort nur eine Stringkennung annimmt (`app/src/main/index.ts:9726,9746-9749`). Ein Abbruch mit der ursprünglichen ungültigen Kennung erreicht den Lauf nicht; die weiterlaufende OCR hält Ollama unnötig im Vordergrund (`app/src/main/ocr/localOcr.ts:57-65`).
 Vorschlag: Kennung vor Belegung validieren, beim `sender.destroyed` den Controller abbrechen und den Listener im `finally` entfernen.
 
+### Runde 7
+
+### F59 — Verschachtelte Webdaten umgehen die Feldliste
+Schwere: hoch
+ADR-Stelle: app/src/shared/petrolChatStored.ts:91
+Status: [OFFEN]
+`toStoredWeb` übernimmt `report`, `extras`, `provenance`, `skipped` und `deep` als ganze Objekte/Arrays (`app/src/shared/petrolChatStored.ts:91-103`); `toStoredMessage` kopiert außerdem `imageDelivery` und `imageRecipients` nur flach (`app/src/shared/petrolChatStored.ts:125-129`). Die behauptete explizite Feldliste gilt damit nur für die äußere Nachricht und `sources`. Besonders `report`, `extras` und `deep` akzeptieren beim Laden beliebige zusätzliche JSON-Felder (`app/src/shared/petrolChatStored.ts:233-249`). Ein künftig oder fehlerhaft hinzugefügtes `deep.excerpt`, `report.snapshotId` oder ähnliches landet somit trotz `toStoredMessage` im verschlüsselten JSON und wird wieder akzeptiert; der Test prüft nur die heutigen Beispieldaten und ein äußeres Zusatzfeld (`app/src/shared/petrolChatStored.test.ts:55-77,106-113`).
+Vorschlag: Auch alle verschachtelten Web- und Bild-Metadaten mit expliziten Projektionen und passenden exakten Schemata behandeln; Negativtests für Auszug, Snapshot-Kennung und Bildbytes in jeder frei übernommenen Struktur.
+
+### F60 — „Strenges Laden“ akzeptiert Daten, an denen die Anzeige scheitert
+Schwere: hoch
+ADR-Stelle: app/src/shared/petrolChatStored.ts:233
+Status: [OFFEN]
+Für `report` genügen beliebige Arrays `refs`/`sentences` und ein beliebiges Objekt `summary`; `extras` braucht nur ein JSON-Array, `deep` nur ein JSON-Objekt (`app/src/shared/petrolChatStored.ts:233-249`). Daher akzeptiert `parseStoredChat` z. B. `deep: {}`, `extras: [null]` oder `report: {refs: [], sentences: [null], usedSources: [], summary: {}}` (`app/src/shared/petrolChatStored.ts:302-305`). Nach `restoreMessage` werden diese Werte unverändert an die Anzeige gegeben (`app/src/shared/petrolChatStored.ts:146-152`), die `deep.queries.some`, `extras.filter(x => x.gap)` und `sn.status` liest (`app/src/renderer/components/Agent/PetrolWebAnswer.tsx:354-359,136-145,165-175`). Ein als lesbar gelistetes Gespräch kann so beim Anzeigen abstürzen. Die Tests prüfen keine defekten verschachtelten Strukturen (`app/src/shared/petrolChatStored.test.ts:90-134`).
+Vorschlag: `CitationReport`, `SentenceExtra`, `WebDeepInfo` und deren Unterobjekte vollständig prüfen; für optionale historische Felder eine ausdrücklich versionierte Migration statt beliebiger JSON-Werte.
+
+### F61 — Geladene Webprüfung behauptet weiter Belegstatus ohne Seitenauszug
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:792
+Status: [OFFEN]
+Rev. 2 verlangt bei auszugabhängiger „Prüfung je Satz“ nach dem Laden „nach dem Neustart nicht verfügbar“ (`docs/codex-collab/chat-verlauf-notizen-bilder.md:792-797`). `restoreMessage` setzt die Auszüge leer, behält aber `report` und `extras` samt zuvor aus Auszügen berechneten Werten (`app/src/shared/petrolChatStored.ts:91-103,146-150`; Berechnung `app/src/main/index.ts:7327-7335`). Die jetzige Anzeige verwendet deren Status und Warnungen unverändert, ohne Verfügbarkeitsmerkmal (`app/src/renderer/components/Agent/PetrolChat.tsx:747-752`; `app/src/renderer/components/Agent/PetrolWebAnswer.tsx:136-180`). Schritt 5 nennt nur Snapshot-Knopf, Nachfrage-Hinweis und einen Test „ohne Auszüge“, aber keinen Anzeigezustand für die nicht mehr nachvollziehbare Satzprüfung (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1359-1361`).
+Vorschlag: Geladene Prüfung als gespeichertes Ergebnis mit fehlender nachprüfbarer Textbasis kennzeichnen und auszugabhängige Details ausdrücklich „nach dem Neustart nicht verfügbar“ anzeigen; Anzeige und Export darauf testen.
+
+### F62 — Die vorhandene Anzeige ignoriert beide Wiederherstellungsmerkmale
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:1359
+Status: [OFFEN]
+Schritt 1 setzt `hadSnapshot` und `wasFollowUp` (`app/src/shared/petrolChatStored.ts:118-121,146-152`), aber der deaktivierte Quellenknopf wird derzeit nur innerhalb `msg.web?.snapshotId` gerendert (`app/src/renderer/components/Agent/PetrolChat.tsx:592-604`). Bei einer geladenen gescheiterten Nachfrage ist `followUpSnapshotId` weg; „Erneut senden“ erscheint deshalb wieder und `followUpGoneHint` fehlt (`app/src/renderer/components/Agent/PetrolChat.tsx:717-728`). Die Frage hat zudem weiter `followUp: true`, wodurch sie als Nachfrage etikettiert bleibt (`app/src/renderer/components/Agent/PetrolChat.tsx:703-705`). Der Bauplan verschiebt die Korrektur auf Schritt 5; Schritt 4 lädt die Gespräche aber bereits und bietet die Oberfläche an (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1352-1361`).
+Vorschlag: Laden und Anzeige der Merkmale in einem Schritt ausliefern; beide Zweige einschließlich Retry und automatischer Vormerkung mit einem real geladenen Gespräch testen.
+
+### F63 — Fehlende Mediendatei wird zum scheinbar nutzbaren Bild
+Schwere: hoch
+ADR-Stelle: app/src/shared/petrolChatStored.ts:141
+Status: [OFFEN]
+`restoreMessage` erzeugt bei fehlender Mediendatei ein Bild mit `dataBase64: ''`, und der Test erklärt das als erwartete Rundreise (`app/src/shared/petrolChatStored.ts:141-152`; `app/src/shared/petrolChatStored.test.ts:149-152`). Die Oberfläche zeigt dann ein kaputtes `<img>` ohne Fehlhinweis (`app/src/renderer/components/Agent/PetrolChat.tsx:690-699`). Beim Weiterfragen nimmt der Store die Bild-ID trotzdem in `known` und ggf. in die nächste Nutzlast (`app/src/renderer/stores/petrolChatStore.ts:351-373`); die Main-Prüfung lehnt die leeren Bytes als ungültiges JPEG ab (`app/src/shared/chatImages.ts:128-146`). Schritt 2 räumt nur *unreferenzierte* Medien auf und definiert keinen Fehlerzustand für ein referenziertes, fehlendes oder nicht entschlüsselbares Bild (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1326-1337`).
+Vorschlag: Fehlendes oder defektes Medium als unlesbares Gespräch bzw. als sichtbaren, nicht erneut sendbaren Bildstatus behandeln; Laden und Folgefrage dafür testen.
+
+### F64 — Die 2000er-Kürzung kann einen Antwortanfang ohne Frage speichern
+Schwere: mittel
+ADR-Stelle: app/src/shared/petrolChatStored.ts:317
+Status: [OFFEN]
+`buildStoredChat` schneidet blind die letzten 2000 *Nachrichten* ab (`app/src/shared/petrolChatStored.ts:315-325`), obwohl der eigene Vertrag begründet, dass eine Frage nicht ohne Antwort in den Modellverlauf darf (`app/src/shared/petrolChatStored.ts:14-16`). Bei 2001 regulär wechselnden Nachrichten kann das erste gespeicherte Element eine Assistentenantwort sein. `parseStoredChat` prüft nur Einzelobjekte, nicht die Reihenfolge (`app/src/shared/petrolChatStored.ts:267-305`); `toTurns` zeigt die Antwort allein, und `completedTurns`/`chatHistoryForModel` lassen sie als Modellkontext durch (`app/src/renderer/components/Agent/PetrolChat.tsx:1122-1133`; `app/src/renderer/utils/chatHistory.ts:19-24,39-50`).
+Vorschlag: Nur an vollständigen Wechselgrenzen kürzen und die Sequenz beim Laden prüfen; Test jenseits der 2000er-Grenze mit Stopp- und Fehlerwechseln.
+
+### F65 — Bild-IDs sind als Dateischlüssel nicht gesprächsweit eindeutig
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:1327
+Status: [OFFEN]
+Schritt 2 verwendet `media/<bild-id>.jpg.enc` als einzigen Dateischlüssel und fordert nur ein Zeichenmuster (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1326-1337`). `parseStoredChat` prüft das Muster pro Bild, aber keine Eindeutigkeit über alle Nachrichten (`app/src/shared/petrolChatStored.ts:251-259,267-305`). `imageIdsIn` entfernt Duplikate sogar bewusst (`app/src/shared/petrolChatStored.ts:133-135`). Zwei verschiedene Bilder mit derselben ID würden somit eine Mediendatei teilen; nach Laden zeigt mindestens eine Frage falsche Bytes. Die Renderer-ID besteht aus Zeitstempel und pro Renderer neu startendem Zähler (`app/src/renderer/utils/chatImagePrep.ts:18,45-53`) und ist keine gesprächsweite Main-Zusage.
+Vorschlag: IDs beim Anhängen im Main gesprächsweit vergeben oder Kollisionen mit unterschiedlichen Bytes strikt zurückweisen; Laden auf doppelte IDs prüfen und einen Kollisionsfall testen.
+
+### F66 — Der Main-Bauplan bindet die Gesprächs-ID nicht an ihren Vault
+Schwere: hoch
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:1339
+Status: [OFFEN]
+Rev. 2 verlangt eine Bindung jedes Gesprächs an den Vault (`docs/codex-collab/chat-verlauf-notizen-bilder.md:799-808`), und der Ablagepfad wird aus `vaultPath` abgeleitet (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1326-1327`). Schritt 3 lässt den Renderer aber `{ conversationId, vaultPath, ... }` je Anfrage schicken und nennt nur eine Speicherkarte je Absender und ID (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1339-1342`). Ein Abgleich gegen den beim Erzeugen/Öffnen fest gebundenen, genehmigten Vault sowie der Umgang mit gleicher ID unter anderem Vault fehlen. Die heutigen Chat-Handler erhalten ihren Verlauf und Scope ebenfalls als Renderer-Angaben (`app/src/renderer/stores/petrolChatStore.ts:299-315,368-373`; `app/src/main/index.ts:6959-6962`). Ohne diese Grenze kann ein Gespräch nach Vault-Wechsel unter falschem Vault fortgesetzt oder gespeichert werden.
+Vorschlag: Im Main Gesprächsschlüssel `(Absender, kanonischer genehmigter Vault, Gesprächs-ID)` führen, Vault bei Erzeugung/Öffnung festbinden und jede spätere Anfrage mit abweichendem Vault ablehnen; Wechsel während Stream und Speicherkette testen.
+
+### F67 — Stopp-Bruchstück braucht mehr als die Textstücke im Main
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:1345
+Status: [OFFEN]
+Schritt 3 sagt, der Main kenne das Stopp-Bruchstück aus dem Stream und speichere Stopp/Fehler selbst (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1344-1348`). Für Web-Stopp entsteht die gespeicherte Nachricht heute aber aus *zwei* Kanälen: Textstücken und `petrol-chat-progress` mit bereits feststehenden Quellen, Fehlern und Suchanfragen (`app/src/renderer/stores/petrolChatStore.ts:188-214,418-437`). Der Web-Handler sendet diese Quellen vor der Modellphase und gibt beim Abort ein `stopped`-Ergebnis ohne Antworttext zurück (`app/src/main/index.ts:7294-7305,7316-7325`). Der Bauplan erwähnt weder die Übernahme dieser Fortschrittsdaten in den neuen Main-Gesprächszustand noch die Regel für spät eintreffende Stopp-Ergebnisse; sonst gehen `webPartial`, `webSentQueries` und der Quellenbezug des Bruchstücks verloren.
+Vorschlag: Pro Anfrage im Main Text, Webfortschritt und Bildzustand sammeln; beim Stopp genau einmal atomar finalisieren und ein spätes Ergebnis nur für Metadaten desselben Wechsels nachtragen. Suche-, Modell- und Direktstopp testen.
+
+### F68 — Exakte Formprüfung akzeptiert geerbte JavaScript-Schlüssel
+Schwere: mittel
+ADR-Stelle: app/src/shared/petrolChatStored.ts:216
+Status: [OFFEN]
+`shape` prüft unbekannte Schlüssel mit `k in fields` statt auf eigene Schemafelder (`app/src/shared/petrolChatStored.ts:216-218`). Da `fields` ein normales Objekt ist, sind `__proto__`, `constructor` und `toString` dort über die Prototypkette vorhanden. Ein per `JSON.parse` geladenes Gespräch mit z. B. `{"__proto__":{"excerpt":"..."}}` an Kopf, Nachricht oder Quelle besteht deshalb diesen Teil der Prüfung, obwohl der Vertrag unbekannte Felder ablehnen will (`app/src/shared/petrolChatStored.ts:221,267-305`). Der Test verwendet nur `extra`, das tatsächlich abgelehnt wird (`app/src/shared/petrolChatStored.test.ts:106-113`).
+Vorschlag: `Object.hasOwn(fields, k)` oder ein nullprototypisches Schema verwenden und die drei Schlüssel als Negativfälle testen.
+
+### Runde 8
+
+### F69 — Zwei offene Fragen bestehen die neue Wechselfolgen-Prüfung
+Schwere: mittel
+ADR-Stelle: app/src/shared/petrolChatStored.ts:313
+Status: [OFFEN]
+`validSequence` erlaubt jede Folge von Nutzerfragen und prüft bei zwei Fragen hintereinander nicht, ob die erste als `stopped` markiert ist (`app/src/shared/petrolChatStored.ts:313-319,387-392`). Genau diese Markierung ist aber der Grund für die Ausnahme; ohne sie bleibt die erste Frage beim späteren Modellverlauf als offene Frage stehen, weil `completedTurns` sie nur bei eigenem `stopped` oder direkt folgender fehlerhafter/gestoppter Antwort entfernt (`app/src/renderer/utils/chatHistory.ts:32-50`). Ein gespeichertes `[user ohne stopped, user, assistant]` gilt daher als lesbar und liefert beide Fragen ans Modell. Der neue Test deckt nur die markierte Ausnahme ab (`app/src/shared/petrolChatStored.test.ts:299-304`).
+Vorschlag: Auf eine Nutzerfrage darf nur dann direkt eine weitere folgen, wenn die erste `stopped: true` trägt; diesen Negativfall beim Laden und Bauen testen.
+
+### F70 — `written` umgeht nach dem ersten Save den Schutz für nicht lesbare Gespräche
+Schwere: hoch
+ADR-Stelle: app/src/main/petrolChats/storage.ts:180
+Status: [OFFEN]
+`save` prüft `readChat` auf `unreadable` nur, solange `written` für den Ordner fehlt (`app/src/main/petrolChats/storage.ts:180-188`). Nach einem erfolgreichen Save steht der Hash im Cache (`app/src/main/petrolChats/storage.ts:202-204`). Wird `chat.json.enc` danach beschädigt oder der Schlüssel gewechselt, liefert derselbe Inhalt bei `exists(file)` sofort `false` („unverändert“), ohne die Lesbarkeit zu prüfen; ein geänderter Inhalt überspringt den `readChat`-Zweig und überschreibt sogar die nicht lesbare Datei (`app/src/main/petrolChats/storage.ts:180-202`). Das widerspricht der Zusage, nicht lesbare Gespräche nie zu überschreiben (`app/src/main/petrolChats/storage.ts:11-14,166-170`). Der Fremdschlüsseltest nutzt dafür eine **neue** Storage-Instanz und verfehlt den Cache-Fall (`app/src/main/petrolChats/storage.test.ts:177-186`).
+Vorschlag: Cache nur als Beschleunigung für eine nachweislich unveränderte Datei verwenden (Dateiidentität/mtime oder erneute Lesbarkeit prüfen); Schutz gegen Schlüsselwechsel und externe Beschädigung mit derselben Instanz testen.
+
+### F71 — Unverändertes JSON und vorhandene Dateien verhindern die Bildreparatur
+Schwere: hoch
+ADR-Stelle: app/src/main/petrolChats/storage.ts:180
+Status: [OFFEN]
+Der Hash für „unverändert“ enthält nur `JSON.stringify(chat)` (`app/src/main/petrolChats/storage.ts:176-180`). Ein erster Save darf `chat.json.enc` mit Bildverweis schreiben, obwohl `images` fehlen oder ungültig sind (`app/src/main/petrolChats/storage.ts:191-202`; sogar als Testfall `app/src/main/petrolChats/storage.test.ts:134-142`). Ein zweiter Save mit **demselben Chat und nun gültigen Bildbytes** kehrt wegen `written` oder nach Neustart wegen gleicher JSON-Datei vor der Medienschleife zurück (`app/src/main/petrolChats/storage.ts:180-188`); das Bild bleibt dauerhaft fehlend. Ist eine Mediendatei vorhanden, aber beschädigt oder mit falschem Schlüssel verschlüsselt, wird sie bei geändertem Chat ebenfalls wegen bloßem `exists(target)` nie repariert (`app/src/main/petrolChats/storage.ts:194-200,300-306`). `readMedia` fasst auch einen Entschlüsselungsfehler als „fehlend“ auf (`app/src/main/petrolChats/storage.ts:300-306`); nach `restoreMessage` steht die ID in `imagesMissing`, und `cleanup` hält nur Dateien für `images` fest (`app/src/shared/petrolChatStored.ts:330-344`; `app/src/main/petrolChats/storage.ts:264-270`). Ein nur vorübergehender Medienfehler kann so beim nächsten Speichern/Aufräumen zur endgültigen Löschung des Chiffrats werden.
+Vorschlag: Vor „unverändert“ referenzierte Medien mitprüfen; fehlende Medien aus gelieferten Bytes nachschreiben, beschädigte nicht still ersetzen, sondern einen expliziten Reparatur-/Fehlerzustand führen. Temporären Entschlüsselungsfehler von dauerhaft fehlender Datei unterscheiden.
+
+### F72 — „Alle löschen“ ist nicht gegen gleichzeitiges Speichern serialisiert
+Schwere: hoch
+ADR-Stelle: app/src/main/petrolChats/storage.ts:217
+Status: [OFFEN]
+`save` und `delete` benutzen nur eine Kette je Gesprächsordner (`app/src/main/petrolChats/storage.ts:128-135,172-175,208-214`). `deleteAll` liest einmal die vorhandenen IDs, wartet nur deren `delete` ab und entfernt danach den gesamten Vault-Ordner (`app/src/main/petrolChats/storage.ts:217-223`). Ein Save für eine neue ID, der nach dem `readdirSafe` beginnt, steht in keiner dieser Ketten und kann vor dem abschließenden `fs.rm(vdir)` erfolgreich antworten, obwohl sein Gespräch unmittelbar danach verschwindet. Auch ein später Save für eine bereits gelöschte ID kann zwischen deren `delete` und dem Root-`rm` laufen. Der Test führt Save und „alle löschen“ nur nacheinander aus (`app/src/main/petrolChats/storage.test.ts:209-214`).
+Vorschlag: Eine Vault-weite Sperre/Generation für `deleteAll` und alle Saves einführen; beim Löschen neue Saves blockieren oder danach ausdrücklich als neues Gespräch behandeln. Gleichzeitige Saves für alte und neue IDs testen.
+
+### F73 — `path.resolve` bindet einen Vault-Alias nicht an denselben Ablageordner
+Schwere: mittel
+ADR-Stelle: docs/codex-collab/chat-verlauf-notizen-bilder.md:1473
+Status: [OFFEN]
+Rev. 9 nennt einen „kanonischen genehmigten Vault“, konkret aber `assertApprovedVault` plus `path.resolve` (`docs/codex-collab/chat-verlauf-notizen-bilder.md:1473-1478`). Der Main nimmt sowohl den aufgelösten als auch den per `realpath` ermittelten Vault-Root in seine Genehmigungsliste auf (`app/src/main/index.ts:1258-1266,1281-1285`). `vaultKey` hasht den übergebenen String ohne Kanonisierung (`app/src/main/petrolChats/storage.ts:71-73,109-115`). Derselbe physische Vault über einen Symlink-Pfad und seinen realen Pfad erhält deshalb zwei Gesprächslisten; ein Gespräch kann beim Wechsel zwischen diesen genehmigten Aliasen scheinbar verschwinden, obwohl der Vault nicht verschoben wurde. Der Storage-Test prüft nur zwei tatsächlich unterschiedliche Pfadstrings (`app/src/main/petrolChats/storage.test.ts:152-156`).
+Vorschlag: Beim Anlegen/Öffnen `realpath` des genehmigten Vault-Roots als stabile Gesprächsbindung verwenden und genau diesen Pfad an die Ablage geben; Symlink-Alias gegen Realpfad testen.
+
+### F74 — Medien werden weder an Bildgrenzen noch an gespeicherte Maße gebunden
+Schwere: mittel
+ADR-Stelle: app/src/main/petrolChats/storage.ts:310
+Status: [OFFEN]
+Der gespeicherte Bildvertrag erlaubt ein beliebiges nichtnegatives `byteLength` und Maße bis 1600, aber prüft keine Beziehung zur Mediendatei (`app/src/shared/petrolChatStored.ts:228-230`). `isCleanJpeg` prüft nur, dass die Base64-Daten als JPEG-Kopf erkannt werden und kein Metadatenblock gemeldet wird; Dateigröße, tatsächliche Breite/Höhe und `byteLength` werden nicht gegen den Verweis geprüft (`app/src/main/petrolChats/storage.ts:310-315`). `save` akzeptiert die Bytes aus `images[imageId]` unabhängig von diesen Metadaten, `load` gibt sie ebenso zurück (`app/src/main/petrolChats/storage.ts:194-202,153-163`). Dadurch kann ein anderes gültiges JPEG unter derselben ID angezeigt und bei Folgefragen ans Modell geschickt werden; auch sehr große Strings gehen in `safeStorage.encryptString` (`app/src/main/petrolChats/electronCrypto.ts:24-25`). Der Test verwendet nur passende synthetische Bilddaten (`app/src/main/petrolChats/storage.test.ts:55-57,82-93`).
+Vorschlag: Vor Speichern und nach Entschlüsseln tatsächliche Größe und Maße mit `StoredChatImage` vergleichen und die 3-MB-Grenze aus `shared/chatImages.ts` erzwingen; vertauschte und übergroße Medien testen.
+
+### F75 — Die Liste entschlüsselt jedes gesamte Gespräch synchron im Main
+Schwere: mittel
+ADR-Stelle: app/src/main/petrolChats/storage.ts:138
+Status: [OFFEN]
+`list` ruft für jede ID seriell `readChat` auf (`app/src/main/petrolChats/storage.ts:138-150`), das jeweils die ganze verschlüsselte Datei liest, mit `safeStorage.decryptString` entschlüsselt und alle Nachrichten prüft (`app/src/main/petrolChats/storage.ts:278-297`; `app/src/main/petrolChats/electronCrypto.ts:24-25`). Der Vertrag begrenzt nur die Zahl der Nachrichten, nicht `content`, Quellentitel/URLs oder sonstige Strings (`app/src/shared/petrolChatStored.ts:101-114,239-273`). Mit vielen oder großen Gesprächen blockiert die synchrone Entschlüsselung den Main-Prozess beim Öffnen der Liste; bei fehlendem Schlüssel wird die Datei sogar vollständig gelesen, bevor `unavailableReason` geprüft wird (`app/src/main/petrolChats/storage.ts:283-291`). Die Tests messen nur zwei kleine Gespräche (`app/src/main/petrolChats/storage.test.ts:200-207`).
+Vorschlag: Gesamtgröße von Chat und Medien begrenzen; Liste mit begrenzter Parallelität oder einem separat verschlüsselten Kopf/Index laden und den Schlüsselstatus vor dem Datei-Read prüfen. Kosten mit vielen großen Gesprächen messen.
+
+### F76 — Rename allein sichert den neuen Gesprächsstand nicht gegen Stromausfall
+Schwere: mittel
+ADR-Stelle: app/src/main/petrolChats/storage.ts:340
+Status: [OFFEN]
+`writeAtomic` schreibt eine Temp-Datei und benennt sie um, ruft aber weder `fsync` für die Datei noch für das Verzeichnis auf (`app/src/main/petrolChats/storage.ts:340-349`). Damit ist der Wechsel für laufende Leser atomar sichtbar, aber nach einem OS-Absturz oder Stromausfall nicht dauerhaft zugesichert; bei einem neuen Gespräch können insbesondere bereits geschriebene Medien und `chat.json.enc` unterschiedlich wiederkehren (`app/src/main/petrolChats/storage.ts:191-203`). Der vorhandene Test prüft nur, dass nach einem regulär abgeschlossenen Save keine Temp-Datei übrig ist (`app/src/main/petrolChats/storage.test.ts:108-115`).
+Vorschlag: Temp-Dateien vor Rename synchronisieren und die betroffenen Verzeichnisse nach Rename synchronisieren; beim Laden fehlende referenzierte Medien als Crash-Fall behandeln.
+
+### F77 — Bild-Retry benutzt dieselbe ID und macht das Gespräch unspeicherbar
+Schwere: hoch
+ADR-Stelle: app/src/shared/petrolChatStored.ts:301
+Status: [OFFEN]
+Die Oberfläche nimmt bei „Erneut senden“ einer fehlgeschlagenen Bildfrage die vorhandenen `retryOf.images` unverändert (`app/src/renderer/components/Agent/PetrolChat.tsx:375-404,717-720`). Der Store hängt diese Bilder mit ihren bisherigen IDs an eine **neue** Nutzerfrage im selben Gespräch (`app/src/renderer/stores/petrolChatStore.ts:280-286`); die alte Frage bleibt sichtbar. Der neue gesprächsweite Check zählt beide Vorkommen als Kollision und `buildStoredChat` wirft (`app/src/shared/petrolChatStored.ts:301-310,420-436`). So kann ein regulärer Retry nach einem Modellfehler die spätere Speicherung des ganzen Gesprächs verhindern. Der Duplikattest verwendet nur zwei künstlich gleich benannte Bilder, nicht den realen Retry-Pfad (`app/src/shared/petrolChatStored.test.ts:307-316`).
+Vorschlag: Beim Retry eine neue Bild-ID für die neue Nachricht vergeben und die Bytes unter ihr ablegen, oder eine bewusst geteilte, unveränderliche Medienreferenz als eigene Vertragsform einführen; Retry nach Fehler und Stopp mit anschließendem Speichern testen.
+
+### Runde 9
+
+### F78 — Verspätetes Öffnen bindet einen verlassenen Tab wieder an den alten Vault
+Schwere: hoch
+ADR-Stelle: app/src/renderer/stores/petrolChatStore.ts:287
+Status: [OFFEN]
+`send` wartet beim ersten Senden auf `petrolConvOpen`, während `conv` im Store noch `null` ist (`app/src/renderer/stores/petrolChatStore.ts:287-297`). Ein Vault-Wechsel in diesem Fenster wird von `vaultChanged` wegen `!sc.conv` ignoriert (`app/src/renderer/stores/petrolChatStore.ts:439-443`; Aufruf bei Pfadwechsel in `app/src/renderer/components/Agent/PetrolChat.tsx:122-124`). Auch `clear` oder `dispose` annullieren das wartende Öffnen nicht (`app/src/renderer/stores/petrolChatStore.ts:420-436`). Nach dessen Auflösung setzt `send` die alte Vault-Bindung wieder ein und schickt die Frage an diesen Vault (`app/src/renderer/stores/petrolChatStore.ts:304-305,343-355`); nach `dispose` erzeugt `patch` den entfernten Bereich erneut (`app/src/renderer/stores/petrolChatStore.ts:192-194`). Der Vault-Test öffnet erst vollständig und wechselt dann (`app/src/renderer/stores/petrolChatStore.test.ts:96-105`).
+Vorschlag: Öffnen an eine Generation des Tabs und den aktuellen Vault koppeln; bei Wechsel, `clear` und `dispose` ein spätes Ergebnis verwerfen und die eben erzeugte Gesprächs-ID im Main schließen. Den verzögerten `open`-Fall testen.
+
+### F79 — Alte Stopp-Antwort kann eine spätere Frage aus der Anzeige entfernen
+Schwere: hoch
+ADR-Stelle: app/src/renderer/stores/petrolChatStore.ts:414
+Status: [OFFEN]
+`stop` setzt `activeScope` sofort auf `null` und beginnt erst dann den asynchronen `petrolConvStop`-Aufruf (`app/src/renderer/stores/petrolChatStore.ts:401-416`). Damit darf `send` schon eine neue Frage im selben Gespräch beginnen (`app/src/renderer/stores/petrolChatStore.ts:276-278,323-340`). Ist diese schnelle zweite Antwort fertig, bevor die alte Stopp-Antwort eintrifft, erfüllt letztere wieder `activeScope !== id` und dieselbe `conv.id` und ersetzt **alle** Nachrichten durch ihren älteren Stand (`app/src/renderer/stores/petrolChatStore.ts:414-416`). Im Main wird der Nachrichtenwert der Stopp-Rückgabe vor dem wartenden Speichern gebildet (`app/src/main/petrolChats/conversation.ts:389-412`); die zweite Frage kann währenddessen anlaufen, weil `conv.turn` schon `null` ist (`app/src/main/petrolChats/conversation.ts:394-396,229-232`). Der Store-Test prüft nur Stopp ohne anschließende Frage (`app/src/renderer/stores/petrolChatStore.test.ts:116-131`).
+Vorschlag: Stopp-Ergebnisse nur für die zugehörige Wechselgeneration übernehmen oder den nächsten Send bis zum Stopp-Abschluss sperren; verzögerten Stopp mit schneller Folgefrage testen.
+
+### F80 — Der Renderer bestimmt weiterhin eine gespeicherte Modell-Herkunftsangabe
+Schwere: mittel
+ADR-Stelle: app/src/shared/petrolChat.ts:87
+Status: [OFFEN]
+Der neue IPC-Vertrag enthält `runLabel` aus dem Renderer (`app/src/shared/petrolChat.ts:74-88`; Erzeugung in `app/src/renderer/components/Agent/PetrolChat.tsx:397-408`). `parseSendRequest` kopiert es ungeprüft hinsichtlich des tatsächlichen Modellwegs (`app/src/main/petrolChats/conversation.ts:515-528`). Für Chatantworten übernimmt der Main dieses Label als `model` (`app/src/main/petrolChats/conversation.ts:370-380`), und die Projektion speichert es sogar im Gesprächskopf (`app/src/shared/petrolChatStored.ts:437-450`). Ein Renderer kann damit beispielsweise eine Cloud-Antwort als lokales Modell ausgeben; die Zusage, dass die Herkunft aus dem Main stammt, gilt für dieses sichtbare und persistente Feld nicht.
+Vorschlag: Anzeigename und Weg nach der tatsächlichen Route im Main bilden bzw. vom Handler zurückgeben; `runLabel` nicht als autoritative Herkunft übernehmen.
+
+### F81 — Direkter Web-IPC bleibt ein Weg zu renderergewählten eingefrorenen Quellen
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:7370
+Status: [OFFEN]
+`petrol-chat-web` bleibt über die Preload-API erreichbar (`app/src/main/preload.ts:392-396`). Der direkte Handler entfernt zwar `history` und `webTopics`, lässt aber `scopeId` und `snapshotId` aus `params` stehen (`app/src/main/index.ts:7370-7374`). `runPetrolWeb` löst eine so bezeichnete eingefrorene Quelle anhand des vom Renderer angegebenen Bereichs und der Kennung auf (`app/src/main/index.ts:6954-6958,7041-7049`). Damit kann derselbe Absender den Gesprächs-IPC und dessen Main-geführte Bindung umgehen und einen bekannten Snapshot eines anderen Gesprächs als Grundlage wählen; der reguläre Weg setzt `scopeId` dagegen aus `conv.id` (`app/src/main/petrolChats/conversation.ts:284-300`).
+Vorschlag: Den direkten Messweg für Snapshot-Nachfragen sperren oder Bereich und Snapshot an ein offenes Gespräch des Absenders binden; eine direkte Anfrage mit fremder Gesprächs-ID und bekannter Snapshot-ID testen.
+
+### F82 — Anfragekennungen kollidieren fensterübergreifend
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:7404
+Status: [OFFEN]
+`petrolConvEvents` ist global allein nach `requestId` indiziert; eine gleichzeitig laufende Kennung eines anderen Fensters wird bei `petrol-conv-send` abgewiesen (`app/src/main/index.ts:7403-7404,7489-7503`). Der Renderer erzeugt die Kennung aus Millisekunde und einem nur im jeweiligen Renderer-Modul geführten Zähler (`app/src/renderer/stores/petrolChatStore.ts:166-171,308`). Zwei Fenster, die ihre erste Frage in derselben Millisekunde senden, können deshalb kollidieren. Die Abbruchverwaltung benutzt bereits den Absender **plus** Kennung (`app/src/main/index.ts:6428-6434`), die neue Ereigniszuordnung jedoch nicht.
+Vorschlag: Auch den Event-Schlüssel aus `sender.id` und `requestId` bilden; parallele Fenster mit gleicher Kennung testen.
+
+### F83 — Speicherfehler wird im Anzeige-Spiegel als eingeschaltete Speicherung geführt
+Schwere: hoch
+ADR-Stelle: app/src/renderer/stores/petrolChatStore.ts:380
+Status: [OFFEN]
+Der Main meldet einen fehlgeschlagenen Save ausdrücklich als `storage: 'failed'` und lässt das Gespräch im Speicher weiterlaufen (`app/src/main/petrolChats/conversation.ts:481-499`; Test `app/src/main/petrolChats/conversation.test.ts:267-278`). Bei einer regulären Antwort ersetzt der Store `'failed'` durch den bisherigen Modus, typischerweise `'on'` (`app/src/renderer/stores/petrolChatStore.ts:375-380`); beim Stopp übernimmt er `res.storage` überhaupt nicht (`app/src/renderer/stores/petrolChatStore.ts:414-417`). Der Scope-Typ kann `'failed'` zudem gar nicht halten (`app/src/renderer/stores/petrolChatStore.ts:85-89`; `app/src/shared/petrolChat.ts:91-97`). So kann Schritt 4 aus dem Renderer-Zustand keine wahrheitsgemäße „nicht gespeichert“-Anzeige bauen; beim Schließen geht das nur im Speicher gehaltene Gespräch verloren (`app/src/renderer/stores/petrolChatStore.ts:173-179,420-435`).
+Vorschlag: Speicherfehler als eigenen sichtbaren Zustand im Scope führen, auch nach Stopp und Wiederholungsversuch; Fehlerantwort und Tab-Schließen im Store-Test prüfen.
+
+### F84 — Aufräumen gilt schon vor Erfolg als erledigt und parallele Öffnungen warten nicht
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:7462
+Status: [OFFEN]
+`cleanupPetrolChatsOnce` setzt den Vault in `petrolChatsCleaned`, **bevor** die Schlüsselverfügbarkeit geprüft und das Aufräumen ausgeführt ist (`app/src/main/index.ts:7460-7472`). Bei vorübergehend fehlendem Schlüssel oder einer Exception gibt es während dieses Programmlaufs keinen weiteren Versuch. Zudem kehrt ein zweiter gleichzeitiger `petrol-conv-open` wegen des bereits gesetzten Merkers sofort zurück, während der erste noch auf `loadUISettings` bzw. `storage.cleanup` wartet (`app/src/main/index.ts:7461-7468,7478-7486`). `openIds` wird nur beim tatsächlichen Aufruf von `cleanup` abgenommen (`app/src/main/index.ts:7468`), während `storage.load` parallel zur Aufräum-Schreibkette läuft (`app/src/main/petrolChats/storage.ts:146-154,171-181,268-283`); eine Öffnung und das Löschen eines abgelaufenen Gesprächs können so gegeneinander laufen.
+Vorschlag: Das laufende Cleanup-Promise je Vault teilen und erst nach erfolgreichem Abschluss als erledigt markieren; temporären Schlüsselausfall und zwei gleichzeitige Öffnungen testen.
+
+### F85 — Ein Öffnen lädt und überträgt sämtliche Bildbytes des Gesprächs auf einmal
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:7478
+Status: [OFFEN]
+Die Ablage liest beim Öffnen jede referenzierte Mediendatei in `images` (`app/src/main/petrolChats/storage.ts:171-181`); `PetrolConversations.open` setzt sämtliche Bytes in die Laufzeitnachrichten und gibt den kompletten Verlauf zurück (`app/src/main/petrolChats/conversation.ts:203-212`). `petrol-conv-open` reicht diese Antwort unverkleinert per IPC weiter (`app/src/main/index.ts:7478-7486`). Das Schema erlaubt 2000 Nachrichten und bis zu vier Bilder je Nutzerfrage, jedes bis 3 MB (`app/src/shared/petrolChatStored.ts:30-32,256-271`; `app/src/shared/chatImages.ts:16-20`); die 16-MB-Grenze schützt nur die verschlüsselte Gesprächsdatei, nicht die Summe der Medien (`app/src/main/petrolChats/storage.ts:191-199`). Schon deutlich darunter kann ein einziges Öffnen den Main, IPC und Renderer mit sehr vielen Base64-Strings belasten.
+Vorschlag: Gesamtbudget für Medien je Gespräch und einen gestuften Bildabruf oder Lazy Loading für die Anzeige vorsehen; Öffnen mit vielen Bildern als Lastfall messen.
+
+### Runde 10
+
+### F86 — Fehlgeschlagenes Öffnen verwirft das bisherige, womöglich ungespeicherte Gespräch
+Schwere: hoch
+ADR-Stelle: app/src/renderer/stores/petrolChatStore.ts:505
+Status: [OFFEN]
+`openConversation` schließt das bisherige Gespräch im Main und leert den Renderer-Bereich **vor** `petrolConvOpen` (`app/src/renderer/stores/petrolChatStore.ts:503-510`). Meldet das Öffnen danach „nicht lesbar“ oder wirft es, gibt die Funktion nur den Fehler zurück und stellt weder Nachrichten noch Gesprächs-ID wieder her (`app/src/renderer/stores/petrolChatStore.ts:510-520`). `close` entfernt das alte Gespräch nach dem Save-Versuch aus dem Main-Speicher (`app/src/main/petrolChats/conversation.ts:448-455`); bei `storage: 'failed'`, `memory` oder fehlendem Schlüssel ist dessen bisheriger Inhalt damit verloren (`app/src/main/petrolChats/conversation.ts:192-195,525-537`). Die Liste zeigt den Öffnungsfehler, aber keine Warnung vor dem Wechsel (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:53-57,124-128`); der Store-Test prüft beim Fehler nur den Rückgabestring (`app/src/renderer/stores/petrolChatStore.test.ts:334-338`).
+Vorschlag: Erst das Ziel laden, dann das alte Gespräch schließen und den Bereich tauschen; einen fehlgeschlagenen Öffnungsversuch aus einem nur im Speicher vorhandenen Gespräch testen.
+
+### F87 — Geladenes Gespräch und neues Senden können denselben Tab gleichzeitig übernehmen
+Schwere: hoch
+ADR-Stelle: app/src/renderer/stores/petrolChatStore.ts:497
+Status: [OFFEN]
+`openConversation` markiert seinen ausstehenden `petrolConvOpen` nicht in `opening` und setzt auch keinen eigenen Ladezustand (`app/src/renderer/stores/petrolChatStore.ts:497-520`). Während es nach dem Leeren des Bereichs auf den Main wartet, sieht `send` weder `activeScope` noch `opening.has(id)`, legt ein **anderes** neues Gespräch an und kann die Frage bereits senden (`app/src/renderer/stores/petrolChatStore.ts:307-332,349-390`). Beide Wege teilen dann dieselbe Generation: die spätere Ladeantwort kann `conv` und Nachrichten über die laufende Antwort setzen, deren Send-Ergebnis anschließend Nachrichten des ersten Gesprächs unter der ID des geladenen zeigt (`app/src/renderer/stores/petrolChatStore.ts:317,405-428,501-520`). Auch ein während `await stopping.get(id)` geschlossener Tab wird danach wieder geöffnet, weil `openConversation` die Generation erst **nach** diesem Await erhöht (`app/src/renderer/stores/petrolChatStore.ts:497-502`; `dispose` erhöht sie in `app/src/renderer/stores/petrolChatStore.ts:485-494`). Die Liste liegt als normale Fläche über dem weiterhin bedienbaren Chat (`app/src/renderer/components/Agent/PetrolChat.tsx:672-683`; `app/src/renderer/styles/index.css:23221-23227`).
+Vorschlag: Zielöffnung ab Beginn als tabgebundenen, abbrechbaren Vorgang markieren; Senden bis zum Abschluss sperren und Generation/Vault sowohl vor als auch nach jedem Await prüfen. Verzögertes Laden mit Send, `clear`, `dispose` und Vault-Wechsel testen.
+
+### F88 — Löschen und Alle löschen haben keine Main-seitige Sperre gegen Wiederöffnen und spätes Speichern
+Schwere: hoch
+ADR-Stelle: app/src/main/index.ts:7550
+Status: [OFFEN]
+`petrol-conv-delete` schließt erst die gerade erfassten Instanzen und ruft **danach** `storage.delete` auf; `delete-all` macht dasselbe mit `closeVault` und `storage.deleteAll` (`app/src/main/index.ts:7549-7573`; `app/src/main/petrolChats/conversation.ts:463-465,479-482`). Dazwischen und während des Löschens können andere IPC-Aufrufe dieselbe ID wieder öffnen oder ein neues Gespräch des Vaults anlegen (`app/src/main/index.ts:7492-7499`; `app/src/main/petrolChats/conversation.ts:197-226`). `storage.load` läuft außerhalb der Vault-Schreibkette, und spätere Saves werden **nach** `delete`/`deleteAll` in diese Kette gestellt und können die Dateien erneut anlegen (`app/src/main/petrolChats/storage.ts:146-154,171-181,191-193,245-259`). Weder die Main-Handler noch `PetrolConversations` führen während des Löschens eine Sperre oder Generation. Die neuen Tests schließen nur nacheinander zwei Fenster und prüfen kein Löschen mit gleichzeitigem Öffnen/Senden (`app/src/main/petrolChats/conversation.test.ts:320-327`).
+Vorschlag: Löschen pro Vault/ID mit Öffnen und Speichern in einer gemeinsamen Main-seitigen Transaktion oder Generation serialisieren; ein paralleles `open` und ein spätes Send-Ergebnis nach `delete`/`delete-all` testen.
+
+### F89 — Umbenennen aus einem zweiten Fenster kann neuere Nachrichten überschreiben
+Schwere: hoch
+ADR-Stelle: app/src/main/index.ts:7539
+Status: [OFFEN]
+`isOpen` prüft nur den aufrufenden Absender. Ist dasselbe Gespräch in einem anderen Fenster offen, lädt `petrol-conv-rename` eine **zweite** `Conversation`-Instanz aus der Platte, ändert dort den Titel und speichert deren gesamten Nachrichtenstand (`app/src/main/index.ts:7538-7546`; `app/src/main/petrolChats/conversation.ts:209-226,435-440,525-534`). Eine währenddessen im anderen Fenster abgeschlossene Frage kann dadurch aus der gespeicherten Datei verschwinden, wenn der Titel-Save nach deren Save kommt. Kommt dessen Save später, enthält seine Instanz noch den alten Titel und nimmt die Umbenennung zurück. Die Vault-Kette ordnet nur die vollständigen Writes, sie führt die beiden In-Memory-Stände nicht zusammen (`app/src/main/petrolChats/storage.ts:146-154,191-240`). Der Rename-Test verwendet nur einen Absender (`app/src/main/petrolChats/conversation.test.ts:329-337`).
+Vorschlag: Titeländerungen über einen gemeinsamen Gesprächsstand oder eine gezielte, versionierte Mutation der zuletzt gespeicherten Datei ausführen; zwei Fenster mit parallelem Send und Rename testen.
+
+### F90 — Löschen in einem Fenster lässt den Verlauf in anderen Fenstern als offen stehen
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:7556
+Status: [OFFEN]
+`closeEverywhere` und `closeVault` entfernen die Main-Instanzen aller Fenster, aber die Lösch-Handler senden diesen Fenstern kein Ereignis zur Anzeige-Aktualisierung (`app/src/main/index.ts:7549-7573`; `app/src/main/petrolChats/conversation.ts:448-465,479-482`). Nur die Liste des **aufrufenden** Fensters ruft bei dessen aktueller ID `onCurrentDeleted` auf (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:58-70`; Verdrahtung in `app/src/renderer/components/Agent/PetrolChat.tsx:672-681`). Ein anderes Fenster behält `scope.conv` und die Nachrichten, bis ein weiteres Senden an `PetrolConversations.get` mit „Gespräch nicht offen“ scheitert (`app/src/renderer/stores/petrolChatStore.ts:390-420`; `app/src/main/petrolChats/conversation.ts:234-239`).
+Vorschlag: Löschung an alle betroffenen Fenster melden und deren Scope gezielt leeren; Zweifenster-Test einschließlich Renderer-Zustand ergänzen.
+
+### F91 — Bildladen nach Punkt 29 ist weder im Main noch im Renderer bedarfsweise
+Schwere: mittel
+ADR-Stelle: app/src/main/petrolChats/storage.ts:176
+Status: [OFFEN]
+`petrol-conv-open` entfernt Bildbytes erst aus der **IPC-Antwort** (`app/src/main/index.ts:7491-7501`). Zuvor liest `storage.load` weiterhin **jede** Mediendatei und `PetrolConversations.open` hält alle Base64-Strings im Main-Speicher (`app/src/main/petrolChats/storage.ts:171-181`; `app/src/main/petrolChats/conversation.ts:217-226`). Danach fordert der Renderer per Effekt sofort sämtliche Bilder ohne Bytes an, unabhängig davon, welche Marke sichtbar ist (`app/src/renderer/components/Agent/PetrolChat.tsx:126-128`; `app/src/renderer/stores/petrolChatStore.ts:524-535`). Ein Gespräch mit 40 Bildern verursacht also beim Öffnen weiterhin 40 Medienreads und anschließend bis zu 40 parallele Bild-IPCs; das in Rev. 9 Punkt 29 versprochene Laden „erst bei Bedarf“ und die dafür genannte Lastmessung sind so nicht eingelöst.
+Vorschlag: Medien erst auf Anforderung der sichtbaren Marke aus der Ablage lesen und gleichzeitige Abrufe begrenzen; den 40-Bilder-Fall für Main-Speicher, Öffnungszeit und IPC-Zahl messen.
+
+### F92 — „Erneut senden“ einer geladenen Frage lässt fehlende Bilder still weg
+Schwere: hoch
+ADR-Stelle: app/src/renderer/components/Agent/PetrolChat.tsx:398
+Status: [OFFEN]
+Ein beim Laden nicht lesbares Bild liegt in `imagesMissing`, während `images` nur vorhandene Bilder enthält (`app/src/shared/petrolChatStored.ts:347-360`). Die Anzeige benennt das fehlende Bild (`app/src/renderer/components/Agent/PetrolChat.tsx:728-736`), bietet bei einer fehlgeschlagenen Antwort aber weiterhin „Erneut senden“ an (`app/src/renderer/components/Agent/PetrolChat.tsx:747-755`). Der Retry nimmt ausschließlich `retryOf.images`; bei einem einzigen fehlenden Bild ist das eine leere Liste, bei mehreren eine unvollständige (`app/src/renderer/components/Agent/PetrolChat.tsx:387-401`). Der Main bekommt dann eine Textfrage ohne die ursprünglichen Bildreferenzen (`app/src/renderer/stores/petrolChatStore.ts:390-400`; `app/src/main/petrolChats/conversation.ts:249-255,278-284`). Bei einer Frage nach dem Bild kann das Modell so antworten, ohne dass der Retry auf den Verlust hinweist.
+Vorschlag: Retry sperren oder die fehlenden Bilder ausdrücklich anzeigen und eine bewusste Textfrage verlangen; geladenen Fehlerwechsel mit `imagesMissing` testen.
+
+### F93 — Ohne verfügbaren Schlüssel verschwinden gespeicherte Dateien sogar aus der Löschliste
+Schwere: mittel
+ADR-Stelle: app/src/main/index.ts:7511
+Status: [OFFEN]
+`petrol-conv-list` gibt bei `unavailableReason()` sofort `items: []` zurück (`app/src/main/index.ts:7505-7513`). Die Ablage könnte vorhandene Dateien in diesem Zustand als `unreadable` mit ID und Dateizeit listen, ohne sie zu entschlüsseln (`app/src/main/petrolChats/storage.ts:157-168,315-328`). Die Oberfläche bietet „Alle löschen“ aber nur bei einer nichtleeren Liste an und zeigt somit bei temporär gesperrtem Schlüsselbund weder die vorhandenen Gespräche noch einen Löschweg (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:96-100,148-158`). Das widerspricht dem dortigen Hinweis, nicht lesbare Gespräche könnten gelöscht werden (`app/src/renderer/utils/i18n/petrolChat.ts:72-78`).
+Vorschlag: IDs auch ohne Schlüssel als nicht lesbar auflisten oder mindestens „Alle löschen“ unabhängig vom Entschlüsselungsstatus anbieten; Schlüsselverlust mit vorhandenen Chiffraten testen.
+
+### F94 — Gleiche Bild-ID mit gleichen Maßen darf andere Bildbytes bezeichnen
+Schwere: hoch
+ADR-Stelle: app/src/main/petrolChats/conversation.ts:514
+Status: [OFFEN]
+`checkNewImages` vergleicht eine wiederverwendete ID nur anhand von Name, Breite, Höhe und `byteLength`, nicht anhand der Bytes (`app/src/main/petrolChats/conversation.ts:500-520`). Bei nichtleeren neuen Bytes ersetzt der Main sie gerade **nicht** durch sein eigenes Bild (`app/src/main/petrolChats/conversation.ts:251-255`). Ein anderes gültiges JPEG mit derselben Länge und denselben Maßen kann deshalb unter der alten ID in `known` das historische Bild überschreiben und als Verlaufsbild ans Modell gehen (`app/src/main/petrolChats/conversation.ts:350-367`). Beim Speichern gilt die vorhandene Mediendatei dagegen schon als passend, sobald ihre Metadaten stimmen; sie wird nicht durch die neuen Bytes ersetzt (`app/src/main/petrolChats/storage.ts:219-234,346-355`). Laufzeit, Modellaufruf und wieder geladenes Gespräch können somit für **dieselbe ID verschiedene Pixel** meinen.
+Vorschlag: Bei wiederverwendeter ID nur leere Bytes als Verweis akzeptieren oder neue Bytes mit dem Main-eigenen Bildinhalt vergleichen; zwei gleich große JPEGs mit gleichen Maßen und verschiedenen Pixeln testen.
+
+### F95 — Die Gesprächsliste setzt und restauriert den Tastaturfokus nicht
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/Agent/PetrolChat.tsx:1150
+Status: [OFFEN]
+Der Schalter für die Liste steht am Ende des Chats; die geöffnete Liste wird **vor** Verlauf und Eingabe in die DOM-Reihenfolge eingefügt (`app/src/renderer/components/Agent/PetrolChat.tsx:672-683,1141-1153`). Beim Öffnen gibt es keinen Fokuswechsel in die Region (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:29-50,88-104`): Wer den Schalter mit Tab/Enter bedient, bleibt unten; der nächste Tab-Schritt führt an der neu eingefügten Liste vorbei. Beim Öffnen eines Gesprächs oder Löschen einer Zeile verschwindet außerdem der betätigte Button ohne Fokus-Rückgabe (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:53-79,125-140`). Nur das Rename-Eingabefeld hat `autoFocus` (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:104-114`).
+Vorschlag: Beim Öffnen den Listen-Kopf oder ersten Eintrag fokussieren, beim Schließen den Schalter; nach Löschen/Umbenennen Fokus auf einen verbleibenden Eintrag setzen und die Bestätigung per Tastatur erreichbar halten.
+
+### F96 — Eine verspätete Listenantwort kann Ergebnisse des vorigen Vaults anzeigen
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/Agent/PetrolChatHistory.tsx:37
+Status: [OFFEN]
+`load` bindet zwar den jeweiligen `vaultPath`, hat aber weder Abbruch noch eine Sequenzprüfung vor `setItems`/`setMode` (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:37-49`). Bleibt die Liste bei einem Vault-Wechsel geöffnet, können die Requests für A und B parallel laufen; eine verspätete Antwort von A überschreibt dann die bereits angezeigten B-Einträge. `open`, `remove`, `removeAll` und `rename` benutzen anschließend den **aktuellen** `vaultPath` B mit den sichtbaren IDs bzw. der Anzahl aus A (`app/src/renderer/components/Agent/PetrolChatHistory.tsx:53-78,101-158`); `PetrolChat` hält `historyOpen` beim Vault-Wechsel unverändert (`app/src/renderer/components/Agent/PetrolChat.tsx:123-129,672-681`).
+Vorschlag: Antworten nur für den aktuellen Vault und den neuesten Ladeaufruf übernehmen; Vault-Wechsel mit verzögerten Listenantworten testen.
+
+### F97 — Geladene Webantwort verweist in der festen App-Antwort auf einen gesperrten Knopf
+Schwere: niedrig
+ADR-Stelle: app/src/renderer/utils/i18n/petrolChat.ts:142
+Status: [OFFEN]
+Die feste Antwort auf Fragen nach alten Webquellen fordert zum Klick auf „Hiermit weiterfragen“ an der Antwort oben auf (`app/src/renderer/utils/i18n/petrolChat.ts:142`; Darstellung in `app/src/renderer/components/Agent/PetrolChat.tsx:745-746`). Nach dem Laden trägt die frühere Antwort nur `hadSnapshot`, keine `snapshotId` mehr (`app/src/shared/petrolChatStored.ts:281-284,347-351`), und genau dieser Knopf ist deaktiviert (`app/src/renderer/components/Agent/PetrolChat.tsx:605-607`). Der Main kann die feste Antwort auch bei geladenen Webwechseln aus deren Themenfragen erzeugen (`app/src/main/petrolChats/conversation.ts:263-275`). Der sichtbare Handlungsrat ist in diesem Zustand nicht ausführbar.
+Vorschlag: Die feste Antwort bei geladenen Quellen auf „Globus einschalten und neu suchen“ umstellen; einen geladenen Webwechsel mit anschließender Frage nach einer alten Quelle testen.
+
 ## Claude-Antwort
 
 ### Runde 1 (01.11.2026)
@@ -1229,7 +1510,361 @@ Alle fünf Befunde tragen; Nutzer hat alle freigegeben. F46-Ablehnung von Codex 
 Prüfrunden damit beendet (Nutzerentscheidung). Offen vor Release: Nutzerabnahme, Cloud-Bildweg am
 echten Anbieter, Prüfset.
 
+### Rev. 8 — Bauplan Teil 1 (04.11.2026, Start nach 1.2.1)
+
+Grundlage: Teil 1 oben, Rev. 2 Punkt 1–2, Rev. 3 Punkt 9 und 11, Rev. 4 Punkt 12. Branch
+`feature/chat-verlauf`. Seit dem Plan dazugekommen: Bilder im Chat (1.2, Laufzeitvertrag
+`shared/chatImages.ts`) und die Gesprächsform (`chat-wie-codex.md`). Teil 2 (Notizen) baut auf
+diesem Schnitt auf, ist aber nicht Teil davon.
+
+**Schritt 1 — Datenvertrag (rein, getestet).** `shared/petrolChat.ts` nimmt den Laufzeittyp
+`PetrolChatMessage` aus dem Renderer-Store auf (der Main braucht ihn ab Schritt 3).
+`shared/petrolChatStored.ts`:
+- `StoredChatMessage` mit expliziter Feldliste, Abbildung `toStoredMessage` kopiert nur bekannte
+  Felder. Aus `web.sources` und `webPartial.sources` fällt `excerpt`, `snapshotId` wird
+  `hadSnapshot: true`, `followUpSnapshotId` wird `wasFollowUp: true` (Rev. 3 Punkt 9). Bilder:
+  `StoredChatImage` ohne `dataBase64`.
+- `parseStoredChat(unknown)`: strenge Prüfung beim Laden. Ist der Kopf oder eine Nachricht
+  ungültig, gilt das ganze Gespräch als „nicht lesbar“. Einzelne Nachrichten werden nicht still
+  weggelassen, sonst stünde eine Frage ohne Antwort im Verlauf.
+- `restoreMessage`: setzt `excerpt: ''`. `hadSnapshot` und `wasFollowUp` bleiben erhalten. Bilder
+  bekommen ihre Bytes aus `media/`.
+- `chatTitle` (erste Frage, Leerraum zusammengefasst, 60 Zeichen), `isChatExpired`
+  (Aufbewahrung 30/90/365/nie, gemessen an `updatedAt`).
+
+**Schritt 2 — Ablage im Main (getestet mit eingespieltem Schlüssel).** `main/petrolChats/`:
+`userData/petrol-chats/<sha256(vaultPath)[0..16]>/<gespräch-id>/chat.json.enc` + `media/<bild-id>.jpg.enc`.
+- `safeStorage` für JSON und Medien, Ordner 0700, Dateien 0600, atomar über Temp-Datei + Rename,
+  eine Schreibkette je Gespräch, Schreiben nur bei geändertem Inhalt.
+- Verfügbarkeit: `safeStorage.isEncryptionAvailable()`, unter Linux zusätzlich nicht
+  `basic_text`. Ist der Schlüssel nicht verfügbar, wird nicht gespeichert, und die Liste nennt den
+  Grund. Lässt sich ein Gespräch nicht entschlüsseln, wird es als „nicht lesbar“ gelistet und
+  nur das Löschen angeboten.
+- Aufräumen beim Start, je Vault beim ersten Zugriff: abgelaufene Gespräche, Ordner ohne
+  `chat.json.enc` (Absturzreste), Medien ohne Verweis. Ein gerade offenes Gespräch wird nicht
+  angefasst.
+- Gesprächs-ID vom Main vergeben (`randomBytes(16)` hex), Bild-ID nach `/^[\w-]{1,64}$/`.
+
+**Schritt 3 — Der Main führt das Gespräch (Rev. 4).** Neues `main/petrolChats/conversations.ts`
+mit dem Verlauf je Absender und Gesprächs-ID im Speicher, beim Öffnen von der Platte geladen.
+- Der Renderer schickt `{ conversationId, vaultPath, question, images, Weg }`, weder Verlauf noch
+  Themenfragen. Der Main baut den Modellverlauf selbst: `completedTurns`, Ausschluss der
+  Webwechsel, `webTopicQuestions` und `planImageHistory` wandern nach `shared/`.
+- Frage und Antwort hängt der Main selbst an und speichert. Der Renderer bekommt die fertige
+  Anzeige-Nachricht zurück (Stücke weiter über `petrol-chat-chunk`). Stopp und Fehler legt
+  ebenfalls der Main ab. Das Bruchstück schickt der Renderer nicht mehr mit, der Main kennt es
+  aus dem Stream.
+- `petrol-chat-web`: dasselbe, `scopeId` der Snapshots = Gesprächs-ID (Rev. 3 Punkt 11).
+- LM Studio und Ollama/Cloud nutzen denselben Gesprächsweg. Der Notiz-Chat bleibt auf
+  `ollama-chat` mit Renderer-Verlauf.
+
+**Schritt 4 — Oberfläche.** Liste „Gespräche“ im Chat-Modus (einklappbar, neueste oben,
+umbenennen, löschen, alle löschen, „nicht lesbar“, Hinweis bei fehlendem Schlüssel). „Neues
+Gespräch“ legt ein neues an. Ein neuer Tab startet leer. Tab schließen verliert nichts mehr.
+Vault-Wechsel bricht die laufende Anfrage ab und zeigt die Liste des neuen Vaults. Einstellungen:
+Aufbewahrung (Standard 90 Tage), Sätze zu „nur auf diesem Rechner“, „im Backup des Rechners“
+und „verschobener Vault verliert die Zuordnung“.
+
+**Schritt 5 — Geladene Gespräche ehrlich zeigen.** Antworten mit `hadSnapshot` zeigen „Seiten
+nicht mehr da“, Fragen mit `wasFollowUp` den Hinweis `followUpGoneHint`. Keine stille Vormerkung
+als Nachfrage. Export und Prüfbericht ohne Auszüge sind getestet.
+
+**Prüfung je Schritt:** typecheck, Tests, `electron-vite build`. Ab Schritt 3 zusätzlich in der
+Dev-App über CDP: senden, stoppen, Neustart, laden, weiterfragen, Bild, Webantwort.
+
+### Runde 7 (04.11.2026)
+
+Alle zehn Befunde habe ich gegen den Code geprüft. F60 und F68 habe ich mit einem eigenen Skript
+nachgemessen: `__proto__` am Kopf wurde angenommen, ebenso `deep: {}`, `extras: [null]` und
+`sentences: [null]`. Acht Befunde tragen, F61 und F65 teilweise. Der Nutzer hat die Empfehlung
+freigegeben.
+
+- **F59 [ADRESSIERT, Code]** Jede Struktur hat jetzt genau ein Schema mit `copy` (Speichern) und
+  `check` (Laden), auf jeder Ebene: Prüfbericht, Satzprüfung, gründliche Suche, Provenienz,
+  übersprungene Treffer, Bildzustellung. `toStoredMessage` bildet nur die Merkmale und kopiert dann
+  über das Schema. Ein Negativtest prüft acht verschachtelte Fremdfelder (Auszug, Kennung, Bytes).
+- **F60 [ADRESSIERT, Code]** `CitationReport`, `SentenceExtra`, `WebDeepInfo` (samt `hits`) und
+  `WebSkippedHit` werden vollständig geprüft, mit Aufzählungswerten. Sechs defekte Formen werden
+  abgelehnt (Test).
+- **F61 [TEILWEISE → Rev. 9 Punkt 28]** Die Anzeige braucht die Auszüge nicht, sie zeigt das
+  Ergebnis der Prüfung vom Zeitpunkt der Antwort. „Behauptet Belegstatus“ trifft es deshalb nicht.
+  Trotzdem bekommt sie eine sichtbare Kennzeichnung.
+- **F62 [ADRESSIERT, Plan]** Rev. 9 Punkt 28: Schritt 4 und 5 werden ein Schritt.
+- **F63 [ADRESSIERT, Code + Plan]** Daten: Ein Bild ohne lesbare Mediendatei steht nach dem Laden
+  in `imagesMissing` (ohne Bytes), nicht mit leeren Bytes in `images`. Es geht also nie an ein
+  Modell und bleibt auch beim nächsten Speichern als fehlend markiert (Test). Anzeige: Rev. 9
+  Punkt 28.
+- **F64 [ADRESSIERT, Code]** `trimToTurns` kürzt nur an einer Wechselgrenze. Beim Laden wird die
+  Reihenfolge geprüft: keine Antwort am Anfang, nie zwei Antworten hintereinander. Zwei Fragen
+  hintereinander sind erlaubt (Stopp vor dem ersten Wort). Test mit über 2000 Nachrichten,
+  gestoppten Fragen und Fehlern.
+- **F65 [TEILWEISE, Code + Plan]** Eine Kollision ist bei Zeitstempel und Zähler praktisch
+  unwahrscheinlich, die Abhilfe kostet aber wenig. Doppelte Bild-IDs lehnt das Laden ab, das Bauen
+  wirft `StoredChatError`. Zusätzlich gilt kein Name aus `Object.prototype` als Bild-ID:
+  `__proto__` passt auf `[\w-]`, das hat mein eigener Test gefunden. Rev. 9 Punkt 27: Der Main
+  prüft die Eindeutigkeit beim Anhängen.
+- **F66 [ADRESSIERT, Plan]** Rev. 9 Punkt 26.
+- **F67 [ADRESSIERT, Plan]** Rev. 9 Punkt 27.
+- **F68 [ADRESSIERT, Code]** `Object.hasOwn` statt `in`, Schlüssel von Bild-Wörterbüchern nur als
+  geprüfte Bild-ID. Test mit `__proto__`, `constructor`, `toString` und `hasOwnProperty` an Kopf,
+  Nachricht und Quelle.
+- `buildStoredChat` schreibt nur, was `parseStoredChat` wieder lädt (sonst `StoredChatError`).
+- Prüfung: typecheck sauber, `npm run test` 3342 grün. Rot war nur der bekannte
+  Zeitlimit-Fall `shellExecution.test.ts` (allein grün). `electron-vite build` sauber.
+
+### Rev. 9 — Ergänzungen zum Bauplan (nach Runde 7)
+
+**26. Gespräch fest an seinen Vault gebunden (F66).** Der Main führt Gespräche unter dem
+Schlüssel `(Absender, kanonischer genehmigter Vault, Gesprächs-ID)`. Der Vault wird beim Anlegen
+bzw. Öffnen festgelegt: `assertApprovedVault`, dann `fs.realpath` (F73, sonst hätte derselbe Vault
+über einen Symlink zwei Gesprächslisten). Genau dieser Pfad geht an die Ablage. Jede spätere Anfrage, deren Vault
+abweicht, wird abgelehnt, ebenso eine ID, die unter diesem Vault nicht existiert. Die Speicherkette
+schreibt in den Ordner des gebundenen Vaults, nie in den des aktuellen Renderers. Tests: Wechsel
+während des Streams, späte Speicherung nach Wechsel, gleiche ID unter anderem Vault.
+
+**27. Der Main sammelt den ganzen Wechsel (F67, F65).** Je Anfrage hält der Main einen
+Wechselzustand: Frage, Textstücke, Webfortschritt (Quellen, Fehler, nicht Abgerufenes, gesendete
+Suchanfragen) und Bildzustellung. Beim Stopp schließt er den Wechsel genau einmal ab und bildet das
+Bruchstück daraus (`webPartial`, `webSentQueries`, `imagesDropped`), wie heute der Renderer-Stopp.
+Ein spätes Ergebnis desselben Wechsels darf nur noch Angaben nachtragen (Suchanfragen), nie den
+Text oder den Abschluss. Bild-IDs prüft der Main beim Anhängen auf Eindeutigkeit im Gespräch.
+Tests: Stopp in der Suche, in der Modellphase und bei einer direkten Frage.
+
+**28. Laden und Anzeige gehen zusammen aus (F62, F61, F63).** Schritt 4 und 5 sind ein Schritt.
+Ohne die Anzeige der Merkmale wird kein Gespräch geladen. Dazu gehören:
+- `hadSnapshot` → „Seiten nicht mehr da“;
+- `wasFollowUp` → kein „Erneut senden“, `followUpGoneHint`, keine stille Vormerkung;
+- Prüfung je Satz eines geladenen Gesprächs → „geprüft beim Antworten · Seiten nicht mehr da“;
+- `imagesMissing` → Marke „Bild nicht mehr vorhanden“, nicht erneut sendbar.
+Tests mit einem echt geladenen Gespräch: Erneut senden, Vormerkung, Bild, Export.
+
+### Runde 8 (04.11.2026)
+
+Alle neun Befunde habe ich gegen den Code geprüft. Sieben tragen, F70 und F75 teilweise. Bei F71
+ist es schlimmer als beschrieben: Ein vorübergehender Lesefehler machte aus dem Bild beim nächsten
+Speichern `imagesMissing`, danach löschte das Aufräumen die intakte Datei. Der Nutzer hat alle
+neun freigegeben.
+
+- **F69 [ADRESSIERT, Code]** Zwei Fragen hintereinander nur, wenn die erste `stopped` trägt
+  (Test).
+- **F70 [ADRESSIERT, Code; teilweise]** Der Merker trägt Hash, Größe und Dateizeit. Weicht die
+  Datei ab, wird sie neu gelesen. Ist sie nicht lesbar, wird nicht überschrieben und nicht
+  „unverändert“ gemeldet (Test mit derselben Instanz, beschädigte Datei und Schlüsselwechsel).
+  Nicht übernommen: Ein von dieser Instanz geladenes und gehaltenes Gespräch gilt beim
+  Überschreiben nicht als verloren. Ab Schritt 3 ist der Main-Stand die Wahrheit.
+- **F71 [ADRESSIERT, Code]** `imagesMissing` gibt es nur zur Laufzeit, gespeichert bleibt jedes
+  Bild unter `images`. Die Bildschleife läuft vor der Prüfung auf „unverändert“. Eine fehlende
+  oder unpassende Datei wird nur durch passende Bytes ersetzt (F74). Tests: Nachtragen bei
+  unverändertem Gespräch, vorübergehender Lesefehler mit Laden, Speichern und Aufräumen (Datei
+  bleibt, Bild kommt wieder), kaputte Datei ersetzt.
+- **F72 [ADRESSIERT, Code]** Eine Kette je Vault für Speichern, Löschen, „alle löschen“ und
+  Aufräumen. Test: Speichern vorher, „alle löschen“, Speichern nachher, gleichzeitig gestartet.
+- **F73 [ADRESSIERT, Plan]** Rev. 9 Punkt 26 nennt jetzt `fs.realpath`. Den Pfad liefert der
+  Aufrufer (Schritt 3), die Ablage selbst kanonisiert nicht.
+- **F74 [ADRESSIERT, Code]** `matchesImage`: JPEG ohne Metadaten, Länge = `byteLength`, höchstens
+  3 MB, Maße aus dem JPEG-Kopf = gespeicherte Maße. Geprüft beim Speichern und beim Laden, die
+  Dateigröße schon vor dem Entschlüsseln.
+- **F75 [ADRESSIERT, Code; teilweise]** Schlüssel und Dateigröße werden vor dem Lesen geprüft,
+  Gesprächsdatei höchstens 16 MB (größer: nicht speichern, `too-large`, bzw. „nicht lesbar“).
+  Mehr Parallelität hilft nicht, weil `decryptString` synchron läuft. Ein eigener Kopf für die
+  Liste kommt erst, wenn die Messung in Schritt 4 es verlangt.
+- **F76 [ADRESSIERT, Code]** `fsync` der Temp-Datei vor dem Rename, des Ordners danach (wo das
+  Dateisystem es erlaubt). Fehlt ein Bild nach einem Absturz, ist das der Fall „fehlt beim Laden“
+  (F63).
+- **F77 [ADRESSIERT, Code]** Dieselbe ID mit denselben Angaben ist EIN unveränderliches Bild mit
+  einer Mediendatei (`imageMetaIn`). Abgelehnt wird nur eine ID mit abweichenden Angaben. Test mit
+  dem echten Retry-Verlauf (Fehler, dieselbe Frage mit demselben Bild).
+- Prüfung: typecheck sauber, `npm run test` 3370 grün. Rot nur `shellExecution.test.ts`
+  (bekannt), `electron-vite build` sauber. 85 Tests in Datenvertrag, Ablage und Store.
+
+### Runde 9 (05.11.2026)
+
+Alle acht Befunde habe ich gegen den Code geprüft. Sieben tragen, F85 teilweise. Bei F79 kommt
+eine zweite Seite hinzu: Beide IPC-Aufrufe warten im Main zuerst auf `realpath`. Kam die neue
+Frage vor dem Stopp an, lehnte der Main sie mit „läuft schon eine Antwort“ ab. Der Nutzer hat
+F78–F84 im Code und F85 als Plan freigegeben.
+
+- **F78 [ADRESSIERT, Code]** Generation je Tab (`generations`). „Neues Gespräch“, Tab zu und
+  Vault-Wechsel zählen hoch. `vaultChanged` greift auch während des Öffnens (Vault der Öffnung).
+  Ein spätes Öffnen wird verworfen und das eben angelegte Gespräch im Main geschlossen. Tests:
+  Vault-Wechsel und Tab zu während eines verzögerten Öffnens.
+- **F79 [ADRESSIERT, Code]** Ein laufender Stopp wird je Tab gemerkt (`stopping`), eine neue Frage
+  wartet auf seinen Abschluss. Stopp- und späte Ergebnisse gelten nur für ihren Wechsel
+  (`turnSeqs`) und ihre Generation. Test: verzögerter Stopp, sofortige Folgefrage, danach das
+  späte Ergebnis der ersten Anfrage. In der App geprüft (Oberfläche, qwen3.8:27b-mlx): Stopp nach
+  3 s, die sofort nachgeschobene Frage wurde angenommen und beantwortet.
+- **F80 [ADRESSIERT, Code]** `runLabel` ist aus dem Vertrag entfernt. Der Main bildet das Label
+  (`answerLabel`, gleiche Form wie `cloudRoutesForFeature`), ein mitgeschicktes Label wird
+  ignoriert (Test).
+- **F81 [ADRESSIERT, Code]** `petrol-chat-web` direkt lehnt `snapshotId` ab und läuft ohne
+  `scopeId`, legt also auch keine neuen Auszüge an. Nachfragen misst man über `petrolConvSend`. In
+  der App geprüft.
+- **F82 [ADRESSIERT, Code]** `petrolConvEvents` ist nach Fenster + Kennung geschlüsselt. Die
+  Lauf-Eingaben tragen `senderId`.
+- **F83 [ADRESSIERT, Code]** Der Store führt `'failed'` als eigenen Zustand (`nextStorage`), auch
+  nach Stopp und spätem Ergebnis. „unverändert“ ändert nichts (Test). Die Anzeige folgt in
+  Schritt 4.
+- **F84 [ADRESSIERT, Code]** `OnceShared`: Das Aufräumen je Vault wird geteilt, gilt erst nach
+  Erfolg als erledigt, und wer öffnet, wartet darauf. Tests: gleichzeitige Aufrufe,
+  Fehlschlag/Fehler werden wiederholt.
+- **F85 [TEILWEISE → Rev. 9 Punkt 29]** Im jetzigen Stand öffnet die App noch kein gespeichertes
+  Gespräch, die Last entsteht erst mit Schritt 4. Deshalb dort gelöst.
+- Prüfung: typecheck sauber, `npm run test` 3392 grün. Rot nur `shellExecution.test.ts`
+  (bekannt), `electron-vite build` sauber.
+
+### Runde 10 (05.11.2026)
+
+Alle zwölf Befunde habe ich gegen den Code geprüft, alle tragen. F88–F90 treten nur bei mehreren
+Fenstern auf. Bei F88 kommt ein konkreter Weg hinzu: Ein spätes Ergebnis der gründlichen Suche
+speicherte ein bereits geschlossenes Gespräch und legte es nach dem Löschen wieder an. Beim Bauen
+selbst gefunden: Brach ein Tab-Wechsel das Öffnen ab, blieb die Öffnungs-Sperre stehen und der
+Tab konnte nie wieder senden. Jetzt hat die Sperre einen Besitzer (`openingOwner`). Der Nutzer hat
+alle zwölf freigegeben.
+
+- **F86 [ADRESSIERT, Code]** `openConversation` lädt erst das Ziel und tauscht danach. Scheitert
+  das Öffnen, bleibt das bisherige Gespräch unberührt (Test).
+- **F87 [ADRESSIERT, Code]** Öffnen ist ein laufender Vorgang des Tabs (`opening` + Besitzer).
+  Senden und ein zweites Öffnen sind gesperrt, die Generation zählt sofort hoch. Test: Senden
+  während des Öffnens, Tab zu währenddessen, Senden danach geht.
+- **F88 [ADRESSIERT, Code]** Ein geschlossenes Gespräch speichert nie mehr (`closed`).
+  `beginDelete`/`endDelete` lassen Öffnen und Anlegen während des Löschens scheitern. Test: spätes
+  Ergebnis der gründlichen Suche nach dem Löschen, Öffnen und Anlegen während des Löschens.
+- **F89 [ADRESSIERT, Code]** Ein Gespräch ist nur in einem Fenster offen, ein zweites Fenster
+  bekommt „in einem anderen Fenster offen“. Umbenennen nimmt die offene Kopie (`openSender`).
+  Test: Umbenennen und danach Senden, die Datei hat beides.
+- **F90 [ADRESSIERT, Code]** `closeEverywhere`/`closeVault` liefern die Fenster. Diese bekommen
+  `petrol-conv-closed`, der Store leert die Anzeige (Test).
+- **F91 [ADRESSIERT, Code]** `storage.load(..., { media: false })` und `storage.loadImage`: Der
+  Main liest ein Bild erst, wenn eine Marke es anfragt oder es als Verlaufsbild ans Modell geht
+  (`ensureBytes`). Fehlt die Datei, wandert das Bild nach `imagesMissing`. Fehlt ein Verlaufsbild
+  beim Senden, wird nichts gesendet, die Antwort ist ein ehrlicher Fehler. Im Renderer lädt eine
+  Marke erst, wenn sie sichtbar wird (`LoadWhenVisible`), höchstens drei zugleich. Tests: Öffnen
+  liest keine Bilddatei, Verlaufsbild erst beim Senden, fehlende Datei, Begrenzung auf drei.
+  **Gemessen** in der App: 40 Bilder mit 1600 × 1200 (zusammen 48,7 MB, bewusst schlecht
+  komprimierbar). Öffnen 1 ms und 15 KB ohne Bildbytes, ein Bild 11 ms. Über die Oberfläche luden
+  zuerst 12 von 40 Marken, nach dem Hochscrollen 24.
+- **F92 [ADRESSIERT, Code]** Kein „Erneut senden“ bei fehlendem Bild, dafür ein Hinweis
+  (`retryImageMissing`).
+- **F93 [ADRESSIERT, Code]** Ohne Schlüssel listet `petrol-conv-list` die Gespräche als „nicht
+  lesbar“, sie lassen sich löschen.
+- **F94 [ADRESSIERT, Code]** Bei einer bekannten Bild-ID nimmt der Main immer seine eigenen Bytes
+  (Test mit anderen Pixeln bei gleicher Länge und gleichen Maßen).
+- **F95 [ADRESSIERT, Code]** Beim Öffnen der Liste geht der Fokus auf ihren Kopf. Escape und
+  „Schließen“ geben ihn an „Gespräche“ zurück, nach dem Öffnen eines Gesprächs geht er in die
+  Eingabe. Nach dem Löschen landet er auf dem Eintrag an derselben Stelle, die Bestätigung bekommt
+  den Fokus. In der App geprüft (Fokus nach Öffnen, Escape und Gesprächswechsel).
+- **F96 [ADRESSIERT, Code]** Es zählt nur die neueste Listenantwort (`loadSeq`), beim Vault-Wechsel
+  schließt die Liste.
+- **F97 [ADRESSIERT, Code]** In geladenen Gesprächen mit verfallenen Seiten steht ein eigener Text
+  (`oldWebSourceNoteRestored`).
+- Prüfung: typecheck sauber, `npm run test` 3406 grün, rot nur `shellExecution.test.ts`
+  (bekannt), `electron-vite build` sauber.
+
+**29. Bilder beim Öffnen erst bei Bedarf (F85).** `petrol-conv-open` liefert ein geladenes
+Gespräch ohne Bildbytes. Die Bildmarken holen sie einzeln über einen eigenen IPC (Gesprächs-ID +
+Bild-ID, Vault geprüft, nur Bilder dieses Gesprächs) und halten sie im Renderer. „Erneut senden“
+und „Text aus dem Bild lesen“ holen fehlende Bytes vorher. Belastung messen: ein Gespräch mit
+40 Bildern öffnen.
+
 ## Status
+
+Rev. 8, 04.11.2026: Bauplan Teil 1 (Schritt 1–5). Schritt 1 gebaut (uncommittet, Branch
+`feature/chat-verlauf`): `shared/petrolChat.ts` (Laufzeittyp, neu `hadSnapshot`/`wasFollowUp`),
+`shared/petrolChatStored.ts` + Test (19 grün; Auszüge, Kennungen und Bildbytes fehlen im JSON,
+unbekannte Felder werden weder geschrieben noch geladen, Rundreise stabil). typecheck sauber.
+Nächster Schritt: 2 (Ablage im Main).
+
+Runde 7, 04.11.2026: F59, F60, F63 (Daten), F64, F65, F68 im Code behoben, F61, F62, F66, F67
+als Rev. 9 Punkt 26–28 in den Plan übernommen. 38 Tests im Datenvertrag. Offen: Nutzerabnahme,
+danach Schritt 2.
+
+Schritt 2 gebaut, 04.11.2026 (uncommittet): `main/petrolChats/storage.ts` (`PetrolChatStorage`,
+ohne Electron, Schlüssel/Uhr/ID eingespielt) und `main/petrolChats/electronCrypto.ts`
+(`safeStorage`, unter Linux `basic_text` = nicht speichern). Ablage wie Rev. 8 Schritt 2. Bilder
+werden vor dem Gespräch geschrieben und nur als JPEG ohne Metadaten. Ein kaputtes oder fehlendes
+Bild fehlt beim Laden (F63), das Gespräch bleibt lesbar. Ein nicht lesbares Gespräch wird nie
+überschrieben, nur zum Löschen angeboten, und läuft nach der Dateizeit ab. Die Kopf-ID muss zum
+Ordner passen. 17 Tests (Rundreise, kein Klartext auf der Platte, Rechte 0700/0600, keine
+Temp-Reste, unveränderter Inhalt auch nach neuer Instanz, Schreibkette, ohne Schlüssel,
+fremder Schlüssel, Aufräumen). `npm run test` 3359 grün (rot nur `shellExecution.test.ts`,
+bekannt), typecheck und build sauber. Noch nicht angeschlossen: kein IPC, `safeStorage` nicht in
+der echten App gemessen. Nächster Schritt: 3 (Main führt das Gespräch, Rev. 9 Punkt 26/27).
+
+Runde 8, 04.11.2026: F69–F77 umgesetzt (F73 als Plan, F70/F75 im kleineren Umfang). Offen:
+Nutzerabnahme, Codex-Nachprüfung, danach Schritt 3.
+
+Schritt 3 gebaut, 04.11.2026 (uncommittet): Der Main führt das Gespräch.
+- `main/petrolChats/conversation.ts` (`PetrolConversations`): Verlauf, Themenfragen, feste
+  App-Antwort und Verlaufsbilder aus den eigenen Daten (`shared/chatHistory.ts`, verschoben aus
+  dem Renderer). Bindung (Absender, Vault, ID). Wechselzustand mit Abgriff, Stopp genau einmal,
+  spätes Ergebnis nur mit Suchanfragen (Rev. 9 Punkt 26/27). Bild-IDs nur für dasselbe Bild.
+  Speichern nach jedem Abschluss, ein Speicherfehler beendet das Gespräch nicht.
+- `main/index.ts`: Die drei Handler sind als Funktionen herausgezogen. `petrol-conv-open/-send/
+  -stop/-close` sind neu. `tappedEvent` leitet weiter und liest Textstücke und Fortschritt mit.
+  Der Vault kommt über `assertApprovedVault` + `realpath`. `ollama-chat`/`lmstudio-chat` mit
+  `petrol` lehnen ab, `petrol-chat-web` direkt läuft ohne Verlauf und Themen. Aufräumen je Vault
+  einmal je Programmlauf.
+- Renderer: `petrolChatStore.ts` ist der Anzeige-Spiegel (Gesprächs-ID, `vaultChanged`,
+  Bildbytes bleiben lokal). `PetrolChat.tsx` reicht den Vault durch.
+- Tests: 17 Gesprächsmodul, 16 Store (neu geschrieben, die Logikfälle F08/F09/F57 und die
+  Empfänger liegen jetzt im Main-Test). `npm run test` 3384 grün, rot nur `shellExecution.test.ts`
+  (bekannt). typecheck und build sauber.
+- In der echten App geprüft (eigenes Testprofil und Test-Vault im Scratchpad, Build mit `file://`,
+  CDP 9223), mit `qwen3.5:4b`: zweite Frage kennt die erste (Verlauf vom Main). Direkter
+  `ollama-chat` mit `petrol` abgelehnt, fremder Vault und fremde ID abgelehnt. Stopp nach 2,5 s
+  liefert ein Bruchstück, das späte Ergebnis ändert nichts. Bild (Testrechnung aus Canvas) lokal
+  richtig gelesen, Folgefrage mit Verlaufsbild aus dem Main richtig. Schließen und Wiederöffnen
+  von der Platte: 10 Nachrichten, Bildbytes da. Platte: `safeStorage`-Chiffrat (`v10`), 0700/0600,
+  kein Klartext in Gespräch und Bild. Über die Oberfläche (qwen3.8:27b-mlx): zwei Fragen mit
+  Bezug richtig, zweites Gespräch gespeichert.
+- Nicht geprüft: Websuche und Nachfrage am echten Dienst (kein Schlüssel im Testprofil), LM Studio,
+  Cloud-Weg, Tab schließen in der App.
+Offen: Nutzerabnahme, Codex-Prüfung von Schritt 3, danach Schritt 4+5 (Liste und Anzeige
+geladener Gespräche, Rev. 9 Punkt 28).
+
+Runde 9, 05.11.2026: F78–F84 umgesetzt, F85 als Rev. 9 Punkt 29. Nächster Schritt: 4+5 (Liste,
+Anzeige geladener Gespräche, Bilder bei Bedarf; Rev. 9 Punkt 28/29).
+
+Schritt 4+5 gebaut, 05.11.2026 (uncommittet), Rev. 9 Punkt 28/29:
+- Main: `petrol-conv-list` (wartet auf das Aufräumen, nennt den Speichermodus) und
+  `petrol-conv-image` (Bytes je Bild, nur dieses Gespräch, dieses Fenster, dieser Vault). Neu sind
+  außerdem `-rename` (auch für nicht offene Gespräche: laden, umbenennen, schließen),
+  `-delete` (vorher `closeEverywhere`) und `-delete-all` (vorher `closeVault`). `petrol-conv-open`
+  liefert keine Bildbytes. „Erneut senden“ mit leeren Bytes: Der Main nimmt sein eigenes Bild,
+  ein unbekanntes Bild ohne Bytes wird abgelehnt.
+- Datenvertrag: `restored` an geladenen Nachrichten (gehört nicht zum Speicherformat).
+- Renderer: `PetrolChatHistory.tsx` (Liste über dem Verlauf, Bestätigungen in der Zeile, Hinweise
+  zum Speichern), `openConversation` (stoppt, wartet auf den Stopp, neue Generation, keine
+  Vormerkung) und `loadImage` (Generation geprüft). Anzeige: `hadSnapshot`, `wasFollowUp`,
+  „geprüft beim Antworten“, Ladeplatzhalter und Marke „Bild nicht mehr vorhanden“, OCR-Knopf erst
+  mit Bytes, „nicht gespeichert“ in der Fußzeile. Einstellungen → KI → Chat-Verlauf: Aufbewahrung
+  30/90/365/nie mit den Sätzen zu Rechner, Backup und verschobenem Vault.
+- Tests: 4 neue im Gesprächsmodul, 2 im Store. `npm run test` 3398 grün, rot nur
+  `shellExecution.test.ts` (bekannt). typecheck und build sauber.
+- In der echten App über die Oberfläche geprüft (Testprofil, CDP 9223):
+  - Liste mit drei Gesprächen aus früheren Läufen (Titel, Zeit, Modell). Das Gespräch mit Bild
+    geöffnet: Liste schließt, Bildmarke lädt nach (800 px).
+  - Die Folgefrage im geladenen Gespräch nach „dem Bild von vorhin“ wurde mit „4711“ richtig
+    beantwortet, das Bild kam von der Platte ans Modell.
+  - Umbenennen auf „Testrechnung“ bleibt. Löschen mit Bestätigung in der Zeile: auf der Platte
+    noch 2 Gespräche. Optik per Screenshot geprüft.
+- Nicht geprüft: Anzeige einer geladenen Webantwort mit `hadSnapshot`/`wasFollowUp` in der App
+  (im Testprofil kein Suchschlüssel; durch Unit-Tests der Projektion und der Store-Übernahme
+  gedeckt), nicht lesbares Gespräch in der Liste, Einstellungskarte in der App, Linux/`basic_text`,
+  Messung „40 Bilder öffnen“ aus Punkt 29.
+Offen: Nutzerabnahme, Codex-Prüfung von Schritt 4+5, danach Commit/PR.
+
+Runde 10, 05.11.2026: F86–F97 umgesetzt, 40-Bilder-Messung und Tastaturbedienung in der App
+geprüft. Offen: Nutzerabnahme, danach Commit/PR.
+
+Nutzerabnahme, 05.11.2026, erster Befund: Die Liste über dem Chat verdrängt bei vielen Gesprächen
+den Schreibbereich, sie gehört nach links. Umgebaut: `PetrolChatHistory` ist jetzt ein Abschnitt
+der linken Seitenleiste (`Sidebar.tsx`, über dem Dateibaum). Er ist nur sichtbar, solange der
+Agent-Tab im Chat-Modus vorne ist, lässt sich einklappen (`petrolChatHistoryOpen`, gespeichert)
+und hat einen eigenen Scrollbereich (höchstens 42 % der Seitenleiste). Zeilen wie im Dateibaum,
+Umbenennen und Löschen erst bei Hover/Fokus, „+“ für ein neues Gespräch. Der Knopf „Gespräche“ im
+Chat klappt den Abschnitt auf, zeigt die Seitenleiste und setzt den Fokus dorthin. In der App per
+Screenshot geprüft.
 
 Prüfset (02.11.2026, 12 synthetische Bilder, am Rechner erzeugt, über den echten Chat-Weg mit
 Main-Prüfung und Neukodierung; Fakten per Textabgleich, Bild ohne Text = ehrliches „kein Text“):

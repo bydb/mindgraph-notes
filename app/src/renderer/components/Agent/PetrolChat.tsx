@@ -37,6 +37,7 @@ import { chatModelsOnly } from '../../../shared/chatModels'
 import { CHAT_IMAGE_MAX_PER_MESSAGE, type ChatImage } from '../../../shared/chatImages'
 import { CHAT_IMAGE_CLOUD_CONSENT_VERSION } from '../../../shared/chatImageGate'
 import { prepareChatImage } from '../../utils/chatImagePrep'
+import { PETROL_HISTORY_HEAD_ID } from './PetrolChatHistory'
 
 interface Props {
   tabId: string
@@ -119,6 +120,24 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       window.removeEventListener('focus', check)
     }
   }, [tabId, snapshotCount])
+  // Vault gewechselt: das Gespräch gehört zum alten Vault (Rev. 9 Punkt 26) — laufende Antwort
+  // stoppen, Gespräch schließen, leer neu beginnen.
+  useEffect(() => { chat().vaultChanged(tabId, vaultPath) }, [tabId, vaultPath])
+  // Geladene Gespräche bringen keine Bildbytes mit (Rev. 9 Punkt 29): jede Marke holt ihre, sobald
+  // sie sichtbar wird (`LoadWhenVisible`, F91).
+  // „Gespräche“: Abschnitt in der Seitenleiste aufklappen (und die Seitenleiste zeigen), Fokus dorthin.
+  const showHistory = () => {
+    const ui = useUIStore.getState()
+    ui.setPetrolChatHistoryOpen(true)
+    if (!ui.sidebarVisible) ui.toggleSidebar()
+    requestAnimationFrame(() => document.getElementById(PETROL_HISTORY_HEAD_ID)?.focus())
+  }
+  // Geladenes Gespräch mit Webantworten, deren Seiten weg sind (F97).
+  const webSourcesGone = useMemo(() => messages.some(m => m.hadSnapshot && !m.web?.snapshotId), [messages])
+  const convId = scope?.conv?.id ?? null
+  const storageState = scope?.storage ?? null
+  // Speichert dieses Gespräch nicht? Dann sagt es die Fußzeile (Rev. 2 Punkt 2, F83).
+  const notSaved = !!convId && messages.length > 0 && storageState !== null && storageState !== 'on'
 
   // Websuche: Modul + Einrichtung wie auf der Auftragskarte (dieselbe Konfiguration).
   const webModule = useIsModuleEnabled('web-research')
@@ -401,7 +420,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         : retryWeb ? (retryOf!.webDeep || webDeep ? { query: question.trim(), deep: true } : { query: retryOf!.webQuery ?? normalizeQuery(question) })
           : webDeep ? { query: question.trim(), deep: true } : { query: webQueryNorm },
       followUp: followId ? { snapshotId: followId } : undefined,
-      ...(images.length ? { images } : {})
+      ...(images.length ? { images } : {}),
+      vaultPath
     })
     if (keep) chat().setDraft(tabId, keep)
     if (text === undefined && images.length) { chat().setDraftImages(tabId, []); setImageError(null) }
@@ -589,8 +609,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       {!(msg.origin === 'web' && msg.stopped) && <div className="petrol-turn-actions">
         {msg.content.trim() && <button type="button" className="agent-card-btn" onClick={() => void copy(msg)}>{copiedAt === msg.at ? t('petrolChat.copied') : t('petrolChat.copy')}</button>}
         {vaultPath && msg.content.trim() && <button type="button" className="agent-card-btn" onClick={() => void saveAsNote(msg)}>{savedAt === msg.at ? t('petrolChat.saved') : t('petrolChat.saveNote')}</button>}
-        {msg.web?.snapshotId && msg.web.kind === 'answer' && !msg.stopped && (
-          goneSnapshots.includes(msg.web.snapshotId) ? (
+        {(msg.web?.snapshotId || msg.hadSnapshot) && msg.web?.kind === 'answer' && !msg.stopped && (
+          !msg.web.snapshotId || goneSnapshots.includes(msg.web.snapshotId) ? (
             <button type="button" className="agent-card-btn" disabled title={t('petrolChat.followUpGoneTitle')}>{t('petrolChat.askWithSourcesGone')}</button>
           ) : <button
             type="button"
@@ -693,11 +713,21 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                           const d = turn.question!.imageDelivery?.[img.id]
                           const to = turn.question!.imageRecipients?.[img.id] ?? (d?.kind === 'image' ? [d.target] : [])
                           return (
-                            <span key={img.id} className={`petrol-img-chip ${d?.kind === 'rejected' && !to.length ? 'is-rejected' : ''}`} title={to.length ? `${img.name} · ${t('petrolChat.imageSentTo', { target: to.join(', ') })}` : d?.kind === 'rejected' ? `${img.name} · ${t('petrolChat.imageNotSent')}` : img.name}>
-                              <img src={`data:image/jpeg;base64,${img.dataBase64}`} alt={img.name} />
+                            <span key={img.id} className={`petrol-img-chip ${d?.kind === 'rejected' && !to.length ? 'is-rejected' : ''} ${img.dataBase64 ? '' : 'is-loading'}`} title={to.length ? `${img.name} · ${t('petrolChat.imageSentTo', { target: to.join(', ') })}` : d?.kind === 'rejected' ? `${img.name} · ${t('petrolChat.imageNotSent')}` : img.name}>
+                              {img.dataBase64 ? <img src={`data:image/jpeg;base64,${img.dataBase64}`} alt={img.name} /> : <LoadWhenVisible onVisible={() => { void chat().loadImage(tabId, img.id) }}><span className="petrol-img-placeholder" aria-label={t('petrolChat.imageLoading')} /></LoadWhenVisible>}
                             </span>
                           )
                         })}
+                      </span>
+                    )}
+                    {/* Geladenes Gespräch, Bilddatei fehlt (F63): benannt, nicht als Bild ausgegeben. */}
+                    {!!turn.question.imagesMissing?.length && (
+                      <span className="petrol-turn-images">
+                        {turn.question.imagesMissing.map(img => (
+                          <span key={img.id} className="petrol-img-chip is-missing" title={`${img.name} · ${t('petrolChat.imageMissing')}`}>
+                            <span className="petrol-img-placeholder">{t('petrolChat.imageMissing')}</span>
+                          </span>
+                        ))}
                       </span>
                     )}
                     {turn.question.followUp
@@ -708,24 +738,25 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                   </div>
                 )}
                 {turn.answer?.appNote === 'old-web-source' ? (
-                  <div className="petrol-turn-a petrol-web-appnote">{t('petrolChat.oldWebSourceNote')}</div>
+                  <div className="petrol-turn-a petrol-web-appnote">{t(webSourcesGone ? 'petrolChat.oldWebSourceNoteRestored' : 'petrolChat.oldWebSourceNote')}</div>
                 ) : turn.answer?.error ? (
                   <>
                     <div className="petrol-turn-error">
                       <span>{turn.answer.content ? t('petrolChat.error', { error: turn.answer.content }) : t('petrolChat.errorEmpty')}</span>
                       {/* Sind die Seiten weg, scheitert jede Wiederholung gleich — dann kein Knopf. */}
-                      {turn.question && !turn.answer.web?.snapshotGone && !(turn.question.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId)) && (
+                      {turn.question && !turn.answer.web?.snapshotGone && !turn.question.wasFollowUp && !turn.question.imagesMissing?.length && !(turn.question.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId)) && (
                         <button type="button" className="agent-card-btn" onClick={() => send(turn.question!.content, turn.question!.followUpSnapshotId, turn.question!)} disabled={busy || busyElsewhere || !hasModel}>
                           {t('petrolChat.retry')}
                         </button>
                       )}
-                      {ocrModule && turn.question?.images?.length && turn.question.images.some(img => turn.question!.imageDelivery?.[img.id]?.kind === 'rejected') ? (
+                      {ocrModule && turn.question?.images?.length && turn.question.images.every(img => !!img.dataBase64) && turn.question.images.some(img => turn.question!.imageDelivery?.[img.id]?.kind === 'rejected') ? (
                         <button type="button" className="agent-card-btn" onClick={() => void imagesToText(turn.question!.images!, turn.question!.content, false)} disabled={!!ocrRun || busy || busyElsewhere}>
                           {ocrRun ? t('petrolChat.ocrRunning') : t('petrolChat.ocrReadText')}
                         </button>
                       ) : null}
                     </div>
-                    {(turn.answer.web?.snapshotGone || (turn.question?.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId))) && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
+                    {(turn.answer.web?.snapshotGone || turn.question?.wasFollowUp || (turn.question?.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId))) && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
+                    {!!turn.question?.imagesMissing?.length && <div className="petrol-web-muted">{t('petrolChat.retryImageMissing')}</div>}
                     {turn.answer.web?.deep && <div className="petrol-web-block"><WebDeepLine deep={turn.answer.web.deep} /></div>}
                     {turn.answer.web?.basis?.kind === 'snapshot' && (
                       <div className="petrol-web-muted">{t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) })}</div>
@@ -750,6 +781,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                       {checkMarks && (turn.answer.web?.report
                         ? <WebCheck answer={turn.answer.content} report={turn.answer.web.report} extras={turn.answer.web.extras} />
                         : <div className="petrol-web-muted">{t('petrolChat.webStoppedNoCheck')}</div>)}
+                      {/* Geladen (Rev. 9 Punkt 28, F61): das Ergebnis stammt vom Zeitpunkt der Antwort. */}
+                      {checkMarks && turn.answer.restored && turn.answer.web?.report && <div className="petrol-web-muted">{t('petrolChat.restoredCheck')}</div>}
                       <WebSourcesFold
                         sources={turn.answer.web?.sources ?? turn.answer.webPartial?.sources ?? []}
                         used={turn.answer.web?.report ? new Set(turn.answer.web.report.usedSources) : null}
@@ -1108,12 +1141,34 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           {(!webOn || busy || webQueryOpen || webWaitsForRoute) && <span className="petrol-chat-foot-keys">{webWaitsForRoute ? t('petrolChat.webSendChecking') : t('petrolChat.sendKeys')} · </span>}
           {t('petrolChat.noNotes')}
         </span>
-        {!empty && (
-          <button type="button" className="agent-card-link-btn" onClick={() => chat().clear(tabId)}>{t('petrolChat.newChat')}</button>
-        )}
+        <span className="petrol-chat-foot-actions">
+          {notSaved && <span className="petrol-chat-notsaved" title={t(storageState === 'failed' ? 'petrolChat.historySaveFailed' : storageState === 'memory' ? 'petrolChat.historyNoVault' : storageState === 'basic-text' ? 'petrolChat.historyBasicText' : 'petrolChat.historyNoKey')}>{t('petrolChat.notSaved')}</span>}
+          <button type="button" className="agent-card-link-btn" onClick={showHistory}>{t('petrolChat.historyOpen')}</button>
+          {!empty && (
+            <button type="button" className="agent-card-link-btn" onClick={() => chat().clear(tabId)}>{t('petrolChat.newChat')}</button>
+          )}
+        </span>
       </div>
     </div>
   )
+}
+
+/** Ruft `onVisible` einmal, sobald der Inhalt im sichtbaren Bereich ist (Bilder bei Bedarf, F91). */
+function LoadWhenVisible({ onVisible, children }: { onVisible: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const cb = useRef(onVisible)
+  cb.current = onVisible
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (typeof IntersectionObserver === 'undefined') { cb.current(); return }
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) { io.disconnect(); cb.current() }
+    }, { rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
+  return <span ref={ref} className="petrol-img-lazy">{children}</span>
 }
 
 interface Turn { question?: PetrolChatMessage; answer?: PetrolChatMessage }

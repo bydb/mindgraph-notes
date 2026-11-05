@@ -394,6 +394,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   petrolChatWeb: (params: unknown) => ipcRenderer.invoke('petrol-chat-web', params),
   petrolChatSnapshotsDrop: (scopeId: string) => ipcRenderer.invoke('petrol-chat-snapshots-drop', scopeId) as Promise<boolean>,
   petrolChatSnapshotsAlive: (scopeId: string, ids: string[]) => ipcRenderer.invoke('petrol-chat-snapshots-alive', scopeId, ids) as Promise<string[]>,
+  // Gespräch im Main (Teil 1): Verlauf, Datenbasis und Speichern liegen dort (Rev. 4 Punkt 12).
+  petrolConvOpen: (vaultPath: string | null, id: string | null) => ipcRenderer.invoke('petrol-conv-open', vaultPath, id),
+  petrolConvSend: (vaultPath: string | null, id: string, req: unknown) => ipcRenderer.invoke('petrol-conv-send', vaultPath, id, req),
+  petrolConvStop: (vaultPath: string | null, id: string) => ipcRenderer.invoke('petrol-conv-stop', vaultPath, id),
+  petrolConvClose: (id: string) => ipcRenderer.invoke('petrol-conv-close', id) as Promise<boolean>,
+  petrolConvList: (vaultPath: string | null) => ipcRenderer.invoke('petrol-conv-list', vaultPath),
+  petrolConvImage: (vaultPath: string | null, id: string, imageId: string) => ipcRenderer.invoke('petrol-conv-image', vaultPath, id, imageId) as Promise<string | null>,
+  petrolConvUpdate: (vaultPath: string | null, id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }) => ipcRenderer.invoke('petrol-conv-update', vaultPath, id, patch),
+  petrolConvDelete: (vaultPath: string | null, id: string) => ipcRenderer.invoke('petrol-conv-delete', vaultPath, id),
+  petrolConvDeleteAll: (vaultPath: string | null) => ipcRenderer.invoke('petrol-conv-delete-all', vaultPath),
+  // Gesprächsliste hat sich geändert (Titel, Anheften, Archiv, Löschen) — neu laden (Design F26).
+  onPetrolConvChanged: (callback: () => void) => {
+    ipcRenderer.removeAllListeners('petrol-conv-changed')
+    ipcRenderer.on('petrol-conv-changed', () => callback())
+  },
+  // Ein anderes Fenster hat das hier offene Gespräch gelöscht (F90).
+  onPetrolConvClosed: (callback: (e: { id: string }) => void) => {
+    ipcRenderer.removeAllListeners('petrol-conv-closed')
+    ipcRenderer.on('petrol-conv-closed', (_event, e) => callback(e))
+  },
   onPetrolChatProgress: (callback: (p: unknown) => void) => {
     ipcRenderer.removeAllListeners('petrol-chat-progress')
     ipcRenderer.on('petrol-chat-progress', (_event, p) => callback(p))

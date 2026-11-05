@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor, protocol } from 'electron'
+import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, webContents, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor, protocol } from 'electron'
 import { IGNORED_DIRECTORY_NAMES } from '../shared/ignoredDirectories'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -183,6 +183,10 @@ import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/
 import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatWideLimits, type WebChatWideLimits, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId, sanitizeSnapshotId } from './llm/petrolWebSnapshots'
+import { PetrolConversations, parseSendRequest, withoutImageBytes, type TurnTap, type WebProgressEvent } from './petrolChats/conversation'
+import { petrolChatStorage } from './petrolChats/electronCrypto'
+import { OnceShared } from './petrolChats/onceShared'
+import { normalizeRetention, sanitizeChatTitle } from '../shared/petrolChatStored'
 import { measureWithFollowUpRoom, parseFollowUpRequest, resolveFollowUp } from './llm/petrolWebFollowUp'
 import { readTelemetryRange, readTelemetryOldestAt } from './llm/telemetryLedger'
 import { fromOllamaResponse, moduleForAiAction, type OllamaTimings } from '../shared/llmTelemetry'
@@ -6458,7 +6462,7 @@ function chatStreamChannel(chatMode: string, kind: 'chunk' | 'done'): string {
   return `ollama-chat-${kind}`
 }
 
-ipcMain.handle('ollama-chat', wrapIpcWithOllamaActivity('notes-chat', async (event, model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown, images?: unknown) => {
+const ollamaChatHandler = wrapIpcWithOllamaActivity('notes-chat', async (event: IpcMainInvokeEvent, model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'email' | 'petrol' = 'direct', cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown, images?: unknown) => {
   console.log('[Ollama] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode, 'cloud:', cloud?.model ?? 'no')
 
   // Email-Chat und Petrol-Chat (Agent-Tab) streamen auf eigenen Channels — alle drei
@@ -6760,7 +6764,16 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
 // (Codex F19). Die Prüfung spiegelt die Verzweigung im Handler: mit Cloud-Modell läuft der
 // Aufruf über den Anbieter oder endet (E-Mail-Modus ohne Freigabe) mit einem Fehler —
 // lokal wird in keinem der beiden Fälle gerechnet.
-(_event, _model, _messages, _context, _chatMode, cloud) => !cloud?.model))
+(_event, _model, _messages, _context, _chatMode, cloud) => !cloud?.model)
+
+// Der Petrol-Chat läuft nur noch über das Gespräch im Main (`petrol-conv-send`, Rev. 4 Punkt 12):
+// Verlauf, Themenfragen und Verlaufsbilder baut der Main selbst. Ein direkter Aufruf mit einem vom
+// Renderer gelieferten Verlauf wird abgelehnt.
+const PETROL_DIRECT_REJECTED = { success: false, error: 'Der Petrol-Chat läuft über das Gespräch im Main.' }
+ipcMain.handle('ollama-chat', (event, ...args: unknown[]) => {
+  if (args[3] === 'petrol') return PETROL_DIRECT_REJECTED
+  return (ollamaChatHandler as (event: IpcMainInvokeEvent, ...a: unknown[]) => Promise<unknown>)(event, ...args)
+})
 
 // ── Websuche im Petrol-Chat (Stufe 1b, docs/codex-collab/chat-websuche.md) ─────────────
 // Eigener IPC statt Agenten-Loop: die App sucht mit den Suchwörtern, die der Nutzer im Feld
@@ -6907,8 +6920,10 @@ ipcMain.handle('petrol-chat-snapshots-alive', (event, scopeId: unknown, ids: unk
   return webSnapshots.alive(event.sender.id, scope, clean)
 })
 
-ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
-  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+// Websuche des Petrol-Chats. Aufgerufen vom Gespräch im Main (Verlauf, Themen und Bereich von
+// dort) oder direkt über `petrol-chat-web` (Messweg per CDP, dann ohne Verlauf und Themen).
+// Die Absenderprüfung liegt beim IPC-Eingang; `event.sender` kann ein Abgriff sein (F67).
+async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) {
   // Synchron vor dem ersten await registrieren (F02): ein „Stopp“ direkt nach dem Senden
   // findet die Anfrage schon vor. Dasselbe Signal trägt Suche, Abrufe und Modell.
   const claimed = claimPetrolRequest(event.sender.id, 'petrol', params?.requestId)
@@ -7351,6 +7366,289 @@ ipcMain.handle('petrol-chat-web', async (event, params: PetrolWebParams) => {
     releasePetrolRequest(req)
     if (!event.sender.isDestroyed()) event.sender.removeListener('destroyed', onDestroyed)
   }
+}
+
+ipcMain.handle('petrol-chat-web', (event, params: PetrolWebParams) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  // Direkter Aufruf (Messweg): kein vom Renderer gelieferter Verlauf, keine Themenfragen und keine
+  // Nachfrage auf eingefrorene Auszüge (Rev. 4, F81) — deren Bereich bindet nur das Gespräch im
+  // Main. Nachfragen misst man über `petrolConvSend`.
+  if (params && typeof params === 'object' && (params as { snapshotId?: unknown }).snapshotId !== undefined) {
+    return { success: false, error: 'Nachfragen auf eingefrorene Seiten laufen über das Gespräch im Main.' }
+  }
+  return runPetrolWeb(event, { ...(params ?? {}), history: [], webTopics: undefined, scopeId: undefined } as PetrolWebParams)
+})
+
+// ── Gespräche des Petrol-Chats (Teil 1, docs/codex-collab/chat-verlauf-notizen-bilder.md) ────
+// Der Main führt Verlauf, Datenbasis und Speicherung (Rev. 4 Punkt 12, Rev. 8/9). Der Renderer
+// schickt Gesprächs-ID, Vault, neue Frage, Weg und neue Bilder; er bekommt Anzeige-Daten zurück.
+// Die Modellaufrufe gehen durch die bestehenden Handler (alle Prüfungen bleiben), über einen
+// Abgriff am Absender, der Textstücke und Webfortschritt für den Stopp sammelt (F67).
+
+/** Absender, der weiterleitet und dabei mitliest. Nur die Felder, die die Handler benutzen. */
+function tappedEvent(event: IpcMainInvokeEvent, tap: TurnTap): IpcMainInvokeEvent {
+  const wc = event.sender
+  const sender = {
+    id: wc.id,
+    send: (channel: string, payload?: unknown) => {
+      try {
+        if (channel === 'petrol-chat-chunk' && payload && typeof payload === 'object') tap.chunk(String((payload as { delta?: unknown }).delta ?? ''))
+        else if (channel === 'petrol-chat-progress' && payload && typeof payload === 'object') tap.progress(payload as WebProgressEvent)
+      } catch {
+        // Der Abgriff darf den Lauf nie stören.
+      }
+      if (!wc.isDestroyed()) wc.send(channel, payload)
+    },
+    once: (ev: 'destroyed', listener: () => void) => { wc.once(ev, listener) },
+    removeListener: (ev: 'destroyed', listener: () => void) => { wc.removeListener(ev, listener) },
+    isDestroyed: () => wc.isDestroyed()
+  }
+  return { sender } as unknown as IpcMainInvokeEvent
+}
+
+/** Laufende Gesprächsanfragen → ihr IPC-Ereignis. Schlüssel Fenster + Kennung (F82). */
+const petrolConvEvents = new Map<string, IpcMainInvokeEvent>()
+const petrolConvKey = (senderId: number, requestId: string) => `${senderId}:${requestId}`
+let petrolConvs: PetrolConversations | null = null
+function petrolConversations(): PetrolConversations {
+  if (petrolConvs) return petrolConvs
+  petrolConvs = new PetrolConversations({
+    storage: petrolChatStorage(),
+    runChat: async (i, tap) => {
+      const ev = petrolConvEvents.get(petrolConvKey(i.senderId, i.requestId))
+      if (!ev) return { success: false, error: 'Anfrage ist keinem Fenster zugeordnet.' }
+      const tev = tappedEvent(ev, tap)
+      const images = i.images.length ? i.images : undefined
+      const res = i.cloud || i.backend !== 'lm-studio'
+        // Der Typ von `ollamaChatHandler` kennt nur die sechs Parameter der Aktivitätsprüfung.
+        ? await (ollamaChatHandler as unknown as (...a: unknown[]) => Promise<unknown>)(tev, i.model, i.messages, '', 'petrol', i.cloud, undefined, i.requestId, i.webTopics, images)
+        : await lmstudioChatHandler(tev, i.model, i.messages, '', 'petrol', i.lmStudioPort ?? LM_STUDIO_DEFAULT_PORT, undefined, i.requestId, i.webTopics, images)
+      return res as { success: boolean; response?: string; error?: string; imageDelivery?: Record<string, import('../shared/chatImages').ChatImageDelivery> }
+    },
+    runWeb: async (i, tap) => {
+      const ev = petrolConvEvents.get(petrolConvKey(i.senderId, i.requestId))
+      if (!ev) return { success: false, error: 'Anfrage ist keinem Fenster zugeordnet.' }
+      const { senderId: _sender, ...params } = i
+      return runPetrolWeb(tappedEvent(ev, tap), params as unknown as PetrolWebParams) as Promise<{ success: boolean; result?: WebChatResult; error?: string }>
+    },
+    abort: (senderId, requestId) => {
+      const key = `${senderId}:${requestId}`
+      petrolChatAborts.get(key)?.abort()
+      petrolChatAborts.delete(key)
+    },
+    dropSnapshots: (senderId, scopeId) => webSnapshots.dropScope(senderId, scopeId),
+    log: msg => console.warn(msg)
+  })
+  return petrolConvs
+}
+
+const petrolConvHooked = new Set<number>()
+function hookPetrolConvSender(wc: { id: number; once: (event: 'destroyed', listener: () => void) => void }): void {
+  if (petrolConvHooked.has(wc.id)) return
+  petrolConvHooked.add(wc.id)
+  const id = wc.id
+  wc.once('destroyed', () => {
+    petrolConvHooked.delete(id)
+    void petrolConversations().dropSender(id)
+  })
+}
+
+/**
+ * Vault des Gesprächs: genehmigt, dann `realpath` (Rev. 9 Punkt 26, F73) — derselbe Vault über
+ * einen Symlink bekäme sonst eine zweite Gesprächsliste. Leer = kein Vault, nur im Speicher.
+ */
+async function petrolChatVault(v: unknown): Promise<string | null> {
+  if (v === null || v === undefined || v === '') return null
+  if (typeof v !== 'string') throw new Error('Vault-Pfad ungültig')
+  assertApprovedVault(v, 'petrol-conv')
+  return fs.realpath(path.resolve(v))
+}
+
+/**
+ * Aufräumen je Vault einmal je Programmlauf, beim ersten Zugriff (Rev. 8 Schritt 2). Geteilt und
+ * erst nach Erfolg erledigt (F84): gleichzeitiges Öffnen wartet auf denselben Durchgang.
+ */
+const petrolChatsCleanup = new OnceShared()
+function cleanupPetrolChatsOnce(vault: string): Promise<void> {
+  return petrolChatsCleanup.run(vault, async () => {
+    const storage = petrolChatStorage()
+    if (storage.unavailableReason()) return false
+    try {
+      const retention = normalizeRetention((await loadUISettings()).petrolChatRetentionDays)
+      const r = await storage.cleanup(vault, retention, petrolConversations().openIds(vault))
+      if (r.expired || r.leftovers || r.orphanFiles) console.log(`[petrol-chats] aufgeräumt: ${r.expired} abgelaufen, ${r.leftovers} Reste, ${r.orphanFiles} Dateien`)
+      return true
+    } catch (err) {
+      console.warn('[petrol-chats] Aufräumen fehlgeschlagen:', err)
+      return false
+    }
+  })
+}
+
+const PETROL_CONV_UNTRUSTED = { ok: false as const, error: 'Nicht autorisierter Aufrufer' }
+const PETROL_CONV_BAD_VAULT = { ok: false as const, error: 'Vault nicht autorisiert.' }
+
+/** Gespräch öffnen (ID) oder neu anlegen (null). Beim Öffnen gehen die Bildbytes mit. */
+ipcMain.handle('petrol-conv-open', async (event, vaultPath: unknown, id: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  hookPetrolConvSender(event.sender)
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  if (vault) await cleanupPetrolChatsOnce(vault)
+  if (id === null || id === undefined) return petrolConversations().create(event.sender.id, vault)
+  const r = await petrolConversations().open(event.sender.id, vault, typeof id === 'string' ? id : '')
+  // Ohne Bildbytes: die Bildmarken holen sie einzeln (`petrol-conv-image`, Rev. 9 Punkt 29, F85).
+  return r.ok ? { ...r, messages: withoutImageBytes(r.messages) } : r
+})
+
+/** Gesprächsliste eines Vaults (Schritt 4): Köpfe, neueste oben; nicht Lesbares mit Vermerk. */
+ipcMain.handle('petrol-conv-list', async (event, vaultPath: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  if (!vault) return { ok: true, storage: 'memory', items: [] }
+  const storage = petrolChatStorage()
+  const reason = storage.unavailableReason()
+  // Ohne Schlüssel stehen vorhandene Gespräche als „nicht lesbar“ da — löschbar statt unsichtbar (F93).
+  if (!reason) await cleanupPetrolChatsOnce(vault)
+  const entries = await storage.list(vault)
+  return {
+    ok: true,
+    storage: reason ?? 'on',
+    items: entries.map(e => e.kind === 'chat'
+      ? { id: e.header.id, title: e.header.title, updatedAt: e.header.updatedAt, ...(e.header.model ? { model: e.header.model } : {}), ...(e.header.pinned ? { pinned: true } : {}), ...(e.header.archived ? { archived: true } : {}) }
+      : { id: e.id, title: '', updatedAt: e.modifiedAt, unreadable: true })
+  }
+})
+
+/** Bildbytes eines Bildes im offenen Gespräch dieses Fensters (Rev. 9 Punkt 29). */
+ipcMain.handle('petrol-conv-image', async (event, vaultPath: unknown, id: unknown, imageId: unknown) => {
+  if (!isTrustedSender(event)) return null
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return null }
+  return petrolConversations().imageBytes(event.sender.id, vault, id, imageId)
+})
+
+/**
+ * Titel, Anheften, Archivieren — auch für nicht offene Gespräche. Ein leerer Titel folgt wieder der
+ * ersten Frage. Ist das Gespräch irgendwo offen, wird GENAU diese Kopie geändert — eine zweite aus
+ * der Platte würde beim Speichern neuere Nachrichten überschreiben (F89).
+ */
+ipcMain.handle('petrol-conv-update', async (event, vaultPath: unknown, id: unknown, raw: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  if (typeof id !== 'string') return { ok: false, error: 'Gesprächs-ID ungültig.' }
+  const r0 = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+  const patch: { title?: string | null; pinned?: boolean; archived?: boolean } = {}
+  if ('title' in r0) patch.title = sanitizeChatTitle(r0.title)
+  if (typeof r0.pinned === 'boolean') patch.pinned = r0.pinned
+  if (typeof r0.archived === 'boolean') patch.archived = r0.archived
+  const convs = petrolConversations()
+  const owner = convs.openSender(vault, id)
+  if (owner === null) {
+    const o = await convs.open(event.sender.id, vault, id)
+    if (!o.ok) return o
+  }
+  const sender = owner ?? event.sender.id
+  const r = await convs.update(sender, vault, id, patch)
+  if (owner === null) await convs.close(sender, id, { dropSnapshots: false })
+  if (r.ok) broadcastPetrolConvChanged()
+  return r.ok ? { ok: true, storage: r.storage } : r
+})
+
+/** Ein Gespräch löschen — vorher in allen Fenstern schließen (laufende Antwort stoppt). */
+ipcMain.handle('petrol-conv-delete', async (event, vaultPath: unknown, id: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  if (!vault || typeof id !== 'string') return { ok: false, error: 'Gespräch nicht gefunden.' }
+  const convs = petrolConversations()
+  // Während des Löschens lässt sich das Gespräch nicht öffnen; geschlossene Kopien speichern nie
+  // mehr (F88). Andere Fenster erfahren es und leeren ihre Anzeige (F90).
+  convs.beginDelete(vault, id)
+  try {
+    const senders = await convs.closeEverywhere(vault, id)
+    await petrolChatStorage().delete(vault, id)
+    notifyPetrolConvClosed(senders.map(s => ({ senderId: s, id })))
+    broadcastPetrolConvChanged()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    convs.endDelete(vault, id)
+  }
+})
+
+/** Alle Gespräche dieses Vaults löschen. */
+ipcMain.handle('petrol-conv-delete-all', async (event, vaultPath: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  if (!vault) return { ok: false, error: 'Kein Vault offen.' }
+  const convs = petrolConversations()
+  convs.beginDelete(vault, null)
+  try {
+    const closed = await convs.closeVault(vault)
+    await petrolChatStorage().deleteAll(vault)
+    notifyPetrolConvClosed(closed)
+    broadcastPetrolConvChanged()
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  } finally {
+    convs.endDelete(vault, null)
+  }
+})
+
+/**
+ * Titel, Anheften, Archiv oder Löschen geändert: alle Fenster laden ihre Gesprächsliste neu (Design F26).
+ * Ohne Inhalt — jedes Fenster fragt die Liste seines eigenen Vaults selbst ab.
+ */
+function broadcastPetrolConvChanged(): void {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('petrol-conv-changed')
+}
+
+/** Fenster, deren offenes Gespräch gelöscht wurde, leeren ihre Anzeige (F90). */
+function notifyPetrolConvClosed(hits: Array<{ senderId: number; id: string }>): void {
+  for (const h of hits) {
+    const wc = webContents.fromId(h.senderId)
+    if (wc && !wc.isDestroyed()) wc.send('petrol-conv-closed', { id: h.id })
+  }
+}
+
+ipcMain.handle('petrol-conv-send', async (event, vaultPath: unknown, id: unknown, raw: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  hookPetrolConvSender(event.sender)
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  const req = parseSendRequest(raw)
+  if ('error' in req) return { ok: false, error: req.error }
+  const evKey = petrolConvKey(event.sender.id, req.requestId)
+  if (petrolConvEvents.has(evKey)) return { ok: false, error: 'Diese Anfrage läuft bereits.' }
+  petrolConvEvents.set(evKey, event)
+  try {
+    const r = await petrolConversations().send(event.sender.id, vault, id, req)
+    return r.ok ? { ...r, messages: withoutImageBytes(r.messages) } : r
+  } finally {
+    petrolConvEvents.delete(evKey)
+  }
+})
+
+/** Stopp: der Main bricht ab und schließt den Wechsel selbst ab (F67). */
+ipcMain.handle('petrol-conv-stop', async (event, vaultPath: unknown, id: unknown) => {
+  if (!isTrustedSender(event)) return PETROL_CONV_UNTRUSTED
+  let vault: string | null
+  try { vault = await petrolChatVault(vaultPath) } catch { return PETROL_CONV_BAD_VAULT }
+  const r = await petrolConversations().stop(event.sender.id, vault, id)
+  return r.ok ? { ...r, messages: withoutImageBytes(r.messages) } : r
+})
+
+/** Tab zu, „Neues Gespräch“, anderes Gespräch: aus dem Speicher nehmen (gespeichert bleibt es). */
+ipcMain.handle('petrol-conv-close', async (event, id: unknown) => {
+  if (!isTrustedSender(event)) return false
+  await petrolConversations().close(event.sender.id, id)
+  return true
 })
 
 // Holt verfügbare Embedding-Modelle
@@ -7715,7 +8013,7 @@ ipcMain.handle('lmstudio-generate', async (event, request: LMStudioRequest) => {
 })
 
 // Chat mit Kontext (für Notes Chat) - LM Studio Version
-ipcMain.handle('lmstudio-chat', async (event, model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown, images?: unknown) => {
+const lmstudioChatHandler = async (event: IpcMainInvokeEvent, model: string, messages: Array<{ role: string; content: string; imageIds?: string[] }>, context: string, chatMode: 'direct' | 'socratic' | 'grill' | 'petrol' = 'direct', port: number = LM_STUDIO_DEFAULT_PORT, contextAttachmentIds?: string[], requestId?: string, webTopics?: unknown, images?: unknown) => {
   console.log('[LM Studio] Chat request with model:', model, 'context length:', context.length, 'mode:', chatMode)
   const chunkChannel = chatStreamChannel(chatMode, 'chunk')
   const doneChannel = chatStreamChannel(chatMode, 'done')
@@ -7871,6 +8169,11 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
   } finally {
     releasePetrolRequest(petrolReq)
   }
+}
+
+ipcMain.handle('lmstudio-chat', (event, ...args: unknown[]) => {
+  if (args[3] === 'petrol') return PETROL_DIRECT_REJECTED
+  return (lmstudioChatHandler as (event: IpcMainInvokeEvent, ...a: unknown[]) => Promise<unknown>)(event, ...args)
 })
 
 // Generiert Embeddings mit LM Studio (falls unterstützt)
