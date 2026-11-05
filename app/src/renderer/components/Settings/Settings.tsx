@@ -1014,6 +1014,8 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const petrolWebLoop = useUIStore(s => s.petrolWebLoop)
   const setPetrolWebLoop = useUIStore(s => s.setPetrolWebLoop)
   const petrolWebCheckMarks = useUIStore(s => s.petrolWebCheckMarks)
+  const petrolChatRetentionDays = useUIStore(s => s.petrolChatRetentionDays)
+  const setPetrolChatRetentionDays = useUIStore(s => s.setPetrolChatRetentionDays)
   const setPetrolWebCheckMarks = useUIStore(s => s.setPetrolWebCheckMarks)
   const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const agentShellModuleOn = useIsModuleEnabled('agent-shell')
@@ -1067,6 +1069,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'ai-embedding', tab: 'ai', label: 'Projekt-RAG Embedding', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'embedding modell bge nomic smart connections ähnlichkeit rag', anchor: 'ai-embedding' },
       { id: 'ai-openrouter', tab: 'ai', label: 'OpenRouter (Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'openrouter cloud api opt-in claude gpt', anchor: 'ai-openrouter' },
       { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (europäischer Anbieter)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
+      { id: 'ai-chat-history', tab: 'ai', label: t('petrolChat.retentionTitle'), path: t('settings.tab.ai'), keywords: 'chat verlauf gespräche aufbewahrung löschen history retention petrol', anchor: 'ai-chat-history' },
       { id: 'ai-webresearch', tab: 'ai', label: 'Webrecherche', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'webrecherche tavily linkup suche web research agent', anchor: 'ai-webresearch' },
       { id: 'ai-imagegen', tab: 'ai', label: 'Bild-Generierung', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'bild generierung nano banana imagen google bilder image generation api key', anchor: 'ai-imagegen' },
       { id: 'ai-smart-connections', tab: 'ai', label: t('settings.integrations.smartConnections'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'smart connections gewichte reranker ähnliche notizen', anchor: 'ai-smart-connections' },
@@ -1795,6 +1798,24 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                       </Card>
                     </>
                   )}
+
+                  {/* Teil 1 (chat-verlauf-notizen-bilder.md): wie lange gespeicherte Gespräche bleiben. */}
+                  <SectionTitle title={t('petrolChat.retentionTitle')} />
+                  <Card anchor="ai-chat-history">
+                    <Row label={t('petrolChat.retentionLabel')} hint={t('petrolChat.retentionHint')}>
+                      <Segmented
+                        ariaLabel={t('petrolChat.retentionLabel')}
+                        value={petrolChatRetentionDays}
+                        onChange={setPetrolChatRetentionDays}
+                        options={[
+                          { value: 30, label: t('petrolChat.retention30') },
+                          { value: 90, label: t('petrolChat.retention90') },
+                          { value: 365, label: t('petrolChat.retention365') },
+                          { value: 0, label: t('petrolChat.retentionNever') }
+                        ]}
+                      />
+                    </Row>
+                  </Card>
 
                   <SectionTitle title={t('settings.aiTab.cloud')} meta={t('settings.aiTab.cloudActive', { n: cloudActiveCount, total: 3 })} />
                   <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>

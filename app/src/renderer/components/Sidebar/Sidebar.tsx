@@ -8,6 +8,7 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
+import { PetrolChatHistory, usePetrolHistoryVisible } from '../Agent/PetrolChatHistory'
 import { useDataviewStore } from '../../stores/dataviewStore'
 import { useVaultSettingsStore } from '../../stores/vaultSettingsStore'
 import { useTranslation } from '../../utils/translations'
@@ -36,6 +37,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   const setShowHiddenFolders = useGraphStore((s) => s.setShowHiddenFolders)
   const hasHiddenFolders = Object.values(fileCustomizations).some(c => c.hidden)
   const clearAllTabs = useTabStore((s) => s.clearAllTabs)
+  const historyVisible = usePetrolHistoryVisible()
   const { t } = useTranslation()
 
   // State für neue Notiz Dialog
@@ -605,12 +607,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
           <PluginSlot slotId="sidebar.panel.remarkable" />
           <ExternalWidgetSlot slot="sidebar.panel" />
           <BookmarksBar />
+          {/* Gespräche des Petrol-Chats — nur bei vorne liegendem Chat (Teil 1, Nutzer 05.11.2026). */}
+          <PetrolChatHistory />
           <div className="sidebar-content">
+            {/* Mit sichtbaren Gesprächen braucht der Dateibaum einen eigenen Kopf, sonst wirken die
+                Farbfilter wie ein Teil der Gespräche (Codex F04, chat-verlauf-seitenleiste-design.md). */}
+            {historyVisible && <div className="pinned-folders-header sidebar-notes-header">{t('petrolChat.historyNotesHeader')}</div>}
             <FileTree entries={fileTree} displayMode={fileTreeDisplayMode} />
           </div>
         </>
       ) : (
         <div className="sidebar-empty">
+          {/* Ohne Vault: der Abschnitt sagt, dass nicht gespeichert wird (Codex F11). */}
+          <PetrolChatHistory noVault />
           <p>{t('sidebar.noVaultOpen')}</p>
           <button className="btn-primary" onClick={handleOpenVault}>
             {t('sidebar.openVault')}

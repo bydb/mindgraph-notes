@@ -45,6 +45,7 @@
   --color-organize: #d97706;
   --color-integrate: #0f9f8f;
   --color-danger: #dc2626;
+  --danger-on: #fff;
   --color-warning: #d97706;
   --color-success: #15803d;
   --color-info: #256fd1;
@@ -133,6 +134,7 @@
   --color-organize: #f5a524;
   --color-integrate: #27c7b8;
   --color-danger: #ff6b6b;
+  --danger-on: #1a1a1a;
   --color-warning: #f59e0b;
   --color-success: #34d399;
   --color-info: #6aa9ff;
@@ -169,6 +171,7 @@
     --color-organize: #f5a524;
     --color-integrate: #27c7b8;
     --color-danger: #ff6b6b;
+    --danger-on: #1a1a1a;
     --color-warning: #f59e0b;
     --color-success: #34d399;
     --color-info: #6aa9ff;
@@ -23214,6 +23217,107 @@ body.presentation-mode *::after {
   font-size: 11.5px; line-height: 1.45; color: var(--text-secondary);
 }
 .petrol-chat-foot .agent-card-link-btn { font-size: 11.5px; }
+/* Teil 1: „Gespräche“ und Hinweis „nicht gespeichert“ (chat-verlauf-notizen-bilder.md Rev. 9). */
+.petrol-chat-foot-actions { display: inline-flex; align-items: center; gap: 12px; }
+.petrol-chat-notsaved { color: color-mix(in srgb, var(--color-warning) 80%, var(--text-primary)); cursor: help; }
+
+/* Gesprächsliste in der Seitenleiste (Teil 1; Design: docs/codex-collab/chat-verlauf-seitenleiste-design.md).
+   Vorbild Codex-App (Nutzer 05.11.2026): eine ruhige Zeile je Gespräch, nur der Titel; zwei leise
+   Knöpfe beim Überfahren an fester Stelle; Details in einer Karte neben der Seitenleiste. Raster wie
+   der Dateibaum (.file-item-row: margin 1px 10px, padding 7px 10px, 2-px-Linkskante). */
+.petrol-history { flex-shrink: 0; display: flex; flex-direction: column; min-height: 0; min-width: 0; padding: 6px 0 6px; border-bottom: 1px solid var(--border-subtle); }
+.petrol-history.is-open { max-height: min(36vh, 360px); }
+.sidebar-empty .petrol-history { align-self: stretch; text-align: left; margin-bottom: 16px; }
+.petrol-history-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px 2px 6px; }
+.petrol-history-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 4px 6px; border: none; background: none; border-radius: 6px; cursor: pointer;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary);
+}
+.petrol-history-toggle:hover { color: var(--text-primary); }
+.petrol-history-chevron { transition: transform 0.15s ease; }
+.petrol-history.is-open .petrol-history-chevron { transform: rotate(90deg); }
+@media (prefers-reduced-motion: reduce) { .petrol-history-chevron { transition: none; } }
+.petrol-history-count { font-weight: 600; letter-spacing: 0; }
+.petrol-history-head-actions { display: inline-flex; align-items: center; gap: 2px; }
+.petrol-history-headbtn { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: 6px; background: none; color: var(--text-secondary); cursor: pointer; }
+.petrol-history-headbtn:hover:not(:disabled) { background: var(--bg-tertiary, var(--bg-secondary)); color: var(--text-primary); }
+.petrol-history-headbtn:disabled { opacity: 0.35; cursor: default; }
+.petrol-history-notice { margin: 2px 20px 6px 22px; font-size: 12px; line-height: 1.4; color: color-mix(in srgb, var(--color-warning) 80%, var(--text-primary)); }
+.petrol-history-notice.is-error { color: var(--color-danger); }
+.petrol-history-empty { padding: 4px 20px 6px 22px; font-size: 12px; line-height: 1.4; color: var(--text-secondary); }
+.petrol-history-info { margin: 6px 10px 0; padding: 6px 12px 0; border-top: 1px solid var(--border-subtle); font-size: 11.5px; line-height: 1.4; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.petrol-history-search { padding: 2px 10px 6px; }
+.petrol-history-search input {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 12.5px; padding: 5px 9px; border-radius: 7px;
+  border: 1px solid var(--border-subtle); background: var(--bg-primary); color: var(--text-primary);
+}
+/* Nur die Liste darf schrumpfen; Kopf, Suche, Hinweise und Infozeile behalten ihre Höhe. */
+.petrol-history > :not(.petrol-history-list) { flex-shrink: 0; }
+.petrol-history-list { overflow-y: auto; overflow-x: hidden; min-height: 0; min-width: 0; flex: 1 1 auto; scrollbar-gutter: stable; }
+.petrol-history-group ul { list-style: none; margin: 0; padding: 0; }
+.petrol-history-group-label { padding: 8px 20px 3px 22px; font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+.petrol-history-group:first-child .petrol-history-group-label { padding-top: 2px; }
+.petrol-history-item { position: relative; display: flex; align-items: center; min-width: 0; min-height: 32px; margin: 1px 10px; border-radius: 7px; border-left: 2px solid transparent; }
+.petrol-history-item:hover { background: var(--bg-tertiary, var(--bg-secondary)); }
+.petrol-history-item.is-current {
+  --petrol-history-row-bg: color-mix(in srgb, var(--bg-primary) 70%, var(--bg-tertiary));
+  background: var(--petrol-history-row-bg);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+}
+.petrol-history-open {
+  flex: 1; min-width: 0; display: flex; align-items: center; min-height: 32px; padding: 6px 10px;
+  border: none; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; border-radius: 7px;
+}
+.petrol-history-open:disabled { cursor: default; }
+.petrol-history-item-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-primary); }
+.petrol-history-item.is-current .petrol-history-item-title { font-weight: 600; }
+.petrol-history-item.is-unreadable .petrol-history-item-title { color: var(--text-secondary); font-style: italic; }
+/* Knöpfe liegen über dem Titelende (mit Verlauf), damit nichts springt (Codex F07). */
+.petrol-history-actions {
+  position: absolute; right: 2px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; gap: 0; padding-left: 18px;
+  background: linear-gradient(to right, transparent, var(--petrol-history-row-bg, var(--bg-tertiary, var(--bg-secondary))) 16px);
+  opacity: 0; pointer-events: none; border-radius: 0 7px 7px 0;
+}
+.petrol-history-item:hover .petrol-history-actions, .petrol-history-item:focus-within .petrol-history-actions { opacity: 1; pointer-events: auto; }
+.petrol-history-icon { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: none; border-radius: 6px; background: none; color: var(--text-secondary); cursor: pointer; }
+.petrol-history-icon:hover { background: var(--bg-primary); color: var(--text-primary); }
+.petrol-history-icon.is-on { color: var(--accent-color); }
+.petrol-history-confirm { flex: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 8px; padding: 5px 4px 5px 10px; font-size: 12px; color: var(--text-primary); }
+.petrol-history-confirm.is-block { margin: 2px 10px 6px; padding: 6px 8px 6px 12px; border-radius: 7px; background: var(--bg-tertiary, var(--bg-secondary)); }
+.petrol-history-confirm-btns { display: inline-flex; gap: 4px; }
+.petrol-history-act { min-height: 28px; padding: 3px 9px; border: 1px solid var(--border-subtle); border-radius: 6px; background: var(--bg-primary); font: inherit; font-size: 12px; color: var(--text-primary); cursor: pointer; }
+/* Text auf Gefahrfläche: dunkel ist --color-danger hell, weiße Schrift läge bei 2,8:1 (Design F23). */
+.petrol-history-act.is-danger { border-color: var(--color-danger); background: var(--color-danger); color: var(--danger-on, #fff); font-weight: 600; }
+.petrol-history-rename { flex: 1; display: flex; padding: 2px; }
+.petrol-history-rename input {
+  flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 5px 8px;
+  border: 1px solid var(--accent-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);
+}
+.petrol-history :is(button, input):focus-visible { outline: 2px solid var(--focus-ring, var(--accent-color)); outline-offset: -2px; }
+/* Karte neben der Seitenleiste (Portal) — wird nicht vom Scrollbereich abgeschnitten. */
+.petrol-history-card {
+  position: fixed; z-index: 10001; max-width: 320px; padding: 8px 11px; pointer-events: none;
+  background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: 9px; box-shadow: var(--shadow-md);
+}
+.petrol-history-card-title { font-size: 13px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.petrol-history-card-meta { margin-top: 3px; font-size: 12px; line-height: 1.35; color: var(--text-secondary); }
+.petrol-history-menu {
+  position: fixed; z-index: 10002; min-width: 190px; padding: 4px; display: flex; flex-direction: column;
+  background: var(--bg-primary); border: 1px solid var(--border-subtle); border-radius: 9px; box-shadow: var(--shadow-md);
+}
+.petrol-history-menu button { padding: 7px 10px; border: none; border-radius: 6px; background: none; text-align: left; font: inherit; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+.petrol-history-menu button:hover { background: var(--bg-secondary); }
+.petrol-history-menu button:focus-visible { background: var(--bg-secondary); outline: 2px solid var(--focus-ring, var(--accent-color)); outline-offset: -2px; }
+.petrol-history-menu button.is-danger { color: var(--color-danger); }
+.sidebar-notes-header { padding-left: 22px; }
+/* Geräte ohne Hover (Touch): Knöpfe immer sichtbar (Design F21). */
+@media (hover: none) {
+  .petrol-history-actions { opacity: 1; pointer-events: auto; }
+}
+.petrol-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.agent-card-btn.is-danger { background: var(--color-danger); border-color: var(--color-danger); color: #fff; font-weight: 600; }
+.agent-card-btn.is-danger:hover { filter: brightness(0.92); }
 /* Schmal (Nutzer 04.11.2026: „zu viel Leerraum“, „Fußzeile bricht um“): Einladung und Beispiele rücken
    direkt über die Eingabe, die Fußzeile zeigt nur die Zusage zu Notizen. */
 @container (max-width: 640px) {
@@ -23363,6 +23467,12 @@ body.presentation-mode *::after {
 .petrol-img-chip { position: relative; display: inline-flex; width: 52px; height: 52px; border-radius: 7px; overflow: hidden; border: 1px solid var(--border-subtle); background: var(--bg-secondary); }
 .petrol-img-chip img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .petrol-img-chip.is-rejected { opacity: 0.5; border-color: color-mix(in srgb, var(--danger-color, #c0392b) 70%, transparent); }
+.petrol-img-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 3px; box-sizing: border-box; font-size: 9px; line-height: 1.15; text-align: center; color: var(--text-secondary); }
+.petrol-img-chip.is-loading .petrol-img-placeholder { background: linear-gradient(90deg, var(--bg-secondary), var(--bg-primary), var(--bg-secondary)); background-size: 200% 100%; animation: petrol-img-shimmer 1.2s linear infinite; }
+.petrol-img-chip.is-missing { border-style: dashed; }
+.petrol-img-lazy { display: block; width: 100%; height: 100%; }
+@keyframes petrol-img-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .petrol-img-chip.is-loading .petrol-img-placeholder { animation: none; } }
 .petrol-img-remove { position: absolute; top: 3px; right: 3px; width: 17px; height: 17px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 50%; color: #fff; background: rgba(0, 0, 0, 0.55); cursor: pointer; }
 .petrol-img-remove:hover { background: rgba(0, 0, 0, 0.75); }
 .petrol-chat-input { display: flex; align-items: flex-end; gap: 10px; }

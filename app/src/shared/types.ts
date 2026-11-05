@@ -1040,6 +1040,17 @@ export interface ElectronAPI {
   petrolChatSnapshotsDrop: (scopeId: string) => Promise<boolean>;
   /** Teilmenge der Kennungen, deren eingefrorene Auszüge der Main noch hält (Codex F02). */
   petrolChatSnapshotsAlive: (scopeId: string, ids: string[]) => Promise<string[]>;
+  petrolConvOpen: (vaultPath: string | null, id: string | null) => Promise<import('./petrolChat').PetrolConvOpenResult>;
+  petrolConvSend: (vaultPath: string | null, id: string, req: import('./petrolChat').PetrolConvSendRequest) => Promise<import('./petrolChat').PetrolConvResult>;
+  petrolConvStop: (vaultPath: string | null, id: string) => Promise<import('./petrolChat').PetrolConvResult>;
+  petrolConvClose: (id: string) => Promise<boolean>;
+  petrolConvList: (vaultPath: string | null) => Promise<import('./petrolChat').PetrolConvListResult>;
+  petrolConvImage: (vaultPath: string | null, id: string, imageId: string) => Promise<string | null>;
+  petrolConvUpdate: (vaultPath: string | null, id: string, patch: { title?: string; pinned?: boolean; archived?: boolean }) => Promise<{ ok: true; storage: import('./petrolChat').PetrolChatStorageState } | { ok: false; error: string }>;
+  petrolConvDelete: (vaultPath: string | null, id: string) => Promise<{ ok: true } | { ok: false; error: string }>;
+  petrolConvDeleteAll: (vaultPath: string | null) => Promise<{ ok: true } | { ok: false; error: string }>;
+  onPetrolConvClosed: (callback: (e: { id: string }) => void) => void;
+  onPetrolConvChanged: (callback: () => void) => void;
   onPetrolChatProgress: (callback: (p: import('./webChat').PetrolWebProgress) => void) => void;
 
   // Projekt-RAG: Projektordner semantisch befragen (lokal)

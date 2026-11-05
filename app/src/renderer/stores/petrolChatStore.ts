@@ -1,8 +1,10 @@
 // Chat im Agent-Tab („Mit Petrol chatten“, Stufe 1 aus docs/codex-collab/chat-und-agent.md).
 //
-// Bereich = Tab-ID, wie im noteAgentStore. Der Verlauf hält, solange die App läuft, und
-// überlebt den Tab-Wechsel; beim Schließen des Tabs wird er verworfen. Gespeichert wird
-// bewusst noch nichts (Stufe 2: Format, Löschen, Aufbewahrung, Verschlüsselung offen).
+// Bereich = Tab-ID, wie im noteAgentStore. Seit Teil 1 (docs/codex-collab/
+// chat-verlauf-notizen-bilder.md, Rev. 4/8/9) FÜHRT DER MAIN DAS GESPRÄCH: Verlauf fürs Modell,
+// Themenfragen, Verlaufsbilder, Bruchstück beim Stopp und das Speichern liegen dort. Der Store
+// ist der Anzeige-Spiegel: er hält die Gesprächs-ID, zeigt die Frage sofort an, sammelt die
+// Textstücke zur Anzeige und übernimmt am Ende die Nachrichten, die der Main zurückgibt.
 //
 // Der Chat läuft NICHT über den Agenten-Loop (Codex F01–F05), sondern über den
 // streamenden Chat-Aufruf mit chatMode 'petrol' — eigener Systemtext, keine Notizen,
@@ -21,55 +23,14 @@
 import { create } from 'zustand'
 import type { AgentTabMode } from '../../shared/workFocus'
 import type { CloudProviderId } from '../../shared/llmBackend'
-import type { WebChatResult, WebFetchFailure, WebSource } from '../../shared/webChat'
-import { asksAboutOldWebSources, chatHistoryForModel, completedTurns, HISTORY_LIMIT, lastVisibleAnswerIsWeb, webTopicQuestions } from '../utils/chatHistory'
-import { planImageHistory, type ChatImage, type ChatImageDelivery } from '../../shared/chatImages'
+import type { WebFetchFailure, WebSource } from '../../shared/webChat'
+import { asksAboutOldWebSources, completedTurns, HISTORY_LIMIT, lastVisibleAnswerIsWeb, webTopicQuestions } from '../utils/chatHistory'
+import { planImageHistory, type ChatImage } from '../../shared/chatImages'
+import type { PetrolChatMessage, PetrolChatStorageMode, PetrolChatStorageState, PetrolConvResult } from '../../shared/petrolChat'
 import { useUIStore } from './uiStore'
 
-export interface PetrolChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  /** Modell bzw. Cloud-Weg, das die Antwort geschrieben hat (nur assistant). */
-  model?: string
-  /** Per „Stopp“ abgebrochen: bei assistant ein Bruchstück, bei user eine Frage ohne jede Antwort. */
-  stopped?: boolean
-  /** Fehlertext statt Antwort — geht nie in den Verlauf für das Modell. */
-  error?: boolean
-  /** Webwechsel (Frage mit Globus + Webantwort): nie im Modellverlauf. */
-  origin?: 'web'
-  /** Nur Frage: die Suchwörter, die tatsächlich gesendet wurden. */
-  webQuery?: string
-  /** Nur Frage: „gründlich“ — die Suchanfragen hat das Modell geplant (stehen an der Antwort). */
-  webDeep?: boolean
-  /** Nur gestoppte „gründliche“ Frage: Suchanfragen, die bis zum Stopp gesendet waren (F25). */
-  webSentQueries?: string[]
-  /** Frage zu eingefrorenen Auszügen, ohne neue Suche. */
-  followUp?: boolean
-  /** Kennung der Auszüge, an die diese Frage gebunden wurde — für „Erneut senden“. */
-  followUpSnapshotId?: string
-  /** Nur Antwort: Ergebnis aus dem Main (Quellen, Prüfbericht, Provenienz). */
-  web?: WebChatResult
-  /** Nur Antwort ohne Websuche: so viele frühere Webfragen gingen als Thema mit (Weg 1). */
-  webTopicsUsed?: number
-  /**
-   * Feste App-Antwort statt Modell: Frage nach Inhalt einer alten Webantwort/Quelle, die das
-   * Modell nicht sieht (Codex F01, chat-webthema-im-verlauf.md).
-   */
-  appNote?: 'old-web-source'
-  /** Nur Frage: angehängte Bilder (aufbereitet, Rev. 7 Punkt 20). Nur im Speicher. */
-  images?: ChatImage[]
-  /** Nur Frage: was der Main mit jedem Bild gemacht hat (gesendet, abgelehnt). */
-  imageDelivery?: Record<string, ChatImageDelivery>
-  /** Nur Antwort: so viele ältere Bilder gingen bei dieser Anfrage nicht mehr mit (Codex F53). */
-  imagesDropped?: number
-  /** Nur Antwort: ältere Bilder, die der gewählte Weg nicht annahm — ohne sie gefragt (Grund vom Main). */
-  imagesWithheld?: { count: number; reason: string }
-  /** Nur Frage: an wen jedes Bild bisher ging — auch mit späteren Folgefragen (Verlaufsbilder). */
-  imageRecipients?: Record<string, string[]>
-  /** Nur gestoppte Webantwort: Quellen, die bis zum Stopp feststanden. */
-  webPartial?: { sources: WebSource[]; failures: WebFetchFailure[]; notFetched: number }
-  at: number
-}
+// Laufzeittyp liegt seit Teil 1 in shared/ (der Main führt das Gespräch, Rev. 4/Rev. 8).
+export type { PetrolChatMessage } from '../../shared/petrolChat'
 
 /** Fortschritt der laufenden Webanfrage — nur Anzeige, keine Quelle der Wahrheit. */
 export interface PetrolWebProgressState {
@@ -121,6 +82,13 @@ export interface PetrolChatScope {
   goneSnapshots: string[]
   /** Bilder für die nächste Nachricht, schon aufbereitet. */
   draftImages: ChatImage[]
+  /** Gespräch im Main: ID und der Vault, an den es gebunden ist (Rev. 9 Punkt 26). null = noch keins. */
+  conv: { id: string; vault: string | null } | null
+  /**
+   * Wird das Gespräch gespeichert? null = noch nicht bekannt; 'failed' = letzter Speicherversuch
+   * gescheitert, das Gespräch lebt gerade nur im Main-Speicher (F83).
+   */
+  storage: PetrolChatStorageMode | 'failed' | null
 }
 
 export interface PetrolSendOptions {
@@ -135,6 +103,8 @@ export interface PetrolSendOptions {
   followUp?: { snapshotId: string }
   /** Bilder dieser Frage (Entwurf oder „Erneut senden“). Nicht mit Websuche/Nachfrage. */
   images?: ChatImage[]
+  /** Offener Vault — das Gespräch hängt fest daran (Rev. 9 Punkt 26). */
+  vaultPath: string | null
 }
 
 interface PetrolChatState {
@@ -158,6 +128,15 @@ interface PetrolChatState {
   stop: (id: string) => void
   clear: (id: string) => void
   dispose: (id: string) => void
+  /** Vault gewechselt: laufende Antwort stoppen, Gespräch schließen, leer neu beginnen. */
+  vaultChanged: (id: string, vaultPath: string | null) => void
+  /**
+   * Gespeichertes Gespräch in diesem Tab öffnen (Liste, Schritt 4). Eine laufende Antwort wird
+   * vorher gestoppt; das bisherige Gespräch geschlossen (gespeichert bleibt es). Fehlertext oder null.
+   */
+  openConversation: (id: string, convId: string, vaultPath: string | null) => Promise<string | null>
+  /** Bildbytes eines geladenen Gesprächs bei Bedarf holen (Rev. 9 Punkt 29). */
+  loadImage: (id: string, imageId: string) => Promise<void>
 }
 
 function freshScope(): PetrolChatScope {
@@ -175,7 +154,9 @@ function freshScope(): PetrolChatScope {
     followUp: null,
     webProgress: null,
     goneSnapshots: [],
-    draftImages: []
+    draftImages: [],
+    conv: null,
+    storage: null
   }
 }
 
@@ -196,17 +177,60 @@ export function snapshotIdsIn(messages: readonly PetrolChatMessage[]): string[] 
 let requestSeq = 0
 let currentRequest: string | null = null
 let listening = false
-
-/** Laufende Anfrage im Main abbrechen und ungültig machen. */
-function abortCurrent(): void {
-  const id = currentRequest
-  currentRequest = null
-  if (id) void window.electronAPI.petrolChatAbort(id).catch(() => { /* Main schon fertig */ })
+/** Bereiche, deren Gespräch gerade im Main angelegt wird (mit dem Vault) — kein zweites Senden dazwischen. */
+const opening = new Map<string, string | null>()
+/** Wem die Öffnungs-Sperre gehört (Generation des Öffnens) — nur der Besitzer gibt sie frei. */
+const openingOwner = new Map<string, number>()
+/**
+ * Generation je Bereich: zählt bei „Neues Gespräch“, Vault-Wechsel und Tab schließen hoch. Ein
+ * spätes Ergebnis einer älteren Generation wird verworfen (F78).
+ */
+const generations = new Map<string, number>()
+const generation = (id: string) => generations.get(id) ?? 0
+const bumpGeneration = (id: string) => generations.set(id, generation(id) + 1)
+/** Wechselnummer je Bereich: nur das Ergebnis des neuesten Wechsels ersetzt die Anzeige (F79). */
+const turnSeqs = new Map<string, number>()
+const turnSeq = (id: string) => turnSeqs.get(id) ?? 0
+/** Laufender Stopp je Bereich — eine neue Frage wartet, bis der Main ihn abgeschlossen hat (F79). */
+const stopping = new Map<string, Promise<void>>()
+/** Bilder, deren Bytes gerade geholt werden (je Bereich + Bild). */
+const imageLoads = new Set<string>()
+const IMAGE_LOADS_MAX = 3
+let imageLoadsActive = 0
+const imageWaiters: Array<() => void> = []
+function imageSlot(): Promise<void> {
+  if (imageLoadsActive < IMAGE_LOADS_MAX) { imageLoadsActive++; return Promise.resolve() }
+  return new Promise(r => imageWaiters.push(() => { imageLoadsActive++; r() }))
+}
+function releaseImageSlot(): void {
+  imageLoadsActive = Math.max(0, imageLoadsActive - 1)
+  imageWaiters.shift()?.()
 }
 
-/** Gesprächsbereich im Main vergessen: „Neues Gespräch“ und Tab schließen. */
-function dropSnapshots(id: string): void {
-  void window.electronAPI.petrolChatSnapshotsDrop?.(id).catch(() => { /* Main schon weg */ })
+/** Speicherzustand nach einer Antwort des Mains (F83): „unverändert“ ändert nichts. */
+function nextStorage(prev: PetrolChatScope['storage'], state: PetrolChatStorageState): PetrolChatScope['storage'] {
+  if (state === 'saved') return 'on'
+  if (state === 'unchanged') return prev
+  return state
+}
+
+/**
+ * Gespräch im Main schließen: eine laufende Antwort stoppt und wird gespeichert, die Auszüge des
+ * Gesprächs fallen weg (Rev. 3 Punkt 11). Gespeichert bleibt es.
+ */
+function closeConv(conv: { id: string } | null): void {
+  if (conv) void window.electronAPI.petrolConvClose(conv.id).catch(() => { /* Main schon weg */ })
+}
+
+/**
+ * Antworten des Mains tragen keine Bildbytes (`withoutImageBytes`) — der Renderer hat jedes Bild
+ * schon. Hier werden sie aus der eigenen Anzeige wieder eingesetzt.
+ */
+export function withLocalImageBytes(messages: readonly PetrolChatMessage[], local: readonly PetrolChatMessage[], extra: readonly ChatImage[] = []): PetrolChatMessage[] {
+  const bytes = new Map<string, string>()
+  for (const m of local) for (const i of m.images ?? []) if (i.dataBase64) bytes.set(i.id, i.dataBase64)
+  for (const i of extra) if (i.dataBase64) bytes.set(i.id, i.dataBase64)
+  return messages.map(m => (m.images?.length ? { ...m, images: m.images.map(i => (i.dataBase64 ? i : { ...i, dataBase64: bytes.get(i.id) ?? '' })) } : m))
 }
 
 export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
@@ -236,6 +260,10 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       const sc = get().scopes[id]
       if (!sc || sc.streaming === null) return
       patch(id, { streaming: sc.streaming + chunk.delta })
+    })
+    // Ein anderes Fenster hat das hier offene Gespräch gelöscht (F90): Anzeige leeren.
+    window.electronAPI.onPetrolConvClosed?.(e => {
+      for (const [scopeId, sc] of Object.entries(get().scopes)) if (sc.conv?.id === e?.id) get().clear(scopeId)
     })
     window.electronAPI.onPetrolChatProgress(p => {
       if (!p || p.requestId !== currentRequest) return
@@ -274,7 +302,9 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       if (!ids.length) return
       let alive: string[]
       try {
-        alive = await window.electronAPI.petrolChatSnapshotsAlive(id, ids)
+        // Bereich der Auszüge ist die Gesprächs-ID (Rev. 3 Punkt 11).
+        if (!sc.conv) return
+        alive = await window.electronAPI.petrolChatSnapshotsAlive(sc.conv.id, ids)
       } catch {
         return // Main nicht erreichbar: nichts behaupten
       }
@@ -293,40 +323,76 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
 
     send: async (id, text, opts) => {
       const question = text.trim()
-      if (!question || get().activeScope) return
-      ensureListener()
-      const req = `petrol-${Date.now().toString(36)}-${++requestSeq}`
-      currentRequest = req
-      const before = get().scope(id).messages
-      const history = chatHistoryForModel(completedTurns(before))
+      if (!question || get().activeScope || opening.has(id)) return
+      // Ein Stopp ist erst fertig, wenn der Main den Wechsel abgeschlossen hat; sonst lehnte der
+      // Main die neue Frage ab oder ein spätes Stopp-Ergebnis überschriebe sie (F79).
+      const pendingStop = stopping.get(id)
+      if (pendingStop) {
+        await pendingStop
+        if (get().activeScope || opening.has(id)) return
+      }
+      const gen = generation(id)
       const web = opts.web
       const follow = opts.followUp
       const images = opts.images ?? []
       // Bild und Websuche gehen nicht zusammen (Rev. 7 Punkt 22); die Oberfläche sperrt das schon.
       if (images.length && (web || follow)) return
-      // Thema früherer Webfragen (Weg 1): nur eigene Fragen erfolgreicher Webwechsel.
+      ensureListener()
+      const vault = opts.vaultPath ?? null
+      // Gespräch im Main anlegen bzw. an den Vault binden (Rev. 9 Punkt 26).
+      let conv = get().scope(id).conv
+      if (!conv || conv.vault !== vault) {
+        opening.set(id, vault)
+        closeConv(conv)
+        let o: Awaited<ReturnType<typeof window.electronAPI.petrolConvOpen>>
+        try {
+          o = await window.electronAPI.petrolConvOpen(vault, null)
+        } catch (e) {
+          o = { ok: false, error: e instanceof Error ? e.message : String(e) }
+        } finally {
+          opening.delete(id)
+        }
+        // Inzwischen „Neues Gespräch“, Vault gewechselt oder Tab zu: das eben angelegte Gespräch
+        // gehört zu nichts mehr (F78).
+        if (generation(id) !== gen) {
+          if (o.ok) closeConv({ id: o.id })
+          return
+        }
+        if (!o.ok) {
+          const before0 = get().scope(id).messages
+          patch(id, { messages: [...before0, { role: 'user', content: question, at: Date.now() }, { role: 'assistant', content: o.error, error: true, at: Date.now() + 1 }], draft: '' })
+          return
+        }
+        conv = { id: o.id, vault }
+        patch(id, { conv, storage: o.storage, goneSnapshots: [] })
+        if (get().activeScope) return
+      }
+      const req = `petrol-${Date.now().toString(36)}-${++requestSeq}`
+      currentRequest = req
+      const seq = turnSeq(id) + 1
+      turnSeqs.set(id, seq)
+      const before = get().scope(id).messages
+      // Nur Anzeige: dieselben Regeln wie im Main, damit Stopp-Hinweise und „feste Antwort“ sofort
+      // stimmen. Was ans Modell geht, entscheidet der Main (Rev. 4).
       const webTopics = webTopicQuestions(before)
-      // Frage nach einer alten Antwort/Quelle ohne Globus und ohne ausdrückliche Nachfrage:
-      // feste Antwort, kein Modellaufruf. Beide Nachrichten tragen origin 'web'.
-      if (!web && !follow && webTopics.length > 0 && asksAboutOldWebSources(question, { topics: webTopics.map(q => q.text), lastAnswerWasWeb: lastVisibleAnswerIsWeb(before) })) {
-        currentRequest = null
-        patch(id, {
-          messages: [...before,
-            { role: 'user', content: question, origin: 'web', at: Date.now() },
-            { role: 'assistant', content: '', origin: 'web', appNote: 'old-web-source', at: Date.now() + 1 }],
-          draft: ''
-        })
-        return
+      const appNote = !web && !follow && !images.length && webTopics.length > 0 && asksAboutOldWebSources(question, { topics: webTopics.map(q => q.text), lastAnswerWasWeb: lastVisibleAnswerIsWeb(before) })
+      let dropped = 0
+      if (!web && !follow && !appNote) {
+        const withImages = completedTurns(before).filter(m => m.origin !== 'web').slice(-HISTORY_LIMIT)
+          .map(m => ({ role: m.role, content: m.content, imageIds: m.images?.map(i => i.id) ?? [] }))
+        withImages.push({ role: 'user', content: question, imageIds: images.map(i => i.id) })
+        const plan = planImageHistory(withImages, new Set(withImages.flatMap(m => m.imageIds)))
+        if (!('error' in plan)) dropped = plan.dropped.length
       }
       const questionAt = Date.now()
       patch(id, {
         messages: [...before, follow
-          ? { role: 'user', content: question, origin: 'web', followUp: true, followUpSnapshotId: follow.snapshotId, at: Date.now() }
+          ? { role: 'user', content: question, origin: 'web', followUp: true, followUpSnapshotId: follow.snapshotId, at: questionAt }
           : web
             ? { role: 'user', content: question, origin: 'web', ...(web.deep ? { webDeep: true } : { webQuery: web.query }), at: questionAt }
             : { role: 'user', content: question, ...(images.length ? { images } : {}), at: questionAt }],
-        streaming: '',
-        active: !web && !follow && webTopics.length ? { ...opts.run, webTopics: webTopics.length } : opts.run,
+        streaming: appNote ? null : '',
+        active: appNote ? null : { ...opts.run, ...(!web && !follow && webTopics.length ? { webTopics: webTopics.length } : {}), ...(dropped ? { imagesDropped: dropped } : {}) },
         draft: '',
         // Der Globus bleibt, wie er ist (Nutzerwunsch 28.10.2026: sonst musste man ihn bei jeder
         // Frage neu anklicken). Suchfeld und Schalter „gründlich“ starten beim nächsten Mal neu.
@@ -336,138 +402,65 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         webProgress: follow ? { phase: 'model', hosts: [] } : web ? { phase: web.deep ? 'plan' : 'search', hosts: [] } : null
       })
       set({ activeScope: id })
-      if (web || follow) {
-        let wres: Awaited<ReturnType<typeof window.electronAPI.petrolChatWeb>>
-        try {
-          wres = await window.electronAPI.petrolChatWeb({
-            requestId: req,
-            question,
-            query: follow ? '' : web!.query,
-            ...(web?.deep ? { deep: true } : {}),
-            scopeId: id,
-            ...(follow ? { snapshotId: follow.snapshotId } : {}),
-            history,
-            model: opts.model,
-            backend: opts.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
-            lmStudioPort: opts.lmStudioPort,
-            cloud: opts.cloud ? { model: opts.cloud.model, provider: opts.cloud.provider === 'llmbase' ? 'llmbase' : 'openrouter' } : null,
-            // Themenfragen sind keine Sachbasis. Bei der Nachfrage bleiben sie draußen (F03).
-            ...(follow ? {} : { webTopics })
-          })
-        } catch (e) {
-          wres = { success: false, error: e instanceof Error ? e.message : String(e) }
-        }
-        if (req !== currentRequest) {
-          // Gestoppt: das Main-Ergebnis kommt trotzdem und trägt die vollständige Spur der
-          // gesendeten Anfragen — der Fortschritt beim Stopp kann eine gerade gestartete Suche
-          // noch nicht kennen (Codex F35). Nur die Anfragen werden an die Frage nachgetragen.
-          const sent = wres.result?.deep?.queries.map(q => q.text) ?? []
-          const sc = get().scopes[id]
-          if (web?.deep && sent.length && sc) {
-            const k = sc.messages.findIndex(m => m.role === 'user' && m.at === questionAt)
-            if (k >= 0) patch(id, { messages: sc.messages.map((m, i) => (i === k ? { ...m, webSentQueries: sent } : m)) })
-          }
-          return
-        }
-        currentRequest = null
+      let res: PetrolConvResult
+      try {
+        res = await window.electronAPI.petrolConvSend(vault, conv.id, {
+          requestId: req,
+          question,
+          kind: follow ? 'follow-up' : web ? 'web' : 'chat',
+          ...(web ? { web: { query: web.query, ...(web.deep ? { deep: true } : {}) } } : {}),
+          ...(follow ? { followUpSnapshotId: follow.snapshotId } : {}),
+          ...(images.length ? { images } : {}),
+          model: opts.model,
+          backend: opts.backend,
+          ...(opts.lmStudioPort ? { lmStudioPort: opts.lmStudioPort } : {}),
+          cloud: opts.cloud ? { model: opts.cloud.model, provider: opts.cloud.provider === 'llmbase' ? 'llmbase' : 'openrouter' } : null
+        })
+      } catch (e) {
+        res = { ok: false, error: e instanceof Error ? e.message : String(e) }
+      }
+      if (req !== currentRequest) {
+        // Gestoppt: der Main hat den Wechsel abgeschlossen. Ein spätes Ergebnis trägt höchstens
+        // die gesendeten Suchanfragen nach — übernehmen, solange in diesem Bereich nichts Neues läuft.
         const sc = get().scopes[id]
-        set({ activeScope: null })
-        if (!sc) return
-        const r = wres.result
-        const next: PetrolChatMessage = !wres.success || !r
-          ? { role: 'assistant', content: wres.error || '', error: true, origin: 'web', at: Date.now() }
-          : r.kind === 'answer'
-            ? { role: 'assistant', content: r.answer ?? '', model: opts.run.label, origin: 'web', web: r, at: Date.now() }
-            : r.kind === 'nothing-readable'
-              ? { role: 'assistant', content: '', model: opts.run.label, origin: 'web', web: r, at: Date.now() }
-              : { role: 'assistant', content: r.error || '', error: true, origin: 'web', web: r, at: Date.now() }
-        // Nachfragen beziehen sich von selbst auf diese Antwort (Nutzerwunsch 28.10.2026): im Chat
-        // ist klar, dass die nächste Frage an die letzte Antwort anschließt. Wirksam wird das nur
-        // bei ausgeschaltetem Globus; der Hinweis über der Eingabe zeigt es und lässt sich wegklicken.
-        const snap = next.web?.kind === 'answer' && !next.error ? next.web.snapshotId : undefined
-        patch(id, { messages: [...sc.messages, next], streaming: null, active: null, webProgress: null, ...(snap ? { followUp: { snapshotId: snap } } : {}) })
-        if (follow && r?.snapshotGone) markGone(id, [follow.snapshotId])
+        if (res.ok && sc && generation(id) === gen && turnSeq(id) === seq && get().activeScope !== id && sc.conv?.id === conv.id) {
+          patch(id, { messages: withLocalImageBytes(res.messages, sc.messages), storage: nextStorage(sc.storage, res.storage) })
+        }
         return
       }
-      // Verlauf mit Bildverweisen: dieselbe Regel wie im Main (letzte Frage alle, davor die
-      // neuesten zwei). Der Main zählt selbst nach; hier entscheidet sich nur, welche Bytes mitgehen.
-      const withImages = completedTurns(before)
-        .filter(m => m.origin !== 'web')
-        .slice(-HISTORY_LIMIT)
-        .map(m => ({ role: m.role, content: m.content, imageIds: m.images?.map(i => i.id) ?? [], images: m.images ?? [] }))
-      withImages.push({ role: 'user', content: question, imageIds: images.map(i => i.id), images })
-      const known = new Map(withImages.flatMap(m => m.images.map(i => [i.id, i] as const)))
-      const plan = planImageHistory(withImages, new Set(known.keys()))
-      if (!('error' in plan) && plan.dropped.length) {
-        const act = get().scopes[id]?.active
-        if (act) patch(id, { active: { ...act, imagesDropped: plan.dropped.length } })
-      }
-      let res: { success: boolean; response?: string; error?: string; imageDelivery?: Record<string, ChatImageDelivery> }
-      if ('error' in plan) {
-        res = { success: false, error: plan.error }
-      } else {
-        const messages = known.size ? plan.messages.map(m => ({ role: m.role, content: m.content, ...(m.imageIds.length ? { imageIds: m.imageIds } : {}) })) : [...history, { role: 'user' as const, content: question }]
-        const wire = plan.sent.map(i => ({ id: i, dataBase64: known.get(i)!.dataBase64 }))
-        try {
-          res = opts.cloud || opts.backend !== 'lm-studio'
-            ? await window.electronAPI.ollamaChat(opts.model, messages, '', 'petrol', opts.cloud, undefined, req, webTopics, wire.length ? wire : undefined)
-            : await window.electronAPI.lmstudioChat(opts.model, messages, '', 'petrol', opts.lmStudioPort, undefined, req, webTopics, wire.length ? wire : undefined)
-        } catch (e) {
-          res = { success: false, error: e instanceof Error ? e.message : String(e) }
-        }
-      }
-      if (req !== currentRequest) return
       currentRequest = null
-      const sc0 = get().scopes[id]
+      const sc = get().scopes[id]
       set({ activeScope: null })
-      if (!sc0) return
-      // Rückmeldung je Bild an der Frage festhalten — die Marke zeigt, was wirklich ans Modell ging.
-      const delivery = res.imageDelivery ?? {}
-      // Jedes gesendete Bild — auch ein älteres aus dem Verlauf — trägt danach alle Empfänger.
-      const sentTo = Object.entries(delivery).filter(([, d]) => d.kind === 'image') as Array<[string, Extract<ChatImageDelivery, { kind: 'image' }>]>
-      const sc = {
-        ...sc0,
-        messages: sc0.messages.map(m => {
-          if (m.role !== 'user' || !m.images?.length) return m
-          let next = m
-          if (m.at === questionAt && res.imageDelivery && images.length) next = { ...next, imageDelivery: res.imageDelivery }
-          const mine = sentTo.filter(([imgId]) => m.images!.some(i => i.id === imgId))
-          if (!mine.length) return next
-          const rec = { ...(next.imageRecipients ?? {}) }
-          for (const [imgId, d] of mine) rec[imgId] = [...new Set([...(rec[imgId] ?? []), d.target])]
-          return { ...next, imageRecipients: rec }
-        })
+      if (!sc) return
+      if (!res.ok) {
+        // Der Main hat die Frage gar nicht angenommen (Prüfung) — Fehler sichtbar an der Frage.
+        patch(id, { messages: [...sc.messages, { role: 'assistant', content: res.error, error: true, ...(web || follow ? { origin: 'web' as const } : {}), at: Date.now() }], streaming: null, active: null, webProgress: null })
+        return
       }
-      const withheld = Object.values(delivery).filter((d): d is Extract<ChatImageDelivery, { kind: 'history-dropped' }> => d.kind === 'history-dropped')
-      const partial = sc.streaming ?? ''
-      const answer = res.success ? (res.response || partial) : ''
-      const next: PetrolChatMessage = res.success && answer.trim()
-        ? { role: 'assistant', content: answer, model: opts.run.label, ...(webTopics.length ? { webTopicsUsed: webTopics.length } : {}), ...(!('error' in plan) && plan.dropped.length ? { imagesDropped: plan.dropped.length } : {}), ...(withheld.length ? { imagesWithheld: { count: withheld.length, reason: withheld[0].reason ?? '' } } : {}), at: Date.now() }
-        : { role: 'assistant', content: res.error || '', error: true, at: Date.now() }
-      patch(id, { messages: [...sc.messages, next], streaming: null, active: null })
+      const messages = withLocalImageBytes(res.messages, sc.messages, images)
+      const last = messages[messages.length - 1]
+      // Nachfragen beziehen sich von selbst auf diese Antwort (Nutzerwunsch 28.10.2026): wirksam nur
+      // bei ausgeschaltetem Globus; der Hinweis über der Eingabe zeigt es und lässt sich wegklicken.
+      const snap = last?.role === 'assistant' && last.web?.kind === 'answer' && !last.error ? last.web.snapshotId : undefined
+      patch(id, { messages, streaming: null, active: null, webProgress: null, storage: nextStorage(sc.storage, res.storage), ...(snap ? { followUp: { snapshotId: snap } } : {}) })
+      if (follow && last?.web?.snapshotGone) markGone(id, [follow.snapshotId])
     },
 
     stop: id => {
       if (get().activeScope !== id) return
-      abortCurrent()
+      currentRequest = null
       const sc = get().scope(id)
-      // Was bis hierher kam, bleibt stehen — als abgebrochen markiert, nicht still verworfen.
-      // Kam noch gar nichts, wird die Frage selbst als abgebrochen markiert; sonst ginge sie
-      // als offene Frage mit der nächsten ans Modell (Codex F31).
+      // Sofortige Anzeige wie bisher; maßgeblich ist, was der Main abschließt (F67) — das kommt
+      // gleich danach und ersetzt diese Anzeige.
       const kept = sc.streaming ?? ''
       const lastRaw = sc.messages[sc.messages.length - 1]
-      // Gründliche Suche: was bis zum Stopp gesendet war, bleibt an der Frage sichtbar (F25).
       const sent = sc.webProgress?.queries
       const last = lastRaw?.role === 'user' && sent?.length ? { ...lastRaw, webSentQueries: [...sent] } : lastRaw
       const before = last && last !== lastRaw ? [...sc.messages.slice(0, -1), last] : sc.messages
-      // Webanfrage: das Bruchstück behält die Quellen, die beim Stopp feststanden — ohne
-      // Prüfung, aber nachvollziehbar, woraus es stammt.
       const webMark: Partial<PetrolChatMessage> = last?.origin === 'web'
         ? { origin: 'web', webPartial: sc.webProgress?.sources ? { sources: sc.webProgress.sources, failures: sc.webProgress.failures ?? [], notFetched: sc.webProgress.notFetched ?? 0 } : undefined }
-        // Normale Anfrage mit Themenkontext: das Bruchstück behält den Hinweis (Codex F09).
         : {
             ...(sc.active?.webTopics ? { webTopicsUsed: sc.active.webTopics } : {}),
-            // Auch eine abgebrochene Antwort sagt, welche älteren Bilder fehlten (Codex F57).
             ...(sc.active?.imagesDropped ? { imagesDropped: sc.active.imagesDropped } : {})
           }
       patch(id, {
@@ -481,23 +474,122 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
             : before
       })
       set({ activeScope: null })
+      const conv = sc.conv
+      if (!conv) return
+      const gen = generation(id)
+      const seq = turnSeq(id)
+      const done: Promise<void> = window.electronAPI.petrolConvStop(conv.vault, conv.id).then(res => {
+        const now = get().scopes[id]
+        // Nur für genau diesen Wechsel: keine neuere Frage, kein neues Gespräch (F79).
+        if (res.ok && now && generation(id) === gen && turnSeq(id) === seq && get().activeScope !== id && now.conv?.id === conv.id) {
+          patch(id, { messages: withLocalImageBytes(res.messages, now.messages), storage: nextStorage(now.storage, res.storage) })
+        }
+      }).catch(() => { /* Main schon fertig */ }).finally(() => {
+        if (stopping.get(id) === done) stopping.delete(id)
+      })
+      stopping.set(id, done)
     },
 
     clear: id => {
-      if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
-      dropSnapshots(id)
+      bumpGeneration(id)
+      const sc = get().scopes[id]
+      if (get().activeScope === id) { currentRequest = null; set({ activeScope: null }) }
+      closeConv(sc?.conv ?? null)
       // Neues Gespräch startet wie ein neuer Tab mit dem gemerkten Globus (Codex F06).
-      patch(id, { messages: [], goneSnapshots: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: useUIStore.getState().petrolWebSticky === true, webQuery: null, webDeep: false, followUp: null })
+      patch(id, { conv: null, messages: [], goneSnapshots: [], streaming: null, active: null, draft: '', webProgress: null, webArmed: useUIStore.getState().petrolWebSticky === true, webQuery: null, webDeep: false, followUp: null })
     },
 
     dispose: id => {
-      if (get().activeScope === id) { abortCurrent(); set({ activeScope: null }) }
-      dropSnapshots(id)
+      bumpGeneration(id)
+      const sc = get().scopes[id]
+      if (get().activeScope === id) { currentRequest = null; set({ activeScope: null }) }
+      closeConv(sc?.conv ?? null)
       set(s => {
         const scopes = { ...s.scopes }
         delete scopes[id]
         return { scopes }
       })
+    },
+
+    openConversation: async (id, convId, vaultPath) => {
+      // Ab hier ein laufender Vorgang des Tabs (F87): kein Senden, kein zweites Öffnen. Die
+      // Generation zählt sofort hoch — ein Tab zu oder Vault-Wechsel währenddessen verwirft ihn.
+      if (opening.has(id)) return 'Das Gespräch wird gerade geöffnet.'
+      ensureListener()
+      bumpGeneration(id)
+      const gen = generation(id)
+      opening.set(id, vaultPath)
+      openingOwner.set(id, gen)
+      try {
+        if (get().activeScope === id) get().stop(id)
+        await stopping.get(id)
+        if (generation(id) !== gen) return null
+        if (get().activeScope) return 'Gerade läuft eine Antwort.'
+        const sc = get().scope(id)
+        if (sc.conv?.id === convId && sc.conv.vault === vaultPath) return null
+        // Erst das Ziel laden, dann tauschen (F86): scheitert das Öffnen, bleibt das bisherige
+        // Gespräch — womöglich nur im Speicher — unberührt.
+        let o: Awaited<ReturnType<typeof window.electronAPI.petrolConvOpen>>
+        try {
+          o = await window.electronAPI.petrolConvOpen(vaultPath, convId)
+        } catch (e) {
+          o = { ok: false, error: e instanceof Error ? e.message : String(e) }
+        }
+        if (generation(id) !== gen) {
+          if (o.ok) closeConv({ id: o.id })
+          return null
+        }
+        if (!o.ok) return o.error
+        closeConv(get().scope(id).conv)
+        // Geladene Antworten werden nie still als Nachfrage vorgemerkt (Rev. 9 Punkt 28).
+        patch(id, { conv: { id: o.id, vault: vaultPath }, storage: o.storage, messages: o.messages, goneSnapshots: [], streaming: null, active: null, webProgress: null, followUp: null })
+        return null
+      } finally {
+        if (openingOwner.get(id) === gen) { opening.delete(id); openingOwner.delete(id) }
+      }
+    },
+
+    loadImage: async (id, imageId) => {
+      const sc = get().scopes[id]
+      const conv = sc?.conv
+      const key = `${id}|${imageId}`
+      if (!conv || imageLoads.has(key)) return
+      imageLoads.add(key)
+      const gen = generation(id)
+      try {
+        // Höchstens drei Bilder gleichzeitig (F91) — ein Gespräch mit vielen Bildern flutet sonst die IPC.
+        await imageSlot()
+        if (generation(id) !== gen) return
+        const data = await window.electronAPI.petrolConvImage(conv.vault, conv.id, imageId)
+        const now = get().scopes[id]
+        if (!now || generation(id) !== gen || now.conv?.id !== conv.id) return
+        patch(id, {
+          messages: now.messages.map(m => {
+            if (!m.images?.some(i => i.id === imageId && !i.dataBase64)) return m
+            if (data) return { ...m, images: m.images.map(i => (i.id === imageId ? { ...i, dataBase64: data } : i)) }
+            // Datei fehlt oder passt nicht: als „nicht mehr vorhanden“ benennen, nie als leeres Bild (F63).
+            const { dataBase64: _gone, ...meta } = m.images.find(i => i.id === imageId)!
+            const rest = m.images.filter(i => i.id !== imageId)
+            const n: PetrolChatMessage = { ...m, imagesMissing: [...(m.imagesMissing ?? []), meta] }
+            if (rest.length) n.images = rest
+            else delete n.images
+            return n
+          })
+        })
+      } catch {
+        // Marke bleibt ohne Vorschau
+      } finally {
+        releaseImageSlot()
+        imageLoads.delete(key)
+      }
+    },
+
+    vaultChanged: (id, vaultPath) => {
+      const sc = get().scopes[id]
+      // Auch während das Gespräch noch angelegt wird (F78): dann zählt der Vault der Öffnung.
+      const bound = opening.has(id) ? opening.get(id) ?? null : sc?.conv ? sc.conv.vault : undefined
+      if (bound === undefined || bound === vaultPath) return
+      get().clear(id)
     }
   }
 })

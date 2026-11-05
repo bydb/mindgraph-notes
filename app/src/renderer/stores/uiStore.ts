@@ -1,4 +1,5 @@
 import { DEFAULT_SHELL_GUARDRAILS, type ShellGuardrails } from '../../shared/shellGuardrails'
+import { CHAT_RETENTION_DEFAULT, normalizeRetention, type ChatRetentionDays } from '../../shared/petrolChatStored'
 import { normalizeWorkFocus, normalizeAgentTabMode, type WorkFocus, type AgentTabMode } from '../../shared/workFocus'
 import { DEFAULT_COMPUTER_CONTROL, type ComputerControlSettings } from '../../shared/computerControl'
 import { create } from 'zustand'
@@ -739,6 +740,14 @@ interface UIState {
    */
   petrolWebCheckMarks: boolean
   /**
+   * Petrol-Chat: Aufbewahrung gespeicherter Gespräche in Tagen ab der letzten Nachricht, 0 = nie
+   * löschen (Teil 1, chat-verlauf-notizen-bilder.md). Der Main liest den Wert aus ui-settings.json
+   * (`normalizeRetention`, Standard 90).
+   */
+  petrolChatRetentionDays: ChatRetentionDays
+  /** Abschnitt „Gespräche“ in der Seitenleiste aufgeklappt (Teil 1, Nutzer 05.11.2026). */
+  petrolChatHistoryOpen: boolean
+  /**
    * Petrol-Chat: Globus bleibt nach dem Senden an und gilt auch für neue Chats (Nutzerwunsch
    * 28.10.2026). Der letzte Klick auf den Globus setzt den Wert, es gibt keinen eigenen Schalter.
    */
@@ -927,6 +936,8 @@ interface UIState {
   setWebResearchEnabled: (enabled: boolean) => void
   setPetrolWebLoop: (on: boolean) => void
   setPetrolWebCheckMarks: (on: boolean) => void
+  setPetrolChatRetentionDays: (days: ChatRetentionDays) => void
+  setPetrolChatHistoryOpen: (open: boolean) => void
   setPetrolWebSticky: (on: boolean) => void
   setAgentShellEnabled: (enabled: boolean) => void
   setAgentShell: (patch: Partial<ShellGuardrails>) => void
@@ -1114,6 +1125,8 @@ const defaultState = {
   webResearchEnabled: false,
   petrolWebLoop: true,
   petrolWebCheckMarks: false,
+  petrolChatRetentionDays: CHAT_RETENTION_DEFAULT,
+  petrolChatHistoryOpen: true,
   petrolWebSticky: false,
   agentShellEnabled: false,
   agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
@@ -1341,7 +1354,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolWebSticky', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1454,6 +1467,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setWebResearchEnabled: (enabled) => set({ webResearchEnabled: enabled }),
   setPetrolWebLoop: (on) => set({ petrolWebLoop: on === true }),
   setPetrolWebCheckMarks: (on) => set({ petrolWebCheckMarks: on === true }),
+  setPetrolChatRetentionDays: (days) => set({ petrolChatRetentionDays: normalizeRetention(days) }),
+  setPetrolChatHistoryOpen: (open) => set({ petrolChatHistoryOpen: open === true }),
   setPetrolWebSticky: (on) => set({ petrolWebSticky: on === true }),
   setAgentShellEnabled: (enabled) => set({ agentShellEnabled: enabled }),
   setAgentShell: (patch) => set((state) => ({ agentShell: { ...DEFAULT_SHELL_GUARDRAILS, ...state.agentShell, ...patch } })),
