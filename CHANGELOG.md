@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.2] - 2026-11-05
+
+**Gespräche im Chat bleiben jetzt erhalten und stehen links in der Seitenleiste.** Ein geschlossener Tab oder ein Neustart verliert nichts mehr: Jedes Gespräch lässt sich wieder öffnen und weiterführen, auch mit seinen Bildern. Gespräche lassen sich anheften, archivieren, umbenennen und durchsuchen.
+
+### Hintergrund
+
+- **Auslöser:** Bisher verschwand der Chat-Verlauf, sobald man den Tab schloss oder die App neu startete. Wer an einem Gespräch weiterarbeiten wollte, musste von vorn beginnen.
+- **Speicherort:** Gespräche liegen verschlüsselt nur auf diesem Rechner, nicht im Vault, und werden nicht synchronisiert. Sie sind Teil des Backups des Rechners. Steht kein Schlüsselspeicher zur Verfügung, etwa unter Linux ohne laufenden Passwortspeicher, wird nicht gespeichert, und die Liste sagt das.
+- **Liste:** Sie steht links in der Seitenleiste, solange der Chat offen ist: angeheftete Gespräche oben, darunter Heute, Gestern, Letzte 7 Tage und Älter, ab 15 Gesprächen mit Suche. Beim Überfahren erscheinen Anheften und Archivieren, Umbenennen und Löschen stehen im Rechtsklick-Menü. Archivierte Gespräche erreicht man über „…“.
+- **Aufbewahrung:** 30, 90 (Standard) oder 365 Tage seit der letzten Nachricht oder nie, unter Einstellungen → KI → Chat-Verlauf. Angeheftete Gespräche werden nicht automatisch gelöscht.
+- **Geladene Gespräche:** Die abgerufenen Seiten früherer Webantworten werden nicht gespeichert. Nach dem Öffnen steht an solchen Antworten „Seiten nicht mehr da“; für Nachfragen dazu neu suchen. Bilder werden erst geladen, wenn sie im Verlauf sichtbar werden.
+- **Grenzen:** Ein Gespräch ist immer nur in einem Fenster offen. Wird der Vault verschoben oder umbenannt, erscheinen seine Gespräche nicht mehr. Einen Abgleich zwischen Geräten gibt es bewusst nicht.
+
 ## [1.2.1] - 2026-11-04
 
 **Der Chat im Agent-Tab ist ruhiger und zeigt beim Antworten, was er gerade tut.** Das Eingabefeld sitzt unten, Modell und Datenweg stehen direkt daneben, und während einer Antwort erscheint gut lesbar der aktuelle Schritt, etwa „Suche bei Tavily …“ oder „Seiten abrufen …“, mit mitlaufender Zeit. Neu ist außerdem der Skill „Veranstaltungsjournal“: Er macht aus einem Programmablauf ein Teilnehmenden-Heft im A5-Format, das sich auch als A4-Broschüre zum Falten und Heften drucken lässt.
