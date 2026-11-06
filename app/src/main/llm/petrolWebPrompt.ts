@@ -33,7 +33,24 @@ export function prepareWebExcerpt(text: string, sanitize: (text: string) => stri
  * die Einleitung sagt ehrlich, dass nicht neu gesucht wurde und die Seiten älter sein können.
  * Die frühere Antwort steht bewusst NICHT im Prompt (Codex F03): sie ist Modelltext, keine Quelle.
  */
-export function buildPetrolWebSystemPrompt(sources: readonly WebSource[], today: string, sanitize: (text: string) => string, topics: readonly WebTopicQuestion[] = [], followUp = false): string {
+/**
+ * Seiten, die nur im Browser lesbar wären (Händlersuche, Skript-Hülle). App-Text außerhalb des
+ * fremden Blocks: ohne ihn schrieb das Modell „keine Verkaufsstellen gefunden“, obwohl die Liste
+ * nur nicht gelesen werden konnte (06.11.2026). Höchstens drei Hosts zu je 63 Zeichen; das Budget
+ * hält dafür `BROWSER_ONLY_BLOCK_MAX_CHARS` frei (Codex F20), weil die Fehlschläge erst nach dem
+ * Einfrieren feststehen.
+ */
+export function browserOnlyBlock(hosts: readonly string[], sanitize: (text: string) => string): string {
+  const list = [...new Set(hosts.map((h) => sanitize(h).replace(/[^\w.-]/g, '').slice(0, BROWSER_ONLY_HOST_MAX)).filter(Boolean))].slice(0, 3)
+  if (list.length === 0) return ''
+  return `\n\nHINWEIS DER APP: Diese Seiten aus den Suchtreffern laden ihren Inhalt (z. B. eine Händlersuche mit Karte) erst im Browser, die App konnte sie nicht lesen: ${list.join(', ')}. Wenn die Antwort vermutlich dort steht (z. B. Geschäfte, Händler, Filialen, Standorte, Termine), BEGINNE die Antwort mit einem kurzen Satz ohne Nummer, der das sagt und die Website nennt, damit der Nutzer sie selbst öffnet. Danach beantworte die Frage wie sonst mit allem, was die Seiten oben hergeben (z. B. Händler, Proben, Online-Shops, Hintergründe), mit Nummern — der Satz ersetzt die Antwort nicht. Beginne nie mit einer Aussage, dass etwas nicht genannt wird oder fehlt, und behaupte nicht, es gebe keine Einträge oder keine Geschäfte — die Liste konnte nur nicht gelesen werden.`
+}
+
+const BROWSER_ONLY_HOST_MAX = 63
+/** Größter möglicher Hinweisblock — so viel hält das Quellenbudget frei. */
+export const BROWSER_ONLY_BLOCK_MAX_CHARS = browserOnlyBlock(['a', 'b', 'c'].map((c) => c.repeat(BROWSER_ONLY_HOST_MAX)), (t) => t).length
+
+export function buildPetrolWebSystemPrompt(sources: readonly WebSource[], today: string, sanitize: (text: string) => string, topics: readonly WebTopicQuestion[] = [], followUp = false, browserOnlyHosts: readonly string[] = []): string {
   const K = sources.length
   const context = sources.map((s) => `${webSourceHeader(s, sanitize)}\n${s.excerpt}`).join('\n\n---\n\n')
   const intro = followUp
@@ -68,5 +85,5 @@ SICHERHEIT:
 
 ${UNTRUSTED_BEGIN}
 ${context}
-${UNTRUSTED_END}${webTopicsBlock(topics, true)}`
+${UNTRUSTED_END}${browserOnlyBlock(browserOnlyHosts, sanitize)}${webTopicsBlock(topics, true)}`
 }

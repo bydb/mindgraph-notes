@@ -13,6 +13,7 @@ import { ModelCompatibilitySection, ActiveModelStatusBadge } from './ModelCompat
 import { OpenRouterSection } from './OpenRouterSection'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
+import { WebFetchStatsSection } from './WebFetchStatsSection'
 import { AgentShellSection } from './AgentShellSection'
 import { ComputerControlSection } from './ComputerControlSection'
 import { ImageGenerationSection } from './ImageGenerationSection'
@@ -1835,6 +1836,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                       <Row label={t('petrolChat.webCheckMarksLabel')} hint={t('petrolChat.webCheckMarksHint')}>
                         <Toggle checked={petrolWebCheckMarks} onChange={setPetrolWebCheckMarks} ariaLabel={t('petrolChat.webCheckMarksLabel')} />
                       </Row>
+                      <WebFetchStatsSection />
                     </Card>
                   )}
                   {agentShellModuleOn && (

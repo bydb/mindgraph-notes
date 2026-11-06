@@ -7,7 +7,10 @@
 // weil die Aufbereitung der Seiten im selben Thread läuft. Die Abhängigkeiten sind
 // injizierbar, damit Abbruch, Frist und Warteschlange ohne Netz prüfbar sind.
 
-import { fetchAndExtract, FetchExtractError, PageTooLargeError } from '../webResearch/fetchExtract'
+import { fetchAndExtract, FetchExtractError, PageTooLargeError, BrowserOnlyPageError } from '../webResearch/fetchExtract'
+import { noteFetchOutcome } from '../webResearch/fetchStats'
+
+const hostOfUrl = (url: string): string => { try { return new URL(url).hostname } catch { return '' } }
 import { webSearch } from '../webResearch/providers'
 import type { WebResearchConfig, WebSearchHit } from '../../shared/webResearch'
 import {
@@ -136,6 +139,7 @@ export async function gatherWebSources(
 /** Fehler eines Abrufs auf einen benennbaren Grund abbilden (Anzeige „Nicht abgerufen: …“). */
 export function fetchFailReason(err: unknown): WebFetchFailReason {
   if (err instanceof PageTooLargeError) return 'too-large'
+  if (err instanceof BrowserOnlyPageError) return 'browser-only'
   if (err instanceof FetchExtractError) return 'http'
   const msg = err instanceof Error ? err.message : String(err)
   if (/Inhaltstyp/i.test(msg)) return 'type'
@@ -155,6 +159,7 @@ export function defaultWebGatherDeps(config: WebResearchConfig, apiKey: string |
         const r = await fetchAndExtract(url, { signal, markTruncation: false, rejectTruncatedBody: true, ...(pageChars ? { maxChars: pageChars } : {}) })
         // Aufbereitung läuft synchron im Main-Thread — Dauer protokollieren (erst messen, F03).
         console.log(`[PetrolWeb] Seite aufbereitet in ${Date.now() - startedAt} ms (${r.originalChars} Zeichen)`)
+        noteFetchOutcome('chat', 'ok', hostOfUrl(url))
         return {
           ok: true,
           title: r.record.title,
@@ -165,7 +170,10 @@ export function defaultWebGatherDeps(config: WebResearchConfig, apiKey: string |
           truncated: r.truncated
         }
       } catch (err) {
-        return { ok: false, reason: fetchFailReason(err), status: err instanceof FetchExtractError ? err.status : undefined }
+        const reason = fetchFailReason(err)
+        // Abbruch durch den Nutzer ist kein Befund über die Website.
+        if (!signal.aborted) noteFetchOutcome('chat', reason, hostOfUrl(url))
+        return { ok: false, reason, status: err instanceof FetchExtractError ? err.status : undefined }
       }
     }
   }

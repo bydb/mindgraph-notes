@@ -229,11 +229,14 @@ export interface WebSource {
   titleFromPage?: boolean
 }
 
-export type WebFetchFailReason = 'timeout' | 'stopped' | 'empty' | 'too-large' | 'http' | 'type' | 'blocked' | 'error'
+/** `browser-only`: Inhalt entsteht erst im Browser (Händlersuche, Skript-Hülle), `shared/browserOnlyPage.ts`. */
+export type WebFetchFailReason = 'timeout' | 'stopped' | 'empty' | 'too-large' | 'http' | 'type' | 'blocked' | 'browser-only' | 'error'
 
 export interface WebFetchFailure {
   host: string
   reason: WebFetchFailReason
+  /** Nur bei `browser-only`: Adresse des Treffers für den Knopf „selbst öffnen“ (Suchtreffer, nur per Klick). */
+  url?: string
 }
 
 /** Treffer ohne Abruf — nur für den Fall K = 0, nie Quelle (F18). */
@@ -838,7 +841,7 @@ export function freezeWebSources(
   const seenFinal = new Set<string>()
   for (const e of ordered) {
     if (!e.outcome.ok) {
-      failures.push({ host: e.candidate.host, reason: e.outcome.reason })
+      failures.push({ host: e.candidate.host, reason: e.outcome.reason, ...(e.outcome.reason === 'browser-only' ? { url: e.candidate.url } : {}) })
       continue
     }
     // Zwei Treffer, die auf dieselbe Seite weiterleiten, sind EINE Quelle (Codex F36).
@@ -954,13 +957,17 @@ export interface SentenceExtra {
 // „Angaben“ seit F69: „Einen Europreis nennen die abgerufenen Angaben nicht“ galt sonst als Modellwissen.
 const GAP_SOURCE = /\b(?:seite|seiten|auszug|auszüge|auszügen|auszugen|quelle|quellen|angabe|angaben|page|pages|excerpt|excerpts|source|sources)\b/iu
 const GAP_ABSENCE = /\b(?:nicht|nichts|kein|keine|keinen|keinem|keiner|fehlt|fehlen|unklar|not|no|nothing|none|missing)\b/iu
+// Nicht lesbare Händlersuche (App-Hinweis browserOnlyBlock, 06.11.2026): „Die BDK-Website lädt ihre
+// Händlersuche erst im Browser, die App konnte sie nicht lesen.“ nennt eine Lücke, kein Modellwissen.
+// Bewusst eng: nur Browser-/Händlersuche-Wörter, das Fehlen muss trotzdem genannt sein.
+const GAP_BROWSER_ONLY = /(?:\b(?:erst|nur) im browser\b|\b(?:händlersuch|filialsuch|händlerfinder|filialfinder|händlerlist|standortlist|store-locator|store locator)\p{L}*)/iu
 // Gegenbehauptung neben der Lücke („… bestätigt 2027 nicht, 20 Euro sind falsch“, Codex F28).
 const GAP_COUNTER = /\b(?:aber|sondern|jedoch|allerdings|dennoch|trotzdem|falsch|stimmt|stimmen|richtig|korrekt|tatsächlich|but|however|instead|wrong|incorrect|correct|actually)\b/iu
 // Behauptendes Verb hinter einem Doppelpunkt („… nichts: 2027 steigt der Beitrag“, Codex F34).
 const GAP_CLAIM_VERB = /\b(?:ist|sind|war|waren|wird|werden|wurde|wurden|hat|haben|gilt|gelten|beträgt|betragen|kostet|liegt|liegen|steigt|steigen|sinkt|sinken|bestätigt|bestätigen|nennt|nennen|zeigt|zeigen|steht|stehen|gibt|geben|erlaubt|darf|dürfen|muss|müssen|kann|können|soll|sollen|is|are|was|were|will|has|have|costs|rises|falls|shows|states|confirms)\b/iu
 export function isGapStatement(sentence: string, question = ''): boolean {
   const plain = sentence.replace(/(?<!\\)\[\d{1,3}\]/g, ' ').trim()
-  if (plain.length > 220 || !GAP_SOURCE.test(plain) || !GAP_ABSENCE.test(plain) || GAP_COUNTER.test(plain)) return false
+  if (plain.length > 220 || !(GAP_SOURCE.test(plain) || GAP_BROWSER_ONLY.test(plain)) || !GAP_ABSENCE.test(plain) || GAP_COUNTER.test(plain)) return false
   // Hinter einem Doppelpunkt darf nur stehen, WAS fehlt („… nichts: der Betrag für 3.000 €“),
   // keine Aussage mit eigenem Verb und nichts, was mit einer Zahl beginnt (Codex F34).
   const colon = plain.indexOf(':')

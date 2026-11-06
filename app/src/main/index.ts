@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, type IpcMainInvokeEvent, webContents, dialog, shell, Notification, safeStorage, Menu, session, systemPreferences, clipboard, powerMonitor, protocol } from 'electron'
+import { clearFetchStats, getFetchStatsSummary } from './webResearch/fetchStats'
 import { IGNORED_DIRECTORY_NAMES } from '../shared/ignoredDirectories'
 import * as path from 'path'
 import * as fs from 'fs/promises'
@@ -174,7 +175,7 @@ import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombsto
 import { recordLlmRun, getLlmRuns, setTelemetryVault, collectRunTotals } from './llm/telemetry'
 import { buildPetrolChatSystemPrompt, sanitizeWebTopics, webTopicsBlock } from './llm/petrolChatPrompt'
 import { sanitizeChatContext } from './noteAgent/chatContext'
-import { buildPetrolWebSystemPrompt, prepareWebExcerpt } from './llm/petrolWebPrompt'
+import { buildPetrolWebSystemPrompt, prepareWebExcerpt, BROWSER_ONLY_BLOCK_MAX_CHARS } from './llm/petrolWebPrompt'
 import { gatherWebSources, defaultWebGatherDeps } from './llm/petrolWebChat'
 import { runDeepResearch, type DeepResult } from './llm/petrolDeepSearch'
 import { LOOP_LIMITS, runLoopResearch } from './llm/petrolWebLoop'
@@ -6900,6 +6901,20 @@ function hookSnapshotDrop(sender: { id: number; once: (event: 'destroyed', liste
   })
 }
 
+// Zählung der Webabrufe (shared/webFetchStats.ts): nur lesen und löschen, schreiben tut nur der Main.
+// Absender prüfen wie bei den übrigen Webrecherche-Handlern (Codex F21), fail-closed.
+ipcMain.handle('web-fetch-stats-get', (event) => (isTrustedSender(event) ? getFetchStatsSummary() : null))
+ipcMain.handle('web-fetch-stats-clear', async (event) => {
+  if (!isTrustedSender(event)) return false
+  try {
+    await clearFetchStats()
+    return true
+  } catch (err) {
+    console.warn('[WebFetchStats] Löschen fehlgeschlagen:', err instanceof Error ? err.message : err)
+    return false
+  }
+})
+
 ipcMain.handle('petrol-chat-snapshots-drop', (event, scopeId: unknown) => {
   if (!isTrustedSender(event)) return false
   hookSnapshotDrop(event.sender)
@@ -7086,7 +7101,8 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
           systemChars: buildPetrolWebSystemPrompt([], today, sanitizeUntrustedText, webTopics).length + 200 * n,
           questionChars: reservedQuestion,
           history,
-          total: charBudget,
+          // Platz für den Hinweis auf nur im Browser lesbare Seiten (Codex F20).
+          total: charBudget - BROWSER_ONLY_BLOCK_MAX_CHARS,
           sourcesMin: n * DEEP_LIMITS.minExcerpt,
           sourcesMax: wide ? wide.sourcesMax : Math.max(WEB_CHAT_SOURCES_MAX, n * 3000)
         },
@@ -7280,7 +7296,7 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
       // er über der Grenze liegt, die Quellen um genau den Überhang kürzer einfrieren (F17).
       const frozen = freezeWebSourcesToFit(
         gathered.entries,
-        { systemChars, questionChars: question.length, history, total: charBudget, ...(wide ? { sourcesMax: wide.sourcesMax } : {}) },
+        { systemChars, questionChars: question.length, history, total: charBudget - BROWSER_ONLY_BLOCK_MAX_CHARS, ...(wide ? { sourcesMax: wide.sourcesMax } : {}) },
         prepare,
         // Die erste Antwort lässt Platz für eine Nachfrage auf dieselben Seiten (kleine Fenster).
         f => measureWithFollowUpRoom({ sources: f.sources, history: f.history, questionChars: question.length, topics: webTopics, today, sanitize: sanitizeUntrustedText }),
@@ -7311,7 +7327,9 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
     // Quellen gehen VOR der Modellphase an die Anzeige — wird gestoppt, bleibt sichtbar,
     // woraus das Bruchstück stammt. Bei einer Nachfrage sind das die alten Auszüge, nicht neue Abrufe.
     send('petrol-chat-progress', { phase: 'model', sources, failures, notFetched })
-    const systemPrompt = buildPetrolWebSystemPrompt(sources, today, sanitizeUntrustedText, topicsForPrompt, followUp)
+    // Nicht lesbare Händlersuchen benennen (shared/browserOnlyPage.ts); bei einer Nachfrage gibt es keine neuen Abrufe.
+    const browserOnlyHosts = followUp ? [] : failures.filter(f => f.reason === 'browser-only').map(f => f.host)
+    const systemPrompt = buildPetrolWebSystemPrompt(sources, today, sanitizeUntrustedText, topicsForPrompt, followUp, browserOnlyHosts)
     const messages = [
       { role: 'system' as const, content: systemPrompt },
       ...historyForModel,

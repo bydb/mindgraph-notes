@@ -23586,6 +23586,9 @@ body.presentation-mode *::after {
 .petrol-web-appnote { color: var(--text-secondary); font-size: 13px; }
 .petrol-web-block { display: flex; flex-direction: column; gap: 8px; padding: 2px 14px 10px; }
 .petrol-web-muted { font-size: 11.5px; line-height: 1.45; color: var(--text-secondary); }
+/* Nur im Browser lesbare Seiten: sichtbar unter der Antwort, ein Klick zur fehlenden Liste. */
+.petrol-web-browser-only { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.petrol-web-browser-only .agent-card-link-btn { font-size: 12px; }
 .petrol-web-deep { display: flex; flex-direction: column; gap: 2px; }
 .petrol-web-deep-hits > summary { cursor: pointer; list-style-position: inside; }
 .petrol-web-deep-hits ol { margin: 4px 0 2px; padding-left: 20px; display: flex; flex-direction: column; gap: 1px; }

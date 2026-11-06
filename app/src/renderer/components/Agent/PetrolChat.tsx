@@ -32,7 +32,7 @@ import { isQueryTooLong, isWebResearchConfigComplete, normalizeQuery, WEB_QUERY_
 import { applyPreviousTopic, asksForDeeperSearch, asksForMorePages, offerPreviousTopic, previousWebQuestion } from '../../../shared/webChatDeep'
 import { followUpQuery, isAcknowledgement, lastSentWebQuery, looksConversational, offerSearchWords, withWebFootnotes, WEB_CHAT_QUERY_SOFT_MAX, type WebChatProvenance } from '../../../shared/webChat'
 import { webTopicQuestions } from '../../utils/chatHistory'
-import { WebAnswerText, WebCheck, WebDeepLine, WebMarkLegend, WebProvenanceLine, WebSkippedLine, WebSourceList, WebSourcesFold, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
+import { WebAnswerText, WebBrowserOnlyLinks, WebCheck, WebDeepLine, WebMarkLegend, WebProvenanceLine, WebSkippedLine, WebSourceList, WebSourcesFold, WebUnfetchedHits, webFlagLabel } from './PetrolWebAnswer'
 import { chatModelsOnly } from '../../../shared/chatModels'
 import { CHAT_IMAGE_MAX_PER_MESSAGE, type ChatImage } from '../../../shared/chatImages'
 import { CHAT_IMAGE_CLOUD_CONSENT_VERSION } from '../../../shared/chatImageGate'
@@ -757,6 +757,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     </div>
                     {(turn.answer.web?.snapshotGone || turn.question?.wasFollowUp || (turn.question?.followUpSnapshotId && goneSnapshots.includes(turn.question.followUpSnapshotId))) && <div className="petrol-web-muted">{t('petrolChat.followUpGoneHint')}</div>}
                     {!!turn.question?.imagesMissing?.length && <div className="petrol-web-muted">{t('petrolChat.retryImageMissing')}</div>}
+                    {/* Auch wenn das Modell scheitert: eine erkannte, nicht lesbare Händlersuche bleibt anklickbar (Codex F24). */}
+                    {turn.answer.web?.failures?.some(f => f.reason === 'browser-only') && <div className="petrol-web-block"><WebBrowserOnlyLinks failures={turn.answer.web.failures} /></div>}
                     {turn.answer.web?.deep && <div className="petrol-web-block"><WebDeepLine deep={turn.answer.web.deep} /></div>}
                     {turn.answer.web?.basis?.kind === 'snapshot' && (
                       <div className="petrol-web-muted">{t('petrolChat.notRefetched', { date: fetchedSpan(turn.answer.web.sources) })}</div>
@@ -766,6 +768,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                 ) : turn.answer?.web?.kind === 'nothing-readable' ? (
                   <>
                   <div className="petrol-web-block">
+                    <WebBrowserOnlyLinks failures={turn.answer.web.failures} />
                     <WebUnfetchedHits hits={turn.answer.web.unfetchedHits ?? []} failures={turn.answer.web.failures} />
                     <WebDeepLine deep={turn.answer.web.deep} />
                     <WebSkippedLine skipped={turn.answer.web.skipped} />
@@ -777,6 +780,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                   <>
                     <WebAnswerText answer={turn.answer.content} report={turn.answer.web?.report} extras={turn.answer.web?.extras} anchor={`petrol-src-${turn.answer.at}`} marks={checkMarks} />
                     <div className="petrol-web-block">
+                      <WebBrowserOnlyLinks failures={turn.answer.web?.failures ?? turn.answer.webPartial?.failures} />
                       {checkMarks && turn.answer.web?.report && <WebMarkLegend report={turn.answer.web.report} extras={turn.answer.web.extras} />}
                       {checkMarks && (turn.answer.web?.report
                         ? <WebCheck answer={turn.answer.content} report={turn.answer.web.report} extras={turn.answer.web.extras} />

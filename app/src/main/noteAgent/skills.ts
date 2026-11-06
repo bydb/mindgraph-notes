@@ -30,7 +30,9 @@ import { buildExcalidrawMindmap, MindmapInputError, MINDMAP_LIMITS, resolveWikil
 import { buildPptxFromTemplate, inspectPptxTemplate, describePptxTemplate, PptxInputError, PPTX_LIMITS, LAYOUT_KINDS, type PptxSlideInput, type PptxSource } from '../../shared/pptxTemplate'
 import { resolveInVaultSafe } from '../telegram/agent/tools/vaultPaths'
 import { webSearch } from '../webResearch/providers'
-import { fetchAndExtract, FetchExtractError } from '../webResearch/fetchExtract'
+import { fetchAndExtract, FetchExtractError, BrowserOnlyPageError } from '../webResearch/fetchExtract'
+import { noteFetchOutcome } from '../webResearch/fetchStats'
+import { fetchFailReason } from '../llm/petrolWebChat'
 import {
   normalizeWebUrl, normalizeQuery, isQueryTooLong, isSearchAllowedInPhase, mergeDeterministicSources, sanitizeSourceTitle,
   mergeDeterministicSourcesHtml, deterministicSourcesSheet, unfetchedUrlsInCells, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
@@ -1779,6 +1781,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       try {
         const { record, markdown } = await fetchAndExtract(normalized, { signal: ctx.run.abort.signal })
         web.fetches.push(record)
+        noteFetchOutcome('agent', 'ok', hostOf(record.finalUrl))
         web.phase = 'fetch' // erster erfolgreicher Abruf beendet die Such-Phase
         ctx.run.sources.add(record.finalUrl)
         return {
@@ -1789,7 +1792,8 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       } catch (e) {
         // Bei HTTP-Fehlern die ECHTE finale URL + Redirect-Kette in den Fehlversuch-Record
         // übernehmen (Codex-Zusatzpunkt A) — sonst geht die tatsächlich besuchte URL verloren.
-        const info = e instanceof FetchExtractError ? e : undefined
+        if (!ctx.run.abort.signal.aborted) noteFetchOutcome('agent', fetchFailReason(e), hostOf(normalized))
+        const info = e instanceof FetchExtractError || e instanceof BrowserOnlyPageError ? e : undefined
         web.fetches.push({
           requestedUrl: normalized,
           finalUrl: info?.finalUrl || normalized,
@@ -1798,6 +1802,10 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           fetchedAt: new Date().toISOString(),
           status: 'failed'
         })
+        // Händlersuche/Skript-Hülle: das Modell soll die Lücke benennen, nicht „gibt es nicht“ schreiben (06.11.2026).
+        if (e instanceof BrowserOnlyPageError) {
+          return err(`${e.kind === 'locator' ? 'Diese Händler-/Filialsuche lädt ihre Einträge' : 'Diese Seite lädt ihren Inhalt'} erst im Browser (Skripte), die App kann sie nicht lesen: ${e.finalUrl}. Schreibe im Ergebnis, dass die Liste dort steht, hier aber nicht gelesen werden konnte, und nenne die Adresse zum Selbstöffnen. Behaupte nicht, es gebe keine Einträge, und erfinde keine. Probiere sonst andere Treffer (z. B. Händlerseiten, Branchenverzeichnisse).`)
+        }
         return err(`Seite konnte nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`)
       }
     }

@@ -89,3 +89,11 @@ describe('gatherWebSources: übersprungene Treffer (Sperrliste)', () => {
     expect(r.skipped.length).toBe(3)
   })
 })
+
+describe('fetchFailReason: nur im Browser lesbare Seite', () => {
+  it('BrowserOnlyPageError wird zu browser-only', async () => {
+    const { fetchFailReason } = await import('./petrolWebChat')
+    const { BrowserOnlyPageError } = await import('../webResearch/fetchExtract')
+    expect(fetchFailReason(new BrowserOnlyPageError('locator', 'https://bdkparfums.com/en/pages/stores', ['https://bdkparfums.com/en/pages/stores']))).toBe('browser-only')
+  })
+})
