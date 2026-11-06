@@ -158,10 +158,10 @@ export class AntaresService {
   }
 
   /** Initialisiert den serverseitigen Filter-State für die nachfolgende /search-Abfrage. */
-  private async primeSearchMask(table: string, id: string, extraBody: Record<string, string> = {}): Promise<void> {
+  private async primeSearchMask(table: string, id: string, extraBody: Record<string, string> = {}): Promise<boolean> {
     const auth = await this.authenticate()
     const url = `${this.baseUrl}/result?template=partplain&id=${encodeURIComponent(id)}&type=${encodeURIComponent(table)}&pid=${auth.pid}`
-    await this.fetchImpl(url, {
+    const r = await this.fetchImpl(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -171,24 +171,32 @@ export class AntaresService {
         'Referer': `${this.baseUrl}/`
       },
       body: new URLSearchParams({ autosearch: 'true', ...extraBody }).toString()
-    }).catch(() => {})  // best effort
+    }).catch(() => null)  // best effort — Aufrufer prüft das Ergebnis
+    if (r && !r.ok) console.warn(`[antares] primeSearchMask ${table}/${id} → HTTP ${r.status}`)
+    return !!r && r.ok
   }
 
   // ---- Domain methods ----
 
   /** Offene Registrierungen — Zweischritt-Pattern der Antares-UI (primeSearchMask + /search). */
+  //
+  // Greift der serverseitige Filter nicht (Prime fehlgeschlagen / Session-State fehlt), liefert
+  // Antares den KOMPLETTEN Entleiherbestand (>12 000) und ignoriert dabei auch die Pagination.
+  // Erkennungsmerkmal: mehr Zeilen als angefragt. Dann einmal neu primen; klappt das nicht,
+  // Fehler werfen statt den Gesamtbestand als "offene Registrierungen" anzuzeigen.
   async listOffeneRegistrierungen(): Promise<AntaresEntleiher[]> {
-    try {
+    const ROWS = 50
+    for (let attempt = 1; attempt <= 2; attempt++) {
       await this.primeSearchMask('entleiher', '2')
       const data = await this.post<{ rows?: AntaresEntleiher[]; total?: number }>(
         `/search?table=entleiher&id=2&context=${encodeURIComponent(this.context)}`,
-        { page: '1', rows: '50' }
+        { page: '1', rows: String(ROWS) }
       )
-      return data.rows || []
-    } catch (err) {
-      console.warn('[antares] listOffeneRegistrierungen failed:', err instanceof Error ? err.message : err)
-      return []
+      const rows = data.rows || []
+      if (!isUnfilteredResult(rows.length, data.total, ROWS)) return rows
+      console.warn(`[antares] listOffeneRegistrierungen: Filter nicht angewendet (rows=${rows.length}, total=${data.total}), Versuch ${attempt}`)
     }
+    throw new Error('Antares: Filter für offene Registrierungen wurde nicht angewendet (Server lieferte alle Entleiher)')
   }
 
   /** Aufgaben-Counts direkt aus dem Antares-Dashboard-HTML. */
@@ -327,4 +335,12 @@ export class AntaresService {
       return []
     }
   }
+}
+
+/**
+ * Antares ignoriert bei fehlendem Filter-State sowohl Filter als auch Pagination und liefert
+ * den Gesamtbestand. Mehr Zeilen als angefragt ist daher ein sicheres Zeichen dafür.
+ */
+export function isUnfilteredResult(rowCount: number, total: number | undefined, requested: number): boolean {
+  return rowCount > requested || (total !== undefined && Number(total) > 1000)
 }
