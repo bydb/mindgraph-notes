@@ -15,6 +15,7 @@ import {
   deterministicSourcesSheet,
   unfetchedUrlsInCells,
   mergeDeterministicSourcesHtml,
+  browserOnlyFetches,
   sanitizeSourceTitle,
   isWebResearchConfigComplete,
   WEB_QUERY_MAX_CHARS,
@@ -293,6 +294,48 @@ describe('isWebResearchConfigComplete', () => {
 
   it('undefined → false', () => {
     expect(isWebResearchConfigComplete(undefined)).toBe(false)
+  })
+})
+
+describe('Nur im Browser lesbare Seiten in Ergebnissen (Codex F18)', () => {
+  const ok = (url: string) => ({ requestedUrl: url, finalUrl: url, redirectChain: [url], title: 'Gelesen', fetchedAt: '2026-11-06T10:00:00.000Z', status: 'ok' as const })
+  const bo = (url: string) => ({ requestedUrl: url, finalUrl: url, redirectChain: [url], title: '', fetchedAt: '2026-11-06T10:00:00.000Z', status: 'failed' as const, browserOnly: 'locator' as const })
+  const fail = (url: string) => ({ requestedUrl: url, finalUrl: url, redirectChain: [url], title: '', fetchedAt: '2026-11-06T10:00:00.000Z', status: 'failed' as const })
+
+  it('Markdown: getrennt unter „Nicht gelesen“, nie in der Quellenliste; gewöhnliche Fehlschläge bleiben draußen', () => {
+    const md = mergeDeterministicSources('Text.', [ok('https://a.de/1'), bo('https://www.bdkparfums.com/stores'), bo('https://www.bdkparfums.com/stores'), fail('https://c.de/x')])
+    expect(md).toContain('- [Gelesen](https://a.de/1) — abgerufen am 2026-11-06\n\nNicht gelesen (lädt ihre Inhalte erst im Browser, hier nicht gelesen — bitte selbst öffnen):\n\n- [bdkparfums.com](https://www.bdkparfums.com/stores)')
+    expect(md.match(/bdkparfums\.com\/stores/g)).toHaveLength(1)
+    expect(md).not.toContain('c.de/x')
+  })
+
+  it('Markdown: nur nicht lesbare Seiten ergeben trotzdem den Abschnitt', () => {
+    const md = mergeDeterministicSources('Text.', [bo('https://x.de/stores')])
+    expect(md).toContain('## Quellen\n\nNicht gelesen (')
+  })
+
+  it('eine Seite, die doch gelesen wurde, steht nicht unter „Nicht gelesen“', () => {
+    expect(browserOnlyFetches([bo('https://x.de/stores'), ok('https://x.de/stores')])).toEqual([])
+  })
+
+  it('HTML: eigener Absatz mit Liste, escaped; ohne gelesene Quelle keine leere <ol>', () => {
+    const html = mergeDeterministicSourcesHtml('<p>x</p>', [bo('https://x.de/stores?a=1&b=2')])
+    expect(html).toContain('<p>Nicht gelesen (lädt ihre Inhalte erst im Browser, hier nicht gelesen — bitte selbst öffnen):</p>')
+    expect(html).toContain('<a href="https://x.de/stores?a=1&amp;b=2">x.de</a>')
+    expect(html).not.toContain('<ol>')
+  })
+
+  it('Excel: Zeile mit Vermerk, Hinweis-Spalte; ohne gelesene Seite bleibt der Warnhinweis oben', () => {
+    const sheet = deterministicSourcesSheet([ok('https://a.de/1'), bo('https://x.de/stores')])
+    expect(sheet[0]).toEqual(['Titel', 'URL', 'Abgerufen am', 'Hinweis'])
+    expect(sheet[2]).toEqual(['x.de', 'https://x.de/stores', '', 'Nicht gelesen: lädt ihre Inhalte erst im Browser, hier nicht gelesen — bitte selbst öffnen'])
+    const only = deterministicSourcesSheet([bo('https://x.de/stores')])
+    expect(only[0]).toEqual(['Hinweis'])
+    expect(only[1][0]).toContain('keine Seite erfolgreich abgerufen')
+  })
+
+  it('Tabellenlinks auf nicht lesbare Seiten bleiben verboten (B2-Vertrag)', () => {
+    expect(unfetchedUrlsInCells([['https://x.de/stores']], [bo('https://x.de/stores')])).toEqual(['https://x.de/stores'])
   })
 })
 

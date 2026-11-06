@@ -112,6 +112,31 @@ export interface WebFetchRecord {
    * Bleibt Quelle, wird aber überall als „nur Seitenanfang gelesen“ ausgewiesen.
    */
   partial?: true
+  /**
+   * Nur bei `status: 'failed'`: die Seite lädt ihren Inhalt erst im Browser (Händlersuche oder
+   * Skript-Hülle, shared/browserOnlyPage.ts). Die App führt sie in Ergebnissen getrennt von den
+   * Quellen unter „Nicht gelesen“ auf (Codex F18) — nie als Beleg.
+   */
+  browserOnly?: 'shell' | 'locator'
+}
+
+/** Vermerk für Seiten, die nur im Browser lesbar sind (F18). */
+export function browserOnlyNote(en = false): string {
+  return en ? 'loads its content only in a browser, not read here — please open it yourself' : 'lädt ihre Inhalte erst im Browser, hier nicht gelesen — bitte selbst öffnen'
+}
+
+/**
+ * Nur im Browser lesbare Seiten eines Laufs, dedupliziert; eine Seite, die (z. B. über eine
+ * andere Adresse) doch gelesen wurde, fällt heraus.
+ */
+export function browserOnlyFetches(fetches: readonly WebFetchRecord[]): WebFetchRecord[] {
+  const read = new Set(fetches.filter(f => f.status === 'ok').map(f => f.finalUrl))
+  const seen = new Set<string>()
+  return fetches.filter(f => f.status === 'failed' && !!f.browserOnly && /^https?:\/\//i.test(f.finalUrl) && !read.has(f.finalUrl) && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
+}
+
+function hostLabel(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
 }
 
 /** Vermerk für teilweise gelesene Seiten in Quellenblöcken (F17). */
@@ -457,12 +482,17 @@ export function mergeDeterministicSources(markdown: string, fetches: WebFetchRec
   const base = markdown.replace(/\n+##\s+Quellen[\s\S]*$/i, '').trimEnd()
   const seen = new Set<string>()
   const ok = fetches.filter(f => f.status === 'ok' && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
-  if (!ok.length) return base + '\n'
+  const unread = browserOnlyFetches(fetches)
+  if (!ok.length && !unread.length) return base + '\n'
   const lines = ok.map(f => {
     const text = sanitizeSourceTitle(f.title) || f.finalUrl
     return `- [${text}](${f.finalUrl}) — abgerufen am ${f.fetchedAt.slice(0, 10)}${f.partial ? ` — ${partialSourceNote()}` : ''}`
   })
-  return `${base}\n\n## Quellen\n\n${lines.join('\n')}\n`
+  // Nicht lesbare Seiten getrennt von den Quellen, mit eigenem Satz davor (F18): sie belegen nichts.
+  const unreadPart = unread.length
+    ? `${lines.length ? '\n\n' : ''}Nicht gelesen (${browserOnlyNote()}):\n\n${unread.map(f => `- [${hostLabel(f.finalUrl)}](${f.finalUrl})`).join('\n')}`
+    : ''
+  return `${base}\n\n## Quellen\n\n${lines.join('\n')}${unreadPart}\n`
 }
 
 /**
@@ -473,10 +503,17 @@ export function mergeDeterministicSources(markdown: string, fetches: WebFetchRec
 export function deterministicSourcesSheet(fetches: WebFetchRecord[]): string[][] {
   const seen = new Set<string>()
   const ok = fetches.filter(f => f.status === 'ok' && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
-  if (!ok.length) return [['Hinweis'], ['In diesem Lauf wurde keine Seite erfolgreich abgerufen. Die Werte der Tabelle sind nicht durch Quellen belegt.']]
-  // Spalte „Hinweis“ nur, wenn eine Seite nur teilweise gelesen wurde (F17) — sonst bleibt das Blatt wie bisher.
-  if (!ok.some(f => f.partial)) return [['Titel', 'URL', 'Abgerufen am'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10)])]
-  return [['Titel', 'URL', 'Abgerufen am', 'Hinweis'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10), f.partial ? partialSourceNote() : ''])]
+  const unread = browserOnlyFetches(fetches)
+  const noneRead: string[][] = [['Hinweis'], ['In diesem Lauf wurde keine Seite erfolgreich abgerufen. Die Werte der Tabelle sind nicht durch Quellen belegt.']]
+  if (!ok.length && !unread.length) return noneRead
+  // Spalte „Hinweis“ nur, wenn eine Seite nur teilweise gelesen wurde (F17) oder nicht lesbar war (F18).
+  if (!unread.length && !ok.some(f => f.partial)) return [['Titel', 'URL', 'Abgerufen am'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10)])]
+  const rows = [
+    ['Titel', 'URL', 'Abgerufen am', 'Hinweis'],
+    ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10), f.partial ? partialSourceNote() : '']),
+    ...unread.map(f => [hostLabel(f.finalUrl), f.finalUrl, '', `Nicht gelesen: ${browserOnlyNote()}`])
+  ]
+  return ok.length ? rows : [...noneRead, [], ...rows]
 }
 
 /**
@@ -567,7 +604,8 @@ export function mergeDeterministicSourcesHtml(bodyHtml: string, fetches: WebFetc
   const base = stripModelSourcesSection(bodyHtml).trimEnd()
   const seen = new Set<string>()
   const ok = fetches.filter(f => f.status === 'ok' && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
-  if (!ok.length) return base + '\n'
+  const unread = browserOnlyFetches(fetches)
+  if (!ok.length && !unread.length) return base + '\n'
   const items = ok.map(f => {
     const text = escapeHtmlText(sanitizeSourceTitle(f.title) || f.finalUrl)
     const retrieved = `${en ? 'retrieved on' : 'abgerufen am'} ${escapeHtmlText(f.fetchedAt.slice(0, 10))}${f.partial ? ` — ${escapeHtmlText(partialSourceNote(en))}` : ''}`
@@ -577,7 +615,12 @@ export function mergeDeterministicSourcesHtml(bodyHtml: string, fetches: WebFetc
       : text
     return `    <li>${link} — ${retrieved}</li>`
   })
-  return `${base}\n\n<section class="references">\n  <h2>${heading}</h2>\n  <ol>\n${items.join('\n')}\n  </ol>\n</section>\n`
+  // Nicht lesbare Seiten getrennt von der Quellenliste (F18); verlinkt sind nur http(s)-Adressen (browserOnlyFetches).
+  const unreadPart = unread.length
+    ? `\n  <p>${escapeHtmlText(en ? 'Not read' : 'Nicht gelesen')} (${escapeHtmlText(browserOnlyNote(en))}):</p>\n  <ul>\n${unread.map(f => `    <li><a href="${escapeHtmlText(f.finalUrl)}">${escapeHtmlText(hostLabel(f.finalUrl))}</a></li>`).join('\n')}\n  </ul>`
+    : ''
+  const list = items.length ? `\n  <ol>\n${items.join('\n')}\n  </ol>` : ''
+  return `${base}\n\n<section class="references">\n  <h2>${heading}</h2>${list}${unreadPart}\n</section>\n`
 }
 
 /** Ist die Provider-Konfiguration einsatzbereit? (Key-Existenz prüft der Main separat.) */

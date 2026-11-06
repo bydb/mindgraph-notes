@@ -9,7 +9,7 @@ vi.mock('../webResearch/fetchExtract', async (orig) => {
   return { ...actual, fetchAndExtract: vi.fn() }
 })
 
-import { fetchAndExtract, FetchExtractError } from '../webResearch/fetchExtract'
+import { fetchAndExtract, FetchExtractError, BrowserOnlyPageError } from '../webResearch/fetchExtract'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import type { AgentRun, WebRunState } from './runRegistry'
 
@@ -87,5 +87,25 @@ describe('web_fetch — an der Größengrenze gekappte Seite (Codex F17)', () =>
     const res = await runFetch(web)
     expect(web.fetches[0].partial).toBeUndefined()
     expect((res as { content: string }).content.startsWith('WEBSEITE (EXTERNE DATEN')).toBe(true)
+  })
+})
+
+describe('web_fetch — nur im Browser lesbare Seite (Codex F18)', () => {
+  it('Fehlversuch-Record trägt browserOnly, Rückmeldung verbietet die Adresse als Quelle', async () => {
+    mockFetch.mockImplementation(async () => {
+      throw new BrowserOnlyPageError('locator', 'https://shop.example/stores', ['https://start.example/', 'https://shop.example/stores'])
+    })
+    const web = makeWeb()
+    const res = await runFetch(web)
+    expect(res.ok).toBe(false)
+    expect(web.fetches[0]).toMatchObject({ status: 'failed', finalUrl: 'https://shop.example/stores', browserOnly: 'locator' })
+    expect((res as { content: string }).content).toContain('setze die Adresse nicht als Quelle oder Tabellenlink')
+  })
+
+  it('gewöhnlicher Fehlschlag bekommt kein browserOnly', async () => {
+    mockFetch.mockImplementation(async () => { throw new Error('Zeitüberschreitung') })
+    const web = makeWeb()
+    await runFetch(web)
+    expect(web.fetches[0].browserOnly).toBeUndefined()
   })
 })

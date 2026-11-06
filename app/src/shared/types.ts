@@ -638,7 +638,7 @@ export interface NoteAgentDoneEvent {
   // Webrecherche-Provenienz (nur bei aktivierter Webrecherche) — Suchen + Seitenabrufe.
   web?: {
     queries: Array<{ query: string; status: string }>;
-    fetches: Array<{ url: string; title: string; status: string; partial?: boolean }>;
+    fetches: Array<{ url: string; title: string; status: string; partial?: boolean; browserOnly?: boolean }>;
     searchCount: number;
     fetchCount: number;
   };
