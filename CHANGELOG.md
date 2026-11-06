@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.3] - 2026-11-06
+
+**Das Antares-Widget zeigt unter „offene Registrierungen“ wieder nur die Personen, die tatsächlich auf ihre Freischaltung warten.** Bisher stand dort die komplette Entleiherliste des Medienzentrums mit mehreren tausend Einträgen, obwohl die Kachel darüber die richtige Zahl anzeigte.
+
+### Hintergrund
+
+- **Auslöser:** MindGraph hat die Liste ohne den Filter abgefragt, den Antares selbst für „offene Registrierungen“ verwendet. Antares lieferte darauf alle Entleiher.
+- **Jetzt:** MindGraph übernimmt den Filter direkt vom Antares-Dashboard, so wie die Antares-Oberfläche selbst. Gibt es keine offenen Registrierungen, bleibt die Liste leer.
+- **Absicherung:** Liefert Antares trotzdem einmal die ganze Entleiherliste, erscheint eine Fehlermeldung statt der falschen Liste.
+- **Außerdem:** Das Widget fragt Antares jetzt nacheinander statt gleichzeitig ab und lädt nicht mehr doppelt, wenn mehrere Stellen gleichzeitig aktualisieren.
+
 ## [1.2.2] - 2026-11-05
 
 **Gespräche im Chat bleiben jetzt erhalten und stehen links in der Seitenleiste.** Ein geschlossener Tab oder ein Neustart verliert nichts mehr: Jedes Gespräch lässt sich wieder öffnen und weiterführen, auch mit seinen Bildern. Gespräche lassen sich anheften, archivieren, umbenennen und durchsuchen.
