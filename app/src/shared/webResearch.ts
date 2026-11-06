@@ -106,6 +106,17 @@ export interface WebFetchRecord {
   title: string
   fetchedAt: string        // ISO-Zeitstempel
   status: 'ok' | 'failed'
+  /**
+   * Seite war größer als WEB_FETCH_MAX_BYTES und wurde an der Grenze abgeschnitten: gelesen ist
+   * nur ihr Anfang (Codex F17, 06.11.2026 — ikea.com: Öffnungszeiten erst ab Byte 1,69 Mio.).
+   * Bleibt Quelle, wird aber überall als „nur Seitenanfang gelesen“ ausgewiesen.
+   */
+  partial?: true
+}
+
+/** Vermerk für teilweise gelesene Seiten in Quellenblöcken (F17). */
+export function partialSourceNote(en = false): string {
+  return en ? 'only the beginning was read (page too large)' : 'nur Seitenanfang gelesen (Seite zu groß)'
 }
 
 // Provider-Konfiguration (Main-seitig gespeichert, 0d) — der Renderer liefert sie NIE
@@ -449,7 +460,7 @@ export function mergeDeterministicSources(markdown: string, fetches: WebFetchRec
   if (!ok.length) return base + '\n'
   const lines = ok.map(f => {
     const text = sanitizeSourceTitle(f.title) || f.finalUrl
-    return `- [${text}](${f.finalUrl}) — abgerufen am ${f.fetchedAt.slice(0, 10)}`
+    return `- [${text}](${f.finalUrl}) — abgerufen am ${f.fetchedAt.slice(0, 10)}${f.partial ? ` — ${partialSourceNote()}` : ''}`
   })
   return `${base}\n\n## Quellen\n\n${lines.join('\n')}\n`
 }
@@ -463,7 +474,9 @@ export function deterministicSourcesSheet(fetches: WebFetchRecord[]): string[][]
   const seen = new Set<string>()
   const ok = fetches.filter(f => f.status === 'ok' && !seen.has(f.finalUrl) && (seen.add(f.finalUrl), true))
   if (!ok.length) return [['Hinweis'], ['In diesem Lauf wurde keine Seite erfolgreich abgerufen. Die Werte der Tabelle sind nicht durch Quellen belegt.']]
-  return [['Titel', 'URL', 'Abgerufen am'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10)])]
+  // Spalte „Hinweis“ nur, wenn eine Seite nur teilweise gelesen wurde (F17) — sonst bleibt das Blatt wie bisher.
+  if (!ok.some(f => f.partial)) return [['Titel', 'URL', 'Abgerufen am'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10)])]
+  return [['Titel', 'URL', 'Abgerufen am', 'Hinweis'], ...ok.map(f => [sanitizeSourceTitle(f.title) || f.finalUrl, f.finalUrl, f.fetchedAt.slice(0, 10), f.partial ? partialSourceNote() : ''])]
 }
 
 /**
@@ -557,7 +570,7 @@ export function mergeDeterministicSourcesHtml(bodyHtml: string, fetches: WebFetc
   if (!ok.length) return base + '\n'
   const items = ok.map(f => {
     const text = escapeHtmlText(sanitizeSourceTitle(f.title) || f.finalUrl)
-    const retrieved = `${en ? 'retrieved on' : 'abgerufen am'} ${escapeHtmlText(f.fetchedAt.slice(0, 10))}`
+    const retrieved = `${en ? 'retrieved on' : 'abgerufen am'} ${escapeHtmlText(f.fetchedAt.slice(0, 10))}${f.partial ? ` — ${escapeHtmlText(partialSourceNote(en))}` : ''}`
     // Fail-closed: nur http(s) wird verlinkt — alles andere bleibt reiner Text.
     const link = /^https?:\/\//i.test(f.finalUrl)
       ? `<a href="${escapeHtmlText(f.finalUrl)}">${text}</a>`

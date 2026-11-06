@@ -340,7 +340,7 @@ Neuer Befund, nicht im Plan: Bei IKEA verliert defuddle Inhalt, der im HTML steh
 
 - F15: [ADRESSIERT] — `locator` nur noch mit Händler-Widget im HTML (Text ≤ 2 000 Zeichen) oder mit Händlerpfad UND praktisch leerer Seite (< 20 Zeichen Text und sichtbar). Gegenbeispiele (Filialliste ohne PLZ unter `/stores`, ein Laden mit einer Adresse, Widget mit langer Liste) als Tests. Folge an den Messseiten: Apple wird nicht mehr gemeldet, BDK, Barrois, dm weiter.
 - F16: [ADRESSIERT] — `shell` nur bei praktisch leerer Seite (< 20 Zeichen). Kurze Meldung und Preisangabe mit Analyseskript als Negativtests.
-- F17: [OFFEN, eigene Aufgabe] — gekappte Seiten im Agenten als vollständige Quelle; bestand schon vor dieser Änderung.
+- F17: [ADRESSIERT, Nachtrag nach PR #99] — gekappte Seite bleibt Quelle (Ablehnen würde nützliche Teilseiten wie den Staatstheater-Spielplan wegwerfen), aber `WebFetchRecord.partial`; das Modell bekommt einen App-Hinweis VOR dem fremden Text („nur Anfang, nicht als vollständig behandeln“); Markdown-/HTML-Quellenblock, Excel-Quellenblatt (Spalte „Hinweis“ nur bei Bedarf), PowerPoint-Quellenfolie und Ergebniskarte vermerken „nur Seitenanfang gelesen“. Tests in `webResearch.test.ts`, `pptxTemplate.test.ts`, `webFetchRecord.test.ts`. Chat unverändert (lehnt gekappte Seiten weiter als „zu groß“ ab).
 - F18: [OFFEN, eigene Aufgabe] — Grund im Agent-Record, Ergebniskarte, Artefakt-Abschnitt „nicht lesbar“, XLSX-Linkvertrag.
 - F19: [OFFEN, eigene Aufgabe] — Browser-only-Status im Snapshot für Nachfragen.
 - F20: [ADRESSIERT] — Hosts auf 63 Zeichen gekürzt, `BROWSER_ONLY_BLOCK_MAX_CHARS` wird in beiden Einfrier-Wegen (`index.ts`, schnell und gründlich/Schleife) vom Gesamtbudget abgezogen.
@@ -361,4 +361,4 @@ F12: [ADRESSIERT] — strukturierter Grund statt dünner Erfolgsseite, in Chat, 
 
 ## Status
 
-Plan Rev. 1, Prüfrunde 1 erledigt (14 Findings). Messung Schritt 0 und Umsetzung Schritt 1 am 06.11.2026, nicht committet. Rendern (Schritt 2) nach Messung nicht empfohlen; Nutzerentscheidung offen. Runde 2 (F15–F25) geprüft, freigegebene Punkte umgesetzt; F17, F18, F19, F25 und open-external-Absender als eigene Aufgaben offen.
+Plan Rev. 1, Prüfrunde 1 erledigt (14 Findings). Messung Schritt 0 und Umsetzung Schritt 1 am 06.11.2026, nicht committet. Rendern (Schritt 2) nach Messung nicht empfohlen; Nutzerentscheidung offen. Runde 2 (F15–F25) geprüft, freigegebene Punkte umgesetzt; F17 nach PR #99 nachgezogen; F18, F19, F25 und open-external-Absender als eigene Aufgaben offen.

@@ -125,6 +125,8 @@ export interface PptxSource {
   url: string
   /** ISO-Datum des Abrufs. */
   fetchedAt: string
+  /** Nur der Seitenanfang wurde gelesen (Seite zu groß, Codex F17). */
+  partial?: boolean
 }
 
 /** Quellen je Folie — mehr wird auf Folgefolien verteilt (Webrecherche ruft höchstens 10 Seiten ab). */
@@ -1571,7 +1573,7 @@ export async function buildPptxFromTemplate(templateBytes: Uint8Array, input: Pp
       seen.add(url)
       // Titel auf 110 Zeichen kürzen (sichtbar mit „…"): ein Link darf auf der Quellenfolie nicht abgeschnitten werden (Codex F35).
       const rawTitle = cleanText(String(src.title ?? '')).trim() || url
-      valid.push({ title: rawTitle.length > 110 ? `${rawTitle.slice(0, 109).trimEnd()}…` : rawTitle, url, fetchedAt: String(src.fetchedAt ?? '').slice(0, 10) })
+      valid.push({ title: rawTitle.length > 110 ? `${rawTitle.slice(0, 109).trimEnd()}…` : rawTitle, url, fetchedAt: String(src.fetchedAt ?? '').slice(0, 10), ...(src.partial === true ? { partial: true } : {}) })
     }
     if (rejectedSources) earlyNotes.push(`${rejectedSources} abgerufene Quelle(n) mit ungültiger Adresse nicht auf der Quellenfolie`)
     if (valid.length === 0) earlyNotes.push('Ohne Webquellen: in diesem Lauf wurde keine Seite erfolgreich abgerufen')
@@ -1733,7 +1735,8 @@ export async function buildPptxFromTemplate(templateBytes: Uint8Array, input: Pp
               }
             })()
             const date = /^\d{4}-\d{2}-\d{2}$/.test(src.fetchedAt) ? src.fetchedAt.split('-').reverse().join('.') : ''
-            const suffix = [host, date ? `${/^en/i.test(lang) ? 'retrieved' : 'abgerufen am'} ${date}` : ''].filter(Boolean).join(' · ')
+            const en = /^en/i.test(lang)
+            const suffix = [host, date ? `${en ? 'retrieved' : 'abgerufen am'} ${date}` : '', src.partial ? (en ? 'only the beginning read' : 'nur Seitenanfang gelesen') : ''].filter(Boolean).join(' · ')
             return (
               `<a:p><a:r><a:rPr lang="${escapeXml(lang)}" dirty="0"><a:hlinkClick r:id="${rid}"/></a:rPr><a:t>${escapeXml(src.title)}</a:t></a:r>` +
               (suffix ? `<a:r><a:rPr lang="${escapeXml(lang)}" dirty="0"/><a:t>${escapeXml(` — ${suffix}`)}</a:t></a:r>` : '') +
