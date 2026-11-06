@@ -7,7 +7,7 @@
 // mit Ablaufzeit und Obergrenze. Der Renderer kennt nur die Kennung.
 
 import { randomBytes } from 'crypto'
-import type { WebSource } from '../../shared/webChat'
+import type { WebFetchFailure, WebSource } from '../../shared/webChat'
 
 export interface WebSnapshot {
   id: string
@@ -15,8 +15,16 @@ export interface WebSnapshot {
   scopeId: string
   /** Exakt die Auszüge, die das Modell beim Weblauf sah (F19) — nie neu gekürzt. */
   sources: WebSource[]
+  /**
+   * Nur im Browser lesbare Seiten derselben Suche (Codex F19): reisen mit, damit eine Nachfrage
+   * nicht „gibt es nicht“ antwortet und der Öffnen-Knopf bleibt. Nie zitierfähige Quelle.
+   */
+  browserOnly: WebFetchFailure[]
   createdAt: number
 }
+
+/** Höchstens so viele nicht lesbare Seiten je Snapshot — wie im Hinweisblock des Systemtexts. */
+export const WEB_SNAPSHOT_BROWSER_ONLY_MAX = 3
 
 export const WEB_SNAPSHOT_TTL_MS = 3 * 60 * 60 * 1000
 export const WEB_SNAPSHOT_MAX_PER_SENDER = 30
@@ -28,10 +36,14 @@ export class WebSnapshotStore {
   constructor(private readonly now: () => number = Date.now, private readonly newId: () => string = () => randomBytes(16).toString('hex')) {}
 
   /** Legt einen Snapshot an; die ältesten desselben Absenders fallen über der Obergrenze raus. */
-  put(senderId: number, scopeId: string, sources: readonly WebSource[]): string {
+  put(senderId: number, scopeId: string, sources: readonly WebSource[], failures: readonly WebFetchFailure[] = []): string {
     this.prune()
     const id = this.newId()
-    this.items.set(id, { id, senderId, scopeId, sources: sources.map(s => ({ ...s })), createdAt: this.now() })
+    const browserOnly = failures
+      .filter(f => f.reason === 'browser-only' && !!f.url && /^https?:\/\//i.test(f.url))
+      .slice(0, WEB_SNAPSHOT_BROWSER_ONLY_MAX)
+      .map(f => ({ host: f.host, reason: f.reason, url: f.url }))
+    this.items.set(id, { id, senderId, scopeId, sources: sources.map(s => ({ ...s })), browserOnly, createdAt: this.now() })
     const own = [...this.items.values()].filter(s => s.senderId === senderId).sort((a, b) => a.createdAt - b.createdAt)
     for (const old of own.slice(0, Math.max(0, own.length - WEB_SNAPSHOT_MAX_PER_SENDER))) this.items.delete(old.id)
     return id
@@ -42,7 +54,7 @@ export class WebSnapshotStore {
     this.prune()
     const s = this.items.get(id)
     if (!s || s.senderId !== senderId || s.scopeId !== scopeId) return null
-    return { ...s, sources: s.sources.map(x => ({ ...x })) }
+    return { ...s, sources: s.sources.map(x => ({ ...x })), browserOnly: s.browserOnly.map(x => ({ ...x })) }
   }
 
   /**

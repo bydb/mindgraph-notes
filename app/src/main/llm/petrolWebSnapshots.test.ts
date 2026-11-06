@@ -94,3 +94,30 @@ describe('Kennungen aus dem Renderer', () => {
     expect(sanitizeSnapshotId('notahex'.padEnd(32, 'g'))).toBeNull()
   })
 })
+
+describe('WebSnapshotStore: nicht lesbare Seiten (Codex F19)', () => {
+  const fail = (host: string, reason: 'browser-only' | 'timeout', url?: string) => ({ host, reason, ...(url ? { url } : {}) })
+
+  it('hält nur browser-only mit http(s)-Adresse, höchstens drei, als Kopie', () => {
+    const store = new WebSnapshotStore(() => 1_000, () => 'a'.repeat(32))
+    const failures = [
+      fail('a.de', 'browser-only', 'https://a.de/stores'),
+      fail('t.de', 'timeout'),
+      fail('x.de', 'browser-only'),
+      fail('j.de', 'browser-only', 'javascript:alert(1)'),
+      fail('b.de', 'browser-only', 'https://b.de/stores'),
+      fail('c.de', 'browser-only', 'https://c.de/stores'),
+      fail('d.de', 'browser-only', 'https://d.de/stores')
+    ]
+    const id = store.put(1, 'tab-1', [source(1)], failures)
+    const snap = store.get(1, 'tab-1', id)!
+    expect(snap.browserOnly.map(f => f.host)).toEqual(['a.de', 'b.de', 'c.de'])
+    snap.browserOnly[0].host = 'verändert'
+    expect(store.get(1, 'tab-1', id)!.browserOnly[0].host).toBe('a.de')
+  })
+
+  it('ohne Angabe leer', () => {
+    const store = new WebSnapshotStore(() => 1_000, () => 'a'.repeat(32))
+    expect(store.get(1, 'tab-1', store.put(1, 'tab-1', [source(1)]))!.browserOnly).toEqual([])
+  })
+})

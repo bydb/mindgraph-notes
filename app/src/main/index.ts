@@ -7065,7 +7065,8 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
         return finish({ kind: 'error', error: resolved.error, sources: resolved.sources, failures: [], notFetched: 0, ...(resolved.gone ? { snapshotGone: true } : {}), ...followUpMark })
       }
       sources = resolved.sources
-      failures = []
+      // Nicht lesbare Seiten der Ursprungssuche reisen mit (Codex F19): Hinweis ans Modell + Öffnen-Knopf.
+      failures = resolved.browserOnly
       notFetched = 0
       historyForModel = resolved.history
       historyDropped = resolved.dropped
@@ -7327,8 +7328,8 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
     // Quellen gehen VOR der Modellphase an die Anzeige — wird gestoppt, bleibt sichtbar,
     // woraus das Bruchstück stammt. Bei einer Nachfrage sind das die alten Auszüge, nicht neue Abrufe.
     send('petrol-chat-progress', { phase: 'model', sources, failures, notFetched })
-    // Nicht lesbare Händlersuchen benennen (shared/browserOnlyPage.ts); bei einer Nachfrage gibt es keine neuen Abrufe.
-    const browserOnlyHosts = followUp ? [] : failures.filter(f => f.reason === 'browser-only').map(f => f.host)
+    // Nicht lesbare Händlersuchen benennen (shared/browserOnlyPage.ts) — bei einer Nachfrage die aus dem Snapshot (F19).
+    const browserOnlyHosts = failures.filter(f => f.reason === 'browser-only').map(f => f.host)
     const systemPrompt = buildPetrolWebSystemPrompt(sources, today, sanitizeUntrustedText, topicsForPrompt, followUp, browserOnlyHosts)
     const messages = [
       { role: 'system' as const, content: systemPrompt },
@@ -7369,7 +7370,7 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
     // Nur eine fertige Antwort mit zitierter Quelle wird eingefroren. Die Nachfrage legt
     // eine neue Kennung derselben Auszüge an, damit die nächste Frage an diese Antwort bindet.
     const newSnapshotId = !event.sender.isDestroyed() && scopeId && report.usedSources.length > 0
-      ? webSnapshots.put(event.sender.id, scopeId, sources)
+      ? webSnapshots.put(event.sender.id, scopeId, sources, failures)
       : undefined
     return finish({
       kind: 'answer', answer, report, extras, sources, failures, notFetched,
