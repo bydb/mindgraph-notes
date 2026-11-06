@@ -167,3 +167,18 @@ describe('Kleine Kontextfenster: die erste Antwort lässt Platz für die Nachfra
     expect(withTopics).toBeGreaterThanOrEqual(buildPetrolWebSystemPrompt(sources, TODAY, id, topics).length + 5000)
   })
 })
+
+describe('resolveFollowUp: nicht lesbare Seiten reisen mit (Codex F19)', () => {
+  it('liefert sie zurück und misst den Hinweisblock im Budget mit', () => {
+    const store = new WebSnapshotStore(() => 1_000, () => SNAP)
+    const sources = [source(1, 'Auszug')]
+    const snapshotId = store.put(1, 'tab-1', sources, [{ host: 'bdkparfums.com', reason: 'browser-only', url: 'https://bdkparfums.com/stores' }])
+    const withBlock = buildPetrolWebSystemPrompt(sources, TODAY, id, [], true, ['bdkparfums.com']).length
+    // Budget reicht für den Prompt OHNE Block, aber nicht MIT: dann muss die Nachfrage ablehnen.
+    const tight = resolveFollowUp({ store, senderId: 1, scopeId: 'tab-1', snapshotId, history: [], question: '?', charBudget: withBlock - 1, today: TODAY, sanitize: id })
+    expect(tight.ok).toBe(false)
+    const res = resolveFollowUp({ store, senderId: 1, scopeId: 'tab-1', snapshotId, history: [], question: '?', charBudget: withBlock + 100, today: TODAY, sanitize: id })
+    expect(res.ok).toBe(true)
+    if (res.ok) expect(res.browserOnly).toEqual([{ host: 'bdkparfums.com', reason: 'browser-only', url: 'https://bdkparfums.com/stores' }])
+  })
+})

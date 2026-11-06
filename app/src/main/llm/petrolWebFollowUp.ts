@@ -7,7 +7,7 @@
 //   - sie werden weder neu vorbereitet noch gekürzt; zu lang heißt ablehnen oder den
 //     Verlauf kürzen, nie die Seiten.
 
-import { shortenHistoryToFit, type WebSource } from '../../shared/webChat'
+import { shortenHistoryToFit, type WebSource, type WebFetchFailure } from '../../shared/webChat'
 import { buildPetrolWebSystemPrompt } from './petrolWebPrompt'
 import { sanitizeScopeId, sanitizeSnapshotId, type WebSnapshotStore } from './petrolWebSnapshots'
 
@@ -63,7 +63,7 @@ export function measureWithFollowUpRoom(args: {
 }
 
 export type FollowUpResolution<H extends { content: string; role?: string }> =
-  | { ok: true; sources: WebSource[]; history: H[]; dropped: number }
+  | { ok: true; sources: WebSource[]; history: H[]; dropped: number; /** Nicht lesbare Seiten der Ursprungssuche (F19). */ browserOnly: WebFetchFailure[] }
   | {
       ok: false
       /** Snapshot weg (abgelaufen, anderes Gespräch/Fenster): „Erneut senden“ kann nie klappen. */
@@ -92,7 +92,8 @@ export function resolveFollowUp<H extends { content: string; role?: string }>(ar
   if (!snap || snap.sources.length === 0) return { ok: false, gone: true, error: SNAPSHOT_GONE_TEXT, sources: [] }
 
   // Die Auszüge sind bereits vorbereitet (`prepareWebExcerpt`) — hier nur messen, nie anfassen.
-  const promptChars = buildPetrolWebSystemPrompt(snap.sources, args.today, args.sanitize, [], true).length
+  const browserOnlyHosts = snap.browserOnly.map(f => f.host)
+  const promptChars = buildPetrolWebSystemPrompt(snap.sources, args.today, args.sanitize, [], true, browserOnlyHosts).length
   if (promptChars > args.charBudget) {
     // Auch ohne Frage zu groß: typisch, wenn nach der Antwort ein Modell mit kleinerem Fenster
     // gewählt wurde. Die Frage zu kürzen hilft dann nicht.
@@ -112,5 +113,5 @@ export function resolveFollowUp<H extends { content: string; role?: string }>(ar
       sources: snap.sources
     }
   }
-  return { ok: true, sources: snap.sources, history: fitted.history, dropped: fitted.dropped }
+  return { ok: true, sources: snap.sources, history: fitted.history, dropped: fitted.dropped, browserOnly: snap.browserOnly }
 }
