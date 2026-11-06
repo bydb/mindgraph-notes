@@ -348,7 +348,7 @@ Neuer Befund, nicht im Plan: Bei IKEA verliert defuddle Inhalt, der im HTML steh
 - F22: [ADRESSIERT] — Cache erst nach geglücktem Schreiben bzw. Löschen; Löschfehler kommt als `false` an und wird in den Einstellungen als Warnung gezeigt.
 - F23: [ADRESSIERT] — alte Tage werden beim Laden verworfen und beim Anzeigen auf die Platte geschrieben; Tag beim Abruf festgehalten; Liste heißt „Websites je Grund, häufigste zuerst“ mit Hinweis „höchstens die ersten 50 je Tag und Grund“; Datenschutztext nennt Unteradressen. Bleibt: Ohne Anzeige und ohne neuen Abruf liegen alte Tage weiter auf der Platte.
 - F24: [ADRESSIERT] — Öffnen-Knopf auch im Fehlerzweig. Nicht adressiert: im Fall K = 0 stehen versuchte, nicht lesbare Treffer weiterhin auch unter „nicht abgerufen“.
-- F25: [OFFEN, eigene Aufgabe] — keine Sperre gegen eine zweite Instanz mit demselben Profil; im Alltag selten (Dev und installierte App haben getrennte Profile).
+- F25: [ADRESSIERT für die Zählung, Nachtrag nach PR #102] — `fetchStats.ts` liest vor jedem Schreiben frisch von der Platte (kein Zwischenspeicher mehr) und nutzt je Schreibvorgang einen eigenen Temp-Namen (PID + Zufall, bei Fehler entfernt). Test stellt eine zweite Instanz nach (`fetchStats.test.ts`). Bleibt: zwischen Lesen und Umbenennen ein Fenster von Millisekunden, in dem ein gleichzeitiger Eintrag verloren gehen kann — für eine Zählung hingenommen. Eine Instanzsperre für die ganze App (`app.requestSingleInstanceLock`) fehlt weiter; sie beträfe alle Ablagen (emails.json, Einstellungen …) und ändert das Startverhalten unter Windows/Linux — Nutzerentscheidung offen.
 - Geprüft: typecheck, build grün; Tests grün bis auf die bekannten zwei Zeitüberschreitungen in `shellExecution.test.ts` im Gesamtlauf. Nicht in der laufenden App geprüft.
 
 ### Zu den Findings
@@ -361,4 +361,4 @@ F12: [ADRESSIERT] — strukturierter Grund statt dünner Erfolgsseite, in Chat, 
 
 ## Status
 
-Plan Rev. 1, Prüfrunde 1 erledigt (14 Findings). Messung Schritt 0 und Umsetzung Schritt 1 am 06.11.2026, nicht committet. Rendern (Schritt 2) nach Messung nicht empfohlen; Nutzerentscheidung offen. Runde 2 (F15–F25) geprüft, freigegebene Punkte umgesetzt; F17 (PR #100), F18 (PR #101) und F19 nachgezogen; F25 und open-external-Absender als eigene Aufgaben offen.
+Plan Rev. 1, Prüfrunde 1 erledigt (14 Findings). Messung Schritt 0 und Umsetzung Schritt 1 am 06.11.2026, gemergt in PR #99. Rendern (Schritt 2) nach Messung nicht empfohlen; Nutzerentscheidung offen. Runde 2 (F15–F25) geprüft, freigegebene Punkte umgesetzt; F17 (PR #100), F18 (PR #101), F19 (PR #102) und F25 (Zählung) nachgezogen; Instanzsperre für die ganze App und open-external-Absender als eigene Aufgaben offen.
