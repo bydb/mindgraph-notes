@@ -178,25 +178,49 @@ export class AntaresService {
 
   // ---- Domain methods ----
 
-  /** Offene Registrierungen — Zweischritt-Pattern der Antares-UI (primeSearchMask + /search). */
-  //
-  // Greift der serverseitige Filter nicht (Prime fehlgeschlagen / Session-State fehlt), liefert
-  // Antares den KOMPLETTEN Entleiherbestand (>12 000) und ignoriert dabei auch die Pagination.
-  // Erkennungsmerkmal: mehr Zeilen als angefragt. Dann einmal neu primen; klappt das nicht,
-  // Fehler werfen statt den Gesamtbestand als "offene Registrierungen" anzuzeigen.
+  /**
+   * Offene Registrierungen — so wie die Antares-UI es macht.
+   *
+   * `id=2` im /search-Aufruf ist KEINE gespeicherte Suche, sondern nur die Nummer der Suchmaske.
+   * Der eigentliche Filter steckt im Dashboard-Button „offene Registrierungen“:
+   * `data-onclick="searchmask.autosearch({"type":"entleiher","search":{…}})"`. Ohne diese
+   * Suchparameter liefert Antares den kompletten Entleiherbestand (>12 000).
+   * Deshalb: Button aus dem Dashboard lesen → deaktiviert = keine offenen Registrierungen;
+   * sonst genau seine Suchparameter an die Suchmaske geben.
+   */
   async listOffeneRegistrierungen(): Promise<AntaresEntleiher[]> {
     const ROWS = 50
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      await this.primeSearchMask('entleiher', '2')
-      const data = await this.post<{ rows?: AntaresEntleiher[]; total?: number }>(
-        `/search?table=entleiher&id=2&context=${encodeURIComponent(this.context)}`,
-        { page: '1', rows: String(ROWS) }
-      )
-      const rows = data.rows || []
-      if (!isUnfilteredResult(rows.length, data.total, ROWS)) return rows
-      console.warn(`[antares] listOffeneRegistrierungen: Filter nicht angewendet (rows=${rows.length}, total=${data.total}), Versuch ${attempt}`)
+    const button = findDashboardButton(await this.fetchDashboardHtml(), /offene\s+Registrierung/i)
+    if (!button || !button.onclick.trim()) return []  // 0 offene Registrierungen → Button deaktiviert
+    const autosearch = parseAutosearch(button.onclick)
+    if (!autosearch || autosearch.type !== 'entleiher') {
+      throw new Error(`Antares: unbekannte Aktion am Button „offene Registrierungen“: ${truncateError(button.onclick)}`)
     }
-    throw new Error('Antares: Filter für offene Registrierungen wurde nicht angewendet (Server lieferte alle Entleiher)')
+    await this.primeSearchMask('entleiher', '2', autosearch.search)
+    const data = await this.post<{ rows?: AntaresEntleiher[]; total?: number }>(
+      `/search?table=entleiher&id=2&context=${encodeURIComponent(this.context)}`,
+      { page: '1', rows: String(ROWS) }
+    )
+    const rows = data.rows || []
+    if (isUnfilteredResult(rows.length, data.total, ROWS)) {
+      throw new Error('Antares: Filter für offene Registrierungen wurde nicht angewendet (Server lieferte alle Entleiher)')
+    }
+    return rows
+  }
+
+  private async fetchDashboardHtml(): Promise<string> {
+    const auth = await this.authenticate()
+    const r = await this.fetchImpl(`${this.baseUrl}/dashboard?template=plain&pid=${auth.pid}`, {
+      method: 'GET',
+      headers: {
+        'Cookie': auth.cookie,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': `${this.baseUrl}/`,
+        'Accept': 'text/html, */*'
+      }
+    })
+    if (!r.ok) throw new Error(`Antares Dashboard (${r.status})`)
+    return r.text()
   }
 
   /** Aufgaben-Counts direkt aus dem Antares-Dashboard-HTML. */
@@ -343,4 +367,36 @@ export class AntaresService {
  */
 export function isUnfilteredResult(rowCount: number, total: number | undefined, requested: number): boolean {
   return rowCount > requested || (total !== undefined && Number(total) > 1000)
+}
+
+const decodeEntities = (s: string): string =>
+  s.replace(/&quot;/g, '"').replace(/&#0*39;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&auml;/g, 'ä').replace(/&ouml;/g, 'ö').replace(/&uuml;/g, 'ü')
+    .replace(/&Auml;/g, 'Ä').replace(/&Ouml;/g, 'Ö').replace(/&Uuml;/g, 'Ü').replace(/&szlig;/g, 'ß')
+    .replace(/&amp;/g, '&')
+
+/** Findet einen Dashboard-Button (`<a … data-onclick="…">`) anhand seines sichtbaren Texts. */
+export function findDashboardButton(html: string, label: RegExp): { onclick: string; text: string } | null {
+  for (const m of html.matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/gi)) {
+    const text = decodeEntities(m[2].replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim()
+    if (!label.test(text)) continue
+    const attr = m[1].match(/data-onclick\s*=\s*"([^"]*)"/i)
+    return { onclick: attr ? decodeEntities(attr[1]) : '', text }
+  }
+  return null
+}
+
+/** Parst `searchmask.autosearch("type":"…", "search": {…})` aus einem Dashboard-Button. */
+export function parseAutosearch(onclick: string): { type: string; search: Record<string, string> } | null {
+  const m = onclick.match(/searchmask\.autosearch\(([\s\S]*)\)\s*;?\s*$/)
+  if (!m) return null
+  try {
+    const obj = JSON.parse(`{${m[1]}}`) as { type?: unknown; search?: Record<string, unknown> }
+    if (typeof obj.type !== 'string') return null
+    const search: Record<string, string> = {}
+    for (const [k, v] of Object.entries(obj.search ?? {})) search[k] = String(v)
+    return { type: obj.type, search }
+  } catch {
+    return null
+  }
 }
