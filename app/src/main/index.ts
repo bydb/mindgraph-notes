@@ -31,6 +31,7 @@ import { diffKnownMessages, type KnownLocalMessage, type KnownMessageUpdate } fr
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 import { passwordStoreOverride } from '../shared/linuxPasswordStore'
 import { focusExistingWindow } from './singleInstance'
+import { isOpenableExternalUrl } from '../shared/externalUrl'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -10804,14 +10805,15 @@ ipcMain.handle('download-update', async () => {
   }
 })
 
-ipcMain.handle('open-external', async (_event, url: string) => {
-  // Nur Protokolle freigeben, die gefahrlos an die OS-Shell gehen dürfen.
-  // https/http → Browser, mailto → Standard-Mailprogramm. file:/javascript: etc. bleiben blockiert.
-  if (/^https?:\/\//i.test(url) || /^mailto:/i.test(url)) {
-    await shell.openExternal(url)
-    return true
-  }
-  return false
+ipcMain.handle('open-external', async (event, url: unknown) => {
+  // Nur eigene App-Fenster, nur deren Hauptrahmen (wie die übrigen Webrecherche-Handler, Codex F21) —
+  // eingebettete Inhalte dürfen keine Programme des Betriebssystems anstoßen.
+  if (!isTrustedSender(event)) return false
+  // Nur Adressen, die gefahrlos an die OS-Shell gehen dürfen: http(s) → Browser, mailto → Mailprogramm
+  // (shared/externalUrl.ts). file:/javascript:/eigene Schemata und Unzerlegbares bleiben gesperrt.
+  if (!isOpenableExternalUrl(url)) return false
+  await shell.openExternal(url)
+  return true
 })
 
 // Semver-Vergleich: Gibt 1 zurück wenn a > b, -1 wenn a < b, 0 wenn gleich
