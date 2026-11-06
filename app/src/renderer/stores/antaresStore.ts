@@ -57,6 +57,38 @@ function getConfig() {
   return { baseUrl: c.baseUrl, context: c.context }
 }
 
+let inFlight: Promise<void> | null = null
+
+type SetState = (partial: Partial<AntaresState>) => void
+
+async function loadAllSequential(set: SetState): Promise<void> {
+  const { baseUrl, context } = getConfig()
+  const arg = { baseUrl, context }
+  set({ loading: true, lastError: null })
+  type Verleih = { total: number; rows: AntaresVerleihRow[] }
+  // Bewusst NACHEINANDER: Antares hält den Such-Filter (primeSearchMask → /search) serverseitig
+  // pro Benutzer. Parallele Abfragen überschreiben sich gegenseitig den Filter — dann liefert
+  // /search z.B. für "offene Registrierungen" den kompletten Entleiherbestand.
+  const rCounts = await settle(invokePlugin<AntaresDashboardCounts>('antares', 'antares.dashboardCounts', arg))
+  const rReg = await settle(invokePlugin<AntaresEntleiher[]>('antares', 'antares.listOffeneRegistrierungen', arg))
+  const rGer = await settle(invokePlugin<Verleih>('antares', 'antares.listMahnungenGeraete', arg))
+  const rMed = await settle(invokePlugin<Verleih>('antares', 'antares.listMahnungenMedien', arg))
+  const rAus = await settle(invokePlugin<Verleih>('antares', 'antares.listAusgabeliste', arg))
+  const rLiz = await settle(invokePlugin<AntaresLizenz[]>('antares', 'antares.listLizenzenAblauf', { ...arg, daysAhead: 365 }))
+  const firstError = [rCounts, rReg, rGer, rMed, rAus, rLiz].find(r => !r.ok)
+  set({
+    counts: rCounts.ok ? rCounts.data : EMPTY_COUNTS,
+    offeneRegistrierungen: rReg.ok ? rReg.data : [],
+    mahnungenGeraete: rGer.ok ? rGer.data.rows : [],
+    mahnungenMedien: rMed.ok ? rMed.data.rows : [],
+    ausgabeliste: rAus.ok ? rAus.data.rows : [],
+    lizenzenAblauf365: rLiz.ok ? rLiz.data : [],
+    loading: false,
+    lastError: firstError && firstError.ok === false ? firstError.error : null,
+    lastFetchedAt: Date.now()
+  })
+}
+
 export const useAntaresStore = create<AntaresState>((set) => ({
   counts: EMPTY_COUNTS,
   offeneRegistrierungen: [],
@@ -68,31 +100,12 @@ export const useAntaresStore = create<AntaresState>((set) => ({
   lastError: null,
   lastFetchedAt: null,
 
-  loadAll: async () => {
-    const { baseUrl, context } = getConfig()
-    const arg = { baseUrl, context }
-    set({ loading: true, lastError: null })
-    type Verleih = { total: number; rows: AntaresVerleihRow[] }
-    const [rCounts, rReg, rGer, rMed, rAus, rLiz] = await Promise.all([
-      settle(invokePlugin<AntaresDashboardCounts>('antares', 'antares.dashboardCounts', arg)),
-      settle(invokePlugin<AntaresEntleiher[]>('antares', 'antares.listOffeneRegistrierungen', arg)),
-      settle(invokePlugin<Verleih>('antares', 'antares.listMahnungenGeraete', arg)),
-      settle(invokePlugin<Verleih>('antares', 'antares.listMahnungenMedien', arg)),
-      settle(invokePlugin<Verleih>('antares', 'antares.listAusgabeliste', arg)),
-      settle(invokePlugin<AntaresLizenz[]>('antares', 'antares.listLizenzenAblauf', { ...arg, daysAhead: 365 }))
-    ])
-    const firstError = [rCounts, rReg, rGer, rMed, rAus, rLiz].find(r => !r.ok)
-    set({
-      counts: rCounts.ok ? rCounts.data : EMPTY_COUNTS,
-      offeneRegistrierungen: rReg.ok ? rReg.data : [],
-      mahnungenGeraete: rGer.ok ? rGer.data.rows : [],
-      mahnungenMedien: rMed.ok ? rMed.data.rows : [],
-      ausgabeliste: rAus.ok ? rAus.data.rows : [],
-      lizenzenAblauf365: rLiz.ok ? rLiz.data : [],
-      loading: false,
-      lastError: firstError && firstError.ok === false ? firstError.error : null,
-      lastFetchedAt: Date.now()
-    })
+  // Läuft schon ein Ladevorgang (Widget-Mount, Refresh-Button, Workflow-Trigger), hängen sich
+  // weitere Aufrufe an denselben Promise — sonst laufen wieder Antares-Abfragen parallel.
+  loadAll: () => {
+    if (inFlight) return inFlight
+    inFlight = loadAllSequential(set).finally(() => { inFlight = null })
+    return inFlight
   },
 
   reset: () => set({
