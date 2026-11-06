@@ -262,7 +262,11 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
               ))}
               {run.web.fetches.map((f, i) => (
                 <div key={`f${i}`} className="ai-bar-agent-web-item" title={f.url}>
-                  {t('aiBar.web.pageItem')}: {f.title || f.url}{f.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : f.partial ? ` (${t('aiBar.web.partial')})` : ''}
+                  {t('aiBar.web.pageItem')}: {f.title || f.url}{f.browserOnly ? ` (${t('aiBar.web.browserOnly')})` : f.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : f.partial ? ` (${t('aiBar.web.partial')})` : ''}
+                  {/* Nicht lesbare Händlersuche: ein Klick zur Seite im System-Browser (Codex F18). */}
+                  {f.browserOnly && /^https?:\/\//i.test(f.url) && (
+                    <>{' '}<button type="button" className="agent-card-link-btn" onClick={() => void window.electronAPI.openExternal(f.url)}>{t('aiBar.web.open')}</button></>
+                  )}
                 </div>
               ))}
             </div>

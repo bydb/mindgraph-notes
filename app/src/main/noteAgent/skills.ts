@@ -36,8 +36,7 @@ import { fetchFailReason } from '../llm/petrolWebChat'
 import {
   normalizeWebUrl, normalizeQuery, isQueryTooLong, isSearchAllowedInPhase, mergeDeterministicSources, sanitizeSourceTitle,
   mergeDeterministicSourcesHtml, deterministicSourcesSheet, unfetchedUrlsInCells, MAX_WEB_SEARCHES_PER_RUN, MAX_WEB_FETCHES_PER_RUN,
-  type WebSearchHit
-} from '../../shared/webResearch'
+  type WebSearchHit, browserOnlyFetches } from '../../shared/webResearch'
 import { validateAgentMarkdownResult } from '../../shared/agentResultQuality'
 import { shellExecuteTool, shellStageFileTool } from './shellTools'
 import { computerMailDraftTool, computerOpenTool, computerPrintTool, computerRevealTool } from './computerTools'
@@ -1574,6 +1573,8 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
             ? ctx.run.web.fetches
                 .filter(f => f.status === 'ok')
                 .map((f): PptxSource => ({ title: sanitizeSourceTitle(f.title) || f.finalUrl, url: f.finalUrl, fetchedAt: f.fetchedAt, ...(f.partial ? { partial: true } : {}) }))
+                // Nicht lesbare Seiten mit Vermerk dahinter (F18), nie als gelesene Quelle.
+                .concat(browserOnlyFetches(ctx.run.web.fetches).map((f): PptxSource => ({ title: new URL(f.finalUrl).hostname.replace(/^www\./, ''), url: f.finalUrl, fetchedAt: '', unread: true })))
             : undefined
         })
         ctx.run.sources.add(templateRel)
@@ -1801,11 +1802,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           redirectChain: info?.redirectChain || [normalized],
           title: '',
           fetchedAt: new Date().toISOString(),
-          status: 'failed'
+          status: 'failed',
+          ...(e instanceof BrowserOnlyPageError ? { browserOnly: e.kind } : {})
         })
         // Händlersuche/Skript-Hülle: das Modell soll die Lücke benennen, nicht „gibt es nicht“ schreiben (06.11.2026).
         if (e instanceof BrowserOnlyPageError) {
-          return err(`${e.kind === 'locator' ? 'Diese Händler-/Filialsuche lädt ihre Einträge' : 'Diese Seite lädt ihren Inhalt'} erst im Browser (Skripte), die App kann sie nicht lesen: ${e.finalUrl}. Schreibe im Ergebnis, dass die Liste dort steht, hier aber nicht gelesen werden konnte, und nenne die Adresse zum Selbstöffnen. Behaupte nicht, es gebe keine Einträge, und erfinde keine. Probiere sonst andere Treffer (z. B. Händlerseiten, Branchenverzeichnisse).`)
+          return err(`${e.kind === 'locator' ? 'Diese Händler-/Filialsuche lädt ihre Einträge' : 'Diese Seite lädt ihren Inhalt'} erst im Browser (Skripte), die App kann sie nicht lesen: ${e.finalUrl}. Die App führt die Seite im Ergebnis selbst unter „Nicht gelesen“ mit Adresse auf. Schreibe im Text nur, dass die Liste dort steht, hier aber nicht gelesen werden konnte — setze die Adresse nicht als Quelle oder Tabellenlink. Behaupte nicht, es gebe keine Einträge, und erfinde keine. Probiere sonst andere Treffer (z. B. Händlerseiten, Branchenverzeichnisse).`)
         }
         return err(`Seite konnte nicht geladen werden: ${e instanceof Error ? e.message : String(e)}`)
       }

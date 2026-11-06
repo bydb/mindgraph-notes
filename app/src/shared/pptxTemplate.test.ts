@@ -426,6 +426,16 @@ describe('buildPptxFromTemplate', () => {
       expect(slide).toContain('beispiel2.de · abgerufen am 01.10.2026</a:t>')
     })
 
+    it('nicht lesbare Seite steht mit Vermerk, ohne Datum (Codex F18)', async () => {
+      const res = await buildPptxFromTemplate(await buildTemplate({ samples: 'none' }), {
+        slides: [{ layout: 'content', title: 'Inhalt', body: '- x' }],
+        sources: [src(1), { title: 'shop.de', url: 'https://shop.de/stores', fetchedAt: '', unread: true }]
+      })
+      expect(await checkPptxConsistency(res.bytes)).toEqual([])
+      const slide = await text(await open(res.bytes), 'ppt/slides/slide2.xml')
+      expect(slide).toContain('shop.de · nicht gelesen, nur im Browser lesbar')
+    })
+
     it('hängt eine Folie „Quellen" mit echten Links an und ersetzt die des Modells', async () => {
       const res = await buildPptxFromTemplate(await buildTemplate({ samples: 'none' }), {
         slides: [{ layout: 'content', title: 'Inhalt', body: '- x' }, { layout: 'content', title: 'Quellen', body: '- erfundene Quelle' }],
