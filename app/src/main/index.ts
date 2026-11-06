@@ -4646,12 +4646,12 @@ ipcMain.handle('note-agent-route-preflight', async (event, params: { model: stri
 
 // Web-Provenienz fürs done-Event (Renderer zeigt „N Suchen · M Seiten" + Liste). Enthält
 // bewusst NUR das, was tatsächlich passiert ist — inkl. Fehlversuchen.
-function webRunProvenance(run: { web?: WebRunState }): { queries: Array<{ query: string; status: string }>; fetches: Array<{ url: string; title: string; status: string }>; searchCount: number; fetchCount: number } | undefined {
+function webRunProvenance(run: { web?: WebRunState }): { queries: Array<{ query: string; status: string }>; fetches: Array<{ url: string; title: string; status: string; partial?: boolean }>; searchCount: number; fetchCount: number } | undefined {
   const w = run.web
   if (!w) return undefined
   return {
     queries: w.queries,
-    fetches: w.fetches.map(f => ({ url: f.finalUrl, title: f.title, status: f.status })),
+    fetches: w.fetches.map(f => ({ url: f.finalUrl, title: f.title, status: f.status, ...(f.partial ? { partial: true } : {}) })),
     searchCount: w.searchCount,
     fetchCount: w.fetchCount
   }

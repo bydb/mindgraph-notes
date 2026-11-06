@@ -157,7 +157,8 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     redirectChain: res.redirectChain,
     title,
     fetchedAt,
-    status: 'ok'
+    status: 'ok',
+    ...(res.truncated ? { partial: true as const } : {})
   }
   return { record, markdown: trimmed.text, truncated: trimmed.truncated || res.truncated, originalChars: trimmed.originalChars, bodyTruncated: res.truncated }
 }

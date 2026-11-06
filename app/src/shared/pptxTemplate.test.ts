@@ -415,6 +415,17 @@ describe('buildPptxFromTemplate', () => {
   describe('Quellenfolie (Webrecherche)', () => {
     const src = (n: number, url = `https://beispiel${n}.de/artikel`) => ({ title: `Artikel ${n}`, url, fetchedAt: '2026-10-01T12:00:00Z' })
 
+    it('kennzeichnet nur teilweise gelesene Seiten auf der Quellenfolie (Codex F17)', async () => {
+      const res = await buildPptxFromTemplate(await buildTemplate({ samples: 'none' }), {
+        slides: [{ layout: 'content', title: 'Inhalt', body: '- x' }],
+        sources: [{ ...src(1), partial: true }, src(2)]
+      })
+      expect(await checkPptxConsistency(res.bytes)).toEqual([])
+      const slide = await text(await open(res.bytes), 'ppt/slides/slide2.xml')
+      expect(slide).toContain('beispiel1.de · abgerufen am 01.10.2026 · nur Seitenanfang gelesen')
+      expect(slide).toContain('beispiel2.de · abgerufen am 01.10.2026</a:t>')
+    })
+
     it('hängt eine Folie „Quellen" mit echten Links an und ersetzt die des Modells', async () => {
       const res = await buildPptxFromTemplate(await buildTemplate({ samples: 'none' }), {
         slides: [{ layout: 'content', title: 'Inhalt', body: '- x' }, { layout: 'content', title: 'Quellen', body: '- erfundene Quelle' }],

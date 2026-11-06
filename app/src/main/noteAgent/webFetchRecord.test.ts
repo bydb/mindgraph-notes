@@ -60,3 +60,32 @@ describe('web_fetch — Fehlversuch-Record', () => {
     })
   })
 })
+
+describe('web_fetch — an der Größengrenze gekappte Seite (Codex F17)', () => {
+  const okResult = (bodyTruncated: boolean) => ({
+    record: {
+      requestedUrl: 'https://start.example/', finalUrl: 'https://start.example/', redirectChain: ['https://start.example/'],
+      title: 'Groß', fetchedAt: '2026-11-06T10:00:00.000Z', status: 'ok', ...(bodyTruncated ? { partial: true } : {})
+    },
+    markdown: 'Seitenanfang', truncated: bodyTruncated, originalChars: 12, bodyTruncated
+  })
+
+  it('bleibt Quelle, Record trägt partial, das Modell bekommt den Hinweis VOR dem fremden Text', async () => {
+    mockFetch.mockImplementation(async () => okResult(true))
+    const web = makeWeb()
+    const res = await runFetch(web)
+    expect(res.ok).toBe(true)
+    expect(web.fetches[0]).toMatchObject({ status: 'ok', partial: true })
+    const content = (res as { content: string }).content
+    expect(content.indexOf('Hinweis der App: Diese Seite war größer als die Abrufgrenze')).toBe(0)
+    expect(content.indexOf('Hinweis der App')).toBeLessThan(content.indexOf('WEBSEITE (EXTERNE DATEN'))
+  })
+
+  it('vollständige Seite: kein Hinweis, kein partial', async () => {
+    mockFetch.mockImplementation(async () => okResult(false))
+    const web = makeWeb()
+    const res = await runFetch(web)
+    expect(web.fetches[0].partial).toBeUndefined()
+    expect((res as { content: string }).content.startsWith('WEBSEITE (EXTERNE DATEN')).toBe(true)
+  })
+})

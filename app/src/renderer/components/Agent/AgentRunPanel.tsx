@@ -262,7 +262,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
               ))}
               {run.web.fetches.map((f, i) => (
                 <div key={`f${i}`} className="ai-bar-agent-web-item" title={f.url}>
-                  {t('aiBar.web.pageItem')}: {f.title || f.url}{f.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : ''}
+                  {t('aiBar.web.pageItem')}: {f.title || f.url}{f.status !== 'ok' ? ` (${t('aiBar.web.failed')})` : f.partial ? ` (${t('aiBar.web.partial')})` : ''}
                 </div>
               ))}
             </div>

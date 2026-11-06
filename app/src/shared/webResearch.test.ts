@@ -296,6 +296,29 @@ describe('isWebResearchConfigComplete', () => {
   })
 })
 
+describe('Teilweise gelesene Seiten in Quellenblöcken (Codex F17)', () => {
+  const rec = (url: string, partial?: true) => ({
+    requestedUrl: url, finalUrl: url, redirectChain: [url], title: 'T', fetchedAt: '2026-11-06T10:00:00.000Z', status: 'ok' as const, ...(partial ? { partial } : {})
+  })
+
+  it('Markdown, HTML und Excel nennen den Vermerk nur bei gekappten Seiten', () => {
+    const fetches = [rec('https://a.de/1', true), rec('https://b.de/2')]
+    const md = mergeDeterministicSources('Text.', fetches)
+    expect(md).toContain('- [T](https://a.de/1) — abgerufen am 2026-11-06 — nur Seitenanfang gelesen (Seite zu groß)')
+    expect(md).toContain('- [T](https://b.de/2) — abgerufen am 2026-11-06\n')
+    const html = mergeDeterministicSourcesHtml('<p>x</p>', fetches, 'en')
+    expect(html).toContain('retrieved on 2026-11-06 — only the beginning was read (page too large)')
+    const sheet = deterministicSourcesSheet(fetches)
+    expect(sheet[0]).toEqual(['Titel', 'URL', 'Abgerufen am', 'Hinweis'])
+    expect(sheet[1][3]).toBe('nur Seitenanfang gelesen (Seite zu groß)')
+    expect(sheet[2][3]).toBe('')
+  })
+
+  it('ohne gekappte Seite bleibt das Excel-Blatt dreispaltig', () => {
+    expect(deterministicSourcesSheet([rec('https://b.de/2')])[0]).toEqual(['Titel', 'URL', 'Abgerufen am'])
+  })
+})
+
 describe('mergeDeterministicSources', () => {
   const rec = (url: string, title: string, status: 'ok' | 'failed' = 'ok') => ({
     requestedUrl: url, finalUrl: url, redirectChain: [url], title, fetchedAt: '2026-07-20T10:00:00.000Z', status
