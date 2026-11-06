@@ -100,6 +100,9 @@ npm run test         # vitest run — Unit-Tests für pure shared/-Logik
 ### IPC-Kommunikation
 Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.exposeInMainWorld()` in `preload.ts`.
 
+### Instanzsperre je Profil (seit 06.11.2026)
+`app.requestSingleInstanceLock()` direkt nach der userData-Isolation in `main/index.ts`; ein zweiter Start mit demselben Profil beendet sich sofort (Log `[startup] MindGraph läuft bereits mit diesem Profil`), die laufende Instanz holt ihr Fenster nach vorn (`main/singleInstance.ts`). Vorher schrieben zwei Instanzen gleichzeitig in dieselben Ablagen (Codex F25, `docs/codex-collab/web-render-stufe-a.md`). Die Sperre hängt am userData-Verzeichnis: Dev-App, installierte App und Testprofile (`MINDGRAPH_USER_DATA_DIR`) sperren sich nicht gegenseitig. **Dev-Falle:** Ein zweites `npm run dev` bzw. `npx electron-vite dev --remoteDebuggingPort 9222` neben einer laufenden Dev-App beendet sich still — für CDP-Messungen die laufende Dev-App vorher schließen oder ein eigenes `MINDGRAPH_USER_DATA_DIR` setzen.
+
 ### State Management (Zustand, 16 Stores)
 - **uiStore**: UI-Einstellungen, persisted via `persistedKeys` Array. Enthält u.a. `ollama.moduleModelOverrides`, `brain.folderPath`, `notesRootFolder`, `fileTreeKindFilter`, `editorDefaultView`, `imagesFolder`, `smartConnections.useLLMReranker`
 - **notesStore**: Notizen, Vault-Daten

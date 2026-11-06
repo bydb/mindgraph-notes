@@ -30,6 +30,7 @@ import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../s
 import { diffKnownMessages, type KnownLocalMessage, type KnownMessageUpdate } from '../shared/emailSync'
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 import { passwordStoreOverride } from '../shared/linuxPasswordStore'
+import { focusExistingWindow } from './singleInstance'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -53,6 +54,15 @@ const passwordStore = passwordStoreOverride(process.platform, process.env, proce
 if (passwordStore) {
   app.commandLine.appendSwitch('password-store', passwordStore)
   console.log(`[secrets] unbekannter Desktop (${process.env.XDG_CURRENT_DESKTOP || 'leer'}) → --password-store=${passwordStore}`)
+}
+
+// Instanzsperre je Profil (main/singleInstance.ts). Erst NACH der userData-Isolation oben —
+// Electron bindet die Sperre an das userData-Verzeichnis. Eine zweite Instanz beendet sich, bevor
+// sie irgendetwas startet oder schreibt; die laufende holt ihr Fenster nach vorn (second-instance).
+const hasInstanceLock = app.requestSingleInstanceLock()
+if (!hasInstanceLock) {
+  console.log('[startup] MindGraph läuft bereits mit diesem Profil — die laufende Instanz übernimmt.')
+  app.quit()
 }
 
 // Lazy-loaded native/heavy Module — beim Start nicht eager geladen (8-GB-Startup-Optimierung).
@@ -1614,7 +1624,14 @@ if (process.platform === 'linux') {
   appAny.setDesktopName(app.isPackaged ? 'mindgraph-notes.desktop' : 'mindgraph-notes-dev.desktop')
 }
 
+app.on('second-instance', () => {
+  if (!app.isReady()) return
+  focusExistingWindow(mainWindow, createWindow)
+})
+
 app.whenReady().then(async () => {
+  // Zweite Instanz: nichts starten, nichts schreiben — app.quit() läuft bereits.
+  if (!hasInstanceLock) return
   // Startup-Messung (Testplan Performance-Fix): Zeit bis Fenster erstellt ist.
   console.time('app-ready')
   // Reconnect + sync when the machine wakes from sleep. The sync WebSocket often
