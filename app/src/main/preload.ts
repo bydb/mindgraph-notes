@@ -392,6 +392,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Websuche im Petrol-Chat (Stufe 1b): Suche, Abrufe und Modell in EINER Anfrage mit
   // derselben Kennung. Fortschritt auf eigenem Kanal, Textstücke auf petrol-chat-chunk.
   petrolChatWeb: (params: unknown) => ipcRenderer.invoke('petrol-chat-web', params),
+  webFetchStatsGet: () => ipcRenderer.invoke('web-fetch-stats-get'),
+  webFetchStatsClear: () => ipcRenderer.invoke('web-fetch-stats-clear') as Promise<boolean>,
   petrolChatSnapshotsDrop: (scopeId: string) => ipcRenderer.invoke('petrol-chat-snapshots-drop', scopeId) as Promise<boolean>,
   petrolChatSnapshotsAlive: (scopeId: string, ids: string[]) => ipcRenderer.invoke('petrol-chat-snapshots-alive', scopeId, ids) as Promise<string[]>,
   // Gespräch im Main (Teil 1): Verlauf, Datenbasis und Speichern liegen dort (Rev. 4 Punkt 12).

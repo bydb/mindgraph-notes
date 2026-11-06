@@ -1037,6 +1037,8 @@ export interface ElectronAPI {
   onPetrolChatChunk: (callback: (chunk: { requestId: string; delta: string }) => void) => void;
   petrolChatAbort: (requestId: string) => Promise<boolean>;
   petrolChatWeb: (params: import('./webChat').PetrolWebRequest) => Promise<{ success: boolean; result?: import('./webChat').WebChatResult; error?: string }>;
+  webFetchStatsGet: () => Promise<import('./webFetchStats').WebFetchStatsSummary | null>;
+  webFetchStatsClear: () => Promise<boolean>;
   petrolChatSnapshotsDrop: (scopeId: string) => Promise<boolean>;
   /** Teilmenge der Kennungen, deren eingefrorene Auszüge der Main noch hält (Codex F02). */
   petrolChatSnapshotsAlive: (scopeId: string, ids: string[]) => Promise<string[]>;

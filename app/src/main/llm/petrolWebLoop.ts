@@ -106,6 +106,7 @@ function failText(outcome: Extract<WebFetchOutcome, { ok: false }>): string {
     case 'too-large': return 'Seite zu groß'
     case 'type': return 'kein HTML'
     case 'blocked': return 'Adresse nicht erlaubt'
+    case 'browser-only': return 'die Seite lädt ihren Inhalt (z. B. eine Händlersuche) erst im Browser, die App kann sie nicht lesen'
     default: return 'Abruf fehlgeschlagen'
   }
 }

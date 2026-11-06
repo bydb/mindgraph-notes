@@ -306,6 +306,17 @@ describe('Benannte Lücke statt Fehlalarm (Nutzertest 24.10.2026)', () => {
     expect(isGapStatement('Der Begriff „Medienzentrum“ wird in den Auszügen nicht genannt.')).toBe(true)
     expect(isGapStatement('In den Seiten steht nichts dazu, die Frist endet aber 2027.')).toBe(false)
     expect(isGapStatement('Das gilt nicht für Vereine.')).toBe(false)
+    // Nicht lesbare Händlersuche (06.11.2026, echter Satz aus dem Petrol-Chat).
+    expect(isGapStatement('Die offizielle BDK-Website (bdkparfums.com bzw. us.bdkparfums.com) lädt vermutlich eine Händlersuche oder Standortliste erst im Browser, die die App nicht einlesen konnte.')).toBe(true)
+    expect(isGapStatement('Die Händlersuche von BDK lässt sich hier nicht lesen.')).toBe(true)
+    // Wortformen (echter Satz 06.11.2026: „Händlersucher“).
+    expect(isGapStatement('Den Händlersucher von BDK konnte die App nicht lesen.')).toBe(true)
+    expect(isGapStatement('Der Filialfinder lädt erst im Browser und ist hier nicht lesbar.')).toBe(true)
+    // Ohne genanntes Fehlen keine Lücke, mit Gegenbehauptung oder Zahl auch nicht.
+    expect(isGapStatement('Die Händlersuche zeigt Geschäfte in Frankfurt.')).toBe(false)
+    expect(isGapStatement('Die Händlersuche ist nicht lesbar, aber BDK gibt es bei Douglas.')).toBe(false)
+    expect(isGapStatement('Die Händlersuche lädt erst im Browser, nicht lesbar: 12 Geschäfte in Hessen.')).toBe(false)
+    expect(isGapStatement('Im Browser gibt es nichts zu sehen.')).toBe(false)
   })
 
   it('setzt gap nur bei Sätzen ohne Quellennummer', () => {

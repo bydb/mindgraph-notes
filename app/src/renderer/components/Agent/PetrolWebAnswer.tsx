@@ -56,6 +56,7 @@ export const REASON_KEYS: Record<WebFetchFailReason, TranslationKey> = {
   http: 'petrolChat.webReasonHttp',
   type: 'petrolChat.webReasonType',
   blocked: 'petrolChat.webReasonBlocked',
+  'browser-only': 'petrolChat.webReasonBrowserOnly',
   error: 'petrolChat.webReasonError'
 }
 
@@ -257,6 +258,32 @@ export function WebSourcesFold({ sources, used, limited, unused, failed, childre
       </summary>
       <div className="petrol-web-fold-body">{children}</div>
     </details>
+  )
+}
+
+/**
+ * Seiten, die nur im Browser lesbar sind (Händlersuche mit Karte), sichtbar UNTER der Antwort und
+ * nicht im eingeklappten Quellenblock: der Weg zur fehlenden Liste soll ein Klick sein (06.11.2026).
+ * Adresse stammt aus dem Suchtreffer, geöffnet wird nur per Klick im System-Browser.
+ */
+export function WebBrowserOnlyLinks({ failures }: { failures: readonly WebFetchFailure[] | undefined }) {
+  const { t } = useTranslation()
+  const seen = new Set<string>()
+  const pages = (failures ?? []).filter(f => {
+    if (f.reason !== 'browser-only' || !f.url || !/^https?:\/\//i.test(f.url) || seen.has(f.host)) return false
+    seen.add(f.host)
+    return true
+  }).slice(0, 3)
+  if (pages.length === 0) return null
+  return (
+    <div className="petrol-web-browser-only">
+      <span className="petrol-web-muted">{t('petrolChat.webBrowserOnlyLead')}</span>
+      {pages.map(f => (
+        <button key={f.host} type="button" className="agent-card-link-btn" title={f.url} onClick={() => openSource(f.url!)}>
+          {t('petrolChat.webBrowserOnlyOpen', { host: f.host.replace(/^www\./, '') })}
+        </button>
+      ))}
+    </div>
   )
 }
 

@@ -8,6 +8,7 @@ import Defuddle from 'defuddle'
 import { parseHTML } from 'linkedom'
 import TurndownService from 'turndown'
 import { safeFetch } from './egress'
+import { type BrowserOnlyKind, detectBrowserOnlyPage } from '../../shared/browserOnlyPage'
 import {
   type WebFetchRecord,
   sanitizeSourceTitle,
@@ -86,6 +87,26 @@ export class PageTooLargeError extends Error {
 }
 
 /**
+ * Seite, deren Inhalt erst im Browser entsteht (Skript-Hülle oder Händlersuche mit Karte). Die
+ * Webrecherche führt keine Skripte aus — statt des leeren Rahmens bekommen Chat und Agent diesen
+ * Fehler und sagen, dass die Liste hier nicht lesbar ist, statt „nichts gefunden“ (06.11.2026).
+ */
+export class BrowserOnlyPageError extends Error {
+  kind: BrowserOnlyKind
+  finalUrl: string
+  redirectChain: string[]
+  constructor(kind: BrowserOnlyKind, finalUrl: string, redirectChain: string[]) {
+    super(kind === 'locator'
+      ? `Händlersuche lädt ihre Einträge erst im Browser: ${finalUrl}`
+      : `Seite lädt ihren Inhalt erst im Browser: ${finalUrl}`)
+    this.name = 'BrowserOnlyPageError'
+    this.kind = kind
+    this.finalUrl = finalUrl
+    this.redirectChain = redirectChain
+  }
+}
+
+/**
  * `maxChars`: Seitentext höchstens so lang (Standard WEB_PAGE_CONTEXT_MAX_CHARS). Nur der
  * Petrol-Chat mit großem Cloud-Fenster setzt mehr; der Notiz-Agent bleibt beim Standard.
  */
@@ -123,6 +144,10 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     // Titel als untrusted behandeln — auf eine Zeile reduzieren, Steuerzeichen entfernen.
     title = sanitizeSourceTitle(parsed.title || '')
     markdown = buildTurndown().turndown(parsed.content || '')
+    // Eine an der Bytegrenze gekappte Seite hat ein Größen-, kein Browserproblem (ikea.com:
+    // 1,9 MB HTML, Öffnungszeiten erst ab Byte 1,69 Mio.) — dort nie „lädt erst im Browser“ melden.
+    const browserOnly = res.truncated ? null : detectBrowserOnlyPage({ html, text: markdown, url: res.finalUrl })
+    if (browserOnly) throw new BrowserOnlyPageError(browserOnly, res.finalUrl, res.redirectChain)
   }
 
   const trimmed = truncate(markdown.trim(), opts?.markTruncation !== false, opts?.maxChars)

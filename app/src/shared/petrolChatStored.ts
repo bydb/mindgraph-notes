@@ -159,7 +159,7 @@ const byKind = (variants: Record<string, S>): S => {
 // --- Web
 
 const storedSource = shape({ n: nat, title: str, url: str, host: str, fetchedAt: str, originalChars: nat, truncated: bool, titleFromPage: maybe(bool) })
-const failure = shape({ host: str, reason: oneOf('timeout', 'stopped', 'empty', 'too-large', 'http', 'type', 'blocked', 'error') })
+const failure = shape({ host: str, reason: oneOf('timeout', 'stopped', 'empty', 'too-large', 'http', 'type', 'blocked', 'browser-only', 'error'), url: maybe(str) })
 const provenance = shape({
   searchProvider: orNull(str),
   searchOk: bool,
