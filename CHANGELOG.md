@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.4] - 2026-11-06
+
+**Kann die Websuche eine Händler- oder Filialsuche nicht lesen, sagt der Chat das jetzt offen und bietet einen Knopf, um die Seite selbst zu öffnen.** Vorher kam bei solchen Seiten nur der leere Rahmen an, und die Antwort lautete „keine Geschäfte gefunden“, obwohl der Hersteller sie listet. Auch der Agent führt solche Seiten in Notizen, Tabellen, Präsentationen und auf der Ergebniskarte als „nicht gelesen“ auf, statt sie zu verschweigen.
+
+### Hintergrund
+
+- **Auslöser:** Händlersuchen mit Karte laden ihre Einträge erst im Browser per Skript. Die Websuche von MindGraph führt bewusst keine Skripte aus und sah deshalb nur eine leere Seite.
+- **Erkennung:** Erkannt werden eingebettete Händlerkarten und Seiten, die ohne Browser praktisch leer sind. Die Regeln sind eng gefasst, damit echte, lesbare Seiten Quelle bleiben. Lieber eine Händlersuche übersehen als einen Beleg wegwerfen.
+- **Antwort:** Der Chat beginnt dann mit dem Hinweis, dass die Liste auf der Website steht, hier aber nicht gelesen werden konnte, und beantwortet die Frage danach mit dem, was die übrigen Seiten hergeben. Das gilt auch für Nachfragen zu derselben Suche.
+- **Große Seiten:** Seiten über 1,5 MB liest der Agent nur bis zu dieser Grenze. Sie bleiben Quelle, stehen aber überall mit dem Vermerk „nur Seitenanfang gelesen“.
+- **Zählung:** Unter Einstellungen → KI → Webrecherche zeigt MindGraph, wie oft Webabrufe in den letzten 30 Tagen gelangen und woran sie scheiterten. Gezählt wird nur Erfolg oder Fehlgrund, bei Fehlschlägen mit dem Namen der Website, keine Fragen und keine Inhalte. Die Zahlen bleiben auf diesem Rechner und lassen sich zurücksetzen.
+- **Nur eine Instanz:** Ein zweiter Start von MindGraph mit demselben Profil holt jetzt das offene Fenster nach vorn, statt eine zweite Instanz zu öffnen. Zwei gleichzeitig laufende Instanzen konnten sich unter Windows und Linux gegenseitig Einstellungen und Daten überschreiben.
+- **Links:** Links öffnet die App nur noch auf Anfrage ihrer eigenen Fenster und nur für Web- und Mail-Adressen.
+- **Grenze:** Karten, in denen man erst einen Ort suchen muss, kann MindGraph weiterhin nicht selbst lesen. Ein unsichtbarer Browser dafür wurde geprüft und vorerst verworfen: Er hätte bei den meisten getesteten Seiten nicht geholfen und neue Sicherheitsfragen aufgeworfen.
+
 ## [1.2.3] - 2026-11-06
 
 **Das Antares-Widget zeigt unter „offene Registrierungen“ wieder nur die Personen, die tatsächlich auf ihre Freischaltung warten.** Bisher stand dort die komplette Entleiherliste des Medienzentrums mit mehreren tausend Einträgen, obwohl die Kachel darüber die richtige Zahl anzeigte.
