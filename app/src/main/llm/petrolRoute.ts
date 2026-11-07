@@ -36,6 +36,8 @@ export interface RouteDecision {
   question: string
   /** Wie die Entscheidung zustande kam — für Spur und Telemetrie, nie Inhalt. */
   via: 'model' | 'forced' | 'fallback'
+  /** Prüfauftrag zu einer früheren Antwort („Im Web prüfen“, „überprüfe“). */
+  check?: boolean
 }
 
 export function buildRouteSystemPrompt(today: string): string {
@@ -115,5 +117,5 @@ export function resolveRoute(parsed: { search: boolean; question: string; check?
   if (q.length > ROUTE_LIMITS.questionMax) q = q.slice(0, ROUTE_LIMITS.questionMax).replace(/\s+\S*$/, '')
   const check = verify || parsed.check === true
   const question = check ? (q ? checkQuestion(q) : `${CHECK_FALLBACK} ${CHECK_TAIL}`) : q || fallbackQuestion
-  return { search: true, question, via: parsed.search ? 'model' : 'forced' }
+  return { search: true, question, via: parsed.search ? 'model' : 'forced', ...(check ? { check: true } : {}) }
 }

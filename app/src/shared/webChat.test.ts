@@ -232,6 +232,31 @@ describe('Fußnoten-Export (F13)', () => {
   })
 })
 
+describe('Prüfauftrag und Tausender mit Leerzeichen (07.11.2026)', () => {
+  it('Zahlen der geprüften Antwort sind kein Befund', () => {
+    const src = ['Der Südturm ist 157,22 m hoch, der Nordturm 157,18 m.']
+    const answer = 'Die 157,38 m aus meiner letzten Antwort sind falsch [1]. Der Nordturm misst 157,18 m [1]. Die 632 Jahre Bauzeit stehen nicht dort.'
+    const report = analyzeCitations(answer, src)
+    const checked = 'Höhe: 157,38 m. Fertigstellung 1880 nach 632 Jahren Bauzeit.'
+    const ex = sentenceExtras(answer, report, src, '', checked)
+    expect(ex[0].missingNumbers).toEqual([])
+    expect(ex[1].missingNumbers).toEqual([])
+    expect(ex[2].unsourcedNumbers).toBeUndefined()
+    // Ohne Prüfauftrag bleibt der Befund.
+    expect(sentenceExtras(answer, report, src)[0].missingNumbers).toEqual(['157,38 m'])
+  })
+  it('„30 000“ ist eine Zahl und trifft „30.000“ auf der Seite', () => {
+    expect(numberUnits('rund 30 000 bis 35 000 Menschen')).toEqual(['30000', '35000'])
+    expect(numberUnits('30\u202f000 Besucher')).toEqual(['30000'])
+    const src = ['Täglich kommen 30.000 bis 35.000 Besucher.']
+    const answer = 'Täglich kommen rund 30 000 bis 35 000 Besucher [1].'
+    expect(sentenceExtras(answer, analyzeCitations(answer, src), src)[0].missingNumbers).toEqual([])
+    // Keine Dreiergruppe → zwei Zahlen; Jahreszahl danach wird nicht angeklebt.
+    expect(numberUnits('Tag 1 2025')).toEqual(['1', '2025'])
+    expect(numberUnits('Seite 12 45')).toEqual(['12', '45'])
+  })
+})
+
 describe('Zusatzprüfungen je Satz (F21)', () => {
   it('Verneinung bei hoher Wortdeckung wird markiert, erfundene Zahl auch', () => {
     const src = ['Der Vertrag wurde am Montag geschlossen. Der Beitrag beträgt 18,36 Euro.']

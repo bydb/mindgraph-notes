@@ -81,6 +81,8 @@ export interface WebRunInput {
   lmStudioPort?: number
   cloud: { model: string; provider: 'openrouter' | 'llmbase' } | null
   webTopics?: Array<{ text: string; clipped: boolean }>
+  /** Prüfauftrag: die geprüfte frühere Antwort (ihre Zahlen sind Prüfgegenstand, kein Befund). */
+  checked?: string
 }
 /** Automatische Websuche (main/llm/petrolRoute.ts): Entscheidung vor der Antwort. */
 export interface RouteRunInput {
@@ -96,7 +98,7 @@ export interface RouteRunInput {
   lmStudioPort?: number
   cloud: { model: string; provider: 'openrouter' | 'llmbase' } | null
 }
-export type RouteRunResult = { stopped: true } | { stopped?: false; search: boolean; question: string; via: 'model' | 'forced' | 'fallback' }
+export type RouteRunResult = { stopped: true } | { stopped?: false; search: boolean; question: string; via: 'model' | 'forced' | 'fallback'; check?: boolean }
 
 export interface WebRunResult {
   success: boolean
@@ -307,7 +309,7 @@ export class PetrolConversations {
       if (!data) return { ok: false, error: 'Dieses Bild ist nicht mehr vorhanden.' }
       images.push({ ...i, dataBase64: data })
     }
-    let web: (NonNullable<SendRequest['web']> & { routed?: string }) | undefined = req.kind === 'web' ? req.web : undefined
+    let web: (NonNullable<SendRequest['web']> & { routed?: string; checked?: string }) | undefined = req.kind === 'web' ? req.web : undefined
     if (req.kind === 'web' && !web) return { ok: false, error: 'Websuche ohne Suchwörter.' }
     let kind: SendRequest['kind'] = req.kind
     const follow = req.kind === 'follow-up' ? req.followUpSnapshotId : undefined
@@ -356,7 +358,7 @@ export class PetrolConversations {
       this.deps.log?.(`[petrol-route] ${decision.search ? 'suchen' : 'ohne Suche'} (${decision.via})`)
       // Die schnelle Suche schickt `query` wörtlich an den Suchdienst: eine zu lange Prüffrage dort
       // nicht, dann bleibt es bei den getippten Suchwörtern. Recherchiert wird trotzdem mit ihr.
-      if (decision.search) web = { ...web, query: !web.deep && isQueryTooLong(decision.question) ? web.query : decision.question || web.query, routed: decision.question || undefined }
+      if (decision.search) web = { ...web, query: !web.deep && isQueryTooLong(decision.question) ? web.query : decision.question || web.query, routed: decision.question || undefined, ...(decision.check ? { checked: lastAnswerText(before) } : {}) }
       else { web = undefined; kind = 'chat' }
     }
     const userMsg: PetrolChatMessage = follow
@@ -402,7 +404,8 @@ export class PetrolConversations {
           lmStudioPort: req.lmStudioPort,
           cloud: req.cloud,
           // Themenfragen sind keine Sachbasis. Bei der Nachfrage bleiben sie draußen (F03).
-          ...(follow ? {} : { webTopics })
+          ...(follow ? {} : { webTopics }),
+          ...(web?.checked ? { checked: web.checked } : {})
         }, tap)
       } catch (e) {
         wres = { success: false, error: e instanceof Error ? e.message : String(e) }
@@ -678,6 +681,15 @@ export class PetrolConversations {
 
 // ---------------------------------------------------------------------------------------------
 // IPC-Grenze
+
+/** Letzte sichtbare Antwort (kein Fehler, keine feste App-Antwort) — Gegenstand eines Prüfauftrags. */
+function lastAnswerText(messages: readonly PetrolChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role === 'assistant' && !m.error && !m.appNote && m.content.trim()) return m.content
+  }
+  return ''
+}
 
 const SNAPSHOT_ID_RE = /^[0-9a-f]{32}$/
 const isStr = (x: unknown, max: number): x is string => typeof x === 'string' && x.length <= max

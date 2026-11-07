@@ -365,6 +365,12 @@ export interface PetrolWebRequest {
   webTopics?: Array<{ text: string; clipped: boolean }>
   /** „Gründlich“: das Modell plant die Suchanfragen aus `question` (`query` wird ignoriert). */
   deep?: boolean
+  /**
+   * Prüfauftrag („Im Web prüfen“, „überprüfe“): die geprüfte frühere Antwort. Ihre Zahlen sind
+   * Prüfgegenstand — die Antwort nennt sie, um sie zu bestätigen oder zu widerlegen, und sie
+   * stehen deshalb oft gerade NICHT auf der Seite (GUI-Test 07.11.2026, „157,38 m … falsch“).
+   */
+  checked?: string
 }
 
 export interface PetrolWebProgress {
@@ -1061,6 +1067,10 @@ export function numberUnits(text: string): string[] {
     // richtig zitierte Öffnungszeit stand als „Zahl nicht in der Seite“ da. Ein Leerzeichen davor,
     // die Positionen verschieben sich für alle folgenden Treffer gleich.
     .replace(/(\d{1,2}:\d{2}(?::\d{2})?)(uhr|h)(?![\p{L}\p{N}])/gu, '$1 $2')
+    // Tausender mit Leerzeichen („30 000“, schmales/geschütztes Leerzeichen): EINE Zahl. Vorher las die
+    // Prüfung „30“ und „000“ und meldete beide als nicht in der Seite (GUI-Test 07.11.2026). Nur
+    // Dreiergruppen hinter 1–3 Ziffern; die Trennzeichen werden zu Punkten, Länge bleibt gleich.
+    .replace(/(?<![\d.,])\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?![\d.,]\d)(?!\d)/gu, (v) => v.replace(/[ \u00a0\u202f]/g, '.'))
   for (const m of lower.matchAll(WHOLE_VALUE)) out.add(m[0])
   let rest = lower.replace(WHOLE_VALUE, (v) => ' '.repeat(v.length))
   for (const m of rest.matchAll(PREFIX_CURRENCY)) out.add(canonNumber(m[2], true) + UNIT_CANON[m[1]])
@@ -1215,9 +1225,12 @@ export function withoutSourceMentions(text: string, sourceCount: number): string
  * Eine Verneinung wird nie per Wortanteil „freigesprochen“ (F03: „mit/ohne Speicher nicht
  * erlaubt“ hätte die Warnung verloren).
  */
-export function sentenceExtras(answer: string, report: CitationReport, excerpts: readonly string[], question = ''): SentenceExtra[] {
+export function sentenceExtras(answer: string, report: CitationReport, excerpts: readonly string[], question = '', checked = ''): SentenceExtra[] {
   const sourceNumbers = excerpts.map(pageNumbers)
   const askedNumbers = new Set(numberUnits(question).map(numberCore))
+  // Zahlen der geprüften Antwort: weder „nicht in der Seite“ noch „ohne Quelle“ noch „aus deiner Frage“.
+  const checkedNumbers = new Set(numberUnits(checked).map(numberCore))
+  const notChecked = (n: string) => !checkedNumbers.has(numberCore(n))
   return report.sentences.map((s: SentenceCheck) => {
     // Rangspalte („1“, „2.“): die Zählung schreibt das Modell selbst, sie ist keine Sachzahl —
     // auch nicht, wenn die Zelle die Nummer der Zeile erbt (citations.ts). Nur unter einem
@@ -1228,14 +1241,14 @@ export function sentenceExtras(answer: string, report: CitationReport, excerpts:
       const gap = s.status === 'uncited' && isGapStatement(text, question)
       if (s.status === 'uncited' && !gap && isLabel(text) && isTableLabelCell(answer, s.start)) return { missingNumbers: [], negation: false, label: true }
       const unsourced = s.status === 'uncited' && !gap
-        ? numberUnits(withoutSourceMentions(text, excerpts.length)).filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
+        ? numberUnits(withoutSourceMentions(text, excerpts.length)).filter((n) => !askedNumbers.has(numberCore(n)) && notChecked(n)).map(showNumber)
         : []
       return { missingNumbers: [], negation: false, gap, ...(unsourced.length ? { unsourcedNumbers: unsourced } : {}) }
     }
     const plain = withoutSourceMentions(answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' '), excerpts.length)
     const cited = s.refs.map((n) => sourceNumbers[n - 1]).filter(Boolean)
     // Zahl ohne Einheit: irgendwo auf der Seite genügt; mit Einheit nur mit derselben Einheit.
-    const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n) || pn.has(withoutZeroFraction(n)) || pn.has(timeKey(n))))
+    const notOnPage = numberUnits(plain).filter((n) => notChecked(n) && !cited.some((pn) => pn.has(n) || pn.has(withoutZeroFraction(n)) || pn.has(timeKey(n))))
     const missingNumbers = notOnPage.filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
     const questionNumbers = notOnPage.filter((n) => askedNumbers.has(numberCore(n))).map(showNumber)
     // Nur wenn jede Zahl einzeln belegt ist und ein Preis dabei ist: sonst meldet schon `number`.

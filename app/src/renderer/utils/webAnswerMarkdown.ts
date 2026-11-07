@@ -67,8 +67,19 @@ export const MARK_GLYPHS: Record<WebMarkKind, string> = { severe: '!', apart: '�
  * nicht von falsch. Es bleibt in „Prüfung je Satz“. Zahlen, Zitate, Nummern prüfen eigene Marken.
  */
 export function inlineFlags(flags: readonly WebSentenceFlag[]): WebSentenceFlag[] {
-  return flags.filter((f) => f !== 'low')
+  return flags.filter((f) => !NOT_INLINE.has(f))
 }
+
+/**
+ * Nur in „Prüfung je Satz“, nie als Zeichen im Text (Nutzer 07.11.2026, „die roten Ausrufezeichen
+ * stören“). Auszählung der Gespräche dieses Tages: 35 rote Sätze, rund 29 Fehlalarme. „Zitat nicht
+ * gefunden“ traf fast nur Anführungszeichen als Betonung („wegziehen“, „Top-5-GOAT“) und Zitate der
+ * geprüften eigenen Antwort; „Zahl ohne Quelle“ traf „Tag 1“, „Nr. 1“, den Markennamen „4711“ und
+ * „Brand von 2019“ in Sätzen, die ohnehin als Modellwissen (○) gekennzeichnet sind. Rot bleibt für
+ * eine Zahl, die in einem BELEGTEN Satz nicht auf der genannten Seite steht, und für eine Nummer
+ * ohne Quelle. Wieder hereinholen nur nach einer neuen Auszählung.
+ */
+const NOT_INLINE: ReadonlySet<WebSentenceFlag> = new Set(['low', 'quote', 'unsourcedNumber'])
 
 export function markKind(all: readonly WebSentenceFlag[]): WebMarkKind | null {
   const flags = inlineFlags(all)

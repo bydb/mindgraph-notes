@@ -68,7 +68,11 @@ describe('Modellwissen (26.10.2026)', () => {
     expect(hasSevereFlag(['number'])).toBe(true)
     expect(hasSevereFlag(['uncited'])).toBe(false)
     expect(hasSevereFlag(['low', 'gap'])).toBe(false)
-    expect(markKind(['uncited', 'unsourcedNumber'])).toBe('severe')
+    // Zahl im Modellwissen-Satz und nicht gefundenes Zitat: nur in der Prüfliste (Nutzer 07.11.2026).
+    expect(markKind(['uncited', 'unsourcedNumber'])).toBe('knowledge')
+    expect(markKind(['quote'])).toBeNull()
+    expect(markKind(['quote', 'number'])).toBe('severe')
+    expect(markKind(['invalid'])).toBe('severe')
     expect(markKind(['uncited'])).toBe('knowledge')
     // Geringe Wortübereinstimmung steht nicht mehr im Text, nur in der Prüfliste.
     expect(markKind(['low'])).toBeNull()

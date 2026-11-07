@@ -7390,7 +7390,7 @@ async function runPetrolWeb(event: IpcMainInvokeEvent, params: PetrolWebParams) 
     // Zahlen im Seitentitel („Raspberry Pi 5 (8 GB RAM), 189,00 €“) gelten als Seitenzahlen: das Modell
     // sieht den Titel im Kopf der Quelle, und Shops nennen den Preis oft nur dort (Nutzertest 26.10.2026).
     // Nur ein Titel aus der Seite selbst, nie der Suchtreffer-Titel (Codex F62).
-    const extras = sentenceExtras(answer, report, sources.map(s => s.titleFromPage ? `${s.title}\n${s.excerpt}` : s.excerpt), question)
+    const extras = sentenceExtras(answer, report, sources.map(s => s.titleFromPage ? `${s.title}\n${s.excerpt}` : s.excerpt), question, typeof params.checked === 'string' ? params.checked.slice(0, 20_000) : '')
     // Nur eine fertige Antwort mit zitierter Quelle wird eingefroren. Die Nachfrage legt
     // eine neue Kennung derselben Auszüge an, damit die nächste Frage an diese Antwort bindet.
     const newSnapshotId = !event.sender.isDestroyed() && scopeId && report.usedSources.length > 0
