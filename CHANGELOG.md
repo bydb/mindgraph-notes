@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.6] - 2026-11-07
+
+**Die Websuche findet jetzt auch Angaben, die nicht im Haupttext einer Seite stehen, etwa Öffnungszeiten in der Seitenleiste oder Kontaktdaten in der Fußzeile.** Steht die Antwort auf einer Unterseite, kann die Recherche Links derselben Website weiterverfolgen, statt nur Suchtreffer zu lesen. Das gilt für den Chat und für den Agenten.
+
+### Hintergrund
+
+- **Auslöser:** Bei einer Frage nach den Öffnungszeiten mehrerer Einrichtungen fand die Recherche nur wenige davon. Die Zeiten standen entweder am Seitenrand, den die Websuche als Menü und Werbung verwirft, oder auf einer Unterseite, die nur über das Menü erreichbar war.
+- **Seitenrand:** Aus Seitenleiste und Fußzeile übernimmt MindGraph nur kurze Abschnitte mit Zahlen oder E-Mail-Adressen, ohne Menüs und ohne Unsichtbares, insgesamt höchstens 700 Zeichen. Sie stehen gekennzeichnet vor dem Seitentext, damit sie auch bei langen Seiten ankommen.
+- **Unterseiten:** Nach jeder gelesenen Seite bietet MindGraph bis zu 12 (Chat) bzw. 15 (Agent) Links derselben Website zum Weiterlesen an, passende zur Frage zuerst. Fremde Websites und Subdomains sind ausgenommen, das Abrufbudget bleibt gleich.
+- **Cookie-Hinweise:** Auf kurzen Seiten verdrängte der Cookie-Hinweis gelegentlich den eigentlichen Inhalt. Er wird jetzt vorher entfernt.
+- **Satzprüfung:** Eine Quellenangabe direkt unter einer Tabelle gilt für deren Zeilen ohne eigene Angabe, wenn es genau eine Quelle ist. Uhrzeiten wie „9Uhr“ oder „9:00“ statt „09:00“ werden richtig verglichen.
+- **Sicherheit:** Weiterleitungen beim Webabruf sind nur noch auf denselben Port oder einen Standardport erlaubt.
+
 ## [1.2.5] - 2026-11-07
 
 **Nach dem Update auf 1.2.4 öffnete MindGraph ein falsches Profil, Einstellungen und Vault schienen verschwunden. 1.2.5 behebt das: Mit dem Update sind alle bisherigen Einstellungen, Zugangsdaten und der zuletzt geöffnete Vault automatisch wieder da.** Es ist nichts verloren gegangen, die Daten lagen die ganze Zeit unverändert an ihrem Platz. Was Sie in 1.2.4 neu eingerichtet haben, bleibt im falschen Profil und erscheint nicht mehr.
