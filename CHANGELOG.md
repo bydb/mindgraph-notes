@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.7] - 2026-11-07
+
+**Der Chat entscheidet jetzt selbst, ob er für eine Frage im Web nachsieht: Fakten wie Preise, Daten oder Öffnungszeiten recherchiert er mit Quellen, Formulieren und Erklären geht ohne Suche schnell.** Mit „Im Web prüfen“ oder einem getippten „stimmt das?“ lassen Sie eine frühere Antwort Angabe für Angabe gegen Quellen prüfen. Wer für eine Prüfung lernt, bekommt kurz gegliederte Erklärungen mit Merksatz und macht daraus mit einem Klick Karteikarten.
+
+### Hintergrund
+
+- **Auslöser:** Der Globus war ein reiner Schalter. Aus hieß: Faktenantworten kamen aus dem Gedächtnis des Modells, ohne Hinweis und manchmal falsch. An hieß: jede Nachricht löste eine Suche aus, auch „Danke“ oder „überprüfe“.
+- **Websuche automatisch:** Vor jeder Nachricht entscheidet ein kurzer Modellaufruf, ob gesucht wird, und schreibt Folgefragen wie „und der Pi 4?“ zu einer vollständigen Frage um. Gemessen an 30 gemischten Nachrichten traf ein großes lokales Modell jede Entscheidung, ein kleines ebenfalls. Antworten ohne Suche sind als „ohne Websuche, aus Modellwissen“ gekennzeichnet. Wer den Globus ausschaltet, bekommt keine Suche.
+- **Antworten prüfen:** Die Prüfung nennt je Angabe „bestätigt“, „falsch“ (mit der richtigen Angabe und Quelle) oder „nicht belegt“. Sie bezieht sich auf die letzte Antwort oder auf eine, die Sie nennen, etwa „die Zeitleiste von vorhin“.
+- **Ruhigere Prüfzeichen:** Rote Ausrufezeichen erscheinen nur noch, wenn eine Zahl in einem belegten Satz nicht auf der genannten Seite steht. Zitat- und Zahlenhinweise zu Sätzen aus Modellwissen stehen weiter in „Prüfung je Satz“; im Text waren sie meist Fehlalarme.
+- **Lernen:** Erklärungen erscheinen in kurzen Abschnitten mit Fachbegriffen in Petrol und einem Merkkasten am Ende. Erkennt der Chat, dass jemand lernt, steht unter den Antworten „Lernkarten“: Die Karten erscheinen als Vorschau, lassen sich einzeln streichen und sofort lernen. Eine Antwort auf eine Abfragefrage löst keine Websuche aus.
+- **Behoben:** Mit Cloud-Modellen entstanden beim Erzeugen von Karteikarten keine Karten, auch im Karteikarten-Bereich.
+- **Grenzen:** Mit einem lokalen Modell dauert eine Antwort mit Websuche ein bis drei Minuten. Ob eine Frage Fakten braucht, entscheidet das Modell; Geschichtswissen behandelt es oft als Allgemeinwissen und sucht nicht, „Im Web prüfen“ holt die Quellen nach.
+
 ## [1.2.6] - 2026-11-07
 
 **Die Websuche findet jetzt auch Angaben, die nicht im Haupttext einer Seite stehen, etwa Öffnungszeiten in der Seitenleiste oder Kontaktdaten in der Fußzeile.** Steht die Antwort auf einer Unterseite, kann die Recherche Links derselben Website weiterverfolgen, statt nur Suchtreffer zu lesen. Das gilt für den Chat und für den Agenten.
