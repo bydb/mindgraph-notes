@@ -57,8 +57,15 @@ if (passwordStore) {
   console.log(`[secrets] unbekannter Desktop (${process.env.XDG_CURRENT_DESKTOP || 'leer'}) → --password-store=${passwordStore}`)
 }
 
-// Instanzsperre je Profil (main/singleInstance.ts). Erst NACH der userData-Isolation oben —
-// Electron bindet die Sperre an das userData-Verzeichnis. Eine zweite Instanz beendet sich, bevor
+// App-Name VOR jedem Zugriff auf das Profilverzeichnis setzen. Electron legt userData beim ersten
+// Zugriff fest (appData + App-Name) und ändert es danach nicht mehr. Stand der Name weiter unten,
+// fror die Instanzsperre das Profil auf den Paketnamen „mindgraph-notes“ ein: 1.2.4 öffnete ein
+// fremdes Profil, Einstellungen und Vault schienen weg (real, 07.11.2026). Nach der Dev-Isolation,
+// damit das Dev-Profil „mindgraph-notes (dev)“ bleibt. Test: main/appNameOrder.test.ts.
+app.name = 'MindGraph Notes'
+
+// Instanzsperre je Profil (main/singleInstance.ts). Erst NACH der userData-Isolation und dem
+// App-Namen oben — Electron bindet die Sperre an das userData-Verzeichnis. Eine zweite Instanz beendet sich, bevor
 // sie irgendetwas startet oder schreibt; die laufende holt ihr Fenster nach vorn (second-instance).
 const hasInstanceLock = app.requestSingleInstanceLock()
 if (!hasInstanceLock) {
@@ -1605,8 +1612,6 @@ function createWindow(): void {
   })
 }
 
-// App-Name setzen
-app.name = 'MindGraph Notes'
 
 // HTML-Vorschau: privilegiertes Scheme MUSS vor dem ready-Event registriert werden
 // (standard → relative URL-Auflösung im Dokument, secure → keine Mixed-Content-Blocks).
