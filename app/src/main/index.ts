@@ -204,6 +204,7 @@ import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petro
 import { WebSnapshotStore, sanitizeScopeId, sanitizeSnapshotId } from './llm/petrolWebSnapshots'
 import { PetrolConversations, parseSendRequest, withoutImageBytes, type RouteRunInput, type RouteRunResult, type TurnTap, type WebProgressEvent } from './petrolChats/conversation'
 import { buildRouteMessages, parseRouteReply, resolveRoute } from './llm/petrolRoute'
+import { parseFlashcardReply } from '../shared/flashcardParse'
 import { petrolChatStorage } from './petrolChats/electronCrypto'
 import { OnceShared } from './petrolChats/onceShared'
 import { normalizeRetention, sanitizeChatTitle } from '../shared/petrolChatStored'
@@ -11424,8 +11425,8 @@ STRICT RULES:
 - Write questions and answers in the SAME language as the source text.
 - Use LaTeX with $...$ ONLY for genuine mathematical symbols, never for normal prose.
 
-You MUST respond with ONLY a valid JSON array (no markdown fences, no commentary). Do NOT copy the <placeholders> — derive every value from the text:
-[{"front":"<short precise question>","back":"<minimal answer: word, phrase or one short sentence>","topic":"<short topic, 1-3 words>"}]
+You MUST respond with ONLY a valid JSON object (no markdown fences, no commentary). Do NOT copy the <placeholders> — derive every value from the text:
+{"cards":[{"front":"<short precise question>","back":"<minimal answer: word, phrase or one short sentence>","topic":"<short topic, 1-3 words>"}]}
 
 Create as many atomic cards as the text genuinely supports, but at most ${count}. Quality over quantity — skip filler.`
 
@@ -11433,28 +11434,8 @@ Create as many atomic cards as the text genuinely supports, but at most ${count}
 
     const responseText = await quizLlmComplete(model, systemPrompt, userMessage, cloud, { temperature: 0.4, maxTokens: 4000 })
 
-    // Robuste JSON-Extraktion (Modelle umrahmen das Array gern mit Prosa/Fences).
-    let cards: Array<{ front: string; back: string; topic: string }> = []
-    const tryParse = (s: string): typeof cards | null => {
-      try {
-        const cleaned = s.replace(/,\s*]/g, ']').replace(/,\s*}/g, '}')
-        const parsed = JSON.parse(cleaned)
-        return Array.isArray(parsed) ? parsed : null
-      } catch { return null }
-    }
-    const fence = responseText.match(/```(?:json)?\s*([\s\S]*?)```/)
-    if (fence) cards = tryParse(fence[1].trim()) || []
-    if (cards.length === 0) {
-      const start = responseText.indexOf('[')
-      const end = responseText.lastIndexOf(']')
-      if (start !== -1 && end > start) cards = tryParse(responseText.slice(start, end + 1)) || []
-    }
-
-    // Nur valide, nicht-leere Karten; gegen Atomaritäts-Ausreißer hart kürzen.
-    const cleanCards = cards
-      .filter(c => c && typeof c.front === 'string' && typeof c.back === 'string' && c.front.trim() && c.back.trim())
-      .map(c => ({ front: c.front.trim(), back: c.back.trim(), topic: (c.topic || '').trim() }))
-      .slice(0, count)
+    // Array, {"cards": [...]} (JSON-Modus der Cloud-Anbieter erzwingt ein Objekt) oder Einzelkarte.
+    const cleanCards = parseFlashcardReply(responseText, count)
 
     if (cleanCards.length === 0) {
       console.error('[Flashcards] Parsing fehlgeschlagen. Antwort:', responseText.slice(0, 800))

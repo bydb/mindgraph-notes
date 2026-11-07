@@ -23401,6 +23401,31 @@ body.presentation-mode *::after {
 }
 .petrol-turn-a blockquote > :last-child { margin-bottom: 0; }
 .petrol-turn-a hr { border: 0; border-top: 1px solid var(--border-subtle); margin: 16px 0; }
+/* Lernkarten aus einer Antwort: Vorschau als kleine Karteikarten (Frage oben, Antwort darunter). */
+.petrol-cards { margin: 4px 14px 12px; padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--bg-secondary); }
+.petrol-cards-head { display: flex; flex-direction: column; gap: 2px; margin-bottom: 10px; }
+.petrol-cards-title { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.petrol-cards-hint { font-size: 12px; color: var(--text-secondary); }
+.petrol-cards-status { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; font-size: 12.5px; color: var(--text-secondary); }
+.petrol-cards-status.is-error { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
+.petrol-cards-list { list-style: none; margin: 0 0 10px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.petrol-card {
+  position: relative; display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 30px 10px 12px; border-radius: 8px;
+  background: var(--bg-primary); border: 1px solid var(--border-color);
+  border-top: 3px solid var(--accent-color);
+  font-size: 13px; line-height: 1.45;
+}
+.petrol-card-front { font-weight: 600; color: var(--text-primary); }
+.petrol-card-back { color: var(--text-secondary); padding-top: 6px; border-top: 1px dashed var(--border-color); }
+.petrol-card.is-off { opacity: 0.45; border-top-color: var(--border-color); }
+.petrol-card.is-off .petrol-card-front, .petrol-card.is-off .petrol-card-back { text-decoration: line-through; }
+.petrol-card-toggle {
+  position: absolute; top: 6px; right: 6px; width: 20px; height: 20px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 4px; background: transparent; color: var(--text-secondary); cursor: pointer;
+}
+.petrol-card-toggle:hover { background: var(--bg-secondary); color: var(--text-primary); }
 .petrol-turn-a pre { background: var(--bg-secondary); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; }
 .petrol-turn-a code { font-size: 0.92em; }
 .petrol-turn-a a { color: var(--accent-color); cursor: pointer; }

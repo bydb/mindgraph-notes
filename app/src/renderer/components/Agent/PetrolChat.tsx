@@ -18,6 +18,7 @@ import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useNoteAgentStore } from '../../stores/noteAgentStore'
 import { snapshotIdsIn, usePetrolChatStore, type PetrolChatMessage, type PetrolSendOptions } from '../../stores/petrolChatStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
+import { PetrolChatFlashcards } from './PetrolChatFlashcards'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
 import { reserveFreeNoteName } from '../../utils/noteFileName'
@@ -598,6 +599,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // die Seiten selbst und hängt seinen eigenen Quellenblock an. Webrecherche ist vorgewählt und
   // auf der Karte sichtbar; Shell/Rechner schaltet die Übergabe ab.
   const [researchFor, setResearchFor] = useState<number | null>(null)
+  // Lernkarten aus einer Antwort (Schülertest 07.11.2026): Vorschau unter genau dieser Antwort.
+  const [cardsFor, setCardsFor] = useState<number | null>(null)
+  const flashcardsModule = useIsModuleEnabled('flashcards')
   const applyResearch = (msg: PetrolChatMessage) => {
     const agent = useNoteAgentStore.getState()
     agent.setPickedExample(tabId, null)
@@ -647,12 +651,27 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         {noWebAnswer(msg) && webConfigured && msg === lastAnswer && (
           <button type="button" className="agent-card-btn" title={t('petrolChat.verifyInWebTitle')} onClick={verifyInWeb} disabled={busy || busyElsewhere || !hasModel || webWaitsForRoute}>{t('petrolChat.verifyInWeb')}</button>
         )}
+        {flashcardsModule && vaultPath && msg.content.trim() && !msg.error && !msg.stopped && (
+          <button type="button" className="agent-card-btn" title={t('petrolChat.cardsTitleHint')} aria-expanded={cardsFor === msg.at} onClick={() => setCardsFor(cardsFor === msg.at ? null : msg.at)}>{t('petrolChat.cardsButton')}</button>
+        )}
         {msg.origin !== 'web' ? (
           <button type="button" className="agent-card-btn is-accent" aria-expanded={makeFor === msg.at} onClick={() => openMake(msg)}>{t('petrolChat.makeTask')}</button>
         ) : (
           <button type="button" className="agent-card-btn is-accent" aria-expanded={researchFor === msg.at} onClick={() => setResearchFor(researchFor === msg.at ? null : msg.at)}>{t('petrolChat.research')}</button>
         )}
       </div>}
+      {cardsFor === msg.at && vaultPath && (
+        <PetrolChatFlashcards
+          key={msg.at}
+          question={questionFor(msg)}
+          answer={msg.web?.answer ?? msg.content}
+          model={model}
+          backend={ollama.backend === 'lm-studio' ? 'lm-studio' : 'ollama'}
+          cloud={activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider === 'llmbase' ? 'llmbase' : 'openrouter' } : null}
+          vaultPath={vaultPath}
+          onClose={() => setCardsFor(null)}
+        />
+      )}
       {researchFor === msg.at && (
         <div className="petrol-turn-confirm" role="group" aria-label={t('petrolChat.research')}>
           <span>
