@@ -752,6 +752,8 @@ interface UIState {
    * 28.10.2026). Der letzte Klick auf den Globus setzt den Wert, es gibt keinen eigenen Schalter.
    */
   petrolWebSticky: boolean
+  /** Einmalig: Globus auf „automatisch“ umgestellt (07.11.2026). */
+  petrolWebAutoMigrated: boolean
   // Shell-Zugriff des Notiz-Agenten (experimentell): erste Stufe des Opt-ins; die zweite
   // ist der Schalter pro Lauf. Der Main prüft dieses Flag in ui-settings.json selbst.
   agentShellEnabled: boolean
@@ -1127,7 +1129,9 @@ const defaultState = {
   petrolWebCheckMarks: false,
   petrolChatRetentionDays: CHAT_RETENTION_DEFAULT,
   petrolChatHistoryOpen: true,
-  petrolWebSticky: false,
+  // Standard an (07.11.2026): mit automatischer Websuche entscheidet das Modell selbst, ob es sucht.
+  petrolWebSticky: true,
+  petrolWebAutoMigrated: true,
   agentShellEnabled: false,
   agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
   agentComputerEnabled: false,
@@ -1354,7 +1358,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1934,6 +1938,13 @@ export async function initializeUISettings(): Promise<void> {
       // Chat im Agent-Tab (Stufe 1): Neue Installationen starten im Chat. Wer schon
       // Einstellungen hat, kennt den Agent-Tab als Auftragskarte — für ihn ändert sich
       // nichts ungefragt (Nutzerentscheidung 23.10.2026). Der Umschalter steht trotzdem da.
+      // Globus heißt seit 07.11.2026 „automatisch“: an bedeutet nicht mehr „jede Nachricht sucht“,
+      // sondern „das Modell sucht, wenn die Frage Fakten braucht“ (main/llm/petrolRoute.ts). Wer den
+      // alten Globus aus hatte, tat das meist, um Suchen bei Plaudereien zu vermeiden — einmalig an.
+      if ((savedSettings as Record<string, unknown>).petrolWebAutoMigrated !== true) {
+        validSettings.petrolWebSticky = true
+        validSettings.petrolWebAutoMigrated = true
+      }
       validSettings.agentTabDefaultMode = 'agentTabDefaultMode' in savedSettings
         ? normalizeAgentTabMode(validSettings.agentTabDefaultMode)
         : 'task'

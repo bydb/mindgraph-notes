@@ -16,7 +16,7 @@ import MarkdownIt from 'markdown-it'
 import { setChatImageConsentDurable, useUIStore } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useNoteAgentStore } from '../../stores/noteAgentStore'
-import { snapshotIdsIn, usePetrolChatStore, type PetrolChatMessage } from '../../stores/petrolChatStore'
+import { snapshotIdsIn, usePetrolChatStore, type PetrolChatMessage, type PetrolSendOptions } from '../../stores/petrolChatStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
@@ -212,12 +212,15 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     : isQueryTooLong(webQueryNorm) ? t('petrolChat.webQueryTooLong', { max: WEB_QUERY_MAX_CHARS, n: webQueryLen })
     : null
   // Lange Suchwörter: Hinweis, keine Sperre (Nutzertest: lange Suche → Spam-Treffer).
-  const webQueryLong = webOn && !webDeep && !webQueryProblem && webQueryLen > WEB_CHAT_QUERY_SOFT_MAX
+  // Automatische Websuche (Suchfeld nicht von Hand geöffnet): die App schreibt die Frage für die
+  // Suche selbst um — Satz- und Längenwarnungen zu den Suchwörtern wären dann falsch.
+  const webAuto = webOn && scope?.webQuery == null
+  const webQueryLong = webOn && !webAuto && !webDeep && !webQueryProblem && webQueryLen > WEB_CHAT_QUERY_SOFT_MAX
   // Gesprächssatz statt Stichwörter: nur Warnung, gesendet wird trotzdem (Nutzertest 24.10.2026).
   // Geprüft wird, was gesendet würde: nach „Stichwörter verwenden“ ist der Gesprächsanfang weg
   // (OPENER_RE), die Warnung verschwindet dann zu Recht (GUI-Test 25.10.2026).
   // Steht der Themenhinweis, ist er der genauere Rat — die Satzwarnung träte doppelt daneben.
-  const webQueryChatty = webOn && !webDeep && !webQueryProblem && !topicHint && looksConversational(webQueryNorm)
+  const webQueryChatty = webOn && !webAuto && !webDeep && !webQueryProblem && !topicHint && looksConversational(webQueryNorm)
   const webProgress = busy ? scope?.webProgress ?? null : null
 
   // Modelle des aktiven Backends (Ollama bzw. LM Studio), wie im Notiz-Chat.
@@ -389,6 +392,22 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     if (el && stickToBottom.current) el.scrollTop = el.scrollHeight
   }, [messages.length, streaming])
 
+  const sendOpts = (): Omit<PetrolSendOptions, 'vaultPath'> => ({
+    model,
+    backend: ollama.backend === 'lm-studio' ? 'lm-studio' : 'ollama',
+    lmStudioPort: ollama.lmStudioPort,
+    cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null,
+    run: { label: activeCloudRoute ? activeCloudRoute.label : model, routeText: selectedRouteText, routeKind: selectedRouteKind, routeKey }
+  })
+  // „Im Web prüfen“ unter einer Antwort ohne Websuche: die App sucht zu den Angaben der letzten
+  // Antwort (Suche erzwungen, Recherche-Schleife bzw. gründlich) und bestätigt oder korrigiert sie.
+  const verifyInWeb = () => {
+    if (busy || busyElsewhere || !hasModel || ocrRun || !webModule || !webConfigured || webWaitsForRoute) return
+    stickToBottom.current = true
+    const q = t('petrolChat.verifyQuestion')
+    void chat().send(tabId, q, { ...sendOpts(), web: { query: q, deep: true, verify: true }, vaultPath })
+  }
+
   // `text` gesetzt = „Erneut senden“ einer gescheiterten Frage; der laufende Entwurf bleibt dann
   // stehen (der Store leert den Entwurf beim Senden synchron, deshalb danach zurücklegen).
   const send = (text?: string, snapshotId?: string, retryOf?: PetrolChatMessage) => {
@@ -410,15 +429,14 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     if (followId && (followUpWaits || (text === undefined && followUpMissing))) return
     const keep = text !== undefined ? draft : ''
     stickToBottom.current = true
+    // Neue Frage mit Globus: die App entscheidet, ob gesucht wird (automatische Websuche). Ein von
+    // Hand geöffnetes Suchfeld gilt wörtlich; „Erneut senden“ sucht wieder wie damals.
+    const auto = !retryWeb && webAuto
     void chat().send(tabId, question, {
-      model,
-      backend: ollama.backend === 'lm-studio' ? 'lm-studio' : 'ollama',
-      lmStudioPort: ollama.lmStudioPort,
-      cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null,
-      run: { label: activeCloudRoute ? activeCloudRoute.label : model, routeText: selectedRouteText, routeKind: selectedRouteKind, routeKey },
+      ...sendOpts(),
       web: !withWeb ? undefined
         : retryWeb ? (retryOf!.webDeep || webDeep ? { query: question.trim(), deep: true } : { query: retryOf!.webQuery ?? normalizeQuery(question) })
-          : webDeep ? { query: question.trim(), deep: true } : { query: webQueryNorm },
+          : webDeep ? { query: question.trim(), deep: true, ...(auto ? { auto: true } : {}) } : { query: webQueryNorm, ...(auto ? { auto: true } : {}) },
       followUp: followId ? { snapshotId: followId } : undefined,
       ...(images.length ? { images } : {}),
       vaultPath
@@ -598,10 +616,14 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const routeClass = routeKind === 'local' ? '' : routeKind === 'cloud' ? 'is-out' : 'is-muted'
 
   // Dauer = Antwort fertig (msg.at) minus Frage gesendet (since) — wie „Dauer: 17 Sek.“ bei Codex.
+  // Antwort ohne Websuche, solange die Websuche verfügbar ist: das steht an der Antwort, damit eine
+  // Zahl aus dem Modellgedächtnis nicht wie eine nachgeschlagene aussieht (Nutzer, 07.11.2026).
+  const noWebAnswer = (msg: PetrolChatMessage) => webModule && msg.role === 'assistant' && msg.origin !== 'web' && !msg.error && !msg.appNote && !!msg.content.trim()
+  const lastAnswer = [...messages].reverse().find(m => m.role === 'assistant')
   const answerFoot = (msg: PetrolChatMessage, since?: number) => (
     <div className="petrol-turn-foot">
       <span className="petrol-turn-model">
-        {[msg.model, formatDuration(since, msg.at, t), msg.stopped ? t('petrolChat.stopped') : '', msg.webTopicsUsed ? t('petrolChat.topicOnlyLabel') : ''].filter(Boolean).join(' · ')}
+        {[msg.model, formatDuration(since, msg.at, t), msg.stopped ? t('petrolChat.stopped') : '', msg.webTopicsUsed ? t('petrolChat.topicOnlyLabel') : noWebAnswer(msg) ? t('petrolChat.noWebLabel') : ''].filter(Boolean).join(' · ')}
       </span>
       {/* Ein gestopptes Web-Bruchstück ist ungeprüft (F23): nicht kopieren, nicht speichern,
           nicht in einen Auftrag übernehmen — sonst landet ein erfundener Halbsatz im Vault.
@@ -621,6 +643,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               inputRef.current?.focus()
             }}
           >{t('petrolChat.askWithSources')}</button>
+        )}
+        {noWebAnswer(msg) && webConfigured && msg === lastAnswer && (
+          <button type="button" className="agent-card-btn" title={t('petrolChat.verifyInWebTitle')} onClick={verifyInWeb} disabled={busy || busyElsewhere || !hasModel || webWaitsForRoute}>{t('petrolChat.verifyInWeb')}</button>
         )}
         {msg.origin !== 'web' ? (
           <button type="button" className="agent-card-btn is-accent" aria-expanded={makeFor === msg.at} onClick={() => openMake(msg)}>{t('petrolChat.makeTask')}</button>
@@ -701,7 +726,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                     <span className="petrol-turn-q-text">
                       {turn.question.content}
                       {turn.question.origin === 'web' && turn.question.webQuery && turn.question.webQuery !== turn.question.content.trim() && (
-                        <span className="petrol-turn-webq">{t('petrolChat.webQueryLabel')}: {turn.question.webQuery}</span>
+                        <span className="petrol-turn-webq">{t(turn.question.webDeep ? 'petrolChat.webRoutedLabel' : 'petrolChat.webQueryLabel')}: {turn.question.webQuery}</span>
                       )}
                       {!!turn.question.webSentQueries?.length && (
                         <span className="petrol-turn-webq">{t('petrolChat.webDeepSentUntilStop', { queries: turn.question.webSentQueries.map(q => `„${q}“`).join(', ') })}</span>
@@ -837,7 +862,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                         Vorbild Codex: „recherchiert …“) — vorher stand die Phase klein in der Fußzeile. */}
                     <LiveStatus
                       since={turn.question?.at}
-                      text={webProgress.phase === 'plan' ? t('petrolChat.webPhasePlan')
+                      text={webProgress.phase === 'route' ? t('petrolChat.webPhaseRoute')
+                        : webProgress.phase === 'plan' ? t('petrolChat.webPhasePlan')
                         : webProgress.phase === 'pick' ? t('petrolChat.webPhasePick')
                         : webProgress.phase === 'search' && webProgress.queries?.length ? t('petrolChat.webPhaseSearchQuery', { provider: webProvider, query: webProgress.queries[webProgress.queries.length - 1] })
                         : webProgress.phase === 'search' ? t('petrolChat.webPhaseSearch', { provider: webProvider })

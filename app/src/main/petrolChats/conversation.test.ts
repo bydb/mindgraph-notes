@@ -445,3 +445,81 @@ describe('Design F14: Archivieren löst das Anheften', () => {
     expect(h.kind === 'chat' && h.header.pinned).toBeFalsy()
   })
 })
+
+describe('Automatische Websuche (petrolRoute)', () => {
+  let routeCalls: Array<import('./conversation').RouteRunInput>
+  let routeImpl: (i: import('./conversation').RouteRunInput) => Promise<import('./conversation').RouteRunResult>
+  beforeEach(() => {
+    routeCalls = []
+    routeImpl = async () => ({ search: false, question: '', via: 'model' })
+    convs = new PetrolConversations({
+      storage,
+      runChat: (i, t) => { chatCalls.push(i); return chatImpl(i, t) },
+      runWeb: (i, t) => { webCalls.push(i); return webImpl(i, t) },
+      route: i => { routeCalls.push(i); return routeImpl(i) },
+      abort: (_s, r) => { aborted.push(r) },
+      dropSnapshots: (_s, scope) => { dropped.push(scope) },
+      now: () => ++clock
+    })
+  })
+
+  it('keine Suche nötig → normaler Chat, Frage ohne Webherkunft', async () => {
+    const { id } = created(convs, SENDER, VAULT)
+    const r = await convs.send(SENDER, VAULT, id, REQ({ question: 'Danke!', kind: 'web', web: { query: 'Danke!', deep: true, auto: true } }))
+    expect(r.ok).toBe(true)
+    expect(webCalls).toHaveLength(0)
+    expect(chatCalls).toHaveLength(1)
+    if (!r.ok) return
+    expect(r.messages.map(m => [m.role, m.origin, m.content])).toEqual([['user', undefined, 'Danke!'], ['assistant', undefined, 'Antwort']])
+  })
+
+  it('Suche → recherchiert wird die umgeschriebene Frage, angezeigt bleibt die getippte', async () => {
+    const { id } = created(convs, SENDER, VAULT)
+    await convs.send(SENDER, VAULT, id, REQ({ question: 'Paris?' }))
+    routeImpl = async () => ({ search: true, question: 'Liegt das Musée Rodin im Marais?', via: 'model' })
+    const r = await convs.send(SENDER, VAULT, id, REQ({ question: 'überprüfe', kind: 'web', web: { query: 'überprüfe', deep: true, auto: true } }))
+    expect(routeCalls[0].history.map(m => m.content)).toEqual(['Paris?', 'Antwort'])
+    expect(webCalls[0].question).toBe('Liegt das Musée Rodin im Marais?')
+    if (!r.ok) throw new Error('send')
+    const q = r.messages[r.messages.length - 2]
+    expect(q).toMatchObject({ role: 'user', content: 'überprüfe', origin: 'web', webDeep: true, webQuery: 'Liegt das Musée Rodin im Marais?' })
+  })
+
+  it('schnelle Suche: eine zu lange Prüffrage geht nicht als Suchwörter hinaus', async () => {
+    const { id } = created(convs, SENDER, VAULT)
+    const long = 'Stimmt ' + 'Behauptung '.repeat(60)
+    routeImpl = async () => ({ search: true, question: long.trim(), via: 'model' })
+    await convs.send(SENDER, VAULT, id, REQ({ question: 'stimmt das?', kind: 'web', web: { query: 'stimmt das?', auto: true } }))
+    expect(webCalls[0].query).toBe('stimmt das?')
+    expect(webCalls[0].question).toBe(long.trim())
+  })
+
+  it('ohne auto entscheidet niemand', async () => {
+    const { id } = created(convs, SENDER, VAULT)
+    await convs.send(SENDER, VAULT, id, REQ({ question: 'Leitzins', kind: 'web', web: { query: 'Leitzins' } }))
+    expect(routeCalls).toHaveLength(0)
+    expect(webCalls).toHaveLength(1)
+  })
+
+  it('Stopp während der Entscheidung: Frage gestoppt, kein Lauf danach', async () => {
+    const { id } = created(convs, SENDER, VAULT)
+    const gate = deferred<import('./conversation').RouteRunResult>()
+    routeImpl = () => gate.promise
+    const pending = convs.send(SENDER, VAULT, id, REQ({ question: 'Wie hoch?', kind: 'web', web: { query: 'Wie hoch?', deep: true, auto: true } }))
+    await new Promise(r => setTimeout(r, 0))
+    const stopped = await convs.stop(SENDER, VAULT, id)
+    gate.resolve({ stopped: true })
+    await pending
+    expect(webCalls).toHaveLength(0)
+    expect(chatCalls).toHaveLength(0)
+    if (!stopped.ok) throw new Error('stop')
+    expect(stopped.messages).toHaveLength(1)
+    expect(stopped.messages[0]).toMatchObject({ role: 'user', content: 'Wie hoch?', stopped: true })
+  })
+
+  it('parseSendRequest übernimmt auto und verify', async () => {
+    const { parseSendRequest } = await import('./conversation')
+    const r = parseSendRequest({ requestId: 'x', question: 'q', kind: 'web', model: 'm', web: { query: 'q', auto: true, verify: true, extra: 1 } })
+    expect('error' in r ? null : r.web).toEqual({ query: 'q', auto: true, verify: true })
+  })
+})

@@ -39,6 +39,7 @@ import {
   type ChatImageWire
 } from '../../shared/chatImages'
 import type { WebChatResult, WebFetchFailure, WebSource } from '../../shared/webChat'
+import { isQueryTooLong } from '../../shared/webResearch'
 import { buildStoredChat, CHAT_ID_RE, isStoredImageId, restoreMessage, type StoredChatHeader } from '../../shared/petrolChatStored'
 import type { PetrolChatStorage } from './storage'
 import { CLOUD_PROVIDER_META, shortenCloudModelId } from '../../shared/llmBackend'
@@ -81,6 +82,22 @@ export interface WebRunInput {
   cloud: { model: string; provider: 'openrouter' | 'llmbase' } | null
   webTopics?: Array<{ text: string; clipped: boolean }>
 }
+/** Automatische Websuche (main/llm/petrolRoute.ts): Entscheidung vor der Antwort. */
+export interface RouteRunInput {
+  senderId: number
+  requestId: string
+  question: string
+  history: Array<{ role: 'user' | 'assistant'; content: string }>
+  /** Frühere Webfragen des Nutzers — nur die Fragen, wie beim Chat (F09). */
+  topics: string[]
+  verify: boolean
+  model: string
+  backend: 'ollama' | 'lmstudio'
+  lmStudioPort?: number
+  cloud: { model: string; provider: 'openrouter' | 'llmbase' } | null
+}
+export type RouteRunResult = { stopped: true } | { stopped?: false; search: boolean; question: string; via: 'model' | 'forced' | 'fallback' }
+
 export interface WebRunResult {
   success: boolean
   result?: WebChatResult
@@ -107,6 +124,8 @@ export interface ConversationDeps {
   storage: Pick<PetrolChatStorage, 'save' | 'load' | 'loadImage' | 'unavailableReason' | 'newChatId'> | null
   runChat(input: ChatRunInput, tap: TurnTap): Promise<ChatRunResult>
   runWeb(input: WebRunInput, tap: TurnTap): Promise<WebRunResult>
+  /** Entscheidung „suchen oder nicht“ für `web.auto`. Fehlt sie, wird wie bisher immer gesucht. */
+  route?(input: RouteRunInput): Promise<RouteRunResult>
   /** Bricht die laufende Anfrage im Main ab (dieselbe Kennung wie `petrol-chat-abort`). */
   abort(senderId: number, requestId: string): void
   /** Gesprächsbereich der Snapshots vergessen (verworfenes Gespräch, Tab zu). */
@@ -288,8 +307,9 @@ export class PetrolConversations {
       if (!data) return { ok: false, error: 'Dieses Bild ist nicht mehr vorhanden.' }
       images.push({ ...i, dataBase64: data })
     }
-    const web = req.kind === 'web' ? req.web : undefined
+    let web: (NonNullable<SendRequest['web']> & { routed?: string }) | undefined = req.kind === 'web' ? req.web : undefined
     if (req.kind === 'web' && !web) return { ok: false, error: 'Websuche ohne Suchwörter.' }
+    let kind: SendRequest['kind'] = req.kind
     const follow = req.kind === 'follow-up' ? req.followUpSnapshotId : undefined
     if (req.kind === 'follow-up' && !follow) return { ok: false, error: 'Nachfrage ohne Kennung.' }
     // Bild und Websuche gehen nicht zusammen (Rev. 7 Punkt 22).
@@ -311,15 +331,43 @@ export class PetrolConversations {
     }
 
     const questionAt = this.now()
+    // Automatische Websuche: erst entscheiden, ob gesucht wird. Die Frage steht schon sichtbar
+    // (vorläufig als Webfrage), und der Wechsel ist angemeldet, damit „Stopp“ auch hier greift.
+    if (web && (web.auto || web.verify) && this.deps.route) {
+      const pending: Turn = {
+        requestId: req.requestId, questionAt, kind: 'web', deep: !!web.deep, label,
+        text: '', webTopics: 0, imagesDropped: 0, progress: { queries: [] }, done: false
+      }
+      conv.messages = [...before, { role: 'user', content: question, origin: 'web', at: questionAt }]
+      conv.turn = pending
+      let decision: RouteRunResult
+      try {
+        decision = await this.deps.route({
+          senderId, requestId: req.requestId, question, history,
+          topics: webTopics.map(t => t.text), verify: !!web.verify,
+          model: req.model, backend: req.backend === 'lm-studio' ? 'lmstudio' : 'ollama', lmStudioPort: req.lmStudioPort, cloud: req.cloud
+        })
+      } catch {
+        decision = { search: true, question, via: 'fallback' }
+      }
+      if (pending.done || decision.stopped) return { ok: true, messages: conv.messages, storage: 'unchanged' }
+      conv.turn = null
+      conv.messages = before
+      this.deps.log?.(`[petrol-route] ${decision.search ? 'suchen' : 'ohne Suche'} (${decision.via})`)
+      // Die schnelle Suche schickt `query` wörtlich an den Suchdienst: eine zu lange Prüffrage dort
+      // nicht, dann bleibt es bei den getippten Suchwörtern. Recherchiert wird trotzdem mit ihr.
+      if (decision.search) web = { ...web, query: !web.deep && isQueryTooLong(decision.question) ? web.query : decision.question || web.query, routed: decision.question || undefined }
+      else { web = undefined; kind = 'chat' }
+    }
     const userMsg: PetrolChatMessage = follow
       ? { role: 'user', content: question, origin: 'web', followUp: true, followUpSnapshotId: follow, at: questionAt }
       : web
-        ? { role: 'user', content: question, origin: 'web', ...(web.deep ? { webDeep: true } : { webQuery: web.query }), at: questionAt }
+        ? { role: 'user', content: question, origin: 'web', ...(web.deep ? { webDeep: true } : {}), ...(!web.deep ? { webQuery: web.query } : web.routed ? { webQuery: web.routed } : {}), at: questionAt }
         : { role: 'user', content: question, ...(images.length ? { images } : {}), at: questionAt }
     conv.messages = [...before, userMsg]
     const turn: Turn = {
-      requestId: req.requestId, questionAt, kind: req.kind, deep: !!web?.deep, label,
-      text: '', webTopics: req.kind === 'chat' ? webTopics.length : 0, imagesDropped: 0, progress: { queries: [] }, done: false
+      requestId: req.requestId, questionAt, kind, deep: !!web?.deep, label,
+      text: '', webTopics: kind === 'chat' ? webTopics.length : 0, imagesDropped: 0, progress: { queries: [] }, done: false
     }
     conv.turn = turn
     const tap: TurnTap = {
@@ -335,13 +383,15 @@ export class PetrolConversations {
       }
     }
 
-    if (req.kind !== 'chat') {
+    if (kind !== 'chat') {
       let wres: WebRunResult
       try {
         wres = await this.deps.runWeb({
           senderId,
           requestId: req.requestId,
-          question,
+          // Automatisch umgeschrieben: recherchiert und beantwortet wird die eigenständige Frage
+          // („überprüfe“ → die einzelnen Behauptungen); angezeigt bleibt die getippte.
+          question: web?.routed ?? question,
           query: follow ? '' : web!.query,
           ...(web?.deep ? { deep: true } : {}),
           scopeId: conv.id,
@@ -658,7 +708,7 @@ export function parseSendRequest(raw: unknown): SendRequest | { error: string } 
   if (kind === 'web') {
     const w = r.web as Record<string, unknown> | undefined
     if (!w || typeof w !== 'object' || !isStr(w.query, 2000)) return { error: 'Websuche ohne Suchwörter.' }
-    out.web = { query: w.query, ...(w.deep === true ? { deep: true } : {}) }
+    out.web = { query: w.query, ...(w.deep === true ? { deep: true } : {}), ...(w.auto === true ? { auto: true } : {}), ...(w.verify === true ? { verify: true } : {}) }
   }
   if (kind === 'follow-up') {
     if (typeof r.followUpSnapshotId !== 'string' || !SNAPSHOT_ID_RE.test(r.followUpSnapshotId)) return { error: 'Nachfrage ohne gültige Kennung.' }

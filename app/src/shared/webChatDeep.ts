@@ -47,7 +47,7 @@ export interface DeepPlan {
 }
 
 /** Erstes JSON-Objekt im Text (Modelle umgeben es gern mit Erklärungen oder ```json). */
-function firstJsonObject(raw: string): unknown {
+export function firstJsonObject(raw: string): unknown {
   const start = raw.indexOf('{')
   if (start < 0) return null
   let depth = 0

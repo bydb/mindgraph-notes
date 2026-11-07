@@ -202,7 +202,8 @@ import { isEmailDraftCloudAllowed, type CloudProviderSettings } from '../shared/
 import { friendlyOllamaError, ollamaErrorDetail } from '../shared/ollamaError'
 import { WEB_CHAT_CHARS_PER_TOKEN, freezeWebSourcesToFit, stripStrayThink, petrolCloudAllowed, type QueueEntry, type WebDeepInfo, sentenceExtras, webChatCharBudget, webChatWideLimits, type WebChatWideLimits, webChatNumCtx, contextLengthFromShow, WEB_CHAT_MAX_SOURCES, WEB_CHAT_SOURCES_MAX, type WebChatProvenance, type WebChatResult, type PetrolWebRequest, type WebFetchFailure, type WebSkippedHit, type WebSource } from '../shared/webChat'
 import { WebSnapshotStore, sanitizeScopeId, sanitizeSnapshotId } from './llm/petrolWebSnapshots'
-import { PetrolConversations, parseSendRequest, withoutImageBytes, type TurnTap, type WebProgressEvent } from './petrolChats/conversation'
+import { PetrolConversations, parseSendRequest, withoutImageBytes, type RouteRunInput, type RouteRunResult, type TurnTap, type WebProgressEvent } from './petrolChats/conversation'
+import { buildRouteMessages, parseRouteReply, resolveRoute } from './llm/petrolRoute'
 import { petrolChatStorage } from './petrolChats/electronCrypto'
 import { OnceShared } from './petrolChats/onceShared'
 import { normalizeRetention, sanitizeChatTitle } from '../shared/petrolChatStored'
@@ -7448,6 +7449,49 @@ function tappedEvent(event: IpcMainInvokeEvent, tap: TurnTap): IpcMainInvokeEven
   return { sender } as unknown as IpcMainInvokeEvent
 }
 
+/**
+ * Automatische Websuche: ein kurzer Aufruf entscheidet, ob für die Nachricht gesucht wird
+ * (main/llm/petrolRoute.ts). Derselbe Modellweg und dieselbe Cloud-Freigabe wie die Antwort; ohne
+ * Freigabe geht nichts hinaus, dann sucht die App (der Weblauf meldet die fehlende Freigabe selbst).
+ * Abbrechbar über dieselbe Kennung wie der folgende Lauf — die Anmeldung endet vor dessen Beginn.
+ */
+async function runPetrolRoute(i: RouteRunInput): Promise<RouteRunResult> {
+  const claimed = claimPetrolRequest(i.senderId, 'petrol', i.requestId)
+  if (!claimed || claimed === 'duplicate') return resolveRoute(null, i.question, i.verify)
+  let timedOut = false
+  // 120 s: die Frist umfasst das Laden des Modells (qwen3.8:27b kalt real über 30 s, GUI-Test
+  // 07.11.2026). Eine Frist darunter ließ genau den ersten Aufruf nach dem Start immer suchen.
+  const timer = setTimeout(() => { timedOut = true; claimed.controller.abort() }, 120_000)
+  const startedAt = Date.now()
+  try {
+    const ui = await loadUISettings()
+    if (!petrolCloudAllowed(i.cloud, ui.ollama as { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } | undefined)) {
+      return resolveRoute(null, i.question, i.verify)
+    }
+    const backend = i.cloud?.model ? (i.cloud.provider === 'llmbase' ? 'llmbase' : 'openrouter') : i.backend
+    const route = await classifyAgentRoute(backend, i.cloud?.model ?? i.model)
+    const local = backend === 'ollama' && route.provider !== 'ollama-cloud'
+    const messages = buildRouteMessages({
+      question: i.question, history: i.history, topics: i.topics, today: localDateString(),
+      sanitize: sanitizeUntrustedText, verify: i.verify
+    })
+    const params = { model: i.model, backend: i.backend, lmStudioPort: i.lmStudioPort, cloud: i.cloud } as unknown as PetrolWebParams
+    // Kein num_ctx: der normale Chat setzt keins, ein anderer Wert lädt das Modell bei Ollama neu.
+    const call = () => streamPetrolWebModel(params, messages, claimed.controller.signal, () => {}, undefined, true)
+    const raw = local ? await withOllamaActivity('petrol-web-chat', call) : await call()
+    const decision = resolveRoute(parseRouteReply(raw), i.question, i.verify)
+    console.log(`[PetrolRoute] ${decision.search ? 'suchen' : 'ohne Suche'} · ${decision.via} · ${Date.now() - startedAt} ms`)
+    return decision
+  } catch (err) {
+    if (claimed.controller.signal.aborted && !timedOut) return { stopped: true }
+    console.warn('[PetrolRoute] Entscheidung fehlgeschlagen, es wird gesucht:', err instanceof Error ? err.message : err)
+    return resolveRoute(null, i.question, i.verify)
+  } finally {
+    clearTimeout(timer)
+    releasePetrolRequest(claimed)
+  }
+}
+
 /** Laufende Gesprächsanfragen → ihr IPC-Ereignis. Schlüssel Fenster + Kennung (F82). */
 const petrolConvEvents = new Map<string, IpcMainInvokeEvent>()
 const petrolConvKey = (senderId: number, requestId: string) => `${senderId}:${requestId}`
@@ -7473,6 +7517,7 @@ function petrolConversations(): PetrolConversations {
       const { senderId: _sender, ...params } = i
       return runPetrolWeb(tappedEvent(ev, tap), params as unknown as PetrolWebParams) as Promise<{ success: boolean; result?: WebChatResult; error?: string }>
     },
+    route: (i) => runPetrolRoute(i),
     abort: (senderId, requestId) => {
       const key = `${senderId}:${requestId}`
       petrolChatAborts.get(key)?.abort()

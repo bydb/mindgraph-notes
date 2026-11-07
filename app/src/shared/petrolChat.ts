@@ -19,7 +19,10 @@ export interface PetrolChatMessage {
   error?: boolean
   /** Webwechsel (Frage mit Globus + Webantwort): nie im Modellverlauf. */
   origin?: 'web'
-  /** Nur Frage: die Suchwörter, die tatsächlich gesendet wurden. */
+  /**
+   * Nur Frage: die Suchwörter, die tatsächlich gesendet wurden. Bei automatischer Websuche die
+   * eigenständig umgeschriebene Frage, mit der recherchiert wurde (auch bei „gründlich“).
+   */
   webQuery?: string
   /** Nur Frage: „gründlich“ — die Suchanfragen hat das Modell geplant (stehen an der Antwort). */
   webDeep?: boolean
@@ -82,7 +85,12 @@ export interface PetrolConvSendRequest {
   requestId: string
   question: string
   kind: 'chat' | 'web' | 'follow-up'
-  web?: { query: string; deep?: boolean }
+  /**
+   * `auto`: die App entscheidet vor der Antwort, ob gesucht wird, und schreibt die Frage für die
+   * Recherche eigenständig um (main/llm/petrolRoute.ts). `verify`: Knopf „Im Web prüfen“ — Suche
+   * erzwungen, Gegenstand ist die letzte Antwort.
+   */
+  web?: { query: string; deep?: boolean; auto?: boolean; verify?: boolean }
   followUpSnapshotId?: string
   /** Bilder dieser Frage, aufbereitet (neu oder „Erneut senden“). */
   images?: ChatImage[]

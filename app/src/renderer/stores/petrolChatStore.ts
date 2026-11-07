@@ -34,7 +34,8 @@ export type { PetrolChatMessage } from '../../shared/petrolChat'
 
 /** Fortschritt der laufenden Webanfrage — nur Anzeige, keine Quelle der Wahrheit. */
 export interface PetrolWebProgressState {
-  phase: 'plan' | 'search' | 'pick' | 'fetch' | 'model'
+  /** `route`: die App entscheidet noch, ob gesucht wird (automatische Websuche). */
+  phase: 'route' | 'plan' | 'search' | 'pick' | 'fetch' | 'model'
   hosts: string[]
   /** Nur „gründlich“: bisher gesendete Suchanfragen (Anzeige während des Laufs). */
   queries?: string[]
@@ -98,7 +99,7 @@ export interface PetrolSendOptions {
   cloud: { model: string; provider: CloudProviderId } | null
   run: PetrolActiveRun
   /** Gesetzt = Websuche mit genau diesen Suchwörtern, bzw. `deep` = Modell plant die Suche. */
-  web?: { query: string; deep?: boolean }
+  web?: { query: string; deep?: boolean; auto?: boolean; verify?: boolean }
   /** Gesetzt = Nachfrage aus eingefrorenen Auszügen, ohne neue Suche. */
   followUp?: { snapshotId: string }
   /** Bilder dieser Frage (Entwurf oder „Erneut senden“). Nicht mit Websuche/Nachfrage. */
@@ -259,7 +260,8 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       if (!id) return
       const sc = get().scopes[id]
       if (!sc || sc.streaming === null) return
-      patch(id, { streaming: sc.streaming + chunk.delta })
+      // Automatische Websuche ohne Suche: die Antwort kommt direkt — Statuszeile „prüft …“ weg.
+      patch(id, { streaming: sc.streaming + chunk.delta, ...(sc.webProgress?.phase === 'route' ? { webProgress: null } : {}) })
     })
     // Ein anderes Fenster hat das hier offene Gespräch gelöscht (F90): Anzeige leeren.
     window.electronAPI.onPetrolConvClosed?.(e => {
@@ -388,7 +390,9 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
       patch(id, {
         messages: [...before, follow
           ? { role: 'user', content: question, origin: 'web', followUp: true, followUpSnapshotId: follow.snapshotId, at: questionAt }
-          : web
+          // Automatische Websuche: ob gesucht wird, steht erst nach der Entscheidung im Main fest —
+          // bis dahin keine Web-Marke an der Frage.
+          : web && !web.auto
             ? { role: 'user', content: question, origin: 'web', ...(web.deep ? { webDeep: true } : { webQuery: web.query }), at: questionAt }
             : { role: 'user', content: question, ...(images.length ? { images } : {}), at: questionAt }],
         streaming: appNote ? null : '',
@@ -399,7 +403,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
         webQuery: null,
         webDeep: false,
         followUp: null,
-        webProgress: follow ? { phase: 'model', hosts: [] } : web ? { phase: web.deep ? 'plan' : 'search', hosts: [] } : null
+        webProgress: follow ? { phase: 'model', hosts: [] } : web ? { phase: web.auto || web.verify ? 'route' : web.deep ? 'plan' : 'search', hosts: [] } : null
       })
       set({ activeScope: id })
       let res: PetrolConvResult
@@ -408,7 +412,7 @@ export const usePetrolChatStore = create<PetrolChatState>((set, get) => {
           requestId: req,
           question,
           kind: follow ? 'follow-up' : web ? 'web' : 'chat',
-          ...(web ? { web: { query: web.query, ...(web.deep ? { deep: true } : {}) } } : {}),
+          ...(web ? { web: { query: web.query, ...(web.deep ? { deep: true } : {}), ...(web.auto ? { auto: true } : {}), ...(web.verify ? { verify: true } : {}) } } : {}),
           ...(follow ? { followUpSnapshotId: follow.snapshotId } : {}),
           ...(images.length ? { images } : {}),
           model: opts.model,
