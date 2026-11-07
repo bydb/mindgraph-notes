@@ -2,6 +2,17 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.2.5] - 2026-11-07
+
+**Nach dem Update auf 1.2.4 öffnete MindGraph ein falsches Profil, Einstellungen und Vault schienen verschwunden. 1.2.5 behebt das: Mit dem Update sind alle bisherigen Einstellungen, Zugangsdaten und der zuletzt geöffnete Vault automatisch wieder da.** Es ist nichts verloren gegangen, die Daten lagen die ganze Zeit unverändert an ihrem Platz. Was Sie in 1.2.4 neu eingerichtet haben, bleibt im falschen Profil und erscheint nicht mehr.
+
+### Hintergrund
+
+- **Auslöser:** 1.2.4 brachte eine Sperre, damit nur eine MindGraph-Instanz zugleich läuft. Sie griff beim Start auf das Profilverzeichnis zu, bevor die App ihren Namen kannte. Das Betriebssystem legte das Profil dadurch auf einen anderen Ordner fest, und MindGraph las dort ein altes, leeres oder fremdes Profil. Deshalb fehlte auch die Meldung über die Neuerungen.
+- **Behoben:** Der App-Name wird jetzt vor jedem Zugriff auf das Profil gesetzt. Ein automatischer Test hält diese Reihenfolge fest, und die Prüfung erfolgt künftig mit der fertig gebauten App, nicht nur mit einem Testprofil.
+- **Neu seit 1.2.4, falls Sie es verpasst haben:** Kann die Websuche eine Händler- oder Filialsuche nicht lesen, weil sie ihre Einträge erst im Browser lädt, sagt der Chat das offen und bietet einen Knopf zum Selbst-Öffnen, statt „nichts gefunden“ zu melden. Auch der Agent führt solche Seiten in Notizen, Tabellen und Präsentationen als „nicht gelesen“ auf, und zu große Seiten als „nur Seitenanfang gelesen“. Unter Einstellungen → KI → Webrecherche zeigt eine Zählung, woran Webabrufe in den letzten 30 Tagen scheiterten.
+- **Nur eine Instanz:** Die Sperre selbst bleibt: Ein zweiter Start mit demselben Profil holt das offene Fenster nach vorn, statt eine zweite Instanz zu öffnen, die Einstellungen und Daten überschreiben könnte.
+
 ## [1.2.4] - 2026-11-06
 
 **Kann die Websuche eine Händler- oder Filialsuche nicht lesen, sagt der Chat das jetzt offen und bietet einen Knopf, um die Seite selbst zu öffnen.** Vorher kam bei solchen Seiten nur der leere Rahmen an, und die Antwort lautete „keine Geschäfte gefunden“, obwohl der Hersteller sie listet. Auch der Agent führt solche Seiten in Notizen, Tabellen, Präsentationen und auf der Ergebniskarte als „nicht gelesen“ auf, statt sie zu verschweigen.
