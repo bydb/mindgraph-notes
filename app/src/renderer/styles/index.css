@@ -23368,8 +23368,39 @@ body.presentation-mode *::after {
 }
 .petrol-turn-a > :first-child { margin-top: 0; }
 .petrol-turn-a > :last-child { margin-bottom: 0; }
-.petrol-turn-a p { margin: 0 0 8px; }
-.petrol-turn-a ul, .petrol-turn-a ol { margin: 0 0 8px; padding-left: 22px; }
+.petrol-turn-a p { margin: 0 0 10px; }
+.petrol-turn-a ul, .petrol-turn-a ol { margin: 0 0 12px; padding-left: 20px; }
+/* Lernlesbarkeit (Nutzer 07.11.2026, Schülertest Französische Revolution): Überschriften hatten keine
+   eigene Regel und standen in Browsergröße (~22 px) über dem Text, Aufzählungen klebten aneinander,
+   Zeilen liefen über ~95 Zeichen. Jetzt: Abschnitte statt Schlagzeilen, Zeilen um 68 Zeichen, Luft
+   zwischen den Punkten, Fachbegriffe (fett) in Petrol, Zitatblock als Merkkasten. */
+.petrol-turn-a > p, .petrol-turn-a > ul, .petrol-turn-a > ol, .petrol-turn-a > blockquote,
+.petrol-turn-a > h1, .petrol-turn-a > h2, .petrol-turn-a > h3, .petrol-turn-a > h4 { max-width: 68ch; }
+.petrol-turn-a li { margin: 0 0 5px; padding-left: 2px; }
+.petrol-turn-a li > ul, .petrol-turn-a li > ol { margin: 5px 0 0; }
+.petrol-turn-a li::marker { color: var(--accent-color); }
+.petrol-turn-a h1, .petrol-turn-a h2, .petrol-turn-a h3, .petrol-turn-a h4 {
+  position: relative;
+  margin: 20px 0 8px; padding-left: 12px;
+  font-size: 15px; line-height: 1.4; font-weight: 650; letter-spacing: -0.005em;
+  color: var(--text-primary);
+}
+.petrol-turn-a h1::before, .petrol-turn-a h2::before, .petrol-turn-a h3::before, .petrol-turn-a h4::before {
+  content: ''; position: absolute; left: 0; top: 0.2em; bottom: 0.2em;
+  width: 3px; border-radius: 2px; background: var(--accent-color);
+}
+.petrol-turn-a h4 { font-size: 14px; }
+.petrol-turn-a > h1:first-child, .petrol-turn-a > h2:first-child, .petrol-turn-a > h3:first-child { margin-top: 2px; }
+.petrol-turn-a strong { font-weight: 650; color: color-mix(in srgb, var(--accent-color) 62%, var(--text-primary)); }
+.petrol-turn-a th strong, .petrol-turn-a h1 strong, .petrol-turn-a h2 strong, .petrol-turn-a h3 strong, .petrol-turn-a h4 strong { color: inherit; }
+.petrol-turn-a blockquote {
+  margin: 14px 0 10px; padding: 10px 14px;
+  background: color-mix(in srgb, var(--accent-color) 7%, var(--bg-primary));
+  border-left: 3px solid var(--accent-color); border-radius: 0 8px 8px 0;
+  color: var(--text-primary);
+}
+.petrol-turn-a blockquote > :last-child { margin-bottom: 0; }
+.petrol-turn-a hr { border: 0; border-top: 1px solid var(--border-subtle); margin: 16px 0; }
 .petrol-turn-a pre { background: var(--bg-secondary); padding: 10px 12px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; }
 .petrol-turn-a code { font-size: 0.92em; }
 .petrol-turn-a a { color: var(--accent-color); cursor: pointer; }
