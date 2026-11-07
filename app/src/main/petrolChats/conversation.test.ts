@@ -494,6 +494,18 @@ describe('Automatische Websuche (petrolRoute)', () => {
     expect(webCalls[0].question).toBe(long.trim())
   })
 
+  it('lernt der Nutzer, trägt die Antwort den Merker — auch nach Speichern und Öffnen', async () => {
+    const { id } = created(convs, SENDER, VAULT)
+    routeImpl = async () => ({ search: false, question: '', via: 'model', learn: true })
+    const r = await convs.send(SENDER, VAULT, id, REQ({ question: 'frag mich ab', kind: 'web', web: { query: 'frag mich ab', deep: true, auto: true } }))
+    if (!r.ok) throw new Error('send')
+    expect(r.messages[1]).toMatchObject({ role: 'assistant', learning: true })
+    await convs.close(SENDER, id)
+    const o = await convs.open(SENDER, VAULT, id)
+    if (!('ok' in o) || !o.ok) throw new Error('open')
+    expect(o.messages[1].learning).toBe(true)
+  })
+
   it('ohne auto entscheidet niemand', async () => {
     const { id } = created(convs, SENDER, VAULT)
     await convs.send(SENDER, VAULT, id, REQ({ question: 'Leitzins', kind: 'web', web: { query: 'Leitzins' } }))

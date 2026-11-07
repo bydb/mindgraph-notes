@@ -98,7 +98,7 @@ export interface RouteRunInput {
   lmStudioPort?: number
   cloud: { model: string; provider: 'openrouter' | 'llmbase' } | null
 }
-export type RouteRunResult = { stopped: true } | { stopped?: false; search: boolean; question: string; via: 'model' | 'forced' | 'fallback'; check?: boolean }
+export type RouteRunResult = { stopped: true } | { stopped?: false; search: boolean; question: string; via: 'model' | 'forced' | 'fallback'; check?: boolean; learn?: boolean }
 
 export interface WebRunResult {
   success: boolean
@@ -312,6 +312,9 @@ export class PetrolConversations {
     let web: (NonNullable<SendRequest['web']> & { routed?: string; checked?: string }) | undefined = req.kind === 'web' ? req.web : undefined
     if (req.kind === 'web' && !web) return { ok: false, error: 'Websuche ohne Suchwörter.' }
     let kind: SendRequest['kind'] = req.kind
+    // Lernt der Nutzer (Entscheidung der automatischen Websuche)? Steht an der Antwort, der Chat
+    // bietet dann Lernkarten an — gespeichert, damit es nach dem Öffnen noch gilt.
+    let learning = false
     const follow = req.kind === 'follow-up' ? req.followUpSnapshotId : undefined
     if (req.kind === 'follow-up' && !follow) return { ok: false, error: 'Nachfrage ohne Kennung.' }
     // Bild und Websuche gehen nicht zusammen (Rev. 7 Punkt 22).
@@ -355,7 +358,8 @@ export class PetrolConversations {
       if (pending.done || decision.stopped) return { ok: true, messages: conv.messages, storage: 'unchanged' }
       conv.turn = null
       conv.messages = before
-      this.deps.log?.(`[petrol-route] ${decision.search ? 'suchen' : 'ohne Suche'} (${decision.via})`)
+      this.deps.log?.(`[petrol-route] ${decision.search ? 'suchen' : 'ohne Suche'} (${decision.via})${decision.learn ? ' · lernt' : ''}`)
+      learning = decision.learn === true
       // Die schnelle Suche schickt `query` wörtlich an den Suchdienst: eine zu lange Prüffrage dort
       // nicht, dann bleibt es bei den getippten Suchwörtern. Recherchiert wird trotzdem mit ihr.
       if (decision.search) web = { ...web, query: !web.deep && isQueryTooLong(decision.question) ? web.query : decision.question || web.query, routed: decision.question || undefined, ...(decision.check ? { checked: lastAnswerText(before) } : {}) }
@@ -425,7 +429,7 @@ export class PetrolConversations {
       const next: PetrolChatMessage = !wres.success || !r
         ? { role: 'assistant', content: wres.error || '', error: true, origin: 'web', at: this.now() }
         : r.kind === 'answer'
-          ? { role: 'assistant', content: r.answer ?? '', model: label, origin: 'web', web: r, at: this.now() }
+          ? { role: 'assistant', content: r.answer ?? '', model: label, origin: 'web', web: r, ...(learning ? { learning: true } : {}), at: this.now() }
           : r.kind === 'nothing-readable'
             ? { role: 'assistant', content: '', model: label, origin: 'web', web: r, at: this.now() }
             : { role: 'assistant', content: r.error || '', error: true, origin: 'web', web: r, at: this.now() }
@@ -483,6 +487,7 @@ export class PetrolConversations {
       ? {
           role: 'assistant', content: answer, model: label,
           ...(webTopics.length ? { webTopicsUsed: webTopics.length } : {}),
+          ...(learning ? { learning: true } : {}),
           ...(turn.imagesDropped ? { imagesDropped: turn.imagesDropped } : {}),
           ...(withheld.length ? { imagesWithheld: { count: withheld.length, reason: withheld[0].reason ?? '' } } : {}),
           at: this.now()

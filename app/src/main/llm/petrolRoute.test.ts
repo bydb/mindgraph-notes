@@ -14,6 +14,12 @@ describe('parseRouteReply', () => {
     expect(parseRouteReply('{"search": "yes"}')).toBeNull()
     expect(parseRouteReply('{"search": tru')).toBeNull()
   })
+  it('liest den Lern-Merker, auch ohne Suche', () => {
+    expect(parseRouteReply('{"search": false, "learn": true, "question": ""}')?.learn).toBe(true)
+    expect(resolveRoute({ search: false, learn: true, question: '' }, 'frag mich ab').learn).toBe(true)
+    expect(resolveRoute({ search: true, question: 'x' }, 'x').learn).toBeUndefined()
+    expect(resolveRoute(null, 'x').learn).toBeUndefined()
+  })
   it('macht die Frage einzeilig', () => {
     expect(parseRouteReply('{"search": true, "question": "A\\nB"}')?.question).toBe('A B')
   })

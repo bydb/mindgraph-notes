@@ -44,6 +44,8 @@ export interface PetrolChatMessage {
    * mehr da sind (Rev. 3 Punkt 9). Der Knopf zeigt deaktiviert „Seiten nicht mehr da“.
    */
   hadSnapshot?: boolean
+  /** Nur Antwort: der Nutzer lernt gerade (Entscheidung der automatischen Websuche) — Lernkarten anbieten. */
+  learning?: boolean
   /** Nur Antwort ohne Websuche: so viele frühere Webfragen gingen als Thema mit (Weg 1). */
   webTopicsUsed?: number
   /**

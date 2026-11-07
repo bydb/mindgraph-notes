@@ -19,6 +19,7 @@ import { useNoteAgentStore } from '../../stores/noteAgentStore'
 import { snapshotIdsIn, usePetrolChatStore, type PetrolChatMessage, type PetrolSendOptions } from '../../stores/petrolChatStore'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { PetrolChatFlashcards } from './PetrolChatFlashcards'
+import { looksLikeLearning } from '../../../shared/learningIntent'
 import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
 import { reserveFreeNoteName } from '../../utils/noteFileName'
@@ -602,6 +603,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   // Lernkarten aus einer Antwort (Schülertest 07.11.2026): Vorschau unter genau dieser Antwort.
   const [cardsFor, setCardsFor] = useState<number | null>(null)
   const flashcardsModule = useIsModuleEnabled('flashcards')
+  // Lernkarten nur, wenn jemand lernt (Nutzer 07.11.2026): Entscheidung der Websuche an einer
+  // Antwort, sonst die Wortprüfung über die eigenen Nachrichten — gilt fürs ganze Gespräch.
+  const learningChat = messages.some(m => m.learning) || looksLikeLearning(messages.filter(m => m.role === 'user').map(m => m.content))
   const applyResearch = (msg: PetrolChatMessage) => {
     const agent = useNoteAgentStore.getState()
     agent.setPickedExample(tabId, null)
@@ -651,7 +655,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         {noWebAnswer(msg) && webConfigured && msg === lastAnswer && (
           <button type="button" className="agent-card-btn" title={t('petrolChat.verifyInWebTitle')} onClick={verifyInWeb} disabled={busy || busyElsewhere || !hasModel || webWaitsForRoute}>{t('petrolChat.verifyInWeb')}</button>
         )}
-        {flashcardsModule && vaultPath && msg.content.trim() && !msg.error && !msg.stopped && (
+        {flashcardsModule && learningChat && vaultPath && msg.content.trim() && !msg.error && !msg.stopped && (
           <button type="button" className="agent-card-btn" title={t('petrolChat.cardsTitleHint')} aria-expanded={cardsFor === msg.at} onClick={() => setCardsFor(cardsFor === msg.at ? null : msg.at)}>{t('petrolChat.cardsButton')}</button>
         )}
         {msg.origin !== 'web' ? (

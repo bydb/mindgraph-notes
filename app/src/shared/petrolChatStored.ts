@@ -59,6 +59,7 @@ export interface StoredChatMessage {
   web?: StoredWebResult
   hadSnapshot?: boolean
   webTopicsUsed?: number
+  learning?: boolean
   appNote?: 'old-web-source'
   /** Alle Bilder der Frage — auch solche, deren Datei beim letzten Laden fehlte (F71). */
   images?: StoredChatImage[]
@@ -256,6 +257,7 @@ const storedMessage = shape({
   web: maybe(storedWeb),
   hadSnapshot: maybe(yes),
   webTopicsUsed: maybe(nat),
+  learning: maybe(yes),
   appNote: maybe(oneOf('old-web-source')),
   images: maybe(list(storedImage, CHAT_IMAGE_MAX_PER_MESSAGE)),
   imageDelivery: maybe(dict(isStoredImageId, delivery)),
@@ -289,7 +291,7 @@ export function toStoredMessage(m: PetrolChatMessage): StoredChatMessage {
   if (m.followUpSnapshotId || m.wasFollowUp) pre.wasFollowUp = true
   if (m.web?.snapshotId || m.hadSnapshot) pre.hadSnapshot = true
   // Leere Listen und `false`-Merkmale bringen nichts und machten die Rundreise unstabil.
-  for (const k of ['stopped', 'error', 'webDeep', 'followUp'] as const) if (!m[k]) delete pre[k]
+  for (const k of ['stopped', 'error', 'webDeep', 'followUp', 'learning'] as const) if (!m[k]) delete pre[k]
   if (!m.webSentQueries?.length) delete pre.webSentQueries
   // Ein beim Laden fehlendes Bild bleibt gespeichert ein Bild (F71): `imagesMissing` gibt es nur
   // zur Laufzeit. Sonst ginge der Verweis beim nächsten Speichern verloren, und das Aufräumen
