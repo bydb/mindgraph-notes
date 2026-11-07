@@ -7479,7 +7479,7 @@ async function runPetrolRoute(i: RouteRunInput): Promise<RouteRunResult> {
     // Kein num_ctx: der normale Chat setzt keins, ein anderer Wert lädt das Modell bei Ollama neu.
     const call = () => streamPetrolWebModel(params, messages, claimed.controller.signal, () => {}, undefined, true)
     const raw = local ? await withOllamaActivity('petrol-web-chat', call) : await call()
-    const decision = resolveRoute(parseRouteReply(raw), i.question, i.verify)
+    const decision = resolveRoute(parseRouteReply(raw), i.question, i.verify, i.history.map(m => m.content).join('\n'))
     console.log(`[PetrolRoute] ${decision.search ? 'suchen' : 'ohne Suche'} · ${decision.via} · ${Date.now() - startedAt} ms`)
     return decision
   } catch (err) {

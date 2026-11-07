@@ -682,13 +682,17 @@ export class PetrolConversations {
 // ---------------------------------------------------------------------------------------------
 // IPC-Grenze
 
-/** Letzte sichtbare Antwort (kein Fehler, keine feste App-Antwort) — Gegenstand eines Prüfauftrags. */
+/**
+ * Gegenstand eines Prüfauftrags: die letzten sichtbaren Antworten (keine Fehler, keine festen
+ * App-Antworten). Nicht nur die letzte — „prüf die Zeitleiste von vorhin“ meint eine ältere
+ * (Schülertest 07.11.2026). Dient nur dazu, deren Zahlen nicht als Befund zu melden.
+ */
 function lastAnswerText(messages: readonly PetrolChatMessage[]): string {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i]
-    if (m.role === 'assistant' && !m.error && !m.appNote && m.content.trim()) return m.content
-  }
-  return ''
+  return messages
+    .filter(m => m.role === 'assistant' && !m.error && !m.appNote && m.content.trim())
+    .slice(-7)
+    .map(m => m.content)
+    .join('\n\n')
 }
 
 const SNAPSHOT_ID_RE = /^[0-9a-f]{32}$/
