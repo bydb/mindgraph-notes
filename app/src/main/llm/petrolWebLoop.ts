@@ -9,6 +9,9 @@
 // - Zwei Werkzeuge: `web_search` (Treffer NUMMERIERT zurück) und `web_fetch` (liest Treffer n).
 //   Das Modell nennt nie eine URL — es kann nur Treffer des Suchdienstes abrufen (wie die Wahl per
 //   Nummer in der gründlichen Suche). Suche und Abruf dürfen sich abwechseln.
+// - Links einer gelesenen Seite (nur dieselbe Website) bekommen ebenfalls Nummern und sind per
+//   web_fetch lesbar (07.11.2026: Öffnungszeiten standen auf der Unterseite, verlinkt nur im Menü).
+//   Die URL stammt aus der Seite, nie vom Modell; jeder Abruf kostet wie ein Treffer.
 // - Grenzen (Suchen, Abrufe, Runden, Frist) zählt der Main beim START, Fehlschläge zählen mit.
 // - Die Schleife SCHREIBT KEINE Antwort. Sie endet mit `{"use": [Nummern]}`; die Antwort entsteht
 //   danach im bestehenden Antwortschritt aus den eingefrorenen Auszügen, mit Satzprüfung und
@@ -20,6 +23,8 @@ import type { ChatMessage, ToolCall, ToolDefinition } from './chatClient'
 import { normalizeQuery, isQueryTooLong, type WebSearchHit } from '../../shared/webResearch'
 import { splitSkippedHits, type QueueEntry, type WebDeepHit, type WebFetchOutcome, type WebSkippedHit } from '../../shared/webChat'
 import { mergeCandidatesRoundRobin, stripUnaskedDates, type DeepCandidate } from '../../shared/webChatDeep'
+import { PAGE_LINKS_SHOWN_LOOP, rankPageLinks } from '../../shared/pageLinks'
+import { hostnameFromUrl } from '../../shared/webResearch'
 import { UNTRUSTED_BEGIN, UNTRUSTED_END, sanitizeHeaderPart } from '../rag/vaultPrompt'
 import type { DeepPhase, DeepResult, DeepTrace } from './petrolDeepSearch'
 
@@ -54,8 +59,8 @@ export const LOOP_TOOLS: ToolDefinition[] = [
   },
   {
     name: 'web_fetch',
-    description: 'Liest einen Treffer aus einer früheren web_search und liefert einen Auszug des Seitentexts.',
-    parameters: { type: 'object', properties: { result: { type: 'integer', description: 'Nummer des Treffers aus web_search' } }, required: ['result'] }
+    description: 'Liest einen Treffer aus einer früheren web_search oder einen Link einer gelesenen Seite und liefert einen Auszug des Seitentexts.',
+    parameters: { type: 'object', properties: { result: { type: 'integer', description: 'Nummer des Treffers oder Links' } }, required: ['result'] }
   }
 ]
 
@@ -137,6 +142,7 @@ Werkzeuge: web_search liefert nummerierte Treffer; web_fetch liest den Treffer m
 Vorgehen:
 - Suche mit 3 bis 8 Stichwörtern in der Sprache der Frage. Keine ganzen Sätze, kein Datum, das nicht in der Frage steht.
 - Lies die vielversprechendsten Treffer, gern mehrere mit einem Schritt (mehrere web_fetch auf einmal). Fehlen danach Angaben (etwa ein Jahr, ein Preis, Einträge einer gefragten Liste), suche gezielt weiter, gern mit Namen aus den gelesenen Seiten.
+- Nach jeder gelesenen Seite stehen nummerierte Links derselben Website. Steht die gesuchte Angabe vermutlich auf einer Unterseite (etwa Kontakt, Öffnungszeiten, Preise), lies diesen Link mit web_fetch, statt neu zu suchen.
 - Scheitert ein Abruf oder sperrt eine Website, nimm Treffer anderer Websites oder suche neu. Gib nicht auf, solange noch Abrufe frei sind.
 - Höchstens ${budget.searches} Suchen und ${budget.fetches} Seiten. Höre auf, sobald die Frage mit den gelesenen Seiten beantwortbar ist.
 - Bezieht sich die Nachricht auf das Gespräch (etwa „such gründlicher“ oder „schau auf anderen Seiten“), recherchiere zum Thema der früheren Fragen.
@@ -196,6 +202,8 @@ export async function runLoopResearch(
   const fetched = new Map<number, QueueEntry>()
   /** Websites, die einen Abruf abgewiesen haben — weitere Treffer von dort kosten keinen Abruf mehr. */
   const deniedHosts = new Set<string>()
+  /** Nummern (0-basiert), die nur als Link einer Seite bekannt sind — in der Spur erst, wenn gelesen. */
+  const linkOnly = new Set<number>()
   let nudged = false
   let searchError: string | undefined
   let nextIndex = 0
@@ -212,13 +220,16 @@ export async function runLoopResearch(
     const first = use.map((n) => all.find(([k]) => k === n - 1)).filter((x): x is [number, QueueEntry] => !!x)
     const rest = all.filter((x) => !first.includes(x))
     const entries = [...first, ...rest].map(([, e], i) => ({ ...e, candidate: { ...e.candidate, index: i } }))
-    trace.hits = registry.map((c, k): WebDeepHit => {
+    // Nicht gelesene Links einer Seite sind keine Treffer — sonst stünden je Seite ein Dutzend „nicht gewählt“ in der Spur.
+    const shownInTrace = (k: number) => !linkOnly.has(k) || fetched.has(k)
+    trace.hits = registry.flatMap((c, k): WebDeepHit[] => {
+      if (!shownInTrace(k)) return []
       const e = fetched.get(k)
-      return { title: c.title.slice(0, 160), host: c.host, url: c.url, round: 1, status: !e ? 'not-picked' : e.outcome.ok ? 'read' : 'failed' }
+      return [{ title: c.title.slice(0, 160), host: c.host, url: c.url, round: 1, status: !e ? 'not-picked' : e.outcome.ok ? 'read' : 'failed' }]
     })
     return {
       entries, trace, skipped, contactedHosts,
-      notFetched: registry.length - fetched.size,
+      notFetched: registry.filter((_, k) => !fetched.has(k) && !linkOnly.has(k)).length,
       stoppedBy: stopped() ? 'stopped' : null,
       timedOut: timedOut && !stopped(),
       searchError,
@@ -271,6 +282,7 @@ export async function runLoopResearch(
     const lines = found.map((c) => {
       let k = registry.findIndex((r) => r.url === c.url)
       if (k < 0) { registry.push(c); trace.candidates++; k = registry.length - 1 }
+      else if (linkOnly.delete(k)) trace.candidates++
       const title = sanitizeHeaderPart(c.title || c.host, deps.sanitize)
       const snippet = sanitizeHeaderPart(c.snippet.slice(0, LOOP_LIMITS.snippetMax), deps.sanitize)
       const note = fetched.has(k) ? ' (schon gelesen)' : deniedHosts.has(siteKey(c.host)) ? ' (Website sperrt vermutlich Abrufe)' : ''
@@ -288,12 +300,15 @@ export async function runLoopResearch(
     if (deniedHosts.has(siteKey(c.host))) {
       // Als gesperrt eintragen, ohne Abrufbudget — sonst stünde der gewählte Treffer als „nicht gewählt“ in der Spur (F57).
       trace.picked++
+      if (linkOnly.delete(k)) trace.candidates++
       fetched.set(k, { candidate: { index: nextIndex++, url: c.url, host: c.host, title: c.title }, outcome: { ok: false, reason: 'blocked' } })
       return `Treffer ${n} nicht abgerufen: ${c.host} hat automatische Abrufe schon abgewiesen. Nimm Treffer anderer Websites oder suche neu.`
     }
     if (trace.fetches >= maxFetches) { limit('budget'); return 'Abrufgrenze erreicht. Beende mit {"use": [...]}.' }
     trace.fetches++
     trace.picked++
+    // Ein gelesener Link zählt ab jetzt wie ein Treffer (Spur und Zähler bleiben stimmig).
+    if (linkOnly.delete(k)) trace.candidates++
     contactedHosts.push(c.host)
     opts.onPhase?.('fetch', { host: c.host })
     let outcome: WebFetchOutcome
@@ -321,7 +336,28 @@ export async function runLoopResearch(
     const cutNote = full.length > shown || outcome.truncated
       ? `\nHinweis der App: Von dieser Seite siehst du nur den Anfang (${excerpt.length.toLocaleString('de-DE')} von ${full.length.toLocaleString('de-DE')} Zeichen${outcome.truncated ? ', die Seite selbst ist noch länger' : ''}).${opts.answerSeesMore ? ' Die Antwort bekommt mehr davon zu sehen. Fehlt dir hier etwas, das vermutlich weiter unten steht, nimm die Seite trotzdem in "use" auf.' : ' Fehlt dir etwas, das vermutlich weiter unten steht, suche gezielt nach einer Seite, die es weiter oben nennt.'}`
       : ''
-    return wrap(`Treffer ${n} · ${sanitizeHeaderPart(outcome.title || c.title || c.host, deps.sanitize)} · ${c.host}\n${excerpt}`) + cutNote
+    return wrap(`Treffer ${n} · ${sanitizeHeaderPart(outcome.title || c.title || c.host, deps.sanitize)} · ${c.host}\n${excerpt}`) + cutNote + linkBlock(outcome)
+  }
+
+  // Links der gelesenen Seite als neue Nummern. Linktexte sind fremder Text (gerahmt), die Kopfzeile
+  // ist App-Text. Nur solange Abrufe frei sind — sonst wäre es ein Angebot, das nicht einlösbar ist.
+  const linkBlock = (outcome: Extract<WebFetchOutcome, { ok: true }>): string => {
+    if (!outcome.links?.length || trace.fetches >= maxFetches) return ''
+    const lines: string[] = []
+    for (const link of rankPageLinks(outcome.links, question, PAGE_LINKS_SHOWN_LOOP)) {
+      const host = hostnameFromUrl(link.url)
+      if (!host) continue
+      let k = registry.findIndex((r) => r.url === link.url)
+      if (k < 0) {
+        registry.push({ url: link.url, host, title: link.text, snippet: '', from: [] })
+        k = registry.length - 1
+        linkOnly.add(k)
+      }
+      const note = fetched.has(k) ? ' (schon gelesen)' : ''
+      lines.push(`${k + 1}. ${sanitizeHeaderPart(link.text, deps.sanitize, 80)}${note}`)
+    }
+    if (!lines.length) return ''
+    return `\nLinks dieser Seite (dieselbe Website), mit web_fetch per Nummer lesbar:\n${wrap(lines.join('\n'))}`
   }
 
   const finalPick = async (): Promise<number[]> => {

@@ -167,7 +167,8 @@ export function defaultWebGatherDeps(config: WebResearchConfig, apiKey: string |
           fetchedAt: r.record.fetchedAt,
           text: r.markdown,
           originalChars: r.originalChars,
-          truncated: r.truncated
+          truncated: r.truncated,
+          links: r.links
         }
       } catch (err) {
         const reason = fetchFailReason(err)

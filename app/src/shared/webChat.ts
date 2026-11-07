@@ -11,6 +11,7 @@
 // - Einfrieren der modell-sichtbaren Auszüge als kanonische Quellenliste (F06, F19)
 // - Fußnoten-Export (F13)
 
+import type { PageLink } from './pageLinks'
 import { hostnameFromUrl, normalizeWebUrl, type WebSearchHit } from './webResearch'
 import { replaceCitationRefs, type CitationReport, type SentenceCheck } from './rag/citations'
 import { cloudRoutesForFeature, type CloudProviderSettings } from './llmBackend'
@@ -247,7 +248,7 @@ export interface WebUnfetchedHit {
 }
 
 export type WebFetchOutcome =
-  | { ok: true; title: string; finalUrl: string; fetchedAt: string; text: string; originalChars: number; truncated: boolean }
+  | { ok: true; title: string; finalUrl: string; fetchedAt: string; text: string; originalChars: number; truncated: boolean; /** Links derselben Website (nur die Recherche-Schleife bietet sie an). */ links?: PageLink[] }
   | { ok: false; reason: WebFetchFailReason; /** HTTP-Status bei `http`, sonst leer. */ status?: number }
 
 /** Was unter der Antwort steht — aus dem Main, nie aus dem Renderer geschätzt (F11, F14). */
@@ -1055,6 +1056,11 @@ export function numberUnits(text: string): string[] {
   // „59 US-Dollar“ las sich als Zahl mit Wort „US“ ohne Einheit (GUI-Test 26.10.2026) — gleich lang
   // ersetzen, damit die Positionen für Bereiche stimmen.
   const lower = text.toLowerCase().replace(/\bus-?dollars?\b/gu, (v) => 'dollar'.padEnd(v.length))
+    // Angeklebtes „Uhr“/„h“ hinter einer Uhrzeit („08:00-16:00Uhr“, Medienzentrum Frankfurt,
+    // 07.11.2026): sonst galt die Zeit wegen des folgenden Buchstabens nicht als Wert, und eine
+    // richtig zitierte Öffnungszeit stand als „Zahl nicht in der Seite“ da. Ein Leerzeichen davor,
+    // die Positionen verschieben sich für alle folgenden Treffer gleich.
+    .replace(/(\d{1,2}:\d{2}(?::\d{2})?)(uhr|h)(?![\p{L}\p{N}])/gu, '$1 $2')
   for (const m of lower.matchAll(WHOLE_VALUE)) out.add(m[0])
   let rest = lower.replace(WHOLE_VALUE, (v) => ' '.repeat(v.length))
   for (const m of rest.matchAll(PREFIX_CURRENCY)) out.add(canonNumber(m[2], true) + UNIT_CANON[m[1]])
@@ -1092,12 +1098,19 @@ function showNumber(key: string): string {
   return unit ? `${core} ${UNIT_SHOW[unit] ?? unit}` : core
 }
 
+/**
+ * Vergleichsform einer Uhrzeit ohne führende Null (Nutzertest 07.11.2026, Darmstadt): die Seite schrieb
+ * „8:00“, die Antwort „08:00“ — derselbe Wert galt als „Zahl nicht in der Seite“. Nur für den Vergleich;
+ * angezeigt wird die Zahl so, wie sie in der Antwort steht. Datumsangaben bleiben unverändert.
+ */
+const timeKey = (n: string): string => (/^\d{1,2}:\d{2}(?::\d{2})?$/.test(n) ? n.replace(/^0(\d)/, '$1') : n)
+
 /** Belegmenge einer Seite: jede Zahl einmal mit Einheit und einmal ohne. */
 function pageNumbers(text: string): Set<string> {
   const out = new Set<string>()
   for (const n of numberUnits(text)) {
     const z = withoutZeroFraction(n)
-    out.add(n); out.add(numberCore(n)); out.add(z); out.add(numberCore(z))
+    out.add(n); out.add(numberCore(n)); out.add(z); out.add(numberCore(z)); out.add(timeKey(n))
   }
   return out
 }
@@ -1222,7 +1235,7 @@ export function sentenceExtras(answer: string, report: CitationReport, excerpts:
     const plain = withoutSourceMentions(answer.slice(s.start, s.end).replace(/(?<!\\)\[\d{1,3}\]/g, ' '), excerpts.length)
     const cited = s.refs.map((n) => sourceNumbers[n - 1]).filter(Boolean)
     // Zahl ohne Einheit: irgendwo auf der Seite genügt; mit Einheit nur mit derselben Einheit.
-    const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n) || pn.has(withoutZeroFraction(n))))
+    const notOnPage = numberUnits(plain).filter((n) => !cited.some((pn) => pn.has(n) || pn.has(withoutZeroFraction(n)) || pn.has(timeKey(n))))
     const missingNumbers = notOnPage.filter((n) => !askedNumbers.has(numberCore(n))).map(showNumber)
     const questionNumbers = notOnPage.filter((n) => askedNumbers.has(numberCore(n))).map(showNumber)
     // Nur wenn jede Zahl einzeln belegt ist und ein Preis dabei ist: sonst meldet schon `number`.

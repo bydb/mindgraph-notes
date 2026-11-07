@@ -122,8 +122,9 @@ export async function originNeedsPrivateApproval(rawUrl: string): Promise<boolea
 }
 
 /**
- * Ist ein Redirect von `fromUrl` nach `toUrl` erlaubt? Nur same-Host ohne Protokoll-
- * Downgrade (0c). Cross-Host-Redirects (klassischer SSRF-Umweg) werden abgelehnt.
+ * Ist ein Redirect von `fromUrl` nach `toUrl` erlaubt? Nur same-Host, Ziel auf gleichem Port oder
+ * Standardport, ohne Protokoll-Downgrade (0c). Cross-Host-Redirects
+ * (klassischer SSRF-Umweg) werden abgelehnt.
  */
 export function isRedirectAllowed(fromUrl: string, toUrl: string): boolean {
   let from: URL, to: URL
@@ -136,6 +137,11 @@ export function isRedirectAllowed(fromUrl: string, toUrl: string): boolean {
   if (to.protocol !== 'http:' && to.protocol !== 'https:') return false
   if (from.hostname.toLowerCase() !== to.hostname.toLowerCase()) return false
   if (from.protocol === 'https:' && to.protocol === 'http:') return false // kein Downgrade
+  // Kein Wechsel auf einen anderen Dienst desselben Hosts (Codex F28, web-seitenrand-und-links.md):
+  // Ziel ist derselbe Port oder ein Standardport (`URL.port` ist dort leer). Vom Sonderport zurück
+  // auf den Standardport bleibt erlaubt (F33: `site.de:8443` → `site.de`), auf einen ANDEREN
+  // Sonderport nicht.
+  if (to.port !== '' && to.port !== from.port) return false
   return true
 }
 

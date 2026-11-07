@@ -840,6 +840,66 @@ describe('Modellwissen und Quellenverweise (26.10.2026)', () => {
       expect(sentenceExtras(answer, report, pages)[k].unsourcedNumbers).toEqual(['9999'])
     }
   })
+  it('Quellennummer direkt UNTER der Tabelle gilt für Zeilen ohne eigene Nummer (Nutzertest 07.11.2026)', () => {
+    const pages = ['Verleih Mo-Do 08:00-16:00Uhr Fr 08:00-14:00Uhr Veranstaltungen Mo-Do 09:00-17:00Uhr', 'andere Seite 11:00']
+    const table = '| Bereich | Mo – Do | Fr |\n|---|---|---|\n| **Verleih** | 08:00 – 16:00 Uhr | 08:00 – 14:00 Uhr |\n| **Veranstaltungen** | 09:00 – 17:00 Uhr | 10:30 – 14:00 Uhr |\n| **Sonder** [2] | 11:00 Uhr | |'
+    const at = (answer: string, report: ReturnType<typeof analyzeCitations>, t: string) =>
+      report.sentences.findIndex((x) => answer.slice(x.start, x.end).trim() === t)
+    for (const foot of ['[1]', 'Quelle: [1]', 'Quellen: [1].']) {
+      for (const sep of ['\n\n', '\n']) {
+        const answer = `Öffnungszeiten:\n\n${table}${sep}${foot}`
+        const report = analyzeCitations(answer, pages)
+        const ex = sentenceExtras(answer, report, pages)
+        const k = at(answer, report, '08:00 – 16:00 Uhr')
+        expect(report.sentences[k].refs).toEqual([1])
+        expect(ex[k].unsourcedNumbers).toBeUndefined()
+        expect(ex[k].missingNumbers).toEqual([])
+        // Die Zuordnung macht die Prüfung nicht weicher: eine falsche Zeit bleibt ein Befund.
+        expect(ex[at(answer, report, '10:30 – 14:00 Uhr')].missingNumbers).toEqual(['10:30'])
+        // Eine Zeile mit eigener Nummer behält sie.
+        expect(report.sentences[at(answer, report, '11:00 Uhr')].refs).toEqual([2])
+      }
+    }
+  })
+  it('Uhrzeit mit angeklebtem „Uhr“ oder „h“ ist ein Wert (Frankfurt: „08:00-16:00Uhr“)', () => {
+    expect(numberUnits('Mo-Do 08:00-16:00Uhr')).toEqual(expect.arrayContaining(['08:00', '16:00']))
+    expect(numberUnits('bis 17:30h geöffnet')).toEqual(expect.arrayContaining(['17:30']))
+    // Andere angeklebte Buchstaben machen weiterhin keinen Uhrzeit-Wert.
+    expect(numberUnits('Code 12:30abc')).not.toContain('12:30')
+  })
+  it('Liste oder Zitat unter der Tabelle belegt sie nicht (Codex F01, Eingabe aus der Prüfung)', () => {
+    const pages = ['Kurs B 08:00']
+    for (const tail of ['\n\n- [1]', '\n\n> [1]', '\n\n[1] `nur Kurs B`']) {
+      const answer = '| Kurs | Uhrzeit |\n|---|---|\n| Kurs A | 08:00 |' + tail
+      const report = analyzeCitations(answer, pages)
+      const k = report.sentences.findIndex((x) => answer.slice(x.start, x.end).trim() === '08:00')
+      expect(report.sentences[k].status).toBe('uncited')
+      expect(sentenceExtras(answer, report, pages)[k].unsourcedNumbers).toEqual(['08:00'])
+    }
+  })
+  it('Uhrzeit mit und ohne führende Null ist derselbe Wert (Darmstadt: Seite „8:00“, Antwort „08:00“)', () => {
+    const pages = ['Montag bis Freitag von 8:00 - 13:00 Uhr']
+    const answer = 'Geöffnet Montag bis Freitag 08:00–13:00 Uhr [1].'
+    const report = analyzeCitations(answer, pages)
+    expect(sentenceExtras(answer, report, pages)[0].missingNumbers).toEqual([])
+    // Umgekehrt genauso, und eine andere Uhrzeit bleibt ein Befund.
+    const r2 = analyzeCitations('Ab 8:00 Uhr [1].', ['Öffnung 08:00 Uhr'])
+    expect(sentenceExtras('Ab 8:00 Uhr [1].', r2, ['Öffnung 08:00 Uhr'])[0].missingNumbers).toEqual([])
+    const r3 = analyzeCitations('Ab 09:00 Uhr [1].', pages)
+    expect(sentenceExtras('Ab 09:00 Uhr [1].', r3, pages)[0].missingNumbers).toEqual(['09:00'])
+  })
+  it('Quellen-Fußzeile vererbt nichts bei mehreren Quellen, mit Fließtext oder mit Abstand', () => {
+    const pages = ['08:00', '09:00']
+    const table = '| A | B |\n|---|---|\n| X | 08:00 Uhr |'
+    for (const tail of ['\n\n[1][2]', '\n\nSiehe [1] für Details.', '\n\nZwischentext.\n\n[1]', '\n\n\n\n[1]', '\n\n[7]',
+      // Eigene Blöcke sind keine Fußzeile (Codex F01), Inline-Code ist sichtbarer Inhalt (F02).
+      '\n\n- [1]', '\n\n> [1]', '\n\n[1] `nur Kurs B`', '\n| [1] | `nur Kurs B` |']) {
+      const answer = table + tail
+      const report = analyzeCitations(answer, pages)
+      const k = report.sentences.findIndex((x) => answer.slice(x.start, x.end).trim() === '08:00 Uhr')
+      expect(report.sentences[k].refs).toEqual([])
+    }
+  })
   it('Zeile mit mehreren Quellen vererbt nichts (Codex F05)', () => {
     const pages = ['P 9999', 'etwas ganz anderes']
     const answer = '| A | B | C |\n|---|---|---|\n| P [1] | Falsch [2] | 9999 |'

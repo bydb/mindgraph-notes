@@ -452,3 +452,79 @@ describe('Recherche-Schleife', () => {
     expect(r.entries.every((e) => !e.outcome.ok)).toBe(true)
   })
 })
+
+describe('Recherche-Schleife: Links gelesener Seiten (07.11.2026)', () => {
+  const withLinks = (url: string, text: string, links: Array<{ text: string; url: string }>): WebFetchOutcome => ({ ...ok(url, text), links } as WebFetchOutcome)
+
+  it('nummeriert Links derselben Website, liest sie per Nummer, ungelesene fehlen in der Spur', async () => {
+    const log: string[] = []
+    const seen: string[] = []
+    const deps = fakeDeps({
+      turns: [
+        { calls: [call('web_search', { query: 'Medienzentrum Gießen' })] },
+        { calls: [call('web_fetch', { result: 1 })] },
+        // Treffer 1 + 2 aus der Suche, danach die Links: 3 = Öffnungszeiten (Frage-Wort vorn), 4 = Aktuelles.
+        { calls: [call('web_fetch', { result: 3 })] },
+        { text: '{"use": [3]}' }
+      ],
+      results: { 'Medienzentrum Gießen': hits('mz-giessen.de', 'other.de') },
+      pages: {
+        'https://mz-giessen.de/': withLinks('https://mz-giessen.de/', 'Startseite ohne Zeiten', [
+          { text: 'Aktuelles', url: 'https://mz-giessen.de/aktuelles/' },
+          { text: 'Öffnungszeiten', url: 'https://mz-giessen.de/oeffnungszeiten/' }
+        ]),
+        'https://mz-giessen.de/oeffnungszeiten/': ok('https://mz-giessen.de/oeffnungszeiten/', 'Mo-Do 8-16 Uhr')
+      },
+      log,
+      seen
+    })
+    const r = await runLoopResearch('Öffnungszeiten Medienzentrum Gießen', deps, base)
+    const fetchResult = seen.find((s) => s.includes('Startseite ohne Zeiten'))!
+    expect(fetchResult).toContain('Links dieser Seite (dieselbe Website), mit web_fetch per Nummer lesbar:')
+    expect(fetchResult).toMatch(/3\. Öffnungszeiten\n4\. Aktuelles/)
+    // Linktexte stehen im fremden Block.
+    expect(fetchResult.lastIndexOf(UNTRUSTED_BEGIN)).toBeLessThan(fetchResult.indexOf('3. Öffnungszeiten'))
+    expect(log).toEqual(['search:Medienzentrum Gießen', 'fetch:https://mz-giessen.de/', 'fetch:https://mz-giessen.de/oeffnungszeiten/'])
+    expect(r.trace.fetches).toBe(2)
+    expect(r.entries[0].candidate.url).toBe('https://mz-giessen.de/oeffnungszeiten/')
+    // Spur: zwei Suchtreffer + der gelesene Link; „Aktuelles“ (nie gelesen) taucht nicht auf.
+    expect(r.trace.hits?.map((h) => h.url)).toEqual(['https://mz-giessen.de/', 'https://other.de/', 'https://mz-giessen.de/oeffnungszeiten/'])
+    expect(r.trace.candidates).toBe(3)
+    expect(r.notFetched).toBe(1)
+  })
+
+  it('bietet keine Links mehr an, wenn kein Abruf mehr frei ist', async () => {
+    const seen: string[] = []
+    const deps = fakeDeps({
+      turns: [
+        { calls: [call('web_search', { query: 'x y z' })] },
+        { calls: [call('web_fetch', { result: 1 })] },
+        { text: '{"use": [1]}' }
+      ],
+      results: { 'x y z': hits('a.de') },
+      pages: { 'https://a.de/': withLinks('https://a.de/', 'Seite A', [{ text: 'Kontakt', url: 'https://a.de/kontakt' }]) },
+      seen
+    })
+    await runLoopResearch('x', deps, { ...base, fetches: 1 })
+    expect(seen.find((s) => s.includes('Seite A'))).not.toContain('Links dieser Seite')
+  })
+
+  it('ein Link, der später auch als Suchtreffer kommt, behält seine Nummer und zählt einmal', async () => {
+    const seen: string[] = []
+    const deps = fakeDeps({
+      turns: [
+        { calls: [call('web_search', { query: 'a b c' })] },
+        { calls: [call('web_fetch', { result: 1 })] },
+        { calls: [call('web_search', { query: 'd e f' })] },
+        { text: '{"use": [1]}' }
+      ],
+      results: { 'a b c': hits('a.de'), 'd e f': [{ title: 'Kontakt A', url: 'https://a.de/kontakt', snippet: '' }] },
+      pages: { 'https://a.de/': withLinks('https://a.de/', 'Seite A', [{ text: 'Kontakt', url: 'https://a.de/kontakt' }]) },
+      seen
+    })
+    const r = await runLoopResearch('x', deps, base)
+    expect(seen.find((s) => s.includes('Kontakt A'))).toMatch(/^.*2\. Kontakt A/m)
+    expect(r.trace.candidates).toBe(2)
+    expect(r.trace.hits?.map((h) => h.url)).toEqual(['https://a.de/', 'https://a.de/kontakt'])
+  })
+})
