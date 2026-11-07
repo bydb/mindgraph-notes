@@ -87,4 +87,4 @@ Nachtrag 07.11.2026 (Nutzertest Gießen/Darmstadt, nach Freigabe umgesetzt, noch
 ## Status
 
 Runde 1: 2 Befunde, beide umgesetzt.
-Runde 2 (Nachprüfung F01/F02 + Nachtrag Cookie-Banner/Uhrzeit) OFFEN: Auftrag kam am 07.11.2026 nicht an, Codex-Kontingent bei 4 %. Nachholen, wenn das Kontingent wieder voll ist.
+Runde 2 (Nachprüfung F01/F02 + Nachtrag Cookie-Banner/Uhrzeit): ENTFÄLLT nach Nutzerentscheidung 07.11.2026. Stand vom Nutzer in der App abgenommen (Öffnungszeiten Gießen, Frankfurt, Darmstadt ohne Befund).
