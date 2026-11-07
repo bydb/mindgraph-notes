@@ -8,6 +8,8 @@ import Defuddle from 'defuddle'
 import { parseHTML } from 'linkedom'
 import TurndownService from 'turndown'
 import { safeFetch } from './egress'
+import { analyzePage, buildPageRim, removeConsentBanners, withRim } from './pageExtras'
+import type { PageLink } from '../../shared/pageLinks'
 import { type BrowserOnlyKind, detectBrowserOnlyPage } from '../../shared/browserOnlyPage'
 import {
   type WebFetchRecord,
@@ -24,6 +26,8 @@ export interface FetchExtractResult {
   originalChars: number
   /** Der Body selbst wurde an der Bytegrenze gekappt — die Seite ist nur zum Teil da. */
   bodyTruncated: boolean
+  /** Links derselben Website in Seitenreihenfolge (Auswahl: shared/pageLinks.ts). */
+  links: PageLink[]
 }
 
 // Trägt bei HTTP-Fehlern die tatsächliche finale URL + Redirect-Kette, damit der Aufrufer
@@ -133,12 +137,20 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
 
   let title = ''
   let markdown: string
+  let rim = ''
+  let links: PageLink[] = []
 
   if (isPlain) {
     markdown = res.body.toString('utf8')
   } else {
     const html = res.body.toString('utf8')
     const { document } = parseHTML(html)
+    // Links und Seitenrand VOR defuddle lesen: defuddle entfernt Menüs und Ränder aus dem Dokument.
+    const extras = analyzePage(document, res.finalUrl)
+    links = extras.links
+    const rimParagraphs = extras.rimParagraphs
+    // Cookie-Banner raus, bevor defuddle den Hauptinhalt wählt (sonst gewann auf kurzen Seiten der Banner).
+    removeConsentBanners(document)
     // defuddle braucht eine gültige `url` (sonst wirft die Extractor-Auswahl intern).
     const parsed = new Defuddle(document, { url: res.finalUrl }).parse()
     // Titel als untrusted behandeln — auf eine Zeile reduzieren, Steuerzeichen entfernen.
@@ -146,11 +158,17 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     markdown = buildTurndown().turndown(parsed.content || '')
     // Eine an der Bytegrenze gekappte Seite hat ein Größen-, kein Browserproblem (ikea.com:
     // 1,9 MB HTML, Öffnungszeiten erst ab Byte 1,69 Mio.) — dort nie „lädt erst im Browser“ melden.
+    // Geprüft wird der Haupttext OHNE Seitenrand: eine Fußzeile mit Adresse ist kein Seiteninhalt.
     const browserOnly = res.truncated ? null : detectBrowserOnlyPage({ html, text: markdown, url: res.finalUrl })
     if (browserOnly) throw new BrowserOnlyPageError(browserOnly, res.finalUrl, res.redirectChain)
+    rim = buildPageRim(rimParagraphs, markdown)
   }
 
-  const trimmed = truncate(markdown.trim(), opts?.markTruncation !== false, opts?.maxChars)
+  // Der Seitenrand steht vorne und zählt gegen dieselbe Grenze: der Haupttext bekommt den Rest.
+  const maxChars = opts?.maxChars ?? WEB_PAGE_CONTEXT_MAX_CHARS
+  const rimAndLabel = withRim(rim, '')
+  const mainTrimmed = truncate(markdown.trim(), opts?.markTruncation !== false, Math.max(0, maxChars - rimAndLabel.length))
+  const trimmed = { ...mainTrimmed, text: withRim(rim, mainTrimmed.text), originalChars: mainTrimmed.originalChars + rimAndLabel.length }
   const record: WebFetchRecord = {
     requestedUrl: url,
     finalUrl: res.finalUrl,
@@ -160,5 +178,5 @@ export async function fetchAndExtract(url: string, opts?: { signal?: AbortSignal
     status: 'ok',
     ...(res.truncated ? { partial: true as const } : {})
   }
-  return { record, markdown: trimmed.text, truncated: trimmed.truncated || res.truncated, originalChars: trimmed.originalChars, bodyTruncated: res.truncated }
+  return { record, markdown: trimmed.text, truncated: trimmed.truncated || res.truncated, originalChars: trimmed.originalChars, bodyTruncated: res.truncated, links }
 }

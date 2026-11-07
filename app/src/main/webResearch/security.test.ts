@@ -47,6 +47,16 @@ describe('isRedirectAllowed', () => {
     expect(isRedirectAllowed('https://a.com/x', 'file:///etc/passwd')).toBe(false)
     expect(isRedirectAllowed('kaputt', 'https://a.com')).toBe(false)
   })
+
+  it('lehnt den Wechsel auf einen anderen Port desselben Hosts ab (Codex F28)', () => {
+    expect(isRedirectAllowed('https://mz.de/start', 'https://mz.de:8443/private')).toBe(false)
+    expect(isRedirectAllowed('http://mz.de:8080/a', 'http://mz.de:9090/b')).toBe(false)
+    // Zurück auf den Standardport bleibt erlaubt (Codex F33).
+    expect(isRedirectAllowed('http://mz.de:8080/a', 'http://mz.de/b')).toBe(true)
+    expect(isRedirectAllowed('https://site.de:8443/start', 'https://site.de/ziel')).toBe(true)
+    expect(isRedirectAllowed('http://mz.de:8080/a', 'http://mz.de:8080/b')).toBe(true)
+    expect(isRedirectAllowed('http://mz.de/a', 'https://mz.de:443/b')).toBe(true)
+  })
 })
 
 describe('createValidatingLookup (Pinning + Origin-Freigabe)', () => {

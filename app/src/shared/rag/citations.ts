@@ -92,6 +92,11 @@ const TRANSITIONS = new Set([
 
 // Kein Zitat: escaped `\\[1]` und Markdown-Links `[1](…)`/`[1][…]` (F25).
 const REF_RE = /(?<!\\)\[(\d{1,3})\](?!\()(?!\[(?!\d{1,3}\]))/g // `[1][2]` bleibt erlaubt, `[1][ref]` nicht
+// Rest einer Quellen-Fußzeile unter einer Tabelle, nachdem die Nummern entfernt sind: nichts außer
+// optional „Quelle(n):“/„Source(s):“ und Satzzeichen.
+const TABLE_FOOT_REST = /^\s*(?:(?:quellen?|sources?)\s*:?)?[\s.,;·]*$/i
+// Trennzeile einer Markdown-Tabelle (`|---|:--:|`).
+const TABLE_DELIMITER_LINE = /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$/
 
 function normalizeWs(s: string): string {
   return s.toLowerCase().replace(/\s+/g, ' ').trim()
@@ -402,20 +407,66 @@ export function analyzeCitations(answer: string, sources: string[], opts: Citati
   // Zeile (Codex F01). Geerbt wird nur bei GENAU einer Quelle in der Zeile und ohne ungültige
   // Nummer: bei mehreren ist unklar, welche eine Zelle stützt (F05).
   const lineOf = (pos: number): number => answer.lastIndexOf('\n', pos - 1) + 1
-  const rowSeen = new Map<number, { valid: Set<number>; invalid: boolean }>()
+  const rowSeen = new Map<number, { valid: Set<number>; invalid: boolean; refsOnly: boolean }>()
   for (const { span: seg, kind, masked: ranges } of segs) {
     if (kind !== 'cell') continue
-    const row = rowSeen.get(lineOf(seg[0])) ?? { valid: new Set<number>(), invalid: false }
-    for (const m of maskedSlice(answer, seg[0], seg[1], ranges).matchAll(REF_RE)) {
+    const row = rowSeen.get(lineOf(seg[0])) ?? { valid: new Set<number>(), invalid: false, refsOnly: true }
+    const cellText = maskedSlice(answer, seg[0], seg[1], ranges)
+    // „Nur Nummern?“ am UNGEBLENDETEN Text (Codex F02): ausgeblendeter Inline-Code ist trotzdem
+    // sichtbarer Inhalt; `[1] \`nur Kurs B\`` ist keine reine Quellenzeile.
+    if (!TABLE_FOOT_REST.test(answer.slice(seg[0], seg[1]).replace(REF_RE, ' '))) row.refsOnly = false
+    for (const m of cellText.matchAll(REF_RE)) {
       const n = Number(m[1])
       if (n >= 1 && n <= K) row.valid.add(n)
       else row.invalid = true
     }
     rowSeen.set(lineOf(seg[0]), row)
   }
+  // Nummer UNTER der Tabelle (Nutzertest 07.11.2026, Öffnungszeiten Frankfurt): das Modell setzte
+  // „[1]“ als eigene Zeile direkt unter die Tabelle statt in die Zeilen. Jede Uhrzeit galt dann als
+  // „Modellwissen · Zahl ohne Quelle“, obwohl sie wörtlich auf Seite 1 stand. Eine Zeile, die NUR aus
+  // Quellennummern besteht (optional „Quelle:“ davor), direkt unter einer Tabelle (höchstens eine
+  // Leerzeile dazwischen), gilt für die Tabellenzeilen OHNE eigene Nummer — wie das Zeilenerbe nur bei
+  // GENAU einer gültigen Quelle (F05). Die Zahlen werden dann gegen genau diese Seite geprüft; die
+  // Prüfung wird nicht weicher, sie bekommt nur die Zuordnung.
+  const tableFoot = new Map<number, number>()
+  const lineEnd = (ls: number): number => { const nl = answer.indexOf('\n', ls); return nl < 0 ? answer.length : nl }
+  const prevLine = (ls: number): number => (ls <= 0 ? -1 : lineOf(ls - 1))
+  const markTableAbove = (ls: number, n: number): void => {
+    for (; ls >= 0; ls = prevLine(ls)) {
+      if (rowSeen.has(ls)) tableFoot.set(ls, n)
+      else if (!TABLE_DELIMITER_LINE.test(answer.slice(ls, lineEnd(ls)))) break
+    }
+  }
+  for (const { span: seg, kind, masked: ranges } of segs) {
+    if (kind !== 'prose') continue
+    const raw = maskedSlice(answer, seg[0], seg[1], ranges)
+    const nums = [...raw.matchAll(REF_RE)].map((m) => Number(m[1]))
+    // Geprüft werden die GANZEN Zeilen des Absatzes, ungeblendet: ein Listenpunkt „- [1]“ oder ein
+    // Zitat „> [1]“ ist ein eigener Block, keine Fußzeile (Codex F01), und Inline-Code ist sichtbarer
+    // Inhalt (F02).
+    const whole = answer.slice(lineOf(seg[0]), lineEnd(lineOf(Math.max(seg[0], seg[1] - 1))))
+    if (nums.length === 0 || !TABLE_FOOT_REST.test(whole.replace(REF_RE, ' '))) continue
+    const valid = new Set(nums.filter((n) => n >= 1 && n <= K))
+    if (valid.size !== 1 || nums.some((n) => n < 1 || n > K)) continue
+    let ls = prevLine(lineOf(seg[0]))
+    if (ls >= 0 && answer.slice(ls, lineEnd(ls)).trim() === '') ls = prevLine(ls)
+    if (ls < 0 || !rowSeen.has(ls)) continue
+    markTableAbove(ls, [...valid][0])
+  }
+  // Ohne Leerzeile davor liest markdown-it „[1]“ als letzte Tabellenzeile mit einer Zelle: eine
+  // LETZTE Zeile, deren Zellen nur Quellennummern tragen, ist dieselbe Fußzeile.
+  for (const [ls, row] of rowSeen) {
+    if (!row.refsOnly || row.invalid || row.valid.size !== 1) continue
+    const next = lineEnd(ls) + 1
+    if (next < answer.length && rowSeen.has(next)) continue
+    markTableAbove(prevLine(ls), [...row.valid][0])
+  }
   const rowRef = (pos: number): number[] => {
     const row = rowSeen.get(lineOf(pos))
-    return row && !row.invalid && row.valid.size === 1 ? [...row.valid] : []
+    if (row && (row.invalid || row.valid.size > 0)) return !row.invalid && row.valid.size === 1 ? [...row.valid] : []
+    const foot = tableFoot.get(lineOf(pos))
+    return foot !== undefined ? [foot] : []
   }
 
   for (const { span: seg, kind: segKind, masked: ranges } of segs) {

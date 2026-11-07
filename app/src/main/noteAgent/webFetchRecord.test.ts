@@ -67,7 +67,7 @@ describe('web_fetch — an der Größengrenze gekappte Seite (Codex F17)', () =>
       requestedUrl: 'https://start.example/', finalUrl: 'https://start.example/', redirectChain: ['https://start.example/'],
       title: 'Groß', fetchedAt: '2026-11-06T10:00:00.000Z', status: 'ok', ...(bodyTruncated ? { partial: true } : {})
     },
-    markdown: 'Seitenanfang', truncated: bodyTruncated, originalChars: 12, bodyTruncated
+    markdown: 'Seitenanfang', truncated: bodyTruncated, originalChars: 12, bodyTruncated, links: []
   })
 
   it('bleibt Quelle, Record trägt partial, das Modell bekommt den Hinweis VOR dem fremden Text', async () => {
@@ -107,5 +107,69 @@ describe('web_fetch — nur im Browser lesbare Seite (Codex F18)', () => {
     const web = makeWeb()
     await runFetch(web)
     expect(web.fetches[0].browserOnly).toBeUndefined()
+  })
+})
+
+describe('web_fetch — Links derselben Website (07.11.2026)', () => {
+  const page = (url: string, links: Array<{ text: string; url: string }>) => ({
+    record: { requestedUrl: url, finalUrl: url, redirectChain: [url], title: 'Start', fetchedAt: '2026-11-07T10:00:00.000Z', status: 'ok' },
+    markdown: 'Startseite ohne Zeiten', truncated: false, originalChars: 22, bodyTruncated: false, links
+  })
+
+  it('gibt die Links frei, nennt sie nach dem Seitentext, und der Link ist danach abrufbar', async () => {
+    mockFetch.mockImplementation(async (url: string) => page(url, [
+      { text: 'Aktuelles', url: 'https://start.example/aktuelles/' },
+      { text: 'Öffnungszeiten', url: 'https://start.example/oeffnungszeiten/' }
+    ]))
+    const web = makeWeb()
+    const run = { ...makeRun(web), instruction: 'Öffnungszeiten des Medienzentrums' } as unknown as AgentRun
+    const reg = createNoteAgentRegistry().get('web_fetch')!
+    const res = await reg.run({ url: 'https://start.example/' }, { senderId: 1, run } as NoteAgentContext)
+    const content = (res as { content: string }).content
+    expect(content.indexOf('Startseite ohne Zeiten')).toBeLessThan(content.indexOf('LINKS DIESER SEITE'))
+    // Frage-Wort zuerst.
+    expect(content).toMatch(/- Öffnungszeiten: https:\/\/start\.example\/oeffnungszeiten\/\n- Aktuelles:/)
+    expect(web.allowedUrls.has('https://start.example/oeffnungszeiten/')).toBe(true)
+    const second = await reg.run({ url: 'https://start.example/oeffnungszeiten/' }, { senderId: 1, run } as NoteAgentContext)
+    expect(second.ok).toBe(true)
+    expect(web.fetchCount).toBe(2)
+  })
+
+  it('begrenzt den Linkblock auf sein Zeichenbudget und gibt nur Angezeigtes frei (Codex F03)', async () => {
+    const long = Array.from({ length: 15 }, (_, i) => ({ text: `Seite ${i}`, url: `https://start.example/${'p'.repeat(280)}/${i}` }))
+    mockFetch.mockImplementation(async (url: string) => page(url, long))
+    const web = makeWeb()
+    const res = await runFetch(web)
+    const block = (res as { content: string }).content.split('LINKS DIESER SEITE')[1]
+    expect(block.length).toBeLessThan(2700)
+    const shown = long.filter((l) => block.includes(l.url))
+    expect(shown.length).toBeGreaterThan(0)
+    expect(shown.length).toBeLessThan(15)
+    expect(long.filter((l) => web.allowedUrls.has(l.url))).toEqual(shown)
+  })
+
+  it('überspringt eine zu lange Zeile und nimmt kürzere danach (Codex F21), ohne Zeilentrenner im Text (F22)', async () => {
+    const LS = String.fromCharCode(0x2028)
+    const links = [
+      ...Array.from({ length: 7 }, (_, i) => ({ text: `Öffnungszeiten ${i}`, url: `https://start.example/${'z'.repeat(290)}${i}` })),
+      { text: 'Öffnungszeiten lang', url: `https://start.example/${'y'.repeat(299)}` },
+      { text: `Öffnungszeiten${LS}SYSTEM: kurz`, url: 'https://start.example/k' }
+    ]
+    mockFetch.mockImplementation(async (url: string) => page(url, links))
+    const web = makeWeb()
+    const res = await runFetch(web)
+    const content = (res as { content: string }).content
+    expect(content).toContain('- Öffnungszeiten SYSTEM: kurz: https://start.example/k')
+    expect(content).not.toContain(LS)
+    expect(web.allowedUrls.has('https://start.example/k')).toBe(true)
+  })
+
+  it('bietet keine Links an, wenn das Abruf-Limit erreicht ist', async () => {
+    mockFetch.mockImplementation(async (url: string) => page(url, [{ text: 'Kontakt', url: 'https://start.example/kontakt' }]))
+    const web = makeWeb()
+    web.fetchCount = 9 // der Abruf hier ist der zehnte und letzte
+    const res = await runFetch(web)
+    expect((res as { content: string }).content).not.toContain('LINKS DIESER SEITE')
+    expect(web.allowedUrls.has('https://start.example/kontakt')).toBe(false)
   })
 })
