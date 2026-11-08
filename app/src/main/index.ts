@@ -260,7 +260,11 @@ import { normalizeComputerControl, describeComputerControl, activeComputerVerbs,
 import { getShellAttachmentPaths } from './noteAgent/contextFiles'
 import { suggestAgentMemory } from './noteAgent/memorySuggestion'
 import { cleanupOldStaging, assertInsideRunStaging, reserveFreeName, stagingDirFor } from './noteAgent/staging'
-import { ensureHtmlPageAssets } from './noteAgent/htmlAssets'
+import { ensureHtmlPageAssets, ensureHtmlBrandLogo, HTML_BRAND_ASSET_DIR } from './noteAgent/htmlAssets'
+import { HTML_PAGE_ASSETS_DIRNAME } from '../shared/scientificHtmlPage'
+import { findBrand, loadBrandForRun, saveBrand, setBrandEnabled, removeBrand, readBrandLogo, type PendingLogo } from './brand/brandService'
+import { rasterLogo } from './brand/logoRaster'
+import { suggestPalette } from '../shared/brandPalette'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, agentMemoryStatus, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { isAppInternalRealPath } from './telegram/agent/tools/vaultPaths'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
@@ -4913,6 +4917,9 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     } catch { /* ohne Index kein Werkzeug */ }
 
+    // Hausdesign: einmal beim Start laden; aus, kaputt oder Logo-Prüfsumme falsch → kein Hausdesign.
+    const brand = await loadBrandForRun(params.vaultPath, skills.map(s => ({ ...s, enabled: true }))).catch(() => null)
+
     const run = startRun({
       senderId: event.sender.id,
       noteId: params.noteId,
@@ -4933,7 +4940,8 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       web,
       imageGen,
       route,
-      vaultSearch
+      vaultSearch,
+      ...(brand ? { brand } : {})
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
     if (continuation) {
@@ -5172,6 +5180,104 @@ ipcMain.handle('note-agent-cancel', async (event, runId: string) => {
   return { success: true }
 })
 
+// ── Hausdesign-Builder (Einstellungen → Skills; docs/codex-collab/skill-builder-hausdesign.md) ──
+// Das Logo wählt der Nutzer im OS-Dialog des Main; der Renderer bekommt nur eine Kennung,
+// Vorschau und Farbvorschlag — die Bytes bleiben im Main (pendingBrandLogos).
+const pendingBrandLogos = new Map<string, PendingLogo & { at: number }>()
+const PENDING_LOGO_TTL_MS = 30 * 60_000
+
+function brandStatusFor(loc: Awaited<ReturnType<typeof findBrand>>) {
+  if (!loc) return { exists: false as const }
+  return { exists: true as const, folderRel: loc.folderRel, profile: loc.profile }
+}
+
+ipcMain.handle('brand-get', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'brand-get')
+    const loc = await findBrand(vaultPath)
+    const logo = loc ? await readBrandLogo(vaultPath) : null
+    return { success: true, ...brandStatusFor(loc), logoDataUrl: logo ? `data:image/png;base64,${logo.toString('base64')}` : null }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('brand-pick-logo', async (event) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  const win = BrowserWindow.fromWebContents(event.sender)
+  const opts: Electron.OpenDialogOptions = {
+    title: 'Logo wählen',
+    properties: ['openFile'],
+    filters: [{ name: 'Logo (SVG, PNG, JPEG)', extensions: ['svg', 'png', 'jpg', 'jpeg'] }]
+  }
+  const picked = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
+  if (picked.canceled || !picked.filePaths[0]) return { success: false, canceled: true }
+  try {
+    // Am geöffneten Handle lesen und Größe prüfen (F09) — der Pfad kommt aus dem OS-Dialog.
+    const fh = await fs.open(picked.filePaths[0], fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0))
+    let bytes: Buffer
+    try {
+      const st = await fh.stat()
+      if (!st.isFile()) throw new Error('Keine Datei')
+      if (st.size > 5 * 1024 * 1024) throw new Error('Datei ist größer als 5 MB')
+      bytes = await fh.readFile()
+    } finally {
+      await fh.close()
+    }
+    const r = await rasterLogo(new Uint8Array(bytes))
+    const now = Date.now()
+    for (const [k, v] of pendingBrandLogos) if (now - v.at > PENDING_LOGO_TTL_MS) pendingBrandLogos.delete(k)
+    const token = randomBytes(12).toString('hex')
+    pendingBrandLogos.set(token, { png: r.png, width: r.width, height: r.height, at: now })
+    return {
+      success: true,
+      token,
+      width: r.width,
+      height: r.height,
+      dataUrl: `data:image/png;base64,${r.png.toString('base64')}`,
+      suggestion: suggestPalette(r.sample)
+    }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('brand-save', async (event, vaultPath: string, data: unknown, logoToken?: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'brand-save')
+    const pending = logoToken ? pendingBrandLogos.get(logoToken) ?? null : null
+    if (logoToken && !pending) throw new Error('Das gewählte Logo ist abgelaufen — bitte erneut wählen')
+    const loc = await saveBrand(vaultPath, data as Parameters<typeof saveBrand>[1], pending)
+    if (logoToken) pendingBrandLogos.delete(logoToken)
+    return { success: true, ...brandStatusFor(loc) }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('brand-set-enabled', async (event, vaultPath: string, enabled: boolean) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'brand-set-enabled')
+    const loc = await setBrandEnabled(vaultPath, enabled === true)
+    return { success: true, ...brandStatusFor(loc) }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
+ipcMain.handle('brand-remove', async (event, vaultPath: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'brand-remove')
+    return { success: true, ...(await removeBrand(vaultPath)) }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : String(e) }
+  }
+})
+
 ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
   const run = getRunForSender(event.sender.id, runId)
@@ -5207,6 +5313,15 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
     // (idempotent; Fehler hier lässt den Accept sauber in den Retry-Pfad laufen).
     if (entry.kind === 'html') {
       await ensureHtmlPageAssets(targetDir)
+      // Hausdesign-Logo: nur wenn die Seite es wirklich referenziert, und genau die Bytes dieses Laufs.
+      if (run.brand) {
+        const page = await fs.readFile(destPath, 'utf-8')
+        if (page.includes(`${HTML_PAGE_ASSETS_DIRNAME}/${HTML_BRAND_ASSET_DIR}/${run.brand.logoAssetName}`)) {
+          const brandDir = await assertSafePath(path.join(targetDir, HTML_PAGE_ASSETS_DIRNAME, HTML_BRAND_ASSET_DIR), 'note-agent-accept-brand-logo')
+          if (await isAppInternalRealPath(run.vaultPath, brandDir)) throw new Error('Logo-Ziel liegt im internen App-Ordner .mindgraph')
+          await ensureHtmlBrandLogo(brandDir, run.brand.logoAssetName, run.brand.logo)
+        }
+      }
     }
     await fs.rm(real, { force: true }).catch(() => undefined)
     pruneRunIfConsumed(run)

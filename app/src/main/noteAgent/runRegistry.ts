@@ -3,6 +3,7 @@
 // opake Result-Handles (der Renderer sieht nie Staging-Pfade), Results höchstens
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
+import type { BrandRunContext } from '../brand/brandService'
 import type { ChatMessage } from '../llm/chatClient'
 import type { AgentRoute } from '../../shared/agentRoute'
 import type { VaultQueryResult } from '../rag/vaultRetrieve'
@@ -130,6 +131,9 @@ export interface AgentRun {
   // lang und ändert sich nicht. Die Seite rendert dann komplett ohne Layout (real
   // aufgetreten, 01.09.2026). write_html setzt ihn deterministisch wieder ein.
   htmlSourceStyles?: string
+  // Hausdesign beim Start geladen (docs/codex-collab/skill-builder-hausdesign.md): Farben, Logo-Bytes,
+  // Vorlagen. Nur wenn aktiv; die Werkzeuge lesen nur diesen Stand, nie die Datei erneut.
+  brand?: BrandRunContext
   // Texterkennung für Bilder in Anhängen (main/ocr/agentOcr.ts): Einstellungen beim Start,
   // Seitenbudget und Zwischenspeicher je Inhalt — gemeinsam für alle Lesewerkzeuge (F32).
   ocr?: AgentOcrState
@@ -190,6 +194,7 @@ export function startRun(params: {
   skills?: Array<{ name: string; description: string; folderName: string }>
   web?: WebRunState
   imageGen?: boolean
+  brand?: BrandRunContext
   route?: AgentRoute
   vaultSearch?: AgentRun['vaultSearch']
 }): AgentRun | null {
@@ -224,6 +229,7 @@ export function startRun(params: {
     comparisonCaseId: params.comparisonCaseId,
     web: params.web,
     imageGen: params.imageGen,
+    ...(params.brand ? { brand: params.brand } : {}),
     route: params.route,
     vaultSearch: params.vaultSearch
   }

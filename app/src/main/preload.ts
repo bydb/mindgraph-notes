@@ -274,6 +274,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   imageGenHasKey: () => ipcRenderer.invoke('image-gen-has-key'),
   // Agent-Skills Stufe 1: Vault-Skills verwalten
   noteSkillsList: (vaultPath: string) => ipcRenderer.invoke('note-skills-list', vaultPath),
+  // Hausdesign-Builder
+  brandGet: (vaultPath: string) => ipcRenderer.invoke('brand-get', vaultPath),
+  brandPickLogo: () => ipcRenderer.invoke('brand-pick-logo'),
+  brandSave: (vaultPath: string, data: unknown, logoToken?: string) => ipcRenderer.invoke('brand-save', vaultPath, data, logoToken),
+  brandSetEnabled: (vaultPath: string, enabled: boolean) => ipcRenderer.invoke('brand-set-enabled', vaultPath, enabled),
+  brandRemove: (vaultPath: string) => ipcRenderer.invoke('brand-remove', vaultPath),
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) =>
     ipcRenderer.invoke('note-skills-set-enabled', vaultPath, folderName, enabled),
   noteSkillsCreate: (vaultPath: string, name: string) => ipcRenderer.invoke('note-skills-create', vaultPath, name),

@@ -27,6 +27,51 @@ export interface ScientificHtmlPageOptions {
    * Fußzeile. Leer/weggelassen → Seite bleibt unmarkiert (nicht falsch markiert).
    */
   aiModel?: string
+  /**
+   * Hausdesign (docs/codex-collab/skill-builder-hausdesign.md F07/F08/F12): Farben je Rolle und Modus,
+   * optional ein Logo als RELATIVER Pfad (inhaltsadressiert, beim Übernehmen neben die Seite kopiert).
+   * Der Stilblock steht NACH dem Artikelinhalt — er gewinnt gegen einen beim Überarbeiten
+   * wiederhergestellten Quellstil (Nutzerentscheidung: aktives Hausdesign hat Vorrang).
+   */
+  brand?: HtmlBrand
+}
+
+export interface HtmlBrand {
+  name: string
+  text: string
+  tint: string
+  line2: string
+  darkText: string
+  darkTint: string
+  darkLine2: string
+  logoSrc?: string
+  logoWidth?: number
+  logoHeight?: number
+}
+
+export const HTML_BRAND_STYLE_ID = 'mg-hausdesign'
+
+const HEX6 = /^#[0-9a-fA-F]{6}$/
+
+function brandStyleBlock(b: HtmlBrand): string {
+  const ok = [b.text, b.tint, b.line2, b.darkText, b.darkTint, b.darkLine2].every(c => HEX6.test(c))
+  if (!ok) return ''
+  return `<style id="${HTML_BRAND_STYLE_ID}">
+  :root { --accent: ${b.text}; --accent-soft: ${b.tint}; --fig-line: ${b.text}; --fig-line-2: ${b.line2}; }
+  @media (prefers-color-scheme: dark) {
+    :root { --accent: ${b.darkText}; --accent-soft: ${b.darkTint}; --fig-line: ${b.darkText}; --fig-line-2: ${b.darkLine2}; }
+  }
+  header.paper .brand-logo { display: block; max-height: 64px; max-width: 260px; width: auto; height: auto; margin: 0 0 1.25rem; }
+  @media (prefers-color-scheme: dark) { header.paper .brand-logo { background: #ffffff; padding: 6px 10px; border-radius: 6px; } }
+  @media print { header.paper .brand-logo { max-height: 18mm; } }
+</style>`
+}
+
+/** Nur relative, unverdächtige Logo-Pfade (kein Schema, kein ..). */
+function safeLogoSrc(src: string | undefined): string | null {
+  if (!src) return null
+  if (!/^[A-Za-z0-9][A-Za-z0-9._/-]{0,200}$/.test(src) || src.includes('..')) return null
+  return src
 }
 
 /** Grobe Erkennung vollständiger Dokumente — write_html erwartet NUR Body-Inhalt. */
@@ -59,6 +104,8 @@ export function extractAuthoredBodyHtml(html: string): string | null {
   inner = inner.replace(/^\s*<header class="paper">[\s\S]*?<\/header>/i, '')
   // KI-Fußzeile am Ende entfernen — sie wird beim nächsten Schreiben neu gesetzt.
   inner = inner.replace(/<footer class="ai-provenance">[\s\S]*?<\/footer>\s*$/i, '')
+  // Hausdesign-Stil der App — wird beim nächsten Schreiben neu gesetzt.
+  inner = inner.replace(new RegExp(`<style id="${HTML_BRAND_STYLE_ID}">[\\s\\S]*?<\\/style>`, 'gi'), '')
   const trimmed = inner.trim()
   return trimmed ? trimmed : null
 }
@@ -95,6 +142,12 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
   const aiModel = (options.aiModel || '').trim()
   const aiMeta = aiModel ? `\n${buildProvenanceMetaTag(aiModel)}` : ''
   const aiFooter = aiModel ? `  ${buildProvenanceFooterHtml(aiModel, lang)}\n` : ''
+  const brandStyle = options.brand ? brandStyleBlock(options.brand) : ''
+  const logoSrc = options.brand ? safeLogoSrc(options.brand.logoSrc) : null
+  const logoDims = options.brand?.logoWidth && options.brand?.logoHeight
+    ? ` width="${Math.round(options.brand.logoWidth)}" height="${Math.round(options.brand.logoHeight)}"` : ''
+  const logoImg = logoSrc && options.brand
+    ? `\n    <img class="brand-logo" src="${escapeHtml(logoSrc)}" alt="${escapeHtml(options.brand.name)}"${logoDims}>` : ''
 
   return `<!DOCTYPE html>
 <html lang="${lang}">
@@ -257,11 +310,11 @@ export function buildScientificHtmlPage(options: ScientificHtmlPageOptions): str
 </head>
 <body>
 <article>
-  <header class="paper">
+  <header class="paper">${logoImg}
     <h1>${title}</h1>
   </header>
 ${options.bodyHtml}
-${aiFooter}</article>
+${brandStyle ? brandStyle + '\n' : ''}${aiFooter}</article>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {

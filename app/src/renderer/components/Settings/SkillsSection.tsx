@@ -4,6 +4,7 @@ import { useTranslation } from '../../utils/translations'
 import { generateNoteId } from '../../utils/linkExtractor'
 import type { NoteAgentSkill, NoteAgentCatalogSkill } from '../../../shared/types'
 import { PageHeader, SectionTitle, Card, Row, Note, Details, Toggle, Button, Code } from './SettingsUI'
+import { BrandSection } from './BrandSection'
 
 // Agent-Skills Stufe 1 (docs/agent-skills-plan.md): Vault-Skills verwalten.
 // Skills sind Markdown-Notizen (Skills/<ordner>/SKILL.md, agentskills.io-Format) —
@@ -141,6 +142,8 @@ export function SkillsSection({ onClose }: Props) {
   return (
     <div className="settings-section">
       <PageHeader title={t('settings.tab.skills')} subtitle={t('settings.skills.subtitle')} />
+
+      {vaultPath && <BrandSection vaultPath={vaultPath} skills={skills} onChanged={() => void reload()} />}
 
       <SectionTitle title={t('settings.skills.groupVault')} meta={loading ? undefined : t('settings.skills.meta', { n: skills.length, on: enabledCount })} />
       <Card>

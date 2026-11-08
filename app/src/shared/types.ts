@@ -933,6 +933,11 @@ export interface ElectronAPI {
   imageGenHasKey: () => Promise<boolean>;
   // Agent-Skills Stufe 1
   noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; vaultKey?: string; error?: string }>;
+  brandGet: (vaultPath: string) => Promise<BrandStatusResult & { logoDataUrl?: string | null }>;
+  brandPickLogo: () => Promise<{ success: boolean; canceled?: boolean; error?: string; token?: string; width?: number; height?: number; dataUrl?: string; suggestion?: import('./brandPalette').PaletteSuggestion }>;
+  brandSave: (vaultPath: string, data: BrandSaveData, logoToken?: string) => Promise<BrandStatusResult>;
+  brandSetEnabled: (vaultPath: string, enabled: boolean) => Promise<BrandStatusResult>;
+  brandRemove: (vaultPath: string) => Promise<{ success: boolean; error?: string; removed?: number; keptFolder?: boolean }>;
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   noteSkillsCreate: (vaultPath: string, name: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsInstallStarter: (vaultPath: string) => Promise<{ success: boolean; installed: string[]; error?: string }>;
@@ -2193,4 +2198,23 @@ declare global {
   interface Window {
     electronAPI: ElectronAPI;
   }
+}
+
+// Hausdesign-Builder (Einstellungen → Skills)
+export interface BrandSaveData {
+  name: string
+  subline?: string
+  logoHasName: boolean
+  contact: import('./brand').BrandContact
+  colors: import('./brand').BrandColors
+  withLetter: boolean
+  enabled: boolean
+}
+
+export interface BrandStatusResult {
+  success: boolean
+  error?: string
+  exists?: boolean
+  folderRel?: string
+  profile?: import('./brand').BrandProfile
 }

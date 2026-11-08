@@ -23,7 +23,7 @@ import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
 import { markdownToDocx, markdownToDocxBuffer } from '../office/officeService'
 import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from '../../shared/docxTemplateFill'
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
-import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument } from '../../shared/scientificHtmlPage'
+import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument, HTML_PAGE_ASSETS_DIRNAME } from '../../shared/scientificHtmlPage'
 import { buildEdumap, EdumapInputError, EDUMAP_COLORS, EDUMAP_LIMITS, type EdumapColumnInput } from '../../shared/edumap'
 import { IGNORED_DIRECTORY_NAMES } from '../../shared/ignoredDirectories'
 import { buildExcalidrawMindmap, MindmapInputError, MINDMAP_LIMITS, resolveWikilinkInPaths, type MindmapBranchInput } from '../../shared/excalidrawMindmap'
@@ -48,6 +48,7 @@ import type { OcrReadContext } from '../ocr/agentOcr'
 import { IMAGE_MODES, infographicPromptError, parseImageMode } from './imageMode'
 import type { ChatOptions } from '../llm/chatClient'
 import type { CallUsage } from '../../shared/llmCost'
+import { STARTER_DECK_VAULT_REL } from "../../shared/brand"
 
 export interface NoteAgentContext {
   senderId: number
@@ -241,6 +242,20 @@ async function readVaultBinary(vaultPath: string, relPath: string, maxBytes: num
   } finally {
     await fh.close()
   }
+}
+
+/**
+ * Hausdesign (Codex F02): GENAU die mitgelieferte Hausstil-Vorlage wird bei aktivem Hausdesign auf
+ * dessen Präsentationsvorlage umgelenkt — in inspect_pptx_template UND write_pptx gleich, damit
+ * geprüfte und benutzte Vorlage nie auseinanderlaufen. Jede andere Vorlage bleibt unberührt.
+ */
+function resolvePptxTemplateAlias(ctx: NoteAgentContext, templateRel: string): { rel: string; aliased: boolean } {
+  const brand = ctx.run.brand
+  const norm = templateRel.replace(/\\/g, '/').replace(/^\.\//, '')
+  if (brand && norm.toLowerCase() === STARTER_DECK_VAULT_REL.toLowerCase()) {
+    return { rel: `${brand.folderRel}/${brand.profile.deckFile}`, aliased: true }
+  }
+  return { rel: templateRel, aliased: false }
 }
 
 // Leitplanke fürs Einzellesen aus einem Ordner (siehe read_context_file).
@@ -1202,7 +1217,22 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         bodyHtml: articleHtml,
         lang,
         // KI-Provenienz: HTML trägt kein YAML — Kennzeichnung via <meta> + Fußzeile.
-        aiModel: ctx.run.model
+        aiModel: ctx.run.model,
+        // Hausdesign: Farben je Rolle + Logo (inhaltsadressiert, beim Übernehmen kopiert).
+        ...(ctx.run.brand ? {
+          brand: {
+            name: ctx.run.brand.profile.name,
+            text: ctx.run.brand.tokens.text,
+            tint: ctx.run.brand.tokens.tint,
+            line2: ctx.run.brand.tokens.line2,
+            darkText: ctx.run.brand.tokens.darkText,
+            darkTint: ctx.run.brand.tokens.darkTint,
+            darkLine2: ctx.run.brand.tokens.darkLine2,
+            logoSrc: `${HTML_PAGE_ASSETS_DIRNAME}/brand/${ctx.run.brand.logoAssetName}`,
+            logoWidth: ctx.run.brand.profile.logo.width,
+            logoHeight: ctx.run.brand.profile.logo.height
+          }
+        } : {})
       })
       const res = await registerStagedResult(
         ctx,
@@ -1382,7 +1412,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       try {
         const built = buildExcalidrawMindmap(
           { title, branches: branches as MindmapBranchInput[], style: typeof args.style === 'string' ? args.style : undefined },
-          { now: Date.now(), resolveLink: target => resolveWikilinkInPaths(target, mdPaths) }
+          { now: Date.now(), resolveLink: target => resolveWikilinkInPaths(target, mdPaths), ...(ctx.run.brand ? { brand: { fill: ctx.run.brand.tokens.fill, tint: ctx.run.brand.tokens.tint } } : {}) }
         )
         const fileName = sanitizeOutputFileName(rawName, '.excalidraw')
         const links = built.linkCount > 0 ? `, ${built.linkCount} Links` : ''
@@ -1419,16 +1449,18 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const templateRel = requireString(args, 'template')
       if (!templateRel) return err('Parameter "template" fehlt')
       if (!/\.(pptx|potx)$/i.test(templateRel)) return err('Vorlage muss eine .pptx- oder .potx-Datei sein')
+      const alias = resolvePptxTemplateAlias(ctx, templateRel)
       let bytes: Buffer
       try {
-        bytes = await readVaultBinary(ctx.run.vaultPath, templateRel, MAX_PPTX_TEMPLATE_BYTES)
+        bytes = await readVaultBinary(ctx.run.vaultPath, alias.rel, MAX_PPTX_TEMPLATE_BYTES)
       } catch (e) {
-        return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+        return err(`Vorlage "${alias.rel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
       }
       try {
         const info = await inspectPptxTemplate(new Uint8Array(bytes))
-        ctx.run.sources.add(templateRel)
-        return { ok: true, content: describePptxTemplate(info), display: `${path.basename(templateRel)} — ${info.layouts.length} Layouts` }
+        ctx.run.sources.add(alias.rel)
+        const note = alias.aliased ? `Hausdesign aktiv: statt "${templateRel}" wird "${alias.rel}" verwendet (gleiche Layouts, Logo und Farben der Einrichtung).\n\n` : ''
+        return { ok: true, content: note + describePptxTemplate(info), display: `${path.basename(alias.rel)} — ${info.layouts.length} Layouts${alias.aliased ? ' (Hausdesign)' : ''}` }
       } catch (e) {
         if (e instanceof PptxInputError) return err(e.issues.join('; '))
         return err(`Vorlage konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
@@ -1522,11 +1554,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
 
       // Web-Lauf: genau EIN Ergebnis; die Quellenfolie baut die App aus den Abrufen.
       if (ctx.run.web?.wrote) return err('Das Ergebnis wurde bereits geschrieben — im Recherche-Modus ist nur EIN Ergebnis erlaubt.')
+      const alias = resolvePptxTemplateAlias(ctx, templateRel)
       let templateBytes: Buffer
       try {
-        templateBytes = await readVaultBinary(ctx.run.vaultPath, templateRel, MAX_PPTX_TEMPLATE_BYTES)
+        templateBytes = await readVaultBinary(ctx.run.vaultPath, alias.rel, MAX_PPTX_TEMPLATE_BYTES)
       } catch (e) {
-        return err(`Vorlage "${templateRel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
+        return err(`Vorlage "${alias.rel}" konnte nicht gelesen werden: ${e instanceof Error ? e.message : String(e)}`)
       }
 
       // Bilder auflösen: zuerst Ergebnisse dieses Laufs (generate_image), Namensstamm
@@ -1579,10 +1612,10 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
                 .concat(browserOnlyFetches(ctx.run.web.fetches).map((f): PptxSource => ({ title: new URL(f.finalUrl).hostname.replace(/^www\./, ''), url: f.finalUrl, fetchedAt: '', unread: true })))
             : undefined
         })
-        ctx.run.sources.add(templateRel)
+        ctx.run.sources.add(alias.rel)
         for (const src of imageSources) ctx.run.sources.add(src)
         const fileName = sanitizeOutputFileName(rawName, '.pptx')
-        const parts = [`${result.slideCount} Folien`, `Vorlage ${path.basename(templateRel)}`]
+        const parts = [`${result.slideCount} Folien`, `Vorlage ${path.basename(alias.rel)}${alias.aliased ? " (Hausdesign)" : ""}`]
         if (result.filled.length) parts.push(`Felder: ${result.filled.join(', ')}`)
         if (result.notes.length) parts.push(`Hinweise: ${result.notes.join('; ')}`)
         const res = await registerStagedResult(ctx, fileName, 'pptx', Buffer.from(result.bytes), parts.join(', '))
@@ -1640,9 +1673,19 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const infographic = parsedMode.mode === 'infografik'
       const lengthError = infographic ? infographicPromptError(prompt) : null
       if (lengthError) return err(lengthError)
+      // Hausdesign (Codex F13): nur Farbcodes gehen an den Bilddienst, nie Name oder Kontakt;
+      // die Länge wird MIT dem Zusatz geprüft.
+      let finalPrompt = prompt
+      if (infographic && ctx.run.brand) {
+        const t = ctx.run.brand.tokens
+        const sec = ctx.run.brand.profile.colors.secondary ? `, secondary accent ${t.line2}` : ''
+        finalPrompt = `${prompt}\n\nColor palette: primary ${t.fill}, headings ${t.text}${sec}, light panels ${t.tint}; otherwise white and neutral greys. Do not draw any logo.`
+        const withBrand = infographicPromptError(finalPrompt)
+        if (withBrand) return err(`${withBrand} (inklusive der Hausfarben, die die App anhängt — kürze den Prompt um etwa 200 Zeichen)`)
+      }
       const aspectRatio: Ratio = RATIOS.includes(args.aspect_ratio as Ratio) ? (args.aspect_ratio as Ratio) : (infographic ? '3:4' : '16:9')
       const { generateImage } = await import('../imageGen/imagenService')
-      const res = await generateImage(prompt, { aspectRatio, imageSize: infographic ? '2K' : '1K' })
+      const res = await generateImage(finalPrompt, { aspectRatio, imageSize: infographic ? '2K' : '1K' })
       if (!res.success || !res.imageBase64) {
         return err(res.error || 'Bildgenerierung fehlgeschlagen')
       }

@@ -1,0 +1,73 @@
+/* Hausdesign-Builder (Einstellungen → Skills). Grundbausteine aus SettingsUI; hier nur, was sie nicht
+   haben: Logo-Kachel, Farbfelder, Vorschau-Miniaturen. Die Hausfarben der Vorschau kommen als
+   --b-*-Variablen vom Element (Nutzerdaten, keine App-Tokens). */
+
+.brand-logo-tile {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 64px; height: 36px; flex-shrink: 0;
+  border-radius: 8px; border: 1px solid var(--border-subtle); background: #ffffff;
+  padding: 3px 5px; box-sizing: border-box;
+}
+.brand-logo-tile img { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+.brand-wide { width: min(360px, 100%); }
+.brand-files { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.brand-files code { font-size: 11.5px; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+.brand-color { display: inline-flex; align-items: center; gap: 8px; }
+.brand-color-swatch {
+  width: 32px; height: 28px; padding: 0; border: 1px solid var(--border-color); border-radius: 6px;
+  background: none; cursor: pointer;
+}
+.brand-color-swatch::-webkit-color-swatch-wrapper { padding: 2px; }
+.brand-color-swatch::-webkit-color-swatch { border: none; border-radius: 4px; }
+.sui-input.brand-color-hex { width: 96px; font-variant-numeric: tabular-nums; }
+.sui-input.brand-color-hex.is-invalid { border-color: var(--color-danger); }
+
+.brand-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.brand-swatches-label { font-size: 12px; color: var(--text-secondary); margin-right: 2px; }
+.brand-swatch {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 8px 3px 4px; border: 1px solid var(--border-color); border-radius: 999px;
+  background: var(--bg-primary); color: var(--text-primary); font-size: 11.5px; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.brand-swatch:hover { background: var(--bg-hover); }
+.brand-swatch:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.brand-swatch span { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(0, 0, 0, 0.12); }
+
+.brand-actions { display: inline-flex; align-items: center; gap: 10px; margin-left: 8px; }
+.brand-actions-end { display: flex; justify-content: flex-end; margin: 4px 0 0; padding: 8px 16px 12px; }
+
+/* Vorschau: vier Miniaturen, umbrechend. Rahmen immer hell (Folien, Briefe, Seiten sind weiß). */
+.brand-preview { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px; width: 100%; }
+.brand-pv { margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.brand-pv figcaption { font-size: 11.5px; color: var(--text-secondary); }
+.brand-pv-frame {
+  position: relative; aspect-ratio: 16 / 9; overflow: hidden; container-type: size;
+  border: 1px solid var(--border-color); border-radius: 6px; background: #ffffff; color: #1c2024;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 3px;
+  padding: 10px 12px 12px 18px; box-sizing: border-box; font-family: Arial, sans-serif;
+}
+.brand-pv-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--b-fill); }
+.brand-pv-logo-row { position: absolute; top: 6cqh; left: 5.6cqw; right: 10px; display: flex; align-items: center; gap: 6px; }
+.brand-pv-logo-row img { height: 11cqh; max-width: 20cqw; object-fit: contain; object-position: left center; }
+/* Maße wie auf der echten Folie: 0,85" bzw. 1,15" von 7,5" Höhe, Breite höchstens 2,6" bzw. 4,6" von 13,33". */
+.brand-pv-logo-row img.is-large { height: 15cqh; max-width: 35cqw; }
+.brand-pv-wordmark { font-size: 9px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand-pv-kicker { font-size: 7px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--b-text); }
+.brand-pv-title { font-size: 13px; font-weight: 700; line-height: 1.15; }
+
+.brand-pv-dark .brand-pv-frame { background: var(--b-dark); color: #ffffff; padding-left: 12px; }
+.brand-pv-dark .brand-pv-kicker { color: var(--b-ondark); }
+
+.brand-pv-mindmap .brand-pv-frame { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; padding: 10px; }
+.brand-pv-node { font-size: 9px; padding: 4px 8px; border-radius: 6px; border: 1.5px solid var(--b-fill); }
+.brand-pv-node.is-center { background: var(--b-fill); color: #ffffff; font-weight: 700; flex-basis: 60%; text-align: center; }
+.brand-pv-node.is-branch { background: var(--b-tint); color: #1e1e1e; }
+
+.brand-pv-html .brand-pv-frame { justify-content: flex-start; padding: 10px 12px; font-family: Georgia, serif; }
+.brand-pv-html img { max-height: 14px; max-width: 70px; object-fit: contain; align-self: flex-start; margin-bottom: 4px; }
+.brand-pv-h1 { font-size: 12px; font-weight: 700; }
+.brand-pv-abstract { font-size: 8.5px; line-height: 1.4; padding: 4px 6px; background: var(--b-tint); border-left: 2px solid var(--b-text); }
+.brand-pv-link { color: var(--b-text); text-decoration: underline; }

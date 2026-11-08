@@ -46,3 +46,34 @@ export async function ensureHtmlPageAssets(targetDir: string): Promise<void> {
   const dest = path.join(targetDir, HTML_PAGE_ASSETS_DIRNAME, 'katex')
   await copyMissingRecursive(src, dest)
 }
+
+/** Unterordner für Hausdesign-Logos neben übernommenen Seiten. */
+export const HTML_BRAND_ASSET_DIR = 'brand'
+
+/**
+ * Hausdesign-Logo neben die Seite legen (Codex F07). Der Name ist inhaltsadressiert
+ * (`logo-<sha12>.png`): ältere Seiten behalten ihr Logo, wenn das Profil später ein neues
+ * bekommt, und gleiche Bytes werden nie doppelt geschrieben. Geschrieben wird exklusiv in eine
+ * Zwischendatei und dann umbenannt — nie eine halbe Datei am Ziel. `destDir` muss der Aufrufer
+ * vorher per assertSafePath geprüft haben.
+ */
+export async function ensureHtmlBrandLogo(destDir: string, fileName: string, bytes: Buffer): Promise<void> {
+  if (!/^logo-[0-9a-f]{12}\.png$/.test(fileName)) throw new Error('Ungültiger Logo-Name')
+  await fs.mkdir(destDir, { recursive: true })
+  const dest = path.join(destDir, fileName)
+  try {
+    const st = await fs.lstat(dest)
+    if (st.isFile()) return
+    throw new Error('Logo-Ziel ist keine Datei')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
+  }
+  const tmp = path.join(destDir, `.${fileName}.${process.pid}.${Date.now()}.tmp`)
+  await fs.writeFile(tmp, bytes, { flag: 'wx' })
+  try {
+    await fs.rename(tmp, dest)
+  } catch (e) {
+    await fs.rm(tmp, { force: true }).catch(() => undefined)
+    throw e
+  }
+}

@@ -51,6 +51,11 @@ export interface MindmapBuildOptions {
    * vault-relativer Pfad ohne `.md` oder ein Fehlertext. Ohne Resolver sind Links verboten.
    */
   resolveLink?: (target: string) => { path: string } | { error: string }
+  /**
+   * Hausdesign (docs/codex-collab/skill-builder-hausdesign.md): Flächenakzent (Mitte, Linien; Weiß darauf
+   * ≥ 3:1) und helle Tönung (Äste). Ohne Angabe Petrol. Kategorie-Farben bleiben immer (Bedeutung).
+   */
+  brand?: { fill: string; tint: string }
 }
 
 export interface MindmapBuildResult {
@@ -480,6 +485,9 @@ function edgePoint(box: Box, toward: { x: number; y: number }, gap: number): { x
 }
 
 export function buildExcalidrawMindmap(input: MindmapInput, options: MindmapBuildOptions): MindmapBuildResult {
+  const brandOk = options.brand && /^#[0-9a-fA-F]{6}$/.test(options.brand.fill) && /^#[0-9a-fA-F]{6}$/.test(options.brand.tint)
+  const ACCENT = brandOk ? options.brand!.fill : PETROL
+  const ACCENT_TINT = brandOk ? options.brand!.tint : PETROL_TINT
   const { style, center, branches } = prepare(input, options)
   const def = STYLES[style]
   const nodes = layout(center, branches, style)
@@ -548,7 +556,7 @@ export function buildExcalidrawMindmap(input: MindmapInput, options: MindmapBuil
       y: r2(start.y),
       width: Math.abs(dx),
       height: Math.abs(dy),
-      strokeColor: PETROL,
+      strokeColor: ACCENT,
       backgroundColor: 'transparent',
       fillStyle: 'solid',
       strokeWidth: n.role === 'branch' ? 2 : 1,
@@ -581,8 +589,8 @@ export function buildExcalidrawMindmap(input: MindmapInput, options: MindmapBuil
       y: r2(box.y),
       width: r2(box.width),
       height: r2(box.height),
-      strokeColor: kind ? kind.dotColor : PETROL,
-      backgroundColor: isCenter ? PETROL : kind ? kind.canvasColor : n.role === 'branch' ? PETROL_TINT : WHITE,
+      strokeColor: kind ? kind.dotColor : ACCENT,
+      backgroundColor: isCenter ? ACCENT : kind ? kind.canvasColor : n.role === 'branch' ? ACCENT_TINT : WHITE,
       fillStyle: 'solid',
       strokeWidth: n.role === 'leaf' ? 1 : 2,
       roundness: { type: 3 },
@@ -629,7 +637,7 @@ export function buildExcalidrawMindmap(input: MindmapInput, options: MindmapBuil
       viewBackgroundColor: WHITE,
       gridSize: 20,
       currentItemFontFamily: def.fontFamily,
-      currentItemStrokeColor: PETROL,
+      currentItemStrokeColor: ACCENT,
       currentItemRoughness: def.roughness
     },
     files: {}
