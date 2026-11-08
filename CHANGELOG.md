@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.0] - 2026-11-08
+
+**Hinterlegen Sie das Logo Ihrer Einrichtung, und der Agent erstellt Präsentationen, Mindmaps, Webseiten und Infografiken im eigenen Erscheinungsbild.** Sie laden das Logo einmal unter Einstellungen → Skills hoch, MindGraph schlägt die Hausfarben vor und zeigt eine Vorschau. Danach gilt das Hausdesign für jeden Auftrag, ohne dass Sie es erwähnen müssen, und lässt sich mit einem Schalter wieder ausschalten.
+
+### Hintergrund
+
+- **Auslöser:** Medienzentren, Schulen, Hochschulen und Akademien wollen Unterlagen im eigenen Erscheinungsbild. Bisher trug alles, was der Agent erzeugte, das Petrol von MindGraph, und eine eigene Vorlage musste man von Hand vorbereiten.
+- **Präsentationen:** Die mitgelieferte Vorlage mit allen Layouts (Karten, Schritte, Kennzahlen, Abschnitt, Abschluss) wird in den Hausfarben neu angelegt, mit Ihrem Logo auf der Titelfolie und dem Namen Ihrer Einrichtung in der Fußzeile. Eine eigene, ausdrücklich genannte Vorlage bleibt unberührt.
+- **Mindmaps, Webseiten, Infografiken:** Mindmaps erscheinen in der Hausfarbe, Webseiten tragen das Logo im Kopf, Infografiken bekommen die Farbcodes mit. An den Bilddienst gehen nur die Farbcodes, nie Name oder Logo.
+- **Briefe:** Auf Wunsch entsteht eine Word-Vorlage mit Logo, Absenderzeile und Kontakt-Fußzeile. Gibt es im Vault schon einen eigenen Briefkopf, hat dieser Vorrang.
+- **Lesbarkeit:** Ist die Hausfarbe als Schrift zu hell oder die dunkle Farbe für weiße Schrift zu hell, nimmt MindGraph eine angepasste Variante und sagt das in der Vorschau.
+- **Sicherheit:** Das Logo wird auf diesem Rechner geprüft und neu gespeichert. SVG-Dateien mit Skripten oder Verweisen auf fremde Adressen werden abgelehnt.
+- **Chat:** Die Chat-Spalte wächst jetzt mit dem Fenster, Tabellen nutzen die volle Breite.
+- **Grenzen:** Eigene Office-Vorlagen und Hausschriften lassen sich noch nicht hochladen. Arbeitsblätter, Edumaps und das Veranstaltungsjournal behalten ihre bisherigen Farben.
+
 ## [1.2.7] - 2026-11-07
 
 **Der Chat entscheidet jetzt selbst, ob er für eine Frage im Web nachsieht: Fakten wie Preise, Daten oder Öffnungszeiten recherchiert er mit Quellen, Formulieren und Erklären geht ohne Suche schnell.** Mit „Im Web prüfen“ oder einem getippten „stimmt das?“ lassen Sie eine frühere Antwort Angabe für Angabe gegen Quellen prüfen. Wer für eine Prüfung lernt, bekommt kurz gegliederte Erklärungen mit Merksatz und macht daraus mit einem Klick Karteikarten.
