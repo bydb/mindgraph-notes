@@ -23194,9 +23194,16 @@ body.presentation-mode *::after {
 /* Chat als Gesprächsfläche statt Formularkarte (docs/codex-collab/chat-wie-codex.md F01/F04/F05,
    Nutzerentscheidung 04.11.2026). Einstieg bzw. Verlauf füllt die Höhe, die Eingabe ist EINE
    Fläche unten; Einstieg, Beispiele, Eingabe und Fußzeile teilen eine Lesebreite von 800 px. */
-.petrol-chat { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 12px; }
+/* Spaltenbreite wächst mit dem Fenster (Nutzer 08.11.2026: „Chatfenster nicht skalierbar“ — bei
+   breitem Fenster blieb die Spalte bei 800 px, Tabellen standen gedrängt): mindestens 800 px bzw.
+   die ganze Fläche, sonst 82 % der Breite, höchstens 1240 px. Fließtext bleibt bei 68ch (Lernlesbarkeit),
+   Tabellen und Code nutzen die volle Spalte. Verlauf, Eingabe und Fußzeile teilen dieselbe Breite. */
+.agent-view-inner.is-chat { max-width: none; }
+/* Der Kopf behält die Breite des Auftragsmodus (1180 − 2 × 24 px), sonst springt er beim Umschalten. */
+@container (min-width: 1000px) { .agent-view-inner.is-chat > .agent-card-head { max-width: 1132px; } }
+.petrol-chat { --petrol-col: max(800px, min(82%, 1240px)); display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 12px; }
 .agent-view-inner.is-chat > .petrol-chat { max-width: none; }
-.petrol-chat > * { width: 100%; max-width: 800px; margin-inline: auto; box-sizing: border-box; }
+.petrol-chat > * { width: 100%; max-width: var(--petrol-col); margin-inline: auto; box-sizing: border-box; }
 .petrol-chat > .petrol-chat-list { max-width: none; }
 .petrol-chat-hero { flex: 1 1 auto; min-height: 0; padding: 12px 0; display: flex; align-items: center; justify-content: center; }
 .petrol-chat-hero-title { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; color: var(--text-primary); text-align: center; }
@@ -23340,7 +23347,7 @@ body.presentation-mode *::after {
   padding: 4px 0 8px;
 }
 .petrol-turn {
-  width: 100%; max-width: 760px; margin-inline: auto; flex-shrink: 0;
+  width: 100%; max-width: var(--petrol-col, 760px); margin-inline: auto; flex-shrink: 0;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 10px;
