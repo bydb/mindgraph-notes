@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.1] - 2026-11-09
+
+**Während eine E-Mail offen ist, können Sie jetzt Text aus dem Chat oder vom Agenten kopieren und in die Mail einfügen.** Das Schreibfenster lässt sich verschieben, in der Größe ändern und zu einer Leiste verkleinern. Eine eingefügte Liste von Adressen, etwa eine pro Zeile aus einer Tabelle, wird zu einzelnen Empfängern.
+
+### Hintergrund
+
+- **Auslöser:** Rückmeldungen aus dem Alltag. Solange das Schreibfenster offen war, ließ sich nichts anderes in der App anklicken, also auch kein vorformulierter Text aus dem Chat übernehmen. Eine eingefügte Adressliste landete als eine einzige, unbrauchbare Adresse im Feld „An“.
+- **Schreibfenster:** Es schwebt weiter über der App, blockiert sie aber nicht mehr. Es bleibt auch offen, wenn Sie das Posteingangs-Panel schließen oder wechseln. Beginnen Sie eine zweite Mail, wird die erste vorher als Entwurf gesichert. ⌘W schließt im Fenster die Mail statt der Notiz dahinter.
+- **Empfänger:** Für An, CC und BCC gelten Listen mit Zeilenumbruch, Komma, Semikolon oder Leerzeichen, Outlook-Listen wie „Name <Adresse>; …“ und Tabellenzeilen mit Name und Adresse. Doppelte Adressen werden einmal übernommen.
+- **Schutz vor Teilversand:** Was keine gültige Adresse ist, bleibt rot markiert im Feld stehen, und die Mail wird erst gesendet, wenn es korrigiert ist. Vorher hätte sie sonst nur einen Teil der Empfänger erreicht.
+- **Chat:** Code in Antworten erscheint mit Syntaxfarben, Sprachname und einem Knopf zum Kopieren.
+- **Grenzen:** Mehrere Mails gleichzeitig in eigenen Fenstern gibt es noch nicht; eine zweite Mail legt die erste als Entwurf ab.
+
 ## [1.3.0] - 2026-11-08
 
 **Hinterlegen Sie das Logo Ihrer Einrichtung, und der Agent erstellt Präsentationen, Mindmaps, Webseiten und Infografiken im eigenen Erscheinungsbild.** Sie laden das Logo einmal unter Einstellungen → Skills hoch, MindGraph schlägt die Hausfarben vor und zeigt eine Vorschau. Danach gilt das Hausdesign für jeden Auftrag, ohne dass Sie es erwähnen müssen, und lässt sich mit einem Schalter wieder ausschalten.
