@@ -29,7 +29,7 @@ interface SimilarNote {
   hasWikilink: boolean        // Expliziter Wikilink vorhanden
   tagOverlap: number          // Tag-Überlappung (0-1)
   folderProximity: number     // Ordner-Nähe (0-1)
-  rerankerScore?: number      // Cross-Encoder-Score (0-1), nur wenn Reranker aktiv
+  rerankerScore?: number      // LLM-Relevanz-Score (0-1), nur wenn Reranker aktiv
 }
 
 // Default-Gewichtungen (werden von uiStore überschrieben)
@@ -699,7 +699,7 @@ export const SmartConnectionsPanel: React.FC<SmartConnectionsPanelProps> = ({ on
       setIsCalculating(false)
 
       // Reranker läuft im Hintergrund. Wenn fertig: Liste neu sortiert refresh'en.
-      // bge-reranker-v2-m3 auf q8/WASM braucht ~6s/Paar — kein Problem im Background.
+      // LLM-as-Judge über das Ollama-Chat-Modell braucht ~1–3 s/Paar — kein Problem im Background.
       if (smartConnectionsRerankerEnabled && similarities.length > 0) {
         const topForRerank = similarities.slice(0, 10)
         const noteIdAtStart = currentNote.id

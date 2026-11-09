@@ -792,9 +792,9 @@ interface UIState {
   // Smart Connections Gewichtungen
   smartConnectionsWeights: SmartConnectionsWeights
 
-  // Smart Connections Reranker (bge-reranker-v2-m3 via @huggingface/transformers)
-  // Wenn an: nach Embedding-Sort werden Top-50 Kandidaten per Cross-Encoder neu sortiert.
-  // Erstes Einschalten lädt ~570 MB Modell.
+  // Smart Connections Reranker (LLM-as-Judge über das gewählte Ollama-Chat-Modell,
+  // utils/reranker/reranker.ts → IPC ollama-rerank-pair). Wenn an: nach Embedding-Sort
+  // werden die Top-10 Kandidaten paarweise bewertet und neu sortiert. Kein eigener Download.
   smartConnectionsRerankerEnabled: boolean
 
   // Docling PDF Extraction Settings
