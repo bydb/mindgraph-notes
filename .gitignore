@@ -32,8 +32,8 @@ mindgraph-sync-server/node_modules/
 mindgraph-sync-server/data/
 mindgraph-sync-server/dist/
 mindgraph-sync-server/scripts/
-.claude/
-CLAUDE.md
+.claude/*
+!.claude/rules/
 
 # MindGraph vault state (entsteht, wenn ein Ordner als Vault geöffnet wird)
 **/.mindgraph/
