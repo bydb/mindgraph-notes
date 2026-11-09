@@ -11919,21 +11919,24 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   opacity: 0.55;
 }
 
-.inbox-compose-overlay {
+.inbox-compose-overlay,
+.inbox-compose-layer {
+  /* Schwebt über der App, fängt aber keine Klicks: Petrol-Chat, Agent und Notizen
+     dahinter bleiben markier- und kopierbar (vorher Vollflächen-Abdeckung mit Blur). */
   position: fixed;
   inset: 0;
   z-index: 2100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  background: rgba(18, 18, 20, 0.28);
-  backdrop-filter: blur(2px);
+  pointer-events: none;
 }
 
 .inbox-compose-modal {
-  width: min(860px, calc(100vw - 64px));
-  height: min(760px, calc(100vh - 64px));
+  position: fixed;
+  pointer-events: auto;
+  min-width: 420px;
+  min-height: 360px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  resize: both;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -11941,10 +11944,86 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   color: var(--text-primary);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28), 0 0 0 1px color-mix(in srgb, var(--accent-color) 12%, transparent);
+}
+
+.inbox-compose-modal[hidden] {
+  display: none;
+}
+
+.inbox-compose-modal-buttons {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.inbox-compose-modal-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-compose-modal-hint {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.inbox-compose-minibar {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(360px, calc(100vw - 48px));
+  padding: 4px 6px 4px 4px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.22);
+}
+
+.inbox-compose-minibar-open {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: var(--radius-md, 6px);
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.inbox-compose-minibar-open:hover {
+  background: var(--bg-secondary);
+}
+
+.inbox-compose-minibar-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inbox-compose-recipients.is-invalid {
+  border-color: var(--color-danger);
+}
+
+.inbox-compose-recipient-error {
+  margin-top: 4px;
+  color: var(--color-danger);
+  font-size: 12px;
 }
 
 .inbox-compose-modal-header {
+  cursor: grab;
+  user-select: none;
   height: 46px;
   min-height: 46px;
   display: flex;
@@ -11977,13 +12056,11 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 @media (max-width: 760px) {
-  .inbox-compose-overlay {
-    padding: 12px;
-  }
-
   .inbox-compose-modal {
-    width: calc(100vw - 24px);
-    height: calc(100vh - 24px);
+    min-width: 0;
+  }
+  .inbox-compose-modal-hint {
+    display: none;
   }
 }
 

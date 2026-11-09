@@ -1,5 +1,4 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { createPortal } from 'react-dom'
 import { useEmailStore } from '../../stores/emailStore'
 import { collectOwnAddresses, collectReplyAllRecipients } from '../../../shared/emailReply'
 import { findTrashFolder } from '../../../shared/emailFolders'
@@ -10,7 +9,6 @@ import { useProjectStatusStore } from '../../stores/projectStatusStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml, sanitizeEmailHtml } from '../../utils/sanitize'
 import { matchEmailToProjects, gateProjectMatch } from '../../utils/projectMatch'
-import { ComposeView } from './ComposeView'
 import { EmailAIChatView } from './EmailAIChatView'
 import { FolderPicker } from './FolderPicker'
 import { IconCalendar } from '../Shared/Icons'
@@ -140,7 +138,6 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     clearFetchErrors,
     lastSuccessfulFetchAt,
     lastFetchedAt,
-    closeCompose,
     drafts,
     openDraft,
     discardDraft,
@@ -753,6 +750,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
     return (
       <>
         <div className="inbox-panel inbox-panel-compose-shell">
+          {/* Zurück lässt das Schreibfenster offen — es ist eigenständig (ComposeWindow an der App). */}
           {renderHeader(true, () => setCurrentView(selectedEmailId ? 'detail' : 'list'))}
           <div className="inbox-compose-shell-empty">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
@@ -762,34 +760,6 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
             <span>{t('inbox.compose')}</span>
           </div>
         </div>
-        {createPortal(
-          <div className="inbox-compose-overlay" role="dialog" aria-modal="true" aria-label={t('inbox.compose')}>
-            <div className="inbox-compose-modal">
-              <div className="inbox-compose-modal-header">
-                <div className="inbox-compose-modal-title">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                  </svg>
-                  <span>{t('inbox.compose')}</span>
-                </div>
-                <button
-                  className="inbox-panel-close"
-                  data-tooltip={t('inbox.compose.closeHint')}
-                  onClick={() => closeCompose()}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-              <div className="inbox-compose-modal-body">
-                <ComposeView />
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
       </>
     )
   }

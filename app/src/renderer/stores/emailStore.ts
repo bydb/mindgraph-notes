@@ -218,6 +218,26 @@ function persistDraftSoon(compose: ComposeEmail): void {
   }
 }
 
+/** Offenes Schreibfenster sauber abschließen: mit Inhalt in die Entwurfsablage,
+ *  unangefasst verwerfen. Läuft vor JEDEM neuen Entwurf (Neu, Antworten,
+ *  Weiterleiten, Entwurf öffnen) — seit das Fenster die App nicht mehr sperrt, kann
+ *  man bei offener Mail eine zweite starten. Vorher ersetzte der neue Entwurf den
+ *  alten ungesichert; eine ausstehende 400-ms-Sicherung sah schon die neue draftId
+ *  und sprang ab (Codex F04, 09.11.2026). Setzt composeState NICHT zurück. */
+function retireOpenCompose(): void {
+  const state = useEmailStore.getState()
+  const open = state.composeState
+  if (pendingDraftSave) { clearTimeout(pendingDraftSave.timer); pendingDraftSave = null }
+  if (!open?.draftId || !draftVaultPath) return
+  if (draftHasContent(open)) {
+    const res = saveDraft(window.localStorage, draftVaultPath, open)
+    useEmailStore.setState({ drafts: res.drafts, draftSaveError: res.ok ? null : (res.error || 'Entwurf konnte nicht gesichert werden') })
+  } else {
+    useEmailStore.setState({ drafts: removeDraft(window.localStorage, draftVaultPath, open.draftId), draftSaveError: null })
+    void discardStagedAttachments(open)
+  }
+}
+
 /** Entwurf anhängen/aktualisieren — im offenen Fenster ODER in der Ablage des
  *  Vaults, falls das Fenster inzwischen geschlossen wurde. Liefert false, wenn
  *  der Entwurf nirgends mehr existiert (verworfen oder unangefasst geschlossen). */
@@ -1061,6 +1081,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   clearFetchErrors: () => set({ lastFetchErrors: [] }),
 
   startReply: (email: EmailMessage, bodyOverride?: string) => {
+    retireOpenCompose()
     set({
       composeState: {
         ...buildReplyDraft(email, bodyOverride),
@@ -1074,6 +1095,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   startReplyAll: (email: EmailMessage) => {
+    retireOpenCompose()
     const { email: emailSettings } = useUIStore.getState()
     const { to, cc } = collectReplyAllRecipients(email, collectOwnAddresses(emailSettings.accounts))
     set({
@@ -1089,6 +1111,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   startForward: (email: EmailMessage) => {
+    retireOpenCompose()
     const { email: emailSettings } = useUIStore.getState()
     const accountId = resolveReplyAccountId(email, emailSettings.accounts)
     const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
@@ -1123,6 +1146,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   startNewEmail: () => {
+    retireOpenCompose()
     const { email: emailSettings } = useUIStore.getState()
     const account = emailSettings.accounts[0]
     const sig = emailSettings.signature ? `\n\n--\n${emailSettings.signature}` : ''
@@ -1140,21 +1164,9 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   closeCompose: () => {
-    const { composeState, selectedEmailId } = get()
-    if (pendingDraftSave) { clearTimeout(pendingDraftSave.timer); pendingDraftSave = null }
-    let drafts = get().drafts
-    let draftSaveError: string | null = null
-    if (composeState?.draftId && draftVaultPath) {
-      if (draftHasContent(composeState)) {
-        const res = saveDraft(window.localStorage, draftVaultPath, composeState)
-        drafts = res.drafts
-        draftSaveError = res.ok ? null : (res.error || 'Entwurf konnte nicht gesichert werden')
-      } else {
-        drafts = removeDraft(window.localStorage, draftVaultPath, composeState.draftId)
-        void discardStagedAttachments(composeState)
-      }
-    }
-    set({ composeState: null, drafts, draftSaveError, currentView: selectedEmailId ? 'detail' : 'list' })
+    const { selectedEmailId } = get()
+    retireOpenCompose()
+    set({ composeState: null, currentView: selectedEmailId ? 'detail' : 'list' })
   },
 
   discardDraft: async (draftId: string) => {
@@ -1170,6 +1182,8 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
   },
 
   openDraft: (draftId: string) => {
+    if (get().composeState?.draftId === draftId) return // schon offen
+    if (get().composeState) retireOpenCompose()
     const draft = get().drafts.find(d => d.id === draftId)
     if (!draft) return
     set({ composeState: { ...draft.compose, draftId, pristine: false }, currentView: 'compose' })

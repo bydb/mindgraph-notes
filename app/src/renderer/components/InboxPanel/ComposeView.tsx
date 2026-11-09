@@ -6,6 +6,16 @@ import { useContactStore } from '../../stores/contactStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import type { ComposeAttachment } from '../../../shared/types'
+import {
+  hasOpenRecipientGroup,
+  looksLikeRecipientList,
+  mergeRecipients,
+  parseRecipientList,
+  type Recipient
+} from '../../../shared/emailRecipients'
+
+type RecipientField = 'to' | 'cc' | 'bcc'
+const RECIPIENT_FIELDS: RecipientField[] = ['to', 'cc', 'bcc']
 
 export const ComposeView: React.FC = () => {
   const { t } = useTranslation()
@@ -17,8 +27,8 @@ export const ComposeView: React.FC = () => {
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const subjectRef = useRef<HTMLInputElement>(null)
   const [confirmEmptySubject, setConfirmEmptySubject] = useState(false)
-  const [toInput, setToInput] = useState('')
-  const [ccInput, setCcInput] = useState('')
+  const [inputs, setInputs] = useState<Record<RecipientField, string>>({ to: '', cc: '', bcc: '' })
+  const [invalid, setInvalid] = useState<Record<RecipientField, string[]>>({ to: [], cc: [], bcc: [] })
   // Nur der Fehlerpfad lebt hier. Bei Erfolg baut der Store das Fenster sofort ab;
   // Erfolg und „nicht unter Gesendet abgelegt" zeigt die Inbox (lastSendResult).
   const [sendStatus, setSendStatus] = useState<'idle' | 'error'>('idle')
@@ -48,18 +58,10 @@ export const ComposeView: React.FC = () => {
       setSignatureImageUrl(null)
     }
   }, [emailSettings.signatureImagePath])
-  const [toSuggestions, setToSuggestions] = useState<ReturnType<typeof searchContacts>>([])
-  const [ccSuggestions, setCcSuggestions] = useState<ReturnType<typeof searchContacts>>([])
-  const [bccSuggestions, setBccSuggestions] = useState<ReturnType<typeof searchContacts>>([])
-  const [showToDropdown, setShowToDropdown] = useState(false)
-  const [showCcDropdown, setShowCcDropdown] = useState(false)
-  const [showBccDropdown, setShowBccDropdown] = useState(false)
-  const [bccInput, setBccInput] = useState('')
+  const [suggestions, setSuggestions] = useState<Record<RecipientField, ReturnType<typeof searchContacts>>>({ to: [], cc: [], bcc: [] })
+  const [showDropdown, setShowDropdown] = useState<Record<RecipientField, boolean>>({ to: false, cc: false, bcc: false })
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [confirmMissingAttachments, setConfirmMissingAttachments] = useState(false)
-  const toDropdownRef = useRef<HTMLDivElement>(null)
-  const ccDropdownRef = useRef<HTMLDivElement>(null)
-  const bccDropdownRef = useRef<HTMLDivElement>(null)
 
   // Kontakte bei jedem Öffnen neu aufbauen — sonst fehlen seit dem letzten
   // Build gesendete/abgerufene Adressen (Liste ist flüchtig, kein Cache nötig)
@@ -78,121 +80,93 @@ export const ComposeView: React.FC = () => {
     composeState.forwardAttachments.status === 'failed' ||
     (composeState.forwardAttachments.status === 'done' && (composeState.forwardAttachments.skipped?.length ?? 0) > 0)
   )
-  const sendBlocked = isSending || !hasSmtp || composeState.to.length === 0 || forwardLoading
+  // Getippte, noch nicht übernommene Adresse in „An“ zählt: Senden übernimmt sie zuerst.
+  const sendBlocked = isSending || !hasSmtp || (composeState.to.length === 0 && !inputs.to.trim()) || forwardLoading
 
-  const parseEmailInput = (input: string): { name: string; address: string } | null => {
-    const trimmed = input.trim()
-    if (!trimmed) return null
-    const match = trimmed.match(/^"?(.+?)"?\s*<(.+@.+)>$/)
-    if (match) return { name: match[1].trim(), address: match[2].trim() }
-    if (trimmed.includes('@')) return { name: '', address: trimmed }
-    return null
+  const recipientsOf = (field: RecipientField): Recipient[] =>
+    field === 'to' ? composeState.to : (composeState[field] || [])
+
+  /** Text eines Feldes in Chips umsetzen. Liest den Store frisch, damit beim Senden
+   *  drei Felder nacheinander übernommen werden können, ohne sich zu überschreiben.
+   *  Liefert die Einträge, die keine gültige Adresse sind (bleiben im Feld stehen). */
+  const commitField = (field: RecipientField, text: string = inputs[field]): string[] => {
+    const current = useEmailStore.getState().composeState
+    if (!current) return []
+    const parsed = parseRecipientList(text)
+    if (parsed.recipients.length > 0) {
+      const existing = field === 'to' ? current.to : (current[field] || [])
+      setComposeState({ ...current, [field]: mergeRecipients(existing, parsed.recipients) })
+    }
+    setInputs(prev => ({ ...prev, [field]: parsed.rest }))
+    setInvalid(prev => ({ ...prev, [field]: parsed.invalid }))
+    setShowDropdown(prev => ({ ...prev, [field]: false }))
+    return parsed.invalid
   }
 
-  const handleAddTo = useCallback(() => {
-    const parsed = parseEmailInput(toInput)
-    if (parsed) {
-      setComposeState({
-        ...composeState,
-        to: [...composeState.to, parsed]
-      })
-      setToInput('')
-      setShowToDropdown(false)
+  const removeRecipient = (field: RecipientField, index: number) => {
+    const current = useEmailStore.getState().composeState
+    if (!current) return
+    const list = field === 'to' ? current.to : (current[field] || [])
+    setComposeState({ ...current, [field]: list.filter((_, i) => i !== index) })
+  }
+
+  const handleSelectContact = (email: string, name: string, field: RecipientField) => {
+    const current = useEmailStore.getState().composeState
+    if (!current) return
+    const existing = field === 'to' ? current.to : (current[field] || [])
+    setComposeState({ ...current, [field]: mergeRecipients(existing, [{ name, address: email }]) })
+    setInputs(prev => ({ ...prev, [field]: '' }))
+    setInvalid(prev => ({ ...prev, [field]: [] }))
+    setShowDropdown(prev => ({ ...prev, [field]: false }))
+  }
+
+  const handleInputChange = (field: RecipientField, value: string) => {
+    // Komma/Semikolon auf oberster Ebene schließt einen Eintrag ab — aber nicht
+    // mitten in "Müller, Hans" oder <…>.
+    const last = value.slice(-1)
+    if ((last === ',' || last === ';') && !hasOpenRecipientGroup(value.slice(0, -1)) && value.slice(0, -1).includes('@')) {
+      commitField(field, value.slice(0, -1))
+      return
     }
-  }, [toInput, composeState, setComposeState])
-
-  const handleAddCc = useCallback(() => {
-    const parsed = parseEmailInput(ccInput)
-    if (parsed) {
-      setComposeState({
-        ...composeState,
-        cc: [...(composeState.cc || []), parsed]
-      })
-      setCcInput('')
-      setShowCcDropdown(false)
-    }
-  }, [ccInput, composeState, setComposeState])
-
-  const handleAddBcc = useCallback(() => {
-    const parsed = parseEmailInput(bccInput)
-    if (parsed) {
-      setComposeState({
-        ...composeState,
-        bcc: [...(composeState.bcc || []), parsed]
-      })
-      setBccInput('')
-      setShowBccDropdown(false)
-    }
-  }, [bccInput, composeState, setComposeState])
-
-  const handleRemoveBcc = useCallback((index: number) => {
-    setComposeState({
-      ...composeState,
-      bcc: (composeState.bcc || []).filter((_, i) => i !== index)
-    })
-  }, [composeState, setComposeState])
-
-  const handleRemoveTo = useCallback((index: number) => {
-    setComposeState({
-      ...composeState,
-      to: composeState.to.filter((_, i) => i !== index)
-    })
-  }, [composeState, setComposeState])
-
-  const handleRemoveCc = useCallback((index: number) => {
-    setComposeState({
-      ...composeState,
-      cc: (composeState.cc || []).filter((_, i) => i !== index)
-    })
-  }, [composeState, setComposeState])
-
-  const handleSelectContact = useCallback((email: string, name: string, field: 'to' | 'cc' | 'bcc') => {
-    const recipient = { name, address: email }
-    if (field === 'to') {
-      setComposeState({ ...composeState, to: [...composeState.to, recipient] })
-      setToInput('')
-      setShowToDropdown(false)
-    } else if (field === 'cc') {
-      setComposeState({ ...composeState, cc: [...(composeState.cc || []), recipient] })
-      setCcInput('')
-      setShowCcDropdown(false)
+    setInputs(prev => ({ ...prev, [field]: value }))
+    if (invalid[field].length > 0) setInvalid(prev => ({ ...prev, [field]: [] }))
+    if (value.length >= 2 && !looksLikeRecipientList(value)) {
+      setSuggestions(prev => ({ ...prev, [field]: searchContacts(value) }))
+      setShowDropdown(prev => ({ ...prev, [field]: true }))
     } else {
-      setComposeState({ ...composeState, bcc: [...(composeState.bcc || []), recipient] })
-      setBccInput('')
-      setShowBccDropdown(false)
-    }
-  }, [composeState, setComposeState])
-
-  const handleBccInputChange = (value: string) => {
-    setBccInput(value)
-    if (value.length >= 2) {
-      setBccSuggestions(searchContacts(value))
-      setShowBccDropdown(true)
-    } else {
-      setShowBccDropdown(false)
+      setShowDropdown(prev => ({ ...prev, [field]: false }))
     }
   }
 
-  const handleToInputChange = (value: string) => {
-    setToInput(value)
-    if (value.length >= 2) {
-      setToSuggestions(searchContacts(value))
-      setShowToDropdown(true)
-    } else {
-      setShowToDropdown(false)
-    }
+  /** Einfügen: Das einzeilige Feld würde die Zeilenumbrüche verschlucken
+   *  („a@x.deb@y.de“). Deshalb den Text selbst aus der Zwischenablage lesen. */
+  const handlePaste = (field: RecipientField, e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text/plain')
+    if (!pasted || !looksLikeRecipientList(pasted)) return // Einzelwort/-adresse: normales Einfügen
+    e.preventDefault()
+    const input = e.currentTarget
+    const before = inputs[field].slice(0, input.selectionStart ?? inputs[field].length)
+    const after = inputs[field].slice(input.selectionEnd ?? inputs[field].length)
+    commitField(field, `${before}\n${pasted}\n${after}`)
   }
 
-  const handleCcInputChange = (value: string) => {
-    setCcInput(value)
-    if (value.length >= 2) {
-      setCcSuggestions(searchContacts(value))
-      setShowCcDropdown(true)
-    } else {
-      setShowCcDropdown(false)
+  const handleKeyDown = (field: RecipientField, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || (e.key === 'Tab' && inputs[field].trim())) {
+      e.preventDefault()
+      const list = suggestions[field]
+      // Vorschlag nur für einen einzelnen getippten Suchbegriff — nie für eine Liste.
+      if (showDropdown[field] && list.length > 0 && !looksLikeRecipientList(inputs[field])) {
+        handleSelectContact(list[0].email, list[0].name, field)
+      } else {
+        commitField(field)
+      }
     }
+    if (e.key === 'Backspace' && !inputs[field]) {
+      const list = recipientsOf(field)
+      if (list.length > 0) removeRecipient(field, list.length - 1)
+    }
+    if (e.key === 'Escape') setShowDropdown(prev => ({ ...prev, [field]: false }))
   }
-
   const applyFormat = useCallback((type: 'bold' | 'italic' | 'list' | 'hr') => {
     const textarea = bodyRef.current
     if (!textarea) return
@@ -299,8 +273,13 @@ export const ComposeView: React.FC = () => {
     setLtChecking(false)
   }, [composeState, ltSettings, setComposeState])
 
-  const handleSend = useCallback(async (allowEmptySubject = false, allowMissingAttachments = false) => {
-    if (!vaultPath || !composeState.to.length || isSending || !hasSmtp || forwardLoading) return
+  const handleSend = async (allowEmptySubject = false, allowMissingAttachments = false) => {
+    if (!vaultPath || isSending || !hasSmtp || forwardLoading) return
+    // Erst alle drei Felder übernehmen. Bleibt irgendwo eine ungültige Eingabe stehen,
+    // geht nichts raus — sonst erreicht die Mail nur einen Teil der Empfänger.
+    const leftovers = RECIPIENT_FIELDS.flatMap(field => commitField(field))
+    if (leftovers.length > 0) return
+    if (!useEmailStore.getState().composeState?.to.length) return
     if (!composeState.subject.trim() && !allowEmptySubject) {
       setConfirmEmptySubject(true)
       return
@@ -319,7 +298,7 @@ export const ComposeView: React.FC = () => {
       setSendStatus('error')
       setErrorMsg(result.error || t('inbox.compose.error'))
     }
-  }, [vaultPath, composeState, isSending, hasSmtp, forwardLoading, forwardIncomplete, sendEmail, t])
+  }
 
   const getSourceIcon = (sources: string[]) => {
     const icons: string[] = []
@@ -329,11 +308,11 @@ export const ComposeView: React.FC = () => {
     return icons.join('')
   }
 
-  const renderSuggestionDropdown = (suggestions: ReturnType<typeof searchContacts>, show: boolean, field: 'to' | 'cc' | 'bcc', ref: React.RefObject<HTMLDivElement | null>) => {
-    if (!show || suggestions.length === 0) return null
+  const renderSuggestionDropdown = (list: ReturnType<typeof searchContacts>, show: boolean, field: RecipientField) => {
+    if (!show || list.length === 0) return null
     return (
-      <div className="inbox-compose-dropdown" ref={ref}>
-        {suggestions.map(contact => (
+      <div className="inbox-compose-dropdown">
+        {list.map(contact => (
           <div
             key={contact.id}
             className="inbox-compose-dropdown-item"
@@ -395,117 +374,42 @@ export const ComposeView: React.FC = () => {
         </div>
       )}
 
-      {/* To field */}
-      <div className="inbox-compose-row">
-        <label>{t('inbox.compose.to')}:</label>
-        <div className="inbox-compose-recipients-wrapper">
-          <div className="inbox-compose-recipients">
-            {composeState.to.map((r, i) => (
-              <span key={i} className="inbox-compose-chip">
-                {r.name || r.address}
-                <button onClick={() => handleRemoveTo(i)}>&times;</button>
-              </span>
-            ))}
-            <input
-              type="text"
-              value={toInput}
-              onChange={e => handleToInputChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault()
-                  if (showToDropdown && toSuggestions.length > 0) {
-                    handleSelectContact(toSuggestions[0].email, toSuggestions[0].name, 'to')
-                  } else {
-                    handleAddTo()
-                  }
-                }
-                if (e.key === 'Escape') setShowToDropdown(false)
-              }}
-              onBlur={() => {
-                setTimeout(() => setShowToDropdown(false), 200)
-                handleAddTo()
-              }}
-              placeholder={composeState.to.length === 0 ? t('inbox.compose.addRecipient') : ''}
-            />
+      {/* Empfänger: An / CC / BCC — gleiche Logik für alle drei Felder */}
+      {RECIPIENT_FIELDS.map(field => (
+        <div className="inbox-compose-row" key={field}>
+          <label>{t(`inbox.compose.${field}`)}:</label>
+          <div className="inbox-compose-recipients-wrapper">
+            <div className={`inbox-compose-recipients${invalid[field].length > 0 ? ' is-invalid' : ''}`}>
+              {recipientsOf(field).map((r, i) => (
+                <span key={`${r.address}-${i}`} className="inbox-compose-chip" title={r.name ? r.address : undefined}>
+                  {r.name || r.address}
+                  <button type="button" aria-label={t('inbox.compose.removeRecipient')} onClick={() => removeRecipient(field, i)}>&times;</button>
+                </span>
+              ))}
+              <input
+                type="text"
+                value={inputs[field]}
+                aria-label={t(`inbox.compose.${field}`)}
+                aria-invalid={invalid[field].length > 0 || undefined}
+                onChange={e => handleInputChange(field, e.target.value)}
+                onPaste={e => handlePaste(field, e)}
+                onKeyDown={e => handleKeyDown(field, e)}
+                onBlur={() => {
+                  setTimeout(() => setShowDropdown(prev => ({ ...prev, [field]: false })), 200)
+                  commitField(field)
+                }}
+                placeholder={field === 'to' && composeState.to.length === 0 ? t('inbox.compose.addRecipient') : ''}
+              />
+            </div>
+            {invalid[field].length > 0 && (
+              <div className="inbox-compose-recipient-error" role="alert">
+                {t('inbox.compose.invalidRecipient').replace('{list}', invalid[field].join(', '))}
+              </div>
+            )}
+            {renderSuggestionDropdown(suggestions[field], showDropdown[field], field)}
           </div>
-          {renderSuggestionDropdown(toSuggestions, showToDropdown, 'to', toDropdownRef)}
         </div>
-      </div>
-
-      {/* CC field */}
-      <div className="inbox-compose-row">
-        <label>{t('inbox.compose.cc')}:</label>
-        <div className="inbox-compose-recipients-wrapper">
-          <div className="inbox-compose-recipients">
-            {(composeState.cc || []).map((r, i) => (
-              <span key={i} className="inbox-compose-chip">
-                {r.name || r.address}
-                <button onClick={() => handleRemoveCc(i)}>&times;</button>
-              </span>
-            ))}
-            <input
-              type="text"
-              value={ccInput}
-              onChange={e => handleCcInputChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault()
-                  if (showCcDropdown && ccSuggestions.length > 0) {
-                    handleSelectContact(ccSuggestions[0].email, ccSuggestions[0].name, 'cc')
-                  } else {
-                    handleAddCc()
-                  }
-                }
-                if (e.key === 'Escape') setShowCcDropdown(false)
-              }}
-              onBlur={() => {
-                setTimeout(() => setShowCcDropdown(false), 200)
-                handleAddCc()
-              }}
-              placeholder=""
-            />
-          </div>
-          {renderSuggestionDropdown(ccSuggestions, showCcDropdown, 'cc', ccDropdownRef)}
-        </div>
-      </div>
-
-      {/* BCC field */}
-      <div className="inbox-compose-row">
-        <label>{t('inbox.compose.bcc')}:</label>
-        <div className="inbox-compose-recipients-wrapper">
-          <div className="inbox-compose-recipients">
-            {(composeState.bcc || []).map((r, i) => (
-              <span key={i} className="inbox-compose-chip">
-                {r.name || r.address}
-                <button onClick={() => handleRemoveBcc(i)}>&times;</button>
-              </span>
-            ))}
-            <input
-              type="text"
-              value={bccInput}
-              onChange={e => handleBccInputChange(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === 'Tab') {
-                  e.preventDefault()
-                  if (showBccDropdown && bccSuggestions.length > 0) {
-                    handleSelectContact(bccSuggestions[0].email, bccSuggestions[0].name, 'bcc')
-                  } else {
-                    handleAddBcc()
-                  }
-                }
-                if (e.key === 'Escape') setShowBccDropdown(false)
-              }}
-              onBlur={() => {
-                setTimeout(() => setShowBccDropdown(false), 200)
-                handleAddBcc()
-              }}
-              placeholder=""
-            />
-          </div>
-          {renderSuggestionDropdown(bccSuggestions, showBccDropdown, 'bcc', bccDropdownRef)}
-        </div>
-      </div>
-
+      ))}
       {/* Subject */}
       <div className="inbox-compose-row">
         <label>{t('inbox.compose.subject')}:</label>

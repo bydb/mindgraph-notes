@@ -28,6 +28,7 @@ import { splitTextIntoChunks, LONG_TEXT_CHUNK_THRESHOLD } from '../shared/textCh
 import { checkTtsLength } from '../shared/ttsLimits'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../shared/emailFetchWindow'
 import { diffKnownMessages, type KnownLocalMessage, type KnownMessageUpdate } from '../shared/emailSync'
+import { isValidEmailAddress } from '../shared/emailRecipients'
 import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } from '../shared/aiProvenance'
 import { passwordStoreOverride } from '../shared/linuxPasswordStore'
 import { focusExistingWindow } from './singleInstance'
@@ -14557,6 +14558,14 @@ ipcMain.handle('email-send', async (_event, composeData: {
   signatureImagePath?: string
   attachments?: { path: string; filename: string }[]
 }) => {
+  // Zweite Grenze hinter dem Schreibfenster: keine Mail mit kaputter Adresse an
+  // SMTP geben — sonst geht sie still nur an einen Teil der Empfänger (Codex F01).
+  const allRecipients = [...(composeData.to || []), ...(composeData.cc || []), ...(composeData.bcc || [])]
+  const badRecipients = allRecipients.filter(r => !isValidEmailAddress(String(r?.address ?? '').trim()))
+  if (!composeData.to?.length) return { success: false, error: 'Kein Empfänger angegeben' }
+  if (badRecipients.length > 0) {
+    return { success: false, error: `Ungültige Empfängeradresse: ${badRecipients.map(r => r?.address || '(leer)').join(', ')}` }
+  }
   try {
     const nodemailer = await import('nodemailer')
 
@@ -14646,7 +14655,8 @@ ipcMain.handle('email-send', async (_event, composeData: {
           ...(composeData.bcc || []).map(r => r.address)
         ]
       },
-      to: composeData.to.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', '),
+      // Adressobjekte: nodemailer kodiert Namen mit " oder \\ selbst korrekt (Codex F08).
+      to: composeData.to.map(r => r.name ? { name: r.name, address: r.address } : r.address),
       subject: composeData.subject,
       text: composeData.body,
       html: htmlBody,
@@ -14654,13 +14664,13 @@ ipcMain.handle('email-send', async (_event, composeData: {
     }
 
     if (composeData.cc && composeData.cc.length > 0) {
-      mailOptions.cc = composeData.cc.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', ')
+      mailOptions.cc = composeData.cc.map(r => r.name ? { name: r.name, address: r.address } : r.address)
     }
     // BCC: nodemailer setzt die Empfaenger in den SMTP-Umschlag, laesst die
     // Kopfzeile aber weg (auch im streamTransport fuer die IMAP-Kopie — dort
     // waere `keepBcc` noetig, das bewusst nicht gesetzt ist).
     if (composeData.bcc && composeData.bcc.length > 0) {
-      mailOptions.bcc = composeData.bcc.map(r => r.name ? `"${r.name}" <${r.address}>` : r.address).join(', ')
+      mailOptions.bcc = composeData.bcc.map(r => r.name ? { name: r.name, address: r.address } : r.address)
     }
     if (composeData.inReplyTo) {
       mailOptions.inReplyTo = composeData.inReplyTo

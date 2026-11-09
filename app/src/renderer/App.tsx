@@ -40,6 +40,7 @@ import { FlashcardsPanel, FlashcardStudy, FlashcardEditor } from './components/F
 import { useFlashcardStore } from './stores/flashcardStore'
 import { OverduePanel } from './components/OverduePanel/OverduePanel'
 import { InboxPanel } from './components/InboxPanel/InboxPanel'
+import { ComposeWindow } from './components/InboxPanel/ComposeWindow'
 import { DashboardView } from './components/DashboardPanel/DashboardView'
 import { MorningBriefing } from './components/DashboardPanel/MorningBriefing'
 import { SemanticScholarPanel } from './components/SemanticScholarPanel/SemanticScholarPanel'
@@ -1028,6 +1029,12 @@ const App: React.FC = () => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'w' && !e.shiftKey) {
         e.preventDefault()
         e.stopPropagation()
+        // Fokus im Schreibfenster: ⌘W schließt die Mail (Entwurf wird gesichert),
+        // nicht den Tab dahinter — das Fenster ist seit 11/2026 nicht mehr modal.
+        if ((e.target as HTMLElement | null)?.closest?.('.inbox-compose-window')) {
+          useEmailStore.getState().closeCompose()
+          return
+        }
         const { tabs, activeTabId, closeTab } = useTabStore.getState()
         if (activeTabId && tabs.length > 0) {
           closeTab(activeTabId)
@@ -1827,6 +1834,9 @@ const App: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Schreibfenster für E-Mails — an der App, damit Panelwechsel es nicht abbauen */}
+      <ComposeWindow />
 
       {/* Quick Search Modal */}
       <QuickSearch
