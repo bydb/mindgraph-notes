@@ -6,7 +6,10 @@
 // Yes/No-Logit-Extraktion fehlt. Dokumentation siehe Memory [[project-reranker-via-ollama]].
 //
 // Pragmatischer Workaround: einen normalen Chat-Model (z.B. gemma4:latest, qwen3.6:latest)
-// als Relevanz-Richter benutzen. Strukturierter JSON-Output via Ollamas `format: 'json'`.
+// als Relevanz-Richter benutzen. Das Modell soll per System-Prompt nur
+// {"relevance": <0..1>} antworten; der Main-Handler (`ollama-rerank-pair`) setzt bewusst
+// KEIN `format: 'json'` (Ollamas Stream-Constraint würgte Gemma4 still ab) und parst
+// tolerant mit Fallback für Fließtext-Antworten.
 // Per Paar 1 HTTP-Request → ~1-3 Sekunden mit gemma4:latest.
 //
 // Trade-off vs echtem Cross-Encoder:
