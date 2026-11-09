@@ -8,6 +8,7 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
+import { handleChatCodeCopy, type ChatCodeEnv } from '../../utils/chatCodeBlock'
 import { createWebAnswerMarkdown, inlineFlags, markWebAnswer, MARK_GLYPHS, markKind, onlyNeutralFlags, sentenceFlags, type WebAnswerEnv, type WebMarkKind, type WebSentenceFlag } from '../../utils/webAnswerMarkdown'
 import type { CitationEnv } from '../../utils/citationMarkdown'
 import type { CitationReport, SentenceCheck } from '../../../shared/rag/citations'
@@ -68,8 +69,10 @@ function openSource(url: string) {
 export function WebAnswerText({ answer, report, extras, anchor, marks = true }: { answer: string; report?: CitationReport; extras?: SentenceExtra[]; anchor: string; marks?: boolean }) {
   const { t } = useTranslation()
   const html = useMemo(() => {
-    if (!report) return sanitizeHtml(md.render(answer.replace(/[\uE000-\uF8FF]/g, '')))
-    const env: CitationEnv & WebAnswerEnv = {
+    const code: ChatCodeEnv = { copyLabel: t('format.copy'), copiedLabel: t('settings.sync.copied') }
+    if (!report) return sanitizeHtml(md.render(answer.replace(/[\uE000-\uF8FF]/g, ''), code))
+    const env: CitationEnv & WebAnswerEnv & ChatCodeEnv = {
+      ...code,
       cites: { resolve: () => null },
       flags: {
         // Quellenkritik aus (Einstellung): nur Hochzahlen, keine Prüfzeichen.
@@ -80,6 +83,7 @@ export function WebAnswerText({ answer, report, extras, anchor, marks = true }: 
     return sanitizeHtml(md.render(markWebAnswer(answer, report, extras), env))
   }, [answer, report, extras, t, marks])
   const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (handleChatCodeCopy(e.target)) return
     const cite = (e.target as HTMLElement).closest('[data-cite]')
     if (!cite) return
     const row = document.getElementById(`${anchor}-${cite.getAttribute('data-cite')}`)

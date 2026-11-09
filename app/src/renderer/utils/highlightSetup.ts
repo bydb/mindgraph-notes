@@ -145,3 +145,10 @@ export function highlightCode(str: string, lang: string): string {
 
   return wrapLines(highlighted)
 }
+
+/** Anzeigename der Sprache eines Code-Blocks („Python“), oder null, wenn unbekannt. */
+export function codeLanguageLabel(lang: string): string | null {
+  const language = resolveLanguage(lang)
+  if (!language || language === 'plaintext') return null
+  return hljs.getLanguage(language)?.name ?? null
+}

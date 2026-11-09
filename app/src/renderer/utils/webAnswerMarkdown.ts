@@ -13,6 +13,7 @@
  */
 
 import MarkdownIt from 'markdown-it'
+import { chatCodeBlockPlugin } from './chatCodeBlock'
 import type StateInline from 'markdown-it/lib/rules_inline/state_inline.mjs'
 import type { CitationReport, SentenceCheck } from '../../shared/rag/citations'
 import type { SentenceExtra } from '../../shared/webChat'
@@ -175,5 +176,6 @@ export function createWebAnswerMarkdown(): MarkdownIt {
   md.disable(['link', 'image', 'autolink'])
   md.use(citationMarkdownPlugin)
   md.use(flagPlugin)
+  md.use(chatCodeBlockPlugin)
   return md
 }

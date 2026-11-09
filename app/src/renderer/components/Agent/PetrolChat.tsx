@@ -13,6 +13,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import MarkdownIt from 'markdown-it'
+import { chatCodeBlockPlugin, handleChatCodeCopy, type ChatCodeEnv } from '../../utils/chatCodeBlock'
 import { setChatImageConsentDurable, useUIStore } from '../../stores/uiStore'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useNoteAgentStore } from '../../stores/noteAgentStore'
@@ -62,9 +63,10 @@ function modelRouteLine(t: (key: TranslationKey, vars?: Record<string, string | 
 }
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
+md.use(chatCodeBlockPlugin)
 
-function renderMarkdown(text: string): string {
-  return sanitizeHtml(md.render(text))
+function renderMarkdown(text: string, env: ChatCodeEnv): string {
+  return sanitizeHtml(md.render(text, env))
 }
 
 // Links aus Modelltext: das Hauptfenster verweigert jedes neue Fenster (setWindowOpenHandler →
@@ -72,11 +74,16 @@ function renderMarkdown(text: string): string {
 // über den freigegebenen IPC `open-external` (Allowlist http/https/mailto, wie ExternalLink).
 const OPENABLE = /^(https?:|mailto:)/i
 function onAnswerClick(e: React.MouseEvent<HTMLDivElement>) {
+  if (handleChatCodeCopy(e.target)) { e.preventDefault(); return }
   const a = (e.target as HTMLElement).closest('a')
   if (!a) return
   e.preventDefault()
   const href = a.getAttribute('href') ?? ''
   if (OPENABLE.test(href)) void window.electronAPI.openExternal(href)
+}
+
+function onAnswerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+  if ((e.key === 'Enter' || e.key === ' ') && handleChatCodeCopy(e.target)) e.preventDefault()
 }
 
 function openSettingsAt(tab: 'ai' | 'modules', anchor: string) {
@@ -90,6 +97,7 @@ const clip = (text: string, max: number) => (text.length > max ? `${text.slice(0
 
 export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const { t } = useTranslation()
+  const codeEnv = useMemo<ChatCodeEnv>(() => ({ copyLabel: t('format.copy'), copiedLabel: t('settings.sync.copied') }), [t])
   const ollama = useUIStore(s => s.ollama)
   const notesRootFolder = useUIStore(s => s.notesRootFolder)
   const vaultPath = useNotesStore(s => s.vaultPath)
@@ -867,7 +875,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                   </>
                 ) : turn.answer ? (
                   <>
-                    <div className="petrol-turn-a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.answer.content) }} />
+                    <div className="petrol-turn-a" onClick={onAnswerClick} onKeyDown={onAnswerKeyDown} dangerouslySetInnerHTML={{ __html: renderMarkdown(turn.answer.content, codeEnv) }} />
                     {!!turn.answer.imagesWithheld && (
                       <div className="petrol-web-block"><div className="petrol-web-muted">{t(turn.answer.imagesWithheld.count === 1 ? 'petrolChat.imagesWithheldOne' : 'petrolChat.imagesWithheld', { n: turn.answer.imagesWithheld.count, reason: turn.answer.imagesWithheld.reason })}</div></div>
                     )}
@@ -907,7 +915,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
                 ) : isLive ? (
                   <>
                     <LiveStatus since={turn.question?.at} text={streaming ? t('petrolChat.writing') : `${t('petrolChat.waiting')} …`} />
-                    {streaming && <div className="petrol-turn-a" onClick={onAnswerClick} dangerouslySetInnerHTML={{ __html: renderMarkdown(streaming) }} />}
+                    {streaming && <div className="petrol-turn-a" onClick={onAnswerClick} onKeyDown={onAnswerKeyDown} dangerouslySetInnerHTML={{ __html: renderMarkdown(streaming, codeEnv) }} />}
                     <div className="petrol-turn-foot">
                       <span className="petrol-turn-model">{active?.label ?? ''}</span>
                     </div>
