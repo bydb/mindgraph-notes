@@ -405,6 +405,35 @@ Vor jeder Entscheidung zu den Findings gemessen, mit `imapflow` und `nodemailer`
   durchkommt (der dritte Lauf lief erneut mit dem Administratorkonto); SMTP mit OAuth; ein Mandant
   mit abgeschaltetem IMAP; Versand mit Anhang, BCC, Antwort-Kopfzeilen über Graph (F06).
 
+### Messung 10.11.2026, abends — Abschnitt 3 (MIME-Versand über Graph)
+
+Drei Konten im selben Testmandanten: Absender und Blindkopie-Empfänger sind normale Nutzer,
+der normale Empfänger ist ein Administratorkonto. Rohtext aus nodemailer `streamTransport`
+(Zeilenenden LF), als Base64 an `POST /me/sendMail` mit `Content-Type: text/plain`. Kopfzeilen der
+zugestellten Mails über `GET /me/messages/{id}/$value` gelesen.
+
+| Messung | Ergebnis |
+|---|---|
+| M5 normale Nutzer nach Administratorzustimmung | kommen ohne Rückfrage durch, für Graph und für IMAP |
+| M1 selbst gesetzte `Message-ID` | bleibt erhalten: beim Empfänger, beim Blindkopie-Empfänger, in der Gesendet-Kopie |
+| **M2 Blindkopie, `Bcc:` im Rohtext** | Empfänger: keine `Bcc:`-Zeile, Adresse des Blindkopie-Empfängers nirgends in den Kopfzeilen. Blindkopie-Empfänger: Mail kommt an, keine `Bcc:`-Zeile, eigene Adresse nirgends in den Kopfzeilen. Gesendet-Kopie: genau eine, mit `Bcc:`-Zeile |
+| M2 Gegenprobe, `Bcc:` aus dem Rohtext entfernt | Empfänger bekommt die Mail, der Blindkopie-Empfänger **nicht** — Graph leitet die Empfänger aus den Kopfzeilen ab, die Zeile muss also im Rohtext stehen |
+| M4 Antwort-Kopfzeilen | `In-Reply-To` kommt an. Exchange führt die Testantwort nicht im selben Gespräch (`conversationId` verschieden) — der Testbetreff war aber kein „Re: …“, das Ergebnis sagt über echte Antworten nichts |
+| M7 Gesendet-Ordner über IMAP | per SPECIAL-USE gefunden; die von Graph abgelegte Kopie ist dort über die `Message-ID` auffindbar und hat eine UID |
+| M3 Anhänge | 1 MB, 2 × 2 MB, 5 MB, 20 MB (Anfrage 36 MB) jeweils `202` und zugestellt; 20 MB in 10,6 s |
+| M6 Lebensdauer der Marken | 60–90 Minuten, Erneuerungsmarke wird ausgegeben |
+| Zeilenenden | LF wird angenommen |
+
+**Grenzen dieser Messung:** ein Mandant mit Standardeinstellungen; alle drei Postfächer liegen
+**im selben Mandanten** — die Zustellung an einen fremden Mailserver ist nicht gemessen. Die Suche
+des Messskripts fand eine der Mails 75 Sekunden lang nicht, obwohl sie laut Empfangszeit sofort da
+war (Ursache ungeklärt, vermutlich Suchindex) — der Abgleich der Gesendet-Kopie darf sich also
+nicht auf eine sofortige Suche verlassen. Nicht gemessen: M8 (Abbruch nach dem Absenden), M9
+(Konto A an Konto B in derselben App), Mandantengrenzen für die Mailgröße, echtes „Re: …“.
+
+**Folge für E9:** Die Schranke M2 ist für die Zustellung innerhalb eines Mandanten bestanden. Vor
+dem Bau von Abschnitt 6 dieselbe Probe einmal an ein Postfach außerhalb von Microsoft 365.
+
 ### Antworten auf Runde 1 (nach Entscheidung des Nutzers für die Mischform, 10.11.2026)
 
 Alle zitierten Codestellen aus F01–F03, F05, F06 und F10–F12 habe ich nachgeschlagen; sie stimmen.
