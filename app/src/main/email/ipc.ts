@@ -177,10 +177,21 @@ Schlüsselwörter:
 
   // ─── Microsoft 365: Anmeldung (docs/codex-collab/microsoft-365-anbindung.md, Abschnitt 4) ───
   // Das Objekt fasst beim Anlegen nichts an; userData wird erst beim ersten Aufruf gelesen.
-  // Kein Handler gibt je eine Zugangsmarke zurück — nur Kontoname und Zustand.
+  // Kein Handler gibt je eine Zugangsmarke zurück — nur Kontoname und Zustand. Die Ablage liegt
+  // im Unterordner microsoft-auth/, den die Passwort-Handler oben nicht adressieren können.
   const microsoftAuth = createMicrosoftAuth({
     getUserDataDir: () => app.getPath('userData'),
-    isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+    // Linux ohne Schlüsselbund meldet "verfügbar", verschlüsselt aber mit einem festen
+    // Passwort (Backend basic_text). Das zählt hier nicht als Verschlüsselung (Codex F09).
+    isEncryptionAvailable: () => {
+      if (!safeStorage.isEncryptionAvailable()) return false
+      if (process.platform !== 'linux') return true
+      try {
+        return safeStorage.getSelectedStorageBackend() !== 'basic_text'
+      } catch {
+        return false
+      }
+    },
     encrypt: (plain) => safeStorage.encryptString(plain),
     decrypt: (encrypted) => safeStorage.decryptString(encrypted),
     openExternal: (url) => shell.openExternal(url)
@@ -201,6 +212,11 @@ Schlüsselwörter:
     } catch (error) {
       return microsoftFailure(error)
     }
+  })
+
+  ipcMain.handle('email-microsoft-cancel-login', async () => {
+    microsoftAuth.cancelLogin()
+    return { success: true }
   })
 
   ipcMain.handle('email-microsoft-status', async (_event, accountId: string) => {

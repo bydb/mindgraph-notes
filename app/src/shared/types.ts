@@ -1322,6 +1322,8 @@ export interface ElectronAPI {
     | { success: true; account: { id: string; username: string; displayName?: string }; status: MicrosoftMailStatus }
     | { success: false; error: string; errorCode: string }
   >;
+  /** Bricht eine laufende Anmeldung ab (z.B. Browser ohne Anmeldung geschlossen). */
+  emailMicrosoftCancelLogin: () => Promise<{ success: true }>;
   emailMicrosoftStatus: (accountId: string) => Promise<{ success: true; status: MicrosoftMailStatus } | { success: false; error: string; errorCode: string }>;
   emailMicrosoftLogout: (accountId: string) => Promise<{ success: true } | { success: false; error: string; errorCode: string }>;
   // OpenRouter Cloud-Backend

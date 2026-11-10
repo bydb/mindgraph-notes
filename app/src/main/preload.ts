@@ -722,6 +722,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-load-password', accountId),
   emailMicrosoftLogin: (options?: { clientId?: string; tenant?: string }) =>
     ipcRenderer.invoke('email-microsoft-login', options),
+  emailMicrosoftCancelLogin: () =>
+    ipcRenderer.invoke('email-microsoft-cancel-login'),
   emailMicrosoftStatus: (accountId: string) =>
     ipcRenderer.invoke('email-microsoft-status', accountId),
   emailMicrosoftLogout: (accountId: string) =>

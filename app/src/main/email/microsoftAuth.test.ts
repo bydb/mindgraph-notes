@@ -3,28 +3,48 @@ import * as fs from 'fs/promises'
 import * as os from 'os'
 import * as path from 'path'
 import {
-  createMicrosoftAuth, deriveMicrosoftAccountId, classifyMicrosoftError, MicrosoftAuthError,
-  MICROSOFT_IMAP_ENDPOINT, GRAPH_SCOPES, IMAP_SCOPES, DEFAULT_MICROSOFT_CLIENT_ID,
-  type MicrosoftAuthDeps, type MsalAccount, type MsalCacheContext, type MsalModule
+  createMicrosoftAuth, deriveMicrosoftAccountId, classifyMicrosoftError, errorCodeForLog, MicrosoftAuthError,
+  MICROSOFT_IMAP_ENDPOINT, MICROSOFT_AUTH_DIR, GRAPH_SCOPES, IMAP_SCOPES, DEFAULT_MICROSOFT_CLIENT_ID,
+  type MicrosoftAuthDeps, type MsalAccount, type MsalCacheContext, type MsalModule, type MsalResult
 } from './microsoftAuth'
+import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
 
 const TENANT = '11111111-2222-3333-4444-555555555555'
 const OID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'
-const ACCOUNT: MsalAccount = { homeAccountId: `${OID}.${TENANT}`, tenantId: TENANT, localAccountId: OID, username: 'erika@schule.example', name: 'Erika Beispiel' }
+const account = (over: Partial<MsalAccount> = {}): MsalAccount => ({
+  homeAccountId: `${OID}.${TENANT}`, tenantId: TENANT, localAccountId: OID, username: 'erika@schule.example', name: 'Erika Beispiel', idTokenClaims: { oid: OID, tid: TENANT }, ...over
+})
 
-// Nachbau von MSAL: ein "Cache" je Client, der über das Plugin geladen und gespeichert wird.
-function fakeMsal(behaviour: {
-  interactive?: (request: Record<string, unknown>) => Promise<void> | void
+interface Behaviour {
+  /** Konto, das die Anmeldung liefert (Standard: account()). */
+  signIn?: () => MsalAccount
+  /** Ersetzt die Adresse, die an openBrowser geht. */
+  loginUrl?: (clientId: string, tenant: string) => string
+  /** Läuft vor dem Abschluss der Anmeldung; darf hängen bleiben. */
+  beforeFinish?: () => Promise<void>
+  interactiveError?: () => unknown
   silentError?: (scopes: string[]) => unknown
+  /** Läuft im Markenabruf vor der Rückgabe. */
+  duringSilent?: () => Promise<void>
   configs?: Record<string, unknown>[]
-  silentCalls?: string[][]
-} = {}): MsalModule {
+  requests?: Record<string, unknown>[]
+  removed?: MsalAccount[]
+}
+
+// Nachbau von MSAL: ein Cache je Client, über das Plugin geladen und gespeichert.
+// Er belegt die Zustandslogik dieses Moduls, NICHT das Verhalten der echten Bibliothek.
+function fakeMsal(b: Behaviour = {}): MsalModule {
   class Client {
     private accounts: MsalAccount[] = []
     private plugin: { beforeCacheAccess(c: MsalCacheContext): Promise<void>; afterCacheAccess(c: MsalCacheContext): Promise<void> }
+    private clientId: string
+    private tenant: string
     constructor(config: Record<string, unknown>) {
-      behaviour.configs?.push(config)
+      b.configs?.push(config)
       this.plugin = (config.cache as { cachePlugin: Client['plugin'] }).cachePlugin
+      const auth = config.auth as { clientId: string; authority: string }
+      this.clientId = auth.clientId
+      this.tenant = auth.authority.split('/').pop() as string
     }
     private ctx(changed: boolean): MsalCacheContext {
       return {
@@ -35,27 +55,35 @@ function fakeMsal(behaviour: {
         }
       }
     }
-    async acquireTokenInteractive(request: Record<string, unknown>) {
+    async acquireTokenInteractive(request: Record<string, unknown>): Promise<MsalResult> {
+      b.requests?.push(request)
       await this.plugin.beforeCacheAccess(this.ctx(false))
-      await behaviour.interactive?.(request)
-      await (request.openBrowser as (url: string) => Promise<void>)('https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?x=1')
-      this.accounts = [ACCOUNT]
+      if (b.interactiveError) throw b.interactiveError()
+      const url = b.loginUrl ? b.loginUrl(this.clientId, this.tenant)
+        : `https://login.microsoftonline.com/${this.tenant}/oauth2/v2.0/authorize?client_id=${this.clientId}&redirect_uri=${encodeURIComponent('http://localhost:53124')}&scope=x`
+      await (request.openBrowser as (url: string) => Promise<void>)(url)
+      await b.beforeFinish?.()
+      const acc = b.signIn ? b.signIn() : account()
+      this.accounts = [...this.accounts.filter(a => !(a.homeAccountId === acc.homeAccountId && a.tenantId === acc.tenantId)), acc]
       await this.plugin.afterCacheAccess(this.ctx(true))
-      return { accessToken: 'graph-marke', account: ACCOUNT }
+      return { accessToken: 'graph-marke', account: acc, idTokenClaims: acc.idTokenClaims }
     }
-    async acquireTokenSilent(request: Record<string, unknown>) {
+    async acquireTokenSilent(request: Record<string, unknown>): Promise<MsalResult> {
       await this.plugin.beforeCacheAccess(this.ctx(false))
       const scopes = request.scopes as string[]
-      behaviour.silentCalls?.push(scopes)
-      const err = behaviour.silentError?.(scopes)
+      const err = b.silentError?.(scopes)
       if (err) throw err
-      return { accessToken: scopes === IMAP_SCOPES ? 'imap-marke' : 'graph-marke', account: request.account as MsalAccount }
+      await b.duringSilent?.()
+      const acc = request.account as MsalAccount
+      return { accessToken: `${scopes === IMAP_SCOPES ? 'imap' : 'graph'}-marke-${acc.tenantId.slice(0, 4)}`, account: acc }
     }
     getTokenCache() {
       return {
         getAllAccounts: async () => { await this.plugin.beforeCacheAccess(this.ctx(false)); return this.accounts },
-        removeAccount: async (account: MsalAccount) => {
-          this.accounts = this.accounts.filter(a => a.homeAccountId !== account.homeAccountId)
+        removeAccount: async (acc: MsalAccount) => {
+          await this.plugin.beforeCacheAccess(this.ctx(false))
+          b.removed?.push(acc)
+          this.accounts = this.accounts.filter(a => !(a.homeAccountId === acc.homeAccountId && a.tenantId === acc.tenantId))
           await this.plugin.afterCacheAccess(this.ctx(true))
         }
       }
@@ -67,17 +95,29 @@ function fakeMsal(behaviour: {
 let dir = ''
 let opened: string[] = []
 let dirRequests = 0
+const authDir = (): string => path.join(dir, MICROSOFT_AUTH_DIR)
+const bindingsPath = (): string => path.join(authDir(), 'accounts.enc')
 
 const makeDeps = (msal: MsalModule, overrides: Partial<MicrosoftAuthDeps> = {}): MicrosoftAuthDeps => ({
   getUserDataDir: () => { dirRequests++; return dir },
   isEncryptionAvailable: () => true,
-  // Umkehrbare "Verschlüsselung": reicht, um zu zeigen, dass nichts im Klartext auf der Platte liegt.
-  encrypt: (plain) => Buffer.from(Buffer.from(plain, 'utf8').toString('base64').split('').reverse().join('')),
-  decrypt: (enc) => Buffer.from(enc.toString().split('').reverse().join(''), 'base64').toString('utf8'),
+  // Umkehrbar, aber kein Klartext: zeigt, dass alles durch encrypt/decrypt läuft. Keine echte Verschlüsselung.
+  encrypt: (plain) => Buffer.from(`ENC:${Buffer.from(plain, 'utf8').toString('base64').split('').reverse().join('')}`),
+  decrypt: (enc) => {
+    const text = enc.toString()
+    if (!text.startsWith('ENC:')) throw new Error('nicht entschlüsselbar')
+    return Buffer.from(text.slice(4).split('').reverse().join(''), 'base64').toString('utf8')
+  },
   openExternal: async (url) => { opened.push(url) },
   loadMsal: async () => msal,
   ...overrides
 })
+const ID = deriveMicrosoftAccountId(TENANT, OID)
+const hang = (): { promise: Promise<void>; release: () => void } => {
+  let release: () => void = () => undefined
+  const promise = new Promise<void>(r => { release = r })
+  return { promise, release }
+}
 
 beforeEach(async () => {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), 'mg-msauth-'))
@@ -87,15 +127,15 @@ beforeEach(async () => {
 afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
 
 describe('deriveMicrosoftAccountId', () => {
-  it('ist für dieselbe Anmeldung auf jedem Gerät gleich, unabhängig von der Schreibweise', () => {
-    const id = deriveMicrosoftAccountId(TENANT, OID)
-    expect(id).toMatch(/^ms-[0-9a-f]{24}$/)
-    expect(deriveMicrosoftAccountId(TENANT.toUpperCase(), OID.toUpperCase())).toBe(id)
-    expect(id).not.toContain(OID.slice(0, 8))
+  it('ist für dieselbe Anmeldung auf jedem Gerät gleich und hat die reservierte Form', () => {
+    expect(ID).toMatch(/^ms-[0-9a-f]{24}$/)
+    expect(isMicrosoftAccountId(ID)).toBe(true)
+    expect(deriveMicrosoftAccountId(TENANT.toUpperCase(), OID.toUpperCase())).toBe(ID)
+    expect(ID).not.toContain(OID.slice(0, 8))
   })
   it('unterscheidet Nutzer und Mandanten', () => {
-    expect(deriveMicrosoftAccountId(TENANT, OID)).not.toBe(deriveMicrosoftAccountId(TENANT, OID.replace('a', 'b')))
-    expect(deriveMicrosoftAccountId(TENANT, OID)).not.toBe(deriveMicrosoftAccountId(TENANT.replace('1', '2'), OID))
+    expect(ID).not.toBe(deriveMicrosoftAccountId(TENANT, OID.replace('a', 'b')))
+    expect(ID).not.toBe(deriveMicrosoftAccountId(TENANT.replace('1', '2'), OID))
   })
 })
 
@@ -104,16 +144,32 @@ describe('classifyMicrosoftError', () => {
     expect(classifyMicrosoftError({ errorCode: 'access_denied', errorMessage: 'AADSTS90094: Admin consent is required' })).toBe('admin-consent-required')
     expect(classifyMicrosoftError(new Error('Need admin approval'))).toBe('admin-consent-required')
   })
-  it('erkennt Ablehnung, Abbruch und nötige Neuanmeldung', () => {
+  it('ein Abbruch bleibt ein Abbruch, auch mit access_denied (Codex F10)', () => {
+    expect(classifyMicrosoftError({ errorCode: 'access_denied', errorMessage: 'user_cancelled' })).toBe('cancelled')
+    expect(classifyMicrosoftError({ errorCode: 'user_canceled' })).toBe('cancelled')
+  })
+  it('hält abgelehnte Zustimmung, fehlende Zustimmung, Richtlinie und Neuanmeldung auseinander (Codex F10)', () => {
     expect(classifyMicrosoftError({ errorCode: 'access_denied', errorMessage: 'AADSTS65004: User declined to consent' })).toBe('consent-declined')
-    expect(classifyMicrosoftError({ errorCode: 'user_cancelled' })).toBe('cancelled')
+    expect(classifyMicrosoftError({ errorCode: 'access_denied', errorMessage: 'AADSTS53003: blocked by Conditional Access' })).toBe('access-denied')
+    expect(classifyMicrosoftError({ errorCode: 'consent_required' })).toBe('consent-required')
+    expect(classifyMicrosoftError({ errorCode: 'invalid_grant', errorMessage: 'AADSTS65001: not consented' })).toBe('consent-required')
     expect(classifyMicrosoftError({ errorCode: 'interaction_required' })).toBe('reauth-required')
     expect(classifyMicrosoftError({ errorCode: 'invalid_grant', errorMessage: 'AADSTS700082: The refresh token has expired' })).toBe('reauth-required')
-    expect(classifyMicrosoftError(new Error('socket hang up'))).toBe('failed')
+    expect(classifyMicrosoftError({ errorCode: 'network_error' })).toBe('offline')
+    expect(classifyMicrosoftError(Object.assign(new Error('getaddrinfo'), { code: 'ENOTFOUND' }))).toBe('offline')
+    expect(classifyMicrosoftError(new Error('irgendetwas'))).toBe('failed')
+  })
+  it('verwechselt AADSTS-Nummern nicht anhand eines gemeinsamen Anfangs', () => {
+    expect(classifyMicrosoftError({ errorCode: 'x', errorMessage: 'AADSTS650049: etwas anderes' })).toBe('failed')
+  })
+  it('gibt fürs Log nur ein Codewort heraus, nie eine Nachricht (Codex F10)', () => {
+    expect(errorCodeForLog({ errorCode: 'invalid_grant', errorMessage: 'erika@schule.example eyJhbGciOi' })).toBe('invalid_grant')
+    expect(errorCodeForLog({ errorCode: 'erika@schule.example' })).toBe('(ohne Code)')
+    expect(errorCodeForLog(new Error('eyJhbGciOiJ…'))).toBe('(ohne Code)')
   })
 })
 
-describe('createMicrosoftAuth', () => {
+describe('createMicrosoftAuth — Anmeldung und Ablage', () => {
   it('fasst beim Anlegen keine Datei an und lädt nichts', () => {
     let loaded = false
     createMicrosoftAuth(makeDeps(fakeMsal(), { loadMsal: async () => { loaded = true; return fakeMsal() } }))
@@ -121,78 +177,57 @@ describe('createMicrosoftAuth', () => {
     expect(loaded).toBe(false)
   })
 
-  it('meldet an, bindet die Kontoart an die abgeleitete ID und legt nichts im Klartext ab', async () => {
+  it('meldet an und bindet die Kontoart an die abgeleitete ID', async () => {
     const configs: Record<string, unknown>[] = []
     const requests: Record<string, unknown>[] = []
-    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ configs, interactive: (r) => { requests.push(r) } })))
-    const result = await auth.login()
-    expect(result.accountId).toBe(deriveMicrosoftAccountId(TENANT, OID))
+    const result = await createMicrosoftAuth(makeDeps(fakeMsal({ configs, requests }))).login()
+    expect(result.accountId).toBe(ID)
     expect(result.username).toBe('erika@schule.example')
     expect(result.status).toMatchObject({ known: true, signedIn: true, fetchReady: true, sendReady: true })
     expect(opened).toHaveLength(1)
     expect(requests[0].scopes).toEqual(GRAPH_SCOPES)
     expect(requests[0].extraScopesToConsent).toEqual(IMAP_SCOPES)
-    expect((configs[0].auth as { clientId: string; authority: string })).toEqual({ clientId: DEFAULT_MICROSOFT_CLIENT_ID, authority: 'https://login.microsoftonline.com/organizations' })
-    const files = await fs.readdir(dir)
-    expect(files.sort()).toEqual(expect.arrayContaining(['email-microsoft-accounts.enc']))
-    expect(files.some(f => f.startsWith('email-microsoft-cache-'))).toBe(true)
-    expect(files.some(f => f.endsWith('.tmp'))).toBe(false)
+    expect(configs[0].auth).toEqual({ clientId: DEFAULT_MICROSOFT_CLIENT_ID, authority: 'https://login.microsoftonline.com/organizations' })
+  })
+
+  it('legt alles im eigenen Unterordner ab, nichts im Klartext, nichts im Namensraum der Passwörter (Codex F01)', async () => {
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login()
+    // Direkt im Profil liegt nur der Unterordner — keine email-*.enc, die der Passwort-IPC lesen könnte.
+    expect(await fs.readdir(dir)).toEqual([MICROSOFT_AUTH_DIR])
+    const files = await fs.readdir(authDir())
+    expect(files.sort()).toEqual(['accounts.enc', expect.stringMatching(/^cache-[0-9a-f]{20}\.enc$/)])
     for (const f of files) {
-      const content = (await fs.readFile(path.join(dir, f))).toString()
-      expect(content).not.toContain('erika@schule.example')
-      expect(content).not.toContain('GEHEIME-ERNEUERUNGSMARKE')
-      expect(content).not.toContain(OID)
+      const content = (await fs.readFile(path.join(authDir(), f))).toString()
+      expect(content.startsWith('ENC:')).toBe(true)
+      for (const secret of ['erika@schule.example', 'GEHEIME-ERNEUERUNGSMARKE', OID, TENANT]) expect(content).not.toContain(secret)
+      if (process.platform !== 'win32') expect((await fs.stat(path.join(authDir(), f))).mode & 0o077).toBe(0)
+    }
+    // Der Passwortpfad kann weder die Dateien noch das Konto adressieren.
+    expect(() => emailCredentialFileName(ID)).toThrow()
+    for (const guess of [`${MICROSOFT_AUTH_DIR}/accounts`, `x/../${MICROSOFT_AUTH_DIR}/accounts`, 'microsoft-auth\\accounts']) {
+      expect(() => emailCredentialFileName(guess)).toThrow()
     }
   })
 
   it('gibt für den Abruf feste Verbindungsdaten und den Anmeldenamen aus der Anmeldung heraus', async () => {
     const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
-    const { accountId } = await auth.login()
-    expect(await auth.getImapAuth(accountId)).toEqual({ ...MICROSOFT_IMAP_ENDPOINT, user: 'erika@schule.example', accessToken: 'imap-marke' })
-    expect(await auth.getGraphToken(accountId)).toEqual({ accessToken: 'graph-marke', username: 'erika@schule.example', displayName: 'Erika Beispiel' })
+    await auth.login()
+    expect(await auth.getImapAuth(ID)).toEqual({ ...MICROSOFT_IMAP_ENDPOINT, user: 'erika@schule.example', accessToken: 'imap-marke-1111' })
+    expect(await auth.getGraphToken(ID)).toEqual({ accessToken: 'graph-marke-1111', username: 'erika@schule.example', displayName: 'Erika Beispiel' })
   })
 
   it('übersteht einen Neustart: eine neue Instanz liest Bindung und Marken von der Platte', async () => {
-    const { accountId } = await createMicrosoftAuth(makeDeps(fakeMsal())).login()
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login()
     const second = createMicrosoftAuth(makeDeps(fakeMsal()))
-    expect(await second.isMicrosoftAccount(accountId)).toBe(true)
-    expect((await second.getImapAuth(accountId)).accessToken).toBe('imap-marke')
+    expect(await second.status(ID)).toMatchObject({ known: true, signedIn: true, fetchReady: true, sendReady: true })
+    expect((await second.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
   })
 
-  it('nach dem Abmelden: Konto bleibt Microsoft-Konto, gibt aber keine Marke mehr heraus', async () => {
-    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
-    const { accountId } = await auth.login()
-    await auth.logout(accountId)
-    expect(await auth.isMicrosoftAccount(accountId)).toBe(true)
-    expect(await auth.status(accountId)).toMatchObject({ known: true, signedIn: false, fetchReady: false, sendReady: false, errorCode: 'reauth-required' })
-    await expect(auth.getImapAuth(accountId)).rejects.toMatchObject({ code: 'reauth-required' })
-    await expect(auth.getGraphToken(accountId)).rejects.toMatchObject({ code: 'reauth-required' })
-    // auch eine frische Instanz bleibt dabei
-    await expect(createMicrosoftAuth(makeDeps(fakeMsal())).getImapAuth(accountId)).rejects.toMatchObject({ code: 'reauth-required' })
-  })
-
-  it('erneute Anmeldung nach dem Abmelden stellt das Konto unter derselben ID wieder her', async () => {
-    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
-    const first = await auth.login()
-    await auth.logout(first.accountId)
-    const again = await auth.login()
-    expect(again.accountId).toBe(first.accountId)
-    expect((await auth.getImapAuth(again.accountId)).accessToken).toBe('imap-marke')
-  })
-
-  it('unterscheidet Abruf und Versand: fehlt die Zustimmung für IMAP, ist nur der Versand bereit', async () => {
-    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ silentError: (scopes) => scopes === IMAP_SCOPES ? { errorCode: 'consent_required' } : null })))
-    const { accountId, status } = await auth.login()
-    expect(status).toMatchObject({ signedIn: true, fetchReady: false, sendReady: true, errorCode: 'reauth-required' })
-    await expect(auth.getImapAuth(accountId)).rejects.toBeInstanceOf(MicrosoftAuthError)
-    expect((await auth.getGraphToken(accountId)).accessToken).toBe('graph-marke')
-  })
-
-  it('kennt unbekannte Konten nicht und erfindet keine Bindung', async () => {
-    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
-    expect(await auth.isMicrosoftAccount('email-1700000000000')).toBe(false)
-    expect(await auth.status('email-1700000000000')).toEqual({ known: false, signedIn: false, fetchReady: false, sendReady: false })
-    await expect(auth.getImapAuth('email-1700000000000')).rejects.toMatchObject({ code: 'unknown-account' })
+  it('räumt Schreibreste eines abgestürzten Laufs weg (Codex F09)', async () => {
+    await fs.mkdir(authDir(), { recursive: true })
+    await fs.writeFile(path.join(authDir(), 'accounts.enc.4711.tmp'), 'halb geschrieben')
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login()
+    expect((await fs.readdir(authDir())).some(f => f.endsWith('.tmp'))).toBe(false)
   })
 
   it('ohne sichere Ablage: keine Anmeldung, keine Datei, kein Browserfenster', async () => {
@@ -202,38 +237,203 @@ describe('createMicrosoftAuth', () => {
     expect(await fs.readdir(dir)).toEqual([])
   })
 
-  it('öffnet nur die Anmeldeseite von Microsoft', async () => {
-    const msal = fakeMsal({ interactive: async (r) => { await (r.openBrowser as (u: string) => Promise<void>)('https://login.microsoftonline.com.evil.example/x') } })
+  it('verlangt die Objekt-ID aus der Anmeldung und speichert sonst nichts (Codex F07)', async () => {
+    const removed: MsalAccount[] = []
+    // MSAL hätte localAccountId hier aus `sub` gefüllt — je Anwendung verschieden, taugt nicht als Konto-ID.
+    const msal = fakeMsal({ removed, signIn: () => account({ localAccountId: 'sub-je-anwendung-verschieden', idTokenClaims: { tid: TENANT } }) })
     const auth = createMicrosoftAuth(makeDeps(msal))
-    await expect(auth.login()).rejects.toBeInstanceOf(MicrosoftAuthError)
-    expect(opened).toHaveLength(0)
+    await expect(auth.login()).rejects.toMatchObject({ code: 'failed' })
+    expect(removed).toHaveLength(1)
+    await expect(fs.readFile(bindingsPath())).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   it('meldet fehlende Freigabe der Organisation mit festem Code und ohne Kontodaten im Text', async () => {
-    const msal = fakeMsal({ interactive: () => { throw { errorCode: 'access_denied', errorMessage: 'AADSTS90094: erika@schule.example needs admin approval' } } })
+    const msal = fakeMsal({ interactiveError: () => ({ errorCode: 'access_denied', errorMessage: 'AADSTS90094: erika@schule.example needs admin approval' }) })
     const error = await createMicrosoftAuth(makeDeps(msal)).login().catch(e => e)
     expect(error).toBeInstanceOf(MicrosoftAuthError)
     expect(error.code).toBe('admin-consent-required')
     expect(error.message).not.toContain('erika')
-    expect(await fs.readdir(dir)).toEqual([])
   })
 
   it('weist ungültige Anwendungs-ID und Mandanten ab, bevor irgendetwas geöffnet wird', async () => {
     const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
     await expect(auth.login({ clientId: 'keine-guid' })).rejects.toMatchObject({ code: 'invalid-config' })
     await expect(auth.login({ tenant: 'evil.example/oauth2/../x' })).rejects.toMatchObject({ code: 'invalid-config' })
-    expect(opened).toHaveLength(0)
+    await expect(auth.login({ clientId: 42 as unknown as string })).resolves.toMatchObject({ accountId: ID })
+    expect(opened).toHaveLength(1)
   })
 
-  it('nimmt eine eigene Anwendungs-ID mit Mandant und merkt sie am Konto', async () => {
+  it('öffnet nur die Anmeldeseite genau dieses Antrags (Codex F13)', async () => {
+    const good = (c: string, t: string): string => `https://login.microsoftonline.com/${t}/oauth2/v2.0/authorize?client_id=${c}&redirect_uri=${encodeURIComponent('http://localhost:5000')}`
+    const bad: Array<(c: string, t: string) => string> = [
+      () => 'https://login.microsoftonline.com.evil.example/organizations/oauth2/v2.0/authorize',
+      (c, t) => good(c, t).replace('https://', 'http://'),
+      (c, t) => good(c, t).replace('/authorize', '/logout'),
+      (c) => good(c, 'anderer-mandant.example'),
+      (_c, t) => good('99999999-8888-7777-6666-555555555555', t),
+      (c, t) => good(c, t).replace(encodeURIComponent('http://localhost:5000'), encodeURIComponent('https://evil.example/cb')),
+      () => 'keine adresse'
+    ]
+    for (const loginUrl of bad) {
+      await expect(createMicrosoftAuth(makeDeps(fakeMsal({ loginUrl }))).login()).rejects.toBeInstanceOf(MicrosoftAuthError)
+    }
+    expect(opened).toHaveLength(0)
+    await createMicrosoftAuth(makeDeps(fakeMsal({ loginUrl: good }))).login()
+    expect(opened).toHaveLength(1)
+  })
+})
+
+describe('createMicrosoftAuth — Kontoart, Abmelden, Fehlerzustände', () => {
+  it('nach dem Abmelden gibt das Konto keine Marke mehr heraus, auch nicht nach Neustart', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    await auth.login()
+    await auth.logout(ID)
+    expect(await auth.status(ID)).toMatchObject({ known: true, signedIn: false, fetchReady: false, sendReady: false, errorCode: 'reauth-required' })
+    await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+    await expect(auth.getGraphToken(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+    await expect(createMicrosoftAuth(makeDeps(fakeMsal())).getImapAuth(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+  })
+
+  it('erneute Anmeldung stellt das Konto unter derselben ID wieder her', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    await auth.login()
+    await auth.logout(ID)
+    expect((await auth.login()).accountId).toBe(ID)
+    expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
+  })
+
+  it('ein laufender Markenabruf liefert nach dem Abmelden nichts mehr (Codex F06)', async () => {
+    const gate = hang()
+    let block = false
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ duringSilent: () => block ? gate.promise : Promise.resolve() })))
+    await auth.login()
+    block = true
+    const pending = auth.getImapAuth(ID)
+    const caught = pending.catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    block = false
+    await auth.logout(ID)
+    gate.release()
+    expect(await caught).toMatchObject({ code: 'reauth-required' })
+  })
+
+  it('Microsoft-ID ohne Ablage (neues Gerät): Anmeldung nötig, bleibt Microsoft-Konto (Codex F03)', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    expect(await auth.status(ID)).toEqual({ known: true, signedIn: false, fetchReady: false, sendReady: false, errorCode: 'reauth-required' })
+    await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+  })
+
+  it('unlesbare Ablage: Fehler statt „unbekannt“, und die Anmeldung überschreibt sie nicht (Codex F03)', async () => {
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login()
+    for (const damaged of [Buffer.from('kein gültiger Inhalt'), makeDeps(fakeMsal()).encrypt('{ kaputtes json'), makeDeps(fakeMsal()).encrypt('[1,2]')]) {
+      await fs.writeFile(bindingsPath(), damaged)
+      const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+      expect(await auth.status(ID)).toMatchObject({ known: true, signedIn: false, errorCode: 'storage-unreadable' })
+      await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'storage-unreadable' })
+      await expect(auth.logout(ID)).rejects.toMatchObject({ code: 'storage-unreadable' })
+      opened = []
+      await expect(auth.login()).rejects.toMatchObject({ code: 'storage-unreadable' })
+      expect(opened).toHaveLength(0)
+      expect((await fs.readFile(bindingsPath())).equals(damaged)).toBe(true)
+    }
+  })
+
+  it('übernimmt aus der Ablage nur Einträge, deren ID zu Mandant und Objekt passt', async () => {
+    const deps = makeDeps(fakeMsal())
+    await fs.mkdir(authDir(), { recursive: true })
+    const entry = { provider: 'microsoft', tenantId: TENANT, objectId: OID, username: 'x@example.org', homeAccountId: 'h', clientId: DEFAULT_MICROSOFT_CLIENT_ID, tenant: 'organizations', state: 'signed-in' }
+    const other = deriveMicrosoftAccountId(TENANT, 'ffffffff-ffff-ffff-ffff-ffffffffffff')
+    await fs.writeFile(bindingsPath(), deps.encrypt(JSON.stringify({ [other]: entry, 'email-1': entry, [ID]: { ...entry, clientId: 'keine-guid' } })))
+    const auth = createMicrosoftAuth(deps)
+    // untergeschobene Einträge zählen nicht: beide IDs sind „nicht angemeldet“
+    expect(await auth.status(other)).toMatchObject({ signedIn: false, errorCode: 'reauth-required' })
+    expect((await auth.status(other)).username).toBeUndefined()
+    expect((await auth.status(ID)).username).toBeUndefined()
+  })
+
+  it('kennt nur IDs in Microsoft-Form — auch keine geerbten Objektschlüssel (Codex F12)', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    for (const id of ['email-1700000000000', '__proto__', 'constructor', 'toString', '', 'ms-kurz']) {
+      expect(await auth.status(id)).toEqual({ known: false, signedIn: false, fetchReady: false, sendReady: false })
+      await expect(auth.getImapAuth(id)).rejects.toMatchObject({ code: 'unknown-account' })
+      await expect(auth.logout(id)).rejects.toMatchObject({ code: 'unknown-account' })
+    }
+    expect(dirRequests).toBe(0)
+  })
+
+  it('unterscheidet Abruf und Versand: fehlt die Zustimmung für IMAP, ist nur der Versand bereit', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ silentError: (scopes) => scopes === IMAP_SCOPES ? { errorCode: 'consent_required' } : null })))
+    const { status } = await auth.login()
+    expect(status).toMatchObject({ signedIn: true, fetchReady: false, sendReady: true, errorCode: 'consent-required' })
+    await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'consent-required' })
+    expect((await auth.getGraphToken(ID)).accessToken).toBe('graph-marke-1111')
+  })
+
+  it('wählt bei zwei Mandantenprofilen desselben Nutzers das der Bindung (Codex F05)', async () => {
+    const guestTenant = '99999999-2222-3333-4444-555555555555'
+    const guestOid = 'bbbbbbbb-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const guest = account({ tenantId: guestTenant, localAccountId: guestOid, idTokenClaims: { oid: guestOid, tid: guestTenant } })
+    let next = guest
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ signIn: () => next })))
+    const first = await auth.login()   // Gastprofil zuerst im Cache
+    next = account()
+    const second = await auth.login()  // Heimatprofil, gleiche homeAccountId
+    expect(first.accountId).not.toBe(second.accountId)
+    expect((await auth.getImapAuth(first.accountId)).accessToken).toBe('imap-marke-9999')
+    expect((await auth.getImapAuth(second.accountId)).accessToken).toBe('imap-marke-1111')
+  })
+
+  it('Wechsel der Anwendungs-ID: Marken der alten Registrierung werden entfernt (Codex F04)', async () => {
+    const removed: MsalAccount[] = []
     const configs: Record<string, unknown>[] = []
-    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ configs })))
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ removed, configs })))
+    await auth.login()
     const own = '99999999-8888-7777-6666-555555555555'
-    const { accountId } = await auth.login({ clientId: own, tenant: 'schule.example' })
-    expect(configs[0].auth).toEqual({ clientId: own, authority: 'https://login.microsoftonline.com/schule.example' })
-    // Neustart: die Erneuerung nutzt wieder dieselbe Registrierung
-    const again: Record<string, unknown>[] = []
-    await createMicrosoftAuth(makeDeps(fakeMsal({ configs: again }))).getImapAuth(accountId)
-    expect(again[0].auth).toEqual({ clientId: own, authority: 'https://login.microsoftonline.com/schule.example' })
+    const again = await auth.login({ clientId: own, tenant: 'schule.example' })
+    expect(again.accountId).toBe(ID)
+    expect(removed).toHaveLength(1)
+    // Neustart: die Erneuerung nutzt die neue Registrierung
+    const fresh: Record<string, unknown>[] = []
+    await createMicrosoftAuth(makeDeps(fakeMsal({ configs: fresh }))).getImapAuth(ID)
+    expect(fresh[0].auth).toEqual({ clientId: own, authority: 'https://login.microsoftonline.com/schule.example' })
+  })
+})
+
+describe('createMicrosoftAuth — Abbruch und Zeitlimit (Codex F08)', () => {
+  it('gibt nach dem Zeitlimit auf; kommt die Anmeldung später doch an, wird sie verworfen', async () => {
+    const gate = hang()
+    const removed: MsalAccount[] = []
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ beforeFinish: () => gate.promise, removed }), { loginTimeoutMs: 30 }))
+    await expect(auth.login()).rejects.toMatchObject({ code: 'timeout' })
+    gate.release()
+    await new Promise(r => setTimeout(r, 40))
+    expect(removed).toHaveLength(1)
+    expect(await auth.status(ID)).toMatchObject({ signedIn: false, errorCode: 'reauth-required' })
+    await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+  })
+
+  it('lässt sich abbrechen', async () => {
+    const gate = hang()
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ beforeFinish: () => gate.promise })))
+    const pending = auth.login().catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    auth.cancelLogin()
+    expect(await pending).toMatchObject({ code: 'cancelled' })
+    gate.release()
+  })
+
+  it('eine zweite Anmeldung gibt die erste auf', async () => {
+    const gate = hang()
+    let first = true
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ beforeFinish: () => { if (first) { first = false; return gate.promise } return Promise.resolve() } })))
+    const one = auth.login().catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    const two = await auth.login()
+    expect(await one).toMatchObject({ code: 'cancelled' })
+    expect(two.accountId).toBe(ID)
+    gate.release()
+    await new Promise(r => setTimeout(r, 30))
+    // die verspätete erste Anmeldung nimmt der zweiten das Konto nicht weg
+    expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
   })
 })

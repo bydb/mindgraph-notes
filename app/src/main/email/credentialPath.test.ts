@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as path from 'path'
-import { emailCredentialFileName, isSafeEmailAccountId } from './credentialPath'
+import { emailCredentialFileName, isSafeEmailAccountId, isMicrosoftAccountId } from './credentialPath'
 
 describe('emailCredentialFileName', () => {
   it('nimmt die IDs, die die App vergibt', () => {
@@ -30,5 +30,16 @@ describe('emailCredentialFileName', () => {
       expect(isSafeEmailAccountId(id)).toBe(false)
       expect(() => emailCredentialFileName(id)).toThrow()
     }
+  })
+
+  it('gibt für Microsoft-Konten keinen Passwortpfad heraus (Codex F02)', () => {
+    const id = 'ms-0123456789abcdef01234567'
+    expect(isMicrosoftAccountId(id)).toBe(true)
+    expect(() => emailCredentialFileName(id)).toThrow()
+    // knapp daneben ist ein gewöhnliches Konto
+    for (const other of ['ms-0123456789abcdef0123456', 'ms-0123456789ABCDEF01234567', 'email-ms-0123456789abcdef01234567', 'ms-']) {
+      expect(isMicrosoftAccountId(other)).toBe(false)
+    }
+    expect(emailCredentialFileName('ms-kurz')).toBe('email-ms-kurz.enc')
   })
 })
