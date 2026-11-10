@@ -539,6 +539,9 @@ Fassung 3 vom Nutzer freigegeben (10.11.2026).
   geprüft: Senden über das Schreibfenster, Blindkopie und Antwort aus der App heraus, Signaturbild,
   große Anhänge aus der App, der unklare Zustand am echten Netz, Ankunft dieser einen Mail beim
   Empfänger. **Kein Codex-Review.**
+- Abschnitt 7, Teil Onboarding: `EmailSetupStep.tsx` zeigt für „Microsoft 365“ die Anmeldung im
+  Browser statt der Passwortfelder; vom Nutzer im Testprofil gesehen. Offen: Seite für
+  Administratoren, gepackter Build, Codex-Review.
 - Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
   `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
   Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei

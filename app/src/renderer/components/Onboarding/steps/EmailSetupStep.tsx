@@ -1,13 +1,20 @@
 // EmailSetupStep — Onboarding-Schritt für Office-/Professional-Profile, der
-// einen IMAP/SMTP-Account direkt im Onboarding aufnimmt und per
-// emailConnect(...) testet. Office-User aus Outlook/Microsoft-365-Umgebungen
-// erwarten, dass sie nach ein paar Klicks ihre Mails sehen — die Tour-Logik
-// soll daran nicht scheitern, deshalb ist „Später einrichten" jederzeit sichtbar.
+// ein Mailkonto direkt im Onboarding aufnimmt. Office-User aus
+// Microsoft-365-Umgebungen erwarten, dass sie nach ein paar Klicks ihre Mails
+// sehen — die Tour-Logik soll daran nicht scheitern, deshalb ist „Später
+// einrichten" jederzeit sichtbar.
+//
+// Zwei Wege: Microsoft 365 meldet sich im Browser an (kein Passwort hier —
+// Microsoft nimmt für den Mailabruf keine Passwörter mehr an; bis 11/2026
+// führte die vorausgewählte Outlook-Vorgabe deshalb immer in „Verbindung
+// fehlgeschlagen“). Alle anderen Anbieter: IMAP/SMTP mit Passwort, geprüft
+// per emailConnect(...).
 
 import React, { useMemo, useState } from 'react'
 import { useUIStore } from '../../../stores/uiStore'
 import { useTranslation } from '../../../utils/translations'
 import { StepIndicator } from './StepIndicator'
+import { useMicrosoftSignIn } from '../../Settings/EmailMicrosoftAccounts'
 
 interface EmailSetupStepProps {
   onBack: () => void
@@ -31,7 +38,8 @@ interface Preset {
 // User füllt es händisch. Werte beruhen auf den offiziellen Anbieter-Setups.
 const PRESETS: Preset[] = [
   { id: 'gmail',    label: 'Gmail',                  imapHost: 'imap.gmail.com',          imapPort: 993, imapTls: true, smtpHost: 'smtp.gmail.com',         smtpPort: 465, smtpTls: true },
-  { id: 'outlook',  label: 'Outlook / Microsoft 365', imapHost: 'outlook.office365.com',  imapPort: 993, imapTls: true, smtpHost: 'smtp.office365.com',     smtpPort: 587, smtpTls: true },
+  // Microsoft 365 nutzt die Server-Angaben nicht: die Anmeldung läuft über useMicrosoftSignIn.
+  { id: 'outlook',  label: 'Microsoft 365',           imapHost: 'outlook.office365.com',  imapPort: 993, imapTls: true, smtpHost: 'smtp.office365.com',     smtpPort: 587, smtpTls: true },
   { id: 'icloud',   label: 'iCloud',                 imapHost: 'imap.mail.me.com',        imapPort: 993, imapTls: true, smtpHost: 'smtp.mail.me.com',       smtpPort: 587, smtpTls: true },
   { id: 'webde',    label: 'web.de',                 imapHost: 'imap.web.de',             imapPort: 993, imapTls: true, smtpHost: 'smtp.web.de',            smtpPort: 587, smtpTls: true },
   { id: 'gmx',      label: 'GMX',                    imapHost: 'imap.gmx.net',            imapPort: 993, imapTls: true, smtpHost: 'mail.gmx.net',           smtpPort: 587, smtpTls: true },
@@ -60,6 +68,20 @@ export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext, 
   const [status, setStatus] = useState<TestStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const isMicrosoft = presetId === 'outlook'
+  const microsoft = useMicrosoftSignIn()
+  const [microsoftUser, setMicrosoftUser] = useState<string | null>(null)
+
+  const handleMicrosoftSignIn = async () => {
+    const id = await microsoft.signIn()
+    if (!id) return
+    // Das Konto hat der Hook schon in die Einstellungen geschrieben; hier nur das Modul-Flag
+    // setzen (wie beim Passwortweg) und den Namen für die Bestätigung holen.
+    const state = useUIStore.getState()
+    state.setEmail({ enabled: true })
+    setMicrosoftUser(state.email.accounts.find(a => a.id === id)?.user || '')
+    setSaved(true)
+  }
 
   const applyPreset = (id: string) => {
     setPresetId(id)
@@ -137,13 +159,39 @@ export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext, 
               role="tab"
               aria-selected={presetId === p.id}
               className={`onboarding-ai-setup-os-tab ${presetId === p.id ? 'active' : ''}`}
-              onClick={() => applyPreset(p.id)}
+              onClick={() => { if (!saved && !microsoft.pending) applyPreset(p.id) }}
             >
               {p.label}
             </button>
           ))}
         </div>
 
+        {isMicrosoft && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
+            <p className="onboarding-ai-setup-os-hint">{t('onboarding.emailSetup.ms.hint')}</p>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {microsoft.pending ? (
+                <>
+                  <span className="onboarding-ai-setup-os-hint">{t('onboarding.emailSetup.ms.waiting')}</span>
+                  <button type="button" className="onboarding-btn-secondary onboarding-btn-small" onClick={microsoft.cancel}>
+                    {t('onboarding.emailSetup.ms.cancel')}
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="onboarding-btn-primary onboarding-btn-small" onClick={() => void handleMicrosoftSignIn()} disabled={saved}>
+                  {saved ? t('onboarding.emailSetup.saved') : t('onboarding.emailSetup.ms.signIn')}
+                </button>
+              )}
+              {saved && microsoftUser !== null && (
+                <span className="onboarding-ai-setup-status detected"><span className="dot dot-green" /> {t('onboarding.emailSetup.ms.signedIn').replace('{user}', microsoftUser)}</span>
+              )}
+            </div>
+            {microsoft.error && <p className="onboarding-ai-setup-error">{microsoft.error}</p>}
+            {!saved && <p className="onboarding-ai-setup-os-hint">{t('onboarding.emailSetup.ms.personalHint')}</p>}
+          </div>
+        )}
+
+        {!isMicrosoft && (<>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '12px' }}>
           <input
             type="text"
@@ -228,6 +276,7 @@ export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext, 
         </div>
 
         {error && <p className="onboarding-ai-setup-error">{error}</p>}
+        </>)}
       </section>
 
       <section className="onboarding-ai-setup-card onboarding-ai-setup-card-skip">

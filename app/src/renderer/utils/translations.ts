@@ -2702,7 +2702,7 @@ const translations = {
     // Email Setup Step (Onboarding, nur Office/Professional)
     'onboarding.emailSetup.indicator': 'E-Mail einrichten',
     'onboarding.emailSetup.title': 'E-Mail-Konto verbinden',
-    'onboarding.emailSetup.subtitle': 'MindGraph holt deine Mails per IMAP, analysiert sie mit lokaler KI und legt wichtige Nachrichten als Notizen ab. Dein Passwort bleibt verschlüsselt auf diesem Rechner.',
+    'onboarding.emailSetup.subtitle': 'MindGraph holt deine Mails per IMAP, analysiert sie mit lokaler KI und legt wichtige Nachrichten als Notizen ab. Deine Zugangsdaten bleiben verschlüsselt auf diesem Rechner.',
     'onboarding.emailSetup.providerHeading': 'Anbieter wählen',
     'onboarding.emailSetup.accountNamePlaceholder': 'Name (z.B. „Büro" oder „Privat")',
     'onboarding.emailSetup.userPlaceholder': 'E-Mail-Adresse',
@@ -2719,6 +2719,12 @@ const translations = {
     'onboarding.emailSetup.skipHint': 'Du kannst jederzeit in den Einstellungen → E-Mail einen Account hinzufügen. Der Rest des Onboardings funktioniert auch ohne.',
     'onboarding.emailSetup.skipButton': 'Später einrichten',
     'onboarding.emailSetup.continueButton': 'Weiter',
+    'onboarding.emailSetup.ms.hint': 'Postfächer von Schule, Behörde oder Unternehmen melden sich direkt bei Microsoft an – im Browser, ohne Passwort in MindGraph. Mails werden wie bei jedem anderen Konto lokal verarbeitet.',
+    'onboarding.emailSetup.ms.signIn': 'Mit Microsoft anmelden',
+    'onboarding.emailSetup.ms.waiting': 'Warte auf die Anmeldung im Browser …',
+    'onboarding.emailSetup.ms.cancel': 'Abbrechen',
+    'onboarding.emailSetup.ms.signedIn': 'Angemeldet als {user} — Mails werden gleich abgerufen',
+    'onboarding.emailSetup.ms.personalHint': 'Private Outlook.com- und Hotmail-Adressen werden noch nicht unterstützt.',
 
 
     'onboarding.vault.title': 'Wo sollen deine Notizen leben?',
@@ -6130,7 +6136,7 @@ const translations = {
     // Email Setup Step (Onboarding, office/professional only)
     'onboarding.emailSetup.indicator': 'Connect email',
     'onboarding.emailSetup.title': 'Connect your email account',
-    'onboarding.emailSetup.subtitle': 'MindGraph fetches your mail via IMAP, analyses it with local AI, and stores important messages as notes. Your password stays encrypted on this machine.',
+    'onboarding.emailSetup.subtitle': 'MindGraph fetches your mail via IMAP, analyses it with local AI, and stores important messages as notes. Your credentials stay encrypted on this machine.',
     'onboarding.emailSetup.providerHeading': 'Choose provider',
     'onboarding.emailSetup.accountNamePlaceholder': 'Name (e.g. "Work" or "Personal")',
     'onboarding.emailSetup.userPlaceholder': 'Email address',
@@ -6147,6 +6153,12 @@ const translations = {
     'onboarding.emailSetup.skipHint': 'You can add an account anytime via Settings → Email. The rest of the onboarding works without it.',
     'onboarding.emailSetup.skipButton': 'Set up later',
     'onboarding.emailSetup.continueButton': 'Continue',
+    'onboarding.emailSetup.ms.hint': 'Mailboxes of schools, public bodies or companies sign in directly at Microsoft – in the browser, with no password in MindGraph. Mail is processed locally like any other account.',
+    'onboarding.emailSetup.ms.signIn': 'Sign in with Microsoft',
+    'onboarding.emailSetup.ms.waiting': 'Waiting for sign-in in the browser …',
+    'onboarding.emailSetup.ms.cancel': 'Cancel',
+    'onboarding.emailSetup.ms.signedIn': 'Signed in as {user} — fetching mail',
+    'onboarding.emailSetup.ms.personalHint': 'Personal Outlook.com and Hotmail addresses are not supported yet.',
 
 
     'onboarding.vault.title': 'Where should your notes live?',
