@@ -720,6 +720,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('email-save-password', accountId, password),
   emailLoadPassword: (accountId: string) =>
     ipcRenderer.invoke('email-load-password', accountId),
+  emailMicrosoftLogin: (options?: { clientId?: string; tenant?: string }) =>
+    ipcRenderer.invoke('email-microsoft-login', options),
+  emailMicrosoftStatus: (accountId: string) =>
+    ipcRenderer.invoke('email-microsoft-status', accountId),
+  emailMicrosoftLogout: (accountId: string) =>
+    ipcRenderer.invoke('email-microsoft-logout', accountId),
   // OpenRouter Cloud-Backend
   openrouterSaveKey: (apiKey: string) =>
     ipcRenderer.invoke('openrouter-save-key', apiKey),

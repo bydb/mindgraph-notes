@@ -495,6 +495,14 @@ F26 (MIME entsteht erst nach dem SMTP-Versand).
 Fassung 3 vom Nutzer freigegeben (10.11.2026).
 
 - Abschnitt 0 und 1: erledigt, von Codex am Code geprüft (`microsoft-abschnitt-0-1-review.md`), auf master.
+- Abschnitt 3: gemessen (siehe „Messung 10.11.2026, abends“); offen bleibt die Probe an ein Postfach
+  außerhalb von Microsoft 365 und M8/M9.
+- Abschnitt 4, Teil a (Main-Seite): `app/src/main/email/microsoftAuth.ts` mit 17 Tests,
+  `@azure/msal-node` 7.1.2 exakt verankert (`npm audit` unverändert: sechs Befunde im Build-Werkzeug,
+  keiner neu), IPC `email-microsoft-login|status|logout`. In der gebauten App mit Testprofil
+  (nicht gepackt) echt angemeldet: Systembrowser, Rückweg, Ablage verschlüsselt, nach Neustart
+  Abruf und Versand weiter berechtigt. Offen: Oberfläche (Teil b), gepackter Build als Tor,
+  Codex-Review.
 - Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
   `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
   Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei

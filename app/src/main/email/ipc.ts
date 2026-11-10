@@ -7,7 +7,7 @@
 // Was der Block aus index.ts braucht (Pfadprüfung, Hauptfenster, Cloud-Auflösung),
 // kommt über EmailIpcDeps herein — index.ts ist der Einstiegspunkt und lässt sich
 // von hier aus nicht importieren.
-import { app, BrowserWindow, ipcMain, dialog, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../../shared/emailFetchWindow'
@@ -21,6 +21,7 @@ import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData }
 import { buildImapOptions } from './connection'
 import { buildOutgoingMail, renderRawMessage } from './outgoing'
 import { emailCredentialFileName } from './credentialPath'
+import { createMicrosoftAuth, MicrosoftAuthError, classifyMicrosoftError, messageFor, type LoginOptions } from './microsoftAuth'
 import { getDeviceId } from '../deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../../shared/emailMerge'
 import { recordLlmRun, collectRunTotals } from '../llm/telemetry'
@@ -172,6 +173,51 @@ Schlüsselwörter:
   // Email-Passwort laden (safeStorage)
   ipcMain.handle('email-load-password', async (_event, accountId: string) => {
     return loadEmailPassword(accountId)
+  })
+
+  // ─── Microsoft 365: Anmeldung (docs/codex-collab/microsoft-365-anbindung.md, Abschnitt 4) ───
+  // Das Objekt fasst beim Anlegen nichts an; userData wird erst beim ersten Aufruf gelesen.
+  // Kein Handler gibt je eine Zugangsmarke zurück — nur Kontoname und Zustand.
+  const microsoftAuth = createMicrosoftAuth({
+    getUserDataDir: () => app.getPath('userData'),
+    isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: (plain) => safeStorage.encryptString(plain),
+    decrypt: (encrypted) => safeStorage.decryptString(encrypted),
+    openExternal: (url) => shell.openExternal(url)
+  })
+  const microsoftFailure = (error: unknown): { success: false; error: string; errorCode: string } => {
+    const errorCode = classifyMicrosoftError(error)
+    return { success: false, error: error instanceof MicrosoftAuthError ? error.message : messageFor(errorCode), errorCode }
+  }
+
+  ipcMain.handle('email-microsoft-login', async (_event, options?: LoginOptions) => {
+    try {
+      const safeOptions: LoginOptions = {
+        clientId: typeof options?.clientId === 'string' ? options.clientId : undefined,
+        tenant: typeof options?.tenant === 'string' ? options.tenant : undefined
+      }
+      const result = await microsoftAuth.login(safeOptions)
+      return { success: true, account: { id: result.accountId, username: result.username, displayName: result.displayName }, status: result.status }
+    } catch (error) {
+      return microsoftFailure(error)
+    }
+  })
+
+  ipcMain.handle('email-microsoft-status', async (_event, accountId: string) => {
+    try {
+      return { success: true, status: await microsoftAuth.status(String(accountId || '')) }
+    } catch (error) {
+      return microsoftFailure(error)
+    }
+  })
+
+  ipcMain.handle('email-microsoft-logout', async (_event, accountId: string) => {
+    try {
+      await microsoftAuth.logout(String(accountId || ''))
+      return { success: true }
+    } catch (error) {
+      return microsoftFailure(error)
+    }
   })
 
   // Email-Verbindungstest

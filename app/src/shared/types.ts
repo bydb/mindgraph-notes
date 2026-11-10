@@ -1317,6 +1317,13 @@ export interface ElectronAPI {
   emailContactsLoad: (vaultPath: string) => Promise<SavedEmailContact[]>;
   emailSavePassword: (accountId: string, password: string) => Promise<boolean>;
   emailLoadPassword: (accountId: string) => Promise<string | null>;
+  /** Microsoft 365: Anmeldung im Systembrowser. Gibt nie eine Zugangsmarke zurück. */
+  emailMicrosoftLogin: (options?: { clientId?: string; tenant?: string }) => Promise<
+    | { success: true; account: { id: string; username: string; displayName?: string }; status: MicrosoftMailStatus }
+    | { success: false; error: string; errorCode: string }
+  >;
+  emailMicrosoftStatus: (accountId: string) => Promise<{ success: true; status: MicrosoftMailStatus } | { success: false; error: string; errorCode: string }>;
+  emailMicrosoftLogout: (accountId: string) => Promise<{ success: true } | { success: false; error: string; errorCode: string }>;
   // OpenRouter Cloud-Backend
   openrouterSaveKey: (apiKey: string) => Promise<{ success: boolean; hasKey?: boolean; error?: string }>;
   openrouterHasKey: () => Promise<boolean>;
@@ -1704,6 +1711,19 @@ export interface PowerPointData {
 }
 
 // Email Integration Types
+/** Zustand eines Microsoft-365-Mailkontos, wie ihn der Main meldet (ohne Zugangsmarken). */
+export interface MicrosoftMailStatus {
+  known: boolean
+  signedIn: boolean
+  username?: string
+  displayName?: string
+  /** Abruf über IMAP berechtigt */
+  fetchReady: boolean
+  /** Versand über Graph berechtigt */
+  sendReady: boolean
+  errorCode?: string
+}
+
 export interface EmailMessage {
   id: string              // Message-ID Header
   uid: number

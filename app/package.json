@@ -147,6 +147,7 @@
     "vitest": "^4.1.12"
   },
   "dependencies": {
+    "@azure/msal-node": "7.1.2",
     "@codemirror/commands": "^6.10.1",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.12.1",
