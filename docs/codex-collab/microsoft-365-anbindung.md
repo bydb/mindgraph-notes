@@ -431,8 +431,20 @@ war (Ursache ungeklärt, vermutlich Suchindex) — der Abgleich der Gesendet-Kop
 nicht auf eine sofortige Suche verlassen. Nicht gemessen: M8 (Abbruch nach dem Absenden), M9
 (Konto A an Konto B in derselben App), Mandantengrenzen für die Mailgröße, echtes „Re: …“.
 
-**Folge für E9:** Die Schranke M2 ist für die Zustellung innerhalb eines Mandanten bestanden. Vor
-dem Bau von Abschnitt 6 dieselbe Probe einmal an ein Postfach außerhalb von Microsoft 365.
+**Folge für E9:** Die Schranke M2 ist für die Zustellung innerhalb eines Mandanten bestanden.
+
+**Nachmessung über die Mandantengrenze (10.11.2026, spät):** zwei Mails vom Testkonto an ein
+Postfach bei einem anderen Anbieter (Postfix-Server, kein Microsoft 365), Rohtext jeweils mit
+`Bcc:`-Zeile an `POST /me/sendMail`. Ausgewertet wurde der vollständige Quelltext der angekommenen
+Mails (im Mailprogramm des Empfängers geöffnet), nicht die Anzeige.
+
+| Mail | Ergebnis im fremden Postfach |
+|---|---|
+| X — An: fremdes Postfach, Blindkopie: Konto im Mandanten | kommt an; keine `Bcc:`-Zeile; die Adresse des Blindkopie-Empfängers kommt im gesamten Quelltext nicht vor; selbst gesetzte `Message-ID` erhalten |
+| Y — An: Konto im Mandanten, Blindkopie: fremdes Postfach | kommt an; keine `Bcc:`-Zeile; die eigene Adresse steht nur in Zeilen, die der empfangende Server selbst schreibt (`X-Original-To`, `Received … for`) |
+
+**M2 ist damit auch über die Mandantengrenze bestanden.** Grenze: ein Absendermandant, ein fremder
+Empfangsserver. E9 (MIME-Versand mit `Bcc:`-Zeile im Rohtext) kann gebaut werden.
 
 ### Antworten auf Runde 1 (nach Entscheidung des Nutzers für die Mischform, 10.11.2026)
 
