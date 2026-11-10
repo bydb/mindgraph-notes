@@ -542,6 +542,13 @@ Fassung 3 vom Nutzer freigegeben (10.11.2026).
 - Abschnitt 7, Teil Onboarding: `EmailSetupStep.tsx` zeigt für „Microsoft 365“ die Anmeldung im
   Browser statt der Passwortfelder; vom Nutzer im Testprofil gesehen. Offen: Seite für
   Administratoren, gepackter Build, Codex-Review.
+- Tor „gepackter Build“ (10.11.2026, macOS arm64, `electron-builder --dir`, lokal ad-hoc signiert,
+  eigener Profilordner über `--user-data-dir`): MSAL liegt im `app.asar` und lädt; Anmeldung im
+  Systembrowser, Verbindungstest und Ordnerliste über IMAP mit Marke, Neustart mit erhaltener
+  Anmeldung, Abmelden; Passwort-IPC weist präparierte IDs und Microsoft-IDs ab; das Produktivprofil
+  blieb unberührt (keine Sperrdatei). Nicht geprüft: Developer-ID-signierter und notarisierter Build
+  (lokales Signieren scheitert an zwei gleichnamigen Zertifikaten im Schlüsselbund des Nutzers; die
+  Releases signiert die CI), Windows, Linux, Versand und Abruf von Mails im gepackten Build.
 - Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
   `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
   Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei
