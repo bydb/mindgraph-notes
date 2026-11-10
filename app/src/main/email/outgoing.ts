@@ -118,13 +118,25 @@ export async function buildOutgoingMail(
 }
 
 /**
- * RFC-822-Bytes derselben Mail (nodemailer streamTransport, Zeilenenden LF).
+ * RFC-822-Bytes aus denselben Optionen (nodemailer streamTransport, Zeilenenden LF).
  *
- * ACHTUNG: Der Rohtext ENTHÄLT die Kopfzeile `Bcc:`. Nur der SMTP-Versand
- * lässt sie weg (dort stehen die Blindkopie-Empfänger im Umschlag). Für die
- * eigene Gesendet-Kopie ist das gewollt und bei Mailprogrammen üblich; als
- * Versandweg (z.B. MIME an eine Web-Schnittstelle) darf dieser Rohtext erst
- * dienen, wenn belegt ist, dass der Empfänger die Zeile nicht sieht (Codex F18).
+ * Zwei Dinge, die der Name nicht verrät:
+ *
+ * 1. KEINE byte-gleiche Kopie des Versands. Der SMTP-Versand serialisiert die
+ *    Optionen selbst; dieser Aufruf serialisiert sie ein zweites Mal. Gleich
+ *    ist die Message-ID, nicht die MIME-Grenzen — und Anhänge werden erneut
+ *    von der Platte gelesen (eine dazwischen geänderte Datei ergibt eine
+ *    abweichende Kopie). Beide Wege aus EINEM Rohtext zu speisen wäre falsch,
+ *    siehe Punkt 2.
+ *
+ * 2. Der Rohtext ENTHÄLT die Kopfzeile `Bcc:` (streamTransport setzt keepBcc).
+ *    Der normale Versandweg lässt sie weg und führt die Blindkopie-Empfänger
+ *    nur im Umschlag (beides per Test belegt). Wird dieser Rohtext erfolgreich
+ *    in den Gesendet-Ordner gelegt, trägt die Kopie auf dem Server die Zeile —
+ *    üblich für die eigene Kopie. Die lokale Gesendet-Mail der App kennt Bcc
+ *    dagegen gar nicht. Als VERSANDTEXT (z.B. MIME an eine Web-Schnittstelle)
+ *    darf dieser Rohtext erst dienen, wenn an zugestellten Mails gemessen ist,
+ *    dass Empfänger die Zeile nicht sehen (Codex F18, Messung M2).
  */
 export async function renderRawMessage(mailOptions: Record<string, unknown>): Promise<Buffer> {
   const nodemailer = await import('nodemailer')

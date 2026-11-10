@@ -175,6 +175,20 @@ Microsoft. Es kommt ein Test dafür in die Abnahme, damit das Verhalten dokument
 6. **Versand über Graph** — nach E9, E14, E15, E16.
 7. **Einrichtung und Administratoren-Seite.**
 
+**Feste Anforderungen an Abschnitt 6 (Versand über Graph) aus dem Code-Review von Abschnitt 2**
+(`microsoft-abschnitt-2-review.md`, vom Nutzer am 10.11.2026 übernommen):
+
+- Die Weiche zwischen den Versandwegen sitzt **vor** Passwort-, SMTP-Host- und Transporter-Zugriff;
+  der Graph-Zweig erreicht den SMTP-Aufruf nie (dort F01).
+- `renderRawMessage` ist bis zum Bestehen von M2 kein Versandtext; die Graph-eigene MIME-Erzeugung
+  wird erst nach der Messung festgelegt (dort F04).
+- Absendername, Absenderadresse und der Hostteil der Message-ID kommen für Microsoft-Konten aus dem
+  Main-seitigen Kontostand, nicht aus `composeData.account` (dort F05, hier E13).
+- `OutgoingMailInput` wird transportneutral: kein Pflichtfeld `smtpHost`, Umschlag erst im
+  SMTP-Zweig (dort F06).
+- Handler-Test mit kontrollierten Transporten und der produktiven HTML-Funktion: je Aufruf genau ein
+  Transportweg, Reihenfolge und Fehlerwege der Prüfungen (dort F07).
+
 ## Codex-Findings
 
 ### F01 — Der erste Bauabschnitt kann nicht nur Handler umleiten

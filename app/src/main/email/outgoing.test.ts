@@ -110,6 +110,30 @@ describe('renderRawMessage', () => {
     expect(raw.includes('\r\n')).toBe(false)
   })
 
+  it('trägt Absender, Empfänger, CC und Antwort-Kopfzeilen', async () => {
+    const input = base()
+    input.cc = [{ name: '', address: 'cc@example.org' }]
+    input.inReplyTo = '<alt@example.org>'
+    const { mailOptions } = await buildOutgoingMail(input, html)
+    const raw = (await renderRawMessage(mailOptions)).toString()
+    expect(raw).toMatch(/^From: Max Muster <max@example\.org>$/m)
+    expect(raw).toMatch(/^To: Erika Beispiel <erika@example\.org>$/m)
+    expect(raw).toMatch(/^Cc: cc@example\.org$/m)
+    expect(raw).toMatch(/^In-Reply-To: <alt@example\.org>$/m)
+    expect(raw).toMatch(/^References: <alt@example\.org>$/m)
+  })
+
+  it('ist keine byte-gleiche Kopie: zwei Läufe unterscheiden sich in den MIME-Grenzen, nicht in der Message-ID (Codex F02)', async () => {
+    const input = base()
+    input.attachments = [{ path: attachmentPath, filename: 'bericht.txt' }]
+    const { mailOptions, messageId } = await buildOutgoingMail(input, html)
+    const first = (await renderRawMessage(mailOptions)).toString()
+    const second = (await renderRawMessage(mailOptions)).toString()
+    expect(first).toContain(`Message-ID: ${messageId}`)
+    expect(second).toContain(`Message-ID: ${messageId}`)
+    expect(first).not.toBe(second)
+  })
+
   // Hält den Istzustand fest, an dem die Entscheidung über einen MIME-Versand
   // hängt (Codex F18): Die Blindkopie steht im Rohtext.
   it('enthält die Bcc-Kopfzeile — der Rohtext ist kein fertiger Versandtext', async () => {
@@ -118,5 +142,34 @@ describe('renderRawMessage', () => {
     const { mailOptions } = await buildOutgoingMail(input, html)
     const raw = (await renderRawMessage(mailOptions)).toString()
     expect(raw).toMatch(/^Bcc: bcc@example\.org$/m)
+  })
+
+  // Gegenstück: So serialisiert nodemailer für einen normalen Transport (SMTP).
+  // Die Blindkopie steht nur im Umschlag, nicht in den Kopfzeilen.
+  it('normaler Transportweg: Bcc nur im Umschlag, keine Kopfzeile', async () => {
+    const nodemailer = await import('nodemailer')
+    const input = base()
+    input.bcc = [{ name: '', address: 'bcc@example.org' }]
+    const { mailOptions } = await buildOutgoingMail(input, html)
+    const captured = await new Promise<{ raw: string; to: string[] }>((resolve, reject) => {
+      const transport = nodemailer.default.createTransport({
+        name: 'probe',
+        version: '1',
+        send(mail: { message: { createReadStream(): NodeJS.ReadableStream; getEnvelope(): { to: string[] } } }, done: (err: Error | null, info?: unknown) => void) {
+          const chunks: Buffer[] = []
+          const stream = mail.message.createReadStream()
+          stream.on('data', (d: Buffer) => chunks.push(Buffer.from(d)))
+          stream.on('error', reject)
+          stream.on('end', () => {
+            resolve({ raw: Buffer.concat(chunks).toString(), to: mail.message.getEnvelope().to })
+            done(null, {})
+          })
+        }
+      } as never)
+      transport.sendMail(mailOptions).catch(reject)
+    })
+    expect(captured.raw).not.toMatch(/^Bcc:/mi)
+    expect(captured.raw).not.toContain('bcc@example.org')
+    expect(captured.to).toEqual(['erika@example.org', 'bcc@example.org'])
   })
 })
