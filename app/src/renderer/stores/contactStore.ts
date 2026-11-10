@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { redactForLog } from '../../shared/logRedaction'
 import type { AggregatedContact } from '../../shared/types'
 import { useEmailStore } from './emailStore'
 import { useEventAgentBridge } from './eventAgentBridge'
@@ -133,7 +134,7 @@ export const useContactStore = create<ContactState>()((set, get) => ({
 
       set({ contacts: Array.from(contactMap.values()), isBuilding: false })
     } catch (error) {
-      console.error('[ContactStore] Failed to build contacts:', error)
+      console.error('[ContactStore] Failed to build contacts:', redactForLog(error))
       set({ isBuilding: false })
     }
   },

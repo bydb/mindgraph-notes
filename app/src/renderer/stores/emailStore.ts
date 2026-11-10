@@ -405,7 +405,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         }
       }
     } catch (error) {
-      console.error('[EmailStore] Failed to load emails:', error)
+      console.error('[EmailStore] Failed to load emails:', redactForLog(error))
     }
   },
 
@@ -442,9 +442,9 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         return
       }
 
-      console.error('[EmailStore] Failed to save emails:', result?.error)
+      console.error('[EmailStore] Failed to save emails:', redactForLog(result?.error))
     } catch (error) {
-      console.error('[EmailStore] Failed to save emails:', error)
+      console.error('[EmailStore] Failed to save emails:', redactForLog(error))
     }
   }),
 
@@ -515,7 +515,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
 
       return result
     } catch (error) {
-      console.error('[EmailStore] Fetch failed:', error)
+      console.error('[EmailStore] Fetch failed:', redactForLog(error))
       set({ lastFetchErrors: [{ accountId: '', folder: '', error: 'Abruf fehlgeschlagen' }] })
       return { success: false, newCount: 0, totalCount: 0, error: 'Abruf fehlgeschlagen' }
     } finally {
@@ -620,7 +620,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         console.log(`[EmailStore] ${created} notes created from relevant emails`)
       }
     } catch (error) {
-      console.error('[EmailStore] Analysis failed:', error)
+      console.error('[EmailStore] Analysis failed:', redactForLog(error))
       set({ analysisError: error instanceof Error ? error.message : 'Analyse fehlgeschlagen.' })
     } finally {
       warten.cancel()
@@ -665,7 +665,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       }
       return result.success
     } catch (error) {
-      console.error('[EmailStore] Setup failed:', error)
+      console.error('[EmailStore] Setup failed:', redactForLog(error))
       return false
     }
   },
@@ -714,7 +714,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         const tree = await window.electronAPI.readDirectory(vaultPath)
         useNotesStore.getState().setFileTree(tree)
       } catch (error) {
-        console.error('[EmailStore] Failed to refresh file tree:', error)
+        console.error('[EmailStore] Failed to refresh file tree:', redactForLog(error))
       }
     }
 
@@ -832,7 +832,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         }))
       }
     } catch (error) {
-      console.error('[EmailStore] loadFolders failed:', error)
+      console.error('[EmailStore] loadFolders failed:', redactForLog(error))
       set(s => ({
         foldersLoading: { ...s.foldersLoading, [accountId]: false },
         foldersError: { ...s.foldersError, [accountId]: error instanceof Error ? error.message : 'Fehler' }
@@ -895,7 +895,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       await get().saveEmails(vaultPath)
       return { success: true }
     } catch (error) {
-      console.error('[EmailStore] moveEmail failed:', error)
+      console.error('[EmailStore] moveEmail failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Move fehlgeschlagen' }
     }
   },
@@ -921,7 +921,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
         uid: email.uid
       })
     } catch (error) {
-      console.error('[EmailStore] fetchAttachments failed:', error)
+      console.error('[EmailStore] fetchAttachments failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht geladen werden' }
     }
   },
@@ -1254,7 +1254,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       get().updateUnreadRelevantCount()
       return { success: true, removed: res.removed }
     } catch (error) {
-      console.error('[EmailStore] removeLocalEmails failed:', error)
+      console.error('[EmailStore] removeLocalEmails failed:', redactForLog(error))
       return { success: false, removed: 0, error: error instanceof Error ? error.message : 'Entfernen fehlgeschlagen' }
     }
   },

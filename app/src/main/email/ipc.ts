@@ -24,7 +24,7 @@ import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombsto
 import { recordLlmRun, collectRunTotals } from '../llm/telemetry'
 import { fromOllamaResponse, type OllamaTimings } from '../../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../../shared/looseJson'
-import { redactForLog, mailRef } from '../../shared/logRedaction'
+import { redactForLog, firstSentenceForLog, mailRef, folderRef } from '../../shared/logRedaction'
 import { randomBytes } from 'crypto'
 import { recordActivity } from '../activityLedger'
 import { wrapIpcWithOllamaActivity } from '../rag/ollamaActivity'
@@ -297,7 +297,7 @@ Schlüsselwörter:
             const mapped = result.uidMap.get?.(payload.uid) ?? result.uidMap[payload.uid]
             if (typeof mapped === 'number') newUid = mapped
           }
-          console.log(`[Email] Moved uid ${payload.uid} from ${payload.sourceFolder} to ${payload.destinationFolder}`)
+          console.log(`[Email] Moved uid ${payload.uid} from ${folderRef(payload.sourceFolder)} to ${folderRef(payload.destinationFolder)}`)
           return { success: true, newUid, destinationFolder: payload.destinationFolder }
         } finally {
           lock.release()
@@ -955,7 +955,7 @@ Schlüsselwörter:
             const selection = selectFetchBatch(candidates, existingIds, maxPerAccount)
             const selectedUids = selection.selectedUids
             if (selection.skippedCount > 0) {
-              console.log(`[Email] ${account.id}/${fetchFolder}: ${selection.skippedCount} unbekannte Mails bleiben für den nächsten Abruf liegen (Kontingent ${maxPerAccount})`)
+              console.log(`[Email] ${account.id}/${folderRef(fetchFolder)}: ${selection.skippedCount} unbekannte Mails bleiben für den nächsten Abruf liegen (Kontingent ${maxPerAccount})`)
             }
             totalSkipped += selection.skippedCount
 
@@ -1674,7 +1674,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
           } else {
             failed++
             lastError = httpError || 'Antwort des Modells war kein gültiges JSON (auch nach Retry).'
-            console.warn(`[Email] Analyse fehlgeschlagen für ${mailRef(email.id)}: ${redactForLog(lastError).slice(0, 160)}`)
+            console.warn(`[Email] Analyse fehlgeschlagen für ${mailRef(email.id)}: ${firstSentenceForLog(lastError)}`)
           }
         } catch (error) {
           failed++
@@ -2536,7 +2536,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
                 // Kopie mit uid 0 da und liess sich nie verschieben oder mit Anhaengen oeffnen.
                 const appendedUid = appended && typeof appended === 'object' ? (appended as { uid?: unknown }).uid : undefined
                 if (typeof appendedUid === 'number' && appendedUid > 0) sentUid = appendedUid
-                console.log(`[Email] Appended to IMAP folder: ${target}${sentUid ? ` (uid ${sentUid})` : ''}`)
+                console.log(`[Email] Appended to IMAP folder: ${folderRef(target)}${sentUid ? ` (uid ${sentUid})` : ''}`)
               }
             } finally {
               try { await imapClient.logout() } catch { /* ignore */ }

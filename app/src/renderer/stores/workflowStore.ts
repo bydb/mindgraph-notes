@@ -24,6 +24,7 @@ import type { Note } from '../../shared/types'
 import type { WorkflowTriggerProvider } from '@mindgraph/plugin-api'
 import { getWorkflowTriggerProviders, getWorkflowExamples } from '../plugins/slots'
 import { runEventForWorkflow } from './workflowTriggerDispatch'
+import { redactForLog } from '../../shared/logRedaction'
 
 interface ConnectingState {
   nodeId: string
@@ -644,7 +645,7 @@ export const useWorkflowStore = create<WorkflowStoreState>()((set, get) => {
         }
       }
     } catch (e) {
-      console.warn('[workflow] runForNewEmails:', e)
+      console.warn('[workflow] runForNewEmails:', redactForLog(e))
     } finally {
       triggerBatchRunning = false
       set({ running: false, run: lastReal ?? lastSkip ?? get().run })
