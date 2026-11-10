@@ -15,8 +15,12 @@ paths:
 
 ## Smart Email Client
 
+## Wo der Code liegt
+- **Alle `email-*`-Handler stehen in `main/email/ipc.ts`** (seit 10.11.2026, vorher `main/index.ts`), angemeldet über `registerEmailIpc(deps)`. Ausnahme: `email-extract-event` steht weiter in `index.ts` beim Kalender.
+- Neun Stellen öffnen eine Mailverbindung (acht `new ImapFlow`, ein `createTransport`), alle mit `auth: { user, pass }` — eine andere Anmeldeart (OAuth) muss an allen neun ankommen.
+
 ## Empfang & Analyse (IMAP + Ollama)
-- IMAP-Abruf via `imapflow`, Parsing via `mailparser` (dynamic imports in main/index.ts)
+- IMAP-Abruf via `imapflow`, Parsing via `mailparser` (dynamic imports in `main/email/ipc.ts`)
 - Ollama-Analyse: Relevanz (0-100), Sentiment, Zusammenfassung, extrahierte Infos, Aufgaben, `needsReply`, `replyUrgency`
 - Analyse-Prompt enthält Inhalt der `Email-Instruktionen.md` aus dem Vault als Relevanzkriterien
 - Gewichtung: 1 Kriterium → 50-65%, 2 → 65-80%, 3+ oder direkte Rückfrage → 80-95%
@@ -27,7 +31,7 @@ paths:
 - Persistenz: `{vault}/.mindgraph/emails.json`
 
 ## Versand (SMTP + nodemailer + IMAP-Sent-Append)
-- SMTP-Senden via `nodemailer` (dynamic import in main/index.ts, IPC: `email-send`)
+- SMTP-Senden via `nodemailer` (dynamic import in `main/email/ipc.ts`, IPC: `email-send`)
 - Account-Settings: `smtpHost`, `smtpPort`, `smtpTls`, `fromAddress` (volle Absender-Adresse), `name` (Anzeigename)
 - HTML-Email: Body wird zu HTML konvertiert. **Link-Konverter** erkennt 4 Varianten: Markdown-Links `[Text](https://url)`, Markdown-Mailto, nackte URLs, nackte E-Mail-Adressen. Negative Lookbehinds verhindern Doppel-Linking innerhalb bereits gerenderter Tags.
 - Signatur: Text (`signature`) + optionales Bild (`signatureImagePath`) als CID-Attachment eingebettet
@@ -50,7 +54,7 @@ paths:
 
 ## Kontakt-Aggregation
 - **contactStore.ts**: Mergt Kontakte aus 4 Quellen (Email from/to, edoobox Bookings, Vault Wikilinks/Email-Regex, persistenter Kontakt-Speicher)
-- **Persistenter Kontakt-Speicher** `{vault}/.mindgraph/contacts.json`: Empfänger gesendeter Mails werden in `email-load` **vor** dem retainDays-Pruning und in `email-save` geharvestet (`harvestSentRecipients` in main/index.ts) — sonst verschwinden selten angeschriebene Adressen nach 30 Tagen aus dem Compose-Autocomplete. IPC: `email-contacts-load`
+- **Persistenter Kontakt-Speicher** `{vault}/.mindgraph/contacts.json`: Empfänger gesendeter Mails werden in `email-load` **vor** dem retainDays-Pruning und in `email-save` geharvestet (`harvestSentRecipients` in `main/email/ipc.ts`) — sonst verschwinden selten angeschriebene Adressen nach 30 Tagen aus dem Compose-Autocomplete. IPC: `email-contacts-load`
 - Autocomplete in ComposeView mit Source-Indikatoren (📧📅📝)
 - Kontakt-Profil in Detail-View (Email-Anzahl, Buchungen, Vault-Notizen)
 

@@ -28,7 +28,8 @@ app/
 │   │   ├── projectMatch.ts        # Keyword-Matcher Mail→Projekt (Renderer + Workflow-Runner)
 │   │   └── workflow/              # Workflow Canvas: types, model, registry (Metadaten-only), validation, simulation
 │   ├── main/            # Electron Main Process
-│   │   ├── index.ts     # IPC-Handler (~9000 Zeilen, ~200 Handler)
+│   │   ├── index.ts     # IPC-Handler (~13 800 Zeilen, ~295 Handler; wird bereichsweise ausgelagert)
+│   │   ├── email/      # Mailclient: ipc.ts (alle 25 email-*-Handler), store.ts (Ablage + Vereinigung)
 │   │   ├── preload.ts  # contextBridge API
 │   │   ├── ankiImport.ts  # .apkg-Import inkl. Medien-Extraktion
 │   │   ├── brain/      # Lokales Tagesgedächtnis (dailyConsolidation.ts, hardcoded localhost:11434)
@@ -39,7 +40,7 @@ app/
 │   │   ├── office/     # DOCX/XLSX/PPTX (officeService.ts)
 │   │   ├── noteAgent/  # Notiz-Agent: Loop, Werkzeuge (skills.ts), Shell, Rechner-Steuerung
 │   │   ├── petrolChats/ # Petrol-Chat: Gesprächsführung + verschlüsselte Ablage
-│   │   ├── rag/ ocr/ brand/ webResearch/ email/ projectStatus/ imageGen/
+│   │   ├── rag/ ocr/ brand/ webResearch/ projectStatus/ imageGen/
 │   │   ├── plugins/    # Plugin-Host (Registry, Runtime, Katalog, Widgets)
 │   │   ├── transport/  # Schnellerfassung (Tray, Shortcut, ⌘D-Diktat)
 │   │   ├── voice/      # Whisper-CLI (Fallback zum eingebauten Renderer-STT)
@@ -100,7 +101,9 @@ npm run test         # vitest run — Unit-Tests für pure shared/-Logik
 ## Architektur-Patterns
 
 ### IPC-Kommunikation
-Neuer IPC-Handler: `ipcMain.handle()` in `main/index.ts` + `contextBridge.exposeInMainWorld()` in `preload.ts`.
+Neuer IPC-Handler: `ipcMain.handle()` + `contextBridge.exposeInMainWorld()` in `preload.ts`.
+
+**`main/index.ts` wird bereichsweise zerlegt (seit 10.11.2026), nicht in einem Zug.** Wer in einem Bereich ohnehin arbeitet, zieht dessen Handler zuerst unverändert in ein eigenes Modul (eigener Commit ohne Verhaltensänderung), dann erst die Änderung. Muster: `main/email/ipc.ts` — `registerEmailIpc(deps)` wird in `index.ts` an der alten Stelle aufgerufen. **Handler nie beim Import anmelden**, nur in der `register…`-Funktion: Importe laufen vor `app.name` und der Instanzsperre. Was ein Modul aus `index.ts` braucht (`assertSafePath`, `assertApprovedVault`, `validatePath`, Hauptfenster), kommt über das `deps`-Objekt — `index.ts` ist der Einstiegspunkt und nicht importierbar. Neue Handler eines ausgelagerten Bereichs gehören in dessen Modul.
 
 ### Instanzsperre je Profil (seit 06.11.2026)
 `app.requestSingleInstanceLock()` direkt nach der userData-Isolation in `main/index.ts`; ein zweiter Start mit demselben Profil beendet sich sofort (Log `[startup] MindGraph läuft bereits mit diesem Profil`), die laufende Instanz holt ihr Fenster nach vorn (`main/singleInstance.ts`). Vorher schrieben zwei Instanzen gleichzeitig in dieselben Ablagen (Codex F25, `docs/codex-collab/web-render-stufe-a.md`). Die Sperre hängt am userData-Verzeichnis: Dev-App, installierte App und Testprofile (`MINDGRAPH_USER_DATA_DIR`) sperren sich nicht gegenseitig. **`app.name` muss VOR der Sperre und vor jedem anderen userData-Zugriff stehen**: Electron legt userData beim ersten Zugriff aus appData + App-Name fest und ändert es danach nie. 1.2.4 setzte die Sperre vor den Namen — das Profil fror auf den Paketnamen `mindgraph-notes` ein, die App öffnete ein fremdes Profil, Einstellungen und Vault schienen weg (real, 07.11.2026, Hotfix 1.2.5). Mit `MINDGRAPH_USER_DATA_DIR` getestet fällt das nicht auf (Pfad fest vorgegeben) — Gegenprobe mit gepacktem Build: `SingletonLock` muss in `MindGraph Notes/` liegen. Test `main/appNameOrder.test.ts`. **Dev-Falle:** Ein zweites `npm run dev` bzw. `npx electron-vite dev --remoteDebuggingPort 9222` neben einer laufenden Dev-App beendet sich still — für CDP-Messungen die laufende Dev-App vorher schließen oder ein eigenes `MINDGRAPH_USER_DATA_DIR` setzen.
