@@ -22,6 +22,7 @@ import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connecti
 import { buildOutgoingMail, renderRawMessage, findMissingAttachments } from './outgoing'
 import { sendViaGraph } from './graphSend'
 import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
+import { chooseSendTransport } from '../../shared/emailAccountKind'
 import { createMicrosoftAuth, MicrosoftAuthError, classifyMicrosoftError, messageFor, type LoginOptions } from './microsoftAuth'
 import { getDeviceId } from '../deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../../shared/emailMerge'
@@ -2509,8 +2510,9 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     // Gesendet-Append mit Verbindungsangaben des Renderers. Von hier gibt es kein Zurück in den
     // SMTP-Zweig — je Aufruf genau ein Transportweg. Absender und Anzeigename kommen aus der
     // Anmeldung im Main; composeData.account wird für Microsoft-Konten nicht gelesen.
-    if (isMicrosoftAccountId(composeData.accountId) || isMicrosoftAccountId(composeData.account?.id)) {
-      if (!isMicrosoftAccountId(composeData.accountId)) return { success: false, error: 'Konto und Absender passen nicht zusammen.' }
+    const sendTransport = chooseSendTransport(composeData.accountId, composeData.account?.id)
+    if (sendTransport === 'mismatch') return { success: false, error: 'Konto und Absender passen nicht zusammen.' }
+    if (sendTransport === 'graph') {
       try {
         const result = await sendViaGraph({
           accountId: composeData.accountId,
