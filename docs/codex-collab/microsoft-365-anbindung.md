@@ -529,6 +529,16 @@ Fassung 3 vom Nutzer freigegeben (10.11.2026).
   über die Lebensdauer der Marke hinaus. **Kein Codex-Review** (Limit erreicht am 10.11.2026):
   offen für die Hardening-Runde 2 (`microsoft-abschnitt-4a-review.md`), die Einstellungsseite und
   diesen Abschnitt.
+- Abschnitt 6 (Versand über Graph): `app/src/main/email/graphSend.ts` (13 Tests), Weiche am Anfang
+  von `email-send`, `locateMicrosoftSentCopy`, Erfolgstext „An Microsoft übergeben“. Die festen
+  Anforderungen aus dem Review von Abschnitt 2 sind umgesetzt bis auf den Handler-Test mit
+  kontrollierten Transporten: getestet ist das Sendemodul für sich, nicht der Handler. Im Testprofil
+  mit echtem Konto: eine Mail mit Anhang zwischen zwei Testkonten, angenommen in 1,3 s, Kopie im
+  Gesendet-Ordner mit UID gefunden; im Quellbestand der abgerufenen Kopie steht der Absender aus der
+  Anmeldung, von absichtlich falsch mitgeschickten Absender- und Serverangaben keine Spur. Nicht
+  geprüft: Senden über das Schreibfenster, Blindkopie und Antwort aus der App heraus, Signaturbild,
+  große Anhänge aus der App, der unklare Zustand am echten Netz, Ankunft dieser einen Mail beim
+  Empfänger. **Kein Codex-Review.**
 - Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
   `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
   Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei

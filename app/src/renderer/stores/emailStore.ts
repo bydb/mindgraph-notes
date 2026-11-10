@@ -77,7 +77,7 @@ interface EmailState {
   /** Ergebnis des letzten Versands — lebt AUSSERHALB des Compose-Fensters.
    *  Das Fenster wird nach Erfolg sofort abgebaut; eine Warnung („gesendet,
    *  aber nicht unter Gesendet abgelegt") hatte dort nie einen sichtbaren Ort. */
-  lastSendResult: { at: string; subject: string; appendWarning?: string } | null
+  lastSendResult: { at: string; subject: string; appendWarning?: string; transport?: 'smtp' | 'graph' } | null
   /** Konten, deren letzter Abruf fehlschlug (Passwort fehlt, Anmeldung
    *  abgelehnt, Zeitüberschreitung). Leer nach einem Abruf ohne Kontofehler. */
   lastFetchErrors: Array<{ accountId: string; folder: string; error: string }>
@@ -1065,7 +1065,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           composeState: null,
           currentView: 'list',
           drafts,
-          lastSendResult: { at: new Date().toISOString(), subject: composeState.subject, appendWarning: result.appendWarning }
+          lastSendResult: { at: new Date().toISOString(), subject: composeState.subject, appendWarning: result.appendWarning, transport: result.transport }
         })
         void discardStagedAttachments(composeState)
         await get().saveEmails(vaultPath)

@@ -73,7 +73,8 @@ export const ComposeView: React.FC = () => {
   if (!composeState) return null
 
   const account = emailSettings.accounts.find(a => a.id === composeState.accountId)
-  const hasSmtp = account?.smtpHost
+  // Microsoft-Konten senden über Graph und brauchen keinen SMTP-Server.
+  const hasSmtp = account?.smtpHost || isMicrosoftAccountId(account?.id)
   // Weiterleitung: solange Originalanhänge laden, ist Senden gesperrt (UI und
   // Store). Fehlen danach Dateien, braucht der Versand eine bewusste Freigabe.
   const forwardLoading = composeState.forwardAttachments?.status === 'loading'
@@ -595,8 +596,7 @@ export const ComposeView: React.FC = () => {
       {/* Status messages */}
       {!hasSmtp && (
         <div style={{ padding: '0 4px' }}>
-          {/* Microsoft-Konten haben keinen SMTP-Server; ihr Versand (über Graph) folgt in Plan-Abschnitt 6. */}
-          <span className="inbox-compose-warning">{t(isMicrosoftAccountId(account?.id) ? 'inbox.compose.microsoftSendPending' : 'inbox.compose.noSmtp')}</span>
+          <span className="inbox-compose-warning">{t('inbox.compose.noSmtp')}</span>
         </div>
       )}
       {sendStatus === 'error' && (

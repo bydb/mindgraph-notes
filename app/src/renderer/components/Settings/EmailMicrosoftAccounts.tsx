@@ -161,7 +161,6 @@ export const MicrosoftAccountCard: React.FC<{
       <Row label={t('settings.email.ms.send')}>
         <StatusChip tone={status?.sendReady ? 'ok' : 'off'} label={status?.sendReady ? t('settings.email.ms.ready') : t('settings.email.ms.notReady')} />
       </Row>
-      <Note tone="muted">{t('settings.email.ms.pendingHint')}</Note>
     </Card>
   )
 }

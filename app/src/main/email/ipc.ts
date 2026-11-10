@@ -19,7 +19,8 @@ import { isHardLocked as isModelHardLocked } from '../../shared/modelCompatibili
 import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from '../llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
 import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connection'
-import { buildOutgoingMail, renderRawMessage } from './outgoing'
+import { buildOutgoingMail, renderRawMessage, findMissingAttachments } from './outgoing'
+import { sendViaGraph } from './graphSend'
 import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
 import { createMicrosoftAuth, MicrosoftAuthError, classifyMicrosoftError, messageFor, type LoginOptions } from './microsoftAuth'
 import { getDeviceId } from '../deviceId'
@@ -2436,6 +2437,40 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     return renderEmailHtml(body || '')
   })
 
+  /**
+   * Sucht die Kopie, die Microsoft nach dem Versand selbst im Gesendet-Ordner ablegt, über IMAP
+   * (Ordner per SPECIAL-USE, Mail per Message-ID). Liefert Ordnerpfad und UID für die lokale
+   * Gesendet-Mail — ohne UID ließe sie sich weder verschieben noch mit Anhängen öffnen.
+   * Die Kopie erscheint nicht immer sofort (gemessen 10.11.2026): ein paar kurze Versuche,
+   * danach gleicht der nächste Abruf des Gesendet-Ordners über die Message-ID ab.
+   */
+  async function locateMicrosoftSentCopy(accountId: string, messageId: string): Promise<{ mailbox?: string; uid?: number }> {
+    const login = await resolveImapLogin(accountId, { host: '', port: 0, tls: true, user: '' })
+    if ('error' in login) return {}
+    const { ImapFlow } = await import('imapflow')
+    const client = new ImapFlow(buildImapOptions(login.endpoint, login.secret, { socketTimeout: 15000, greetingTimeout: 10000 }))
+    client.on('error', () => { /* ignore */ })
+    try {
+      await client.connect()
+      const mailbox = await findSentMailbox(client)
+      if (!mailbox) return {}
+      const lock = await client.getMailboxLock(mailbox)
+      try {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 2500))
+          const found = await client.search({ header: { 'message-id': messageId } }, { uid: true })
+          const uid = Array.isArray(found) && found.length > 0 ? found[found.length - 1] : 0
+          if (typeof uid === 'number' && uid > 0) return { mailbox, uid }
+        }
+        return { mailbox }
+      } finally {
+        lock.release()
+      }
+    } finally {
+      try { await client.logout() } catch { /* ignore */ }
+    }
+  }
+
   ipcMain.handle('email-send', async (_event, composeData: {
     to: { name: string; address: string }[]
     cc?: { name: string; address: string }[]
@@ -2464,17 +2499,45 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     // SMTP geben — sonst geht sie still nur an einen Teil der Empfänger (Codex F01).
     const allRecipients = [...(composeData.to || []), ...(composeData.cc || []), ...(composeData.bcc || [])]
     const badRecipients = allRecipients.filter(r => !isValidEmailAddress(String(r?.address ?? '').trim()))
-    // Microsoft-Konten senden nicht über SMTP (im Mandanten meist gesperrt) und haben kein
-    // Passwort. Der Versand über Graph ist Plan-Abschnitt 6; bis dahin eine klare Absage statt
-    // „Kein Passwort gespeichert“. Auch die mitgeschickte account.id zählt: sonst liefe der
-    // Gesendet-Append mit Verbindungsangaben des Renderers.
-    if (isMicrosoftAccountId(composeData.accountId) || isMicrosoftAccountId(composeData.account?.id)) {
-      return { success: false, error: 'Der Versand für Microsoft-365-Konten ist noch nicht verfügbar. Der Abruf funktioniert bereits.' }
-    }
     if (!composeData.to?.length) return { success: false, error: 'Kein Empfänger angegeben' }
     if (badRecipients.length > 0) {
       return { success: false, error: `Ungültige Empfängeradresse: ${badRecipients.map(r => r?.address || '(leer)').join(', ')}` }
     }
+    // ── Weiche zwischen den Transportwegen, VOR allem, was SMTP anfasst ──
+    // Microsoft-Konten senden über Graph (SMTP ist im Mandanten meist gesperrt, ein Passwort
+    // gibt es nicht). Auch die mitgeschickte account.id zählt: sonst liefe weiter unten der
+    // Gesendet-Append mit Verbindungsangaben des Renderers. Von hier gibt es kein Zurück in den
+    // SMTP-Zweig — je Aufruf genau ein Transportweg. Absender und Anzeigename kommen aus der
+    // Anmeldung im Main; composeData.account wird für Microsoft-Konten nicht gelesen.
+    if (isMicrosoftAccountId(composeData.accountId) || isMicrosoftAccountId(composeData.account?.id)) {
+      if (!isMicrosoftAccountId(composeData.accountId)) return { success: false, error: 'Konto und Absender passen nicht zusammen.' }
+      try {
+        const result = await sendViaGraph({
+          accountId: composeData.accountId,
+          to: composeData.to,
+          cc: composeData.cc,
+          bcc: composeData.bcc,
+          subject: composeData.subject,
+          body: composeData.body,
+          inReplyTo: composeData.inReplyTo,
+          references: composeData.references,
+          signatureImagePath: composeData.signatureImagePath,
+          attachments: composeData.attachments
+        }, {
+          getGraphToken: (id) => microsoftAuth.getGraphToken(id),
+          renderEmailHtml,
+          describeAuthError: (error) => error instanceof MicrosoftAuthError ? error.message : messageFor(classifyMicrosoftError(error)),
+          locateSentCopy: locateMicrosoftSentCopy
+        })
+        if (result.success) console.log('[Email] Handed to Microsoft:', mailRef(result.messageId))
+        else console.warn('[Email] Graph send not completed:', result.uncertain ? 'uncertain' : 'rejected')
+        return result
+      } catch (error) {
+        console.error('[Email] Graph send failed:', redactForLog(error))
+        return { success: false, transport: 'graph' as const, error: 'Senden über Microsoft ist fehlgeschlagen.' }
+      }
+    }
+
     try {
       const nodemailer = await import('nodemailer')
 
@@ -2493,14 +2556,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       // Datei still uebersprungen — die Mail ging mit „siehe Anhang" und ohne
       // Anhang raus. Fehlt eine, geht nichts raus; der Nutzer entfernt oder
       // waehlt neu.
-      const missingAttachments: string[] = []
-      for (const att of composeData.attachments || []) {
-        try {
-          await fs.access(att.path)
-        } catch {
-          missingAttachments.push(att.filename || path.basename(att.path))
-        }
-      }
+      const missingAttachments = await findMissingAttachments(composeData.attachments)
       if (missingAttachments.length > 0) {
         return { success: false, error: `Anhang nicht gefunden: ${missingAttachments.join(', ')}` }
       }

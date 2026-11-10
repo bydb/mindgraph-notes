@@ -17,13 +17,27 @@ export interface OutgoingMailInput {
   inReplyTo?: string
   references?: string
   account: {
-    smtpHost: string
+    /** Nur für SMTP-Konten; dient dort als letzter Rückfall für den Hostteil der Message-ID. */
+    smtpHost?: string
     user: string
     name?: string
     fromAddress?: string
   }
   signatureImagePath?: string
   attachments?: { path: string; filename: string }[]
+}
+
+/** Dateinamen der Anhänge, die nicht (mehr) lesbar sind. Vor JEDEM Versand prüfen. */
+export async function findMissingAttachments(attachments: { path: string; filename: string }[] | undefined): Promise<string[]> {
+  const missing: string[] = []
+  for (const att of attachments || []) {
+    try {
+      await fs.access(att.path)
+    } catch {
+      missing.push(att.filename || path.basename(att.path))
+    }
+  }
+  return missing
 }
 
 export interface OutgoingMail {

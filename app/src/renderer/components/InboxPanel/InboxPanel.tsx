@@ -1564,7 +1564,7 @@ export const InboxPanel: React.FC<InboxPanelProps> = ({ onClose }) => {
       {lastSendResult && (
         <div className={`inbox-send-result${lastSendResult.appendWarning ? ' has-warning' : ''}`} role="status">
           <div className="inbox-send-result-text">
-            <strong>{t('inbox.sendResult.sent').replace('{subject}', lastSendResult.subject || t('inbox.sendResult.noSubject'))}</strong>
+            <strong>{t(lastSendResult.transport === 'graph' ? 'inbox.sendResult.handedToMicrosoft' : 'inbox.sendResult.sent').replace('{subject}', lastSendResult.subject || t('inbox.sendResult.noSubject'))}</strong>
             {lastSendResult.appendWarning && <span>{lastSendResult.appendWarning}</span>}
           </div>
           <button type="button" className="inbox-banner-close" onClick={clearLastSendResult} title={t('common.close')}>✕</button>

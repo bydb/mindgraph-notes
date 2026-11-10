@@ -1903,6 +1903,10 @@ export interface EmailSendResult {
    *  eigene Mail später verschieben und ihre Anhänge laden — vorher stand
    *  die lokale Kopie dauerhaft mit uid 0 da. */
   sentUid?: number
+  /** Transportweg. 'graph': von Microsoft angenommen (202) — das ist noch keine Zustellung. */
+  transport?: 'smtp' | 'graph'
+  /** true: unklar, ob die Mail hinausging (Abbruch nach dem Absenden). Nicht automatisch wiederholen. */
+  uncertain?: boolean
 }
 
 /** `incremental` = ab dem Abruf-Merker (Automatik); `full` = das ganze
