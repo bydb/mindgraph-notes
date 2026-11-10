@@ -1848,6 +1848,8 @@ export interface EmailAccount {
   smtpHost: string
   smtpPort: number
   smtpTls: boolean
+  /** Nur Anzeige. Welchen Weg der Main nimmt, entscheidet er an der Form der ID (emailAccountKind.ts). */
+  auth?: 'password' | 'microsoft'
 }
 
 export interface ComposeAttachment {

@@ -503,6 +503,11 @@ Fassung 3 vom Nutzer freigegeben (10.11.2026).
   (nicht gepackt) echt angemeldet: Systembrowser, Rückweg, Ablage verschlüsselt, nach Neustart
   Abruf und Versand weiter berechtigt. Offen: Oberfläche (Teil b), gepackter Build als Tor,
   Codex-Review.
+- Abschnitt 4, Teil a nach Codex-Review (`microsoft-abschnitt-4a-review.md`, F01–F13) gehärtet. Dabei
+  eine Lücke im Bestand gefunden und auf master behoben: die Konto-ID der Mailpasswörter ging
+  ungeprüft in den Dateipfad (`main/email/credentialPath.ts`).
+- Abschnitt 4, Teil b (Einstellungen): Konto-Karte und Anmelde-Zeile, im Testprofil mit echtem Konto
+  geprüft (anmelden, Zustand, abmelden, entfernen). Offen: Onboarding, gepackter Build.
 - Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
   `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
   Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei

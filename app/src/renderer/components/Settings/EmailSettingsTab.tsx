@@ -14,6 +14,8 @@ import { ModelRamWarning } from '../Shared/ModelRamWarning'
 import { VERDICT_COLOR } from './ModelCompatibilitySection'
 import { EmailRelevanceRulesSection } from './EmailRelevanceRulesSection'
 import type { TabTFn } from './settingsTypes'
+import { isMicrosoftAccountId } from '../../../shared/emailAccountKind'
+import { MicrosoftAccountCard, MicrosoftAddRows } from './EmailMicrosoftAccounts'
 import {
   PageHeader, SectionTitle, Card, ServiceHead, IconTile, Row, Note, Details, Toggle, Select, Button,
   NumberInput, TextInput, SecretField, Textarea, ModuleOffCard, StatusChip
@@ -58,6 +60,8 @@ export const EmailSettingsTab: React.FC<{ t: TabTFn; ollamaModels: Array<{ name:
     ;(async () => {
       const next: Record<string, string> = {}
       for (const account of email.accounts) {
+        // Microsoft-Konten haben kein Passwort; der Main gäbe für sie ohnehin nichts heraus.
+        if (isMicrosoftAccountId(account.id)) continue
         try {
           const pw = await window.electronAPI.emailLoadPassword(account.id)
           if (pw) next[account.id] = pw
@@ -97,6 +101,18 @@ export const EmailSettingsTab: React.FC<{ t: TabTFn; ollamaModels: Array<{ name:
 
           <SectionTitle title={t('settings.email.groupAccounts')} meta={t('settings.email.accountsMeta', { n: email.accounts.length })} />
           {email.accounts.map((account, idx) => {
+            // Die Kontoart folgt aus der Form der ID, nicht aus einem Feld der Einstellungen.
+            if (isMicrosoftAccountId(account.id)) {
+              return (
+                <MicrosoftAccountCard
+                  key={account.id}
+                  t={t}
+                  account={account}
+                  onRename={name => updateAccount(idx, { name })}
+                  onRemoved={() => setEmail({ accounts: useUIStore.getState().email.accounts.filter(a => a.id !== account.id) })}
+                />
+              )
+            }
             const st = testStatus[account.id] ?? 'idle'
             return (
               <Card key={account.id}>
@@ -167,6 +183,7 @@ export const EmailSettingsTab: React.FC<{ t: TabTFn; ollamaModels: Array<{ name:
                 + {t('settings.email.addAccount')}
               </Button>
             </Row>
+            <MicrosoftAddRows t={t} />
           </Card>
 
           <SectionTitle title={t('settings.email.groupFetch')} />

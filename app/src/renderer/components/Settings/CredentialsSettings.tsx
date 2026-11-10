@@ -5,6 +5,7 @@ import { edooboxService } from '../../stores/edooboxServiceBridge'
 import { wordpressService } from '../../stores/wordpressServiceBridge'
 import { useTranslation } from '../../utils/translations'
 import { PageHeader, SectionTitle, Card, Row, Note, Details, Button, StatusChip } from './SettingsUI'
+import { isMicrosoftAccountId } from '../../../shared/emailAccountKind'
 
 type TabId = 'integrations' | 'email' | 'agents' | 'telegram' | 'speech' | 'sync' | 'dashboard' | 'ai' | `plugin:${string}`
 
@@ -43,6 +44,18 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
     rows.push({ id: 'elevenlabs-key', label: 'ElevenLabs API-Key', category: 'KI-Cloud', note: 'Für Cloud-TTS im Sprache-Modul', settingsTab: 'speech', checkSet: async () => !!(await window.electronAPI.elevenlabsLoadKey()) })
     rows.push({ id: 'sync-passphrase', label: 'Sync-Passphrase', category: 'Sync', note: 'E2E-verschlüsselter Vault-Sync', settingsTab: 'sync', checkSet: async () => !!(await window.electronAPI.syncLoadPassphrase()) })
     for (const acc of email.accounts ?? []) {
+      if (isMicrosoftAccountId(acc.id)) {
+        // Kein Passwort: gespeichert ist die Anmeldung bei Microsoft (verschlüsselt im Profil).
+        rows.push({
+          id: `email-${acc.id}`,
+          label: `Microsoft-Anmeldung (${acc.name || acc.user})`,
+          category: 'Kommunikation',
+          note: 'Microsoft 365 · Abruf und Versand',
+          settingsTab: 'email',
+          checkSet: async () => { const r = await window.electronAPI.emailMicrosoftStatus(acc.id); return r.success && r.status.signedIn }
+        })
+        continue
+      }
       rows.push({
         id: `email-${acc.id}`,
         label: `Email-Passwort (${acc.name || acc.user})`,

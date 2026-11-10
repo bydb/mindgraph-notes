@@ -7,24 +7,16 @@
 // `email-save-password` solche Dateien überschreiben). Deshalb: nur IDs aus
 // Buchstaben, Ziffern, Binde- und Unterstrich; alles andere ist kein Konto.
 
+import { isMicrosoftAccountId } from '../../shared/emailAccountKind'
+
+// Kontoart aus der Form der ID: siehe shared/emailAccountKind.ts.
+export { isMicrosoftAccountId, MICROSOFT_ACCOUNT_ID_RE } from '../../shared/emailAccountKind'
+
 /** Erlaubte Konto-IDs. Die App vergibt `email-<Zeitstempel>`. */
 export const EMAIL_ACCOUNT_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/
 
 export function isSafeEmailAccountId(accountId: unknown): accountId is string {
   return typeof accountId === 'string' && EMAIL_ACCOUNT_ID_RE.test(accountId)
-}
-
-/**
- * Konto-IDs von Microsoft-365-Konten (abgeleitet aus Mandant und Objekt-ID,
- * siehe microsoftAuth.ts). Die Kontoart folgt aus der FORM der ID, nicht aus
- * dem Vorhandensein einer Ablagedatei: so bleibt ein Microsoft-Konto auch dann
- * ein Microsoft-Konto, wenn seine Ablage fehlt oder unlesbar ist, und kann nie
- * auf den Passwortweg fallen (Codex F02, F03).
- */
-export const MICROSOFT_ACCOUNT_ID_RE = /^ms-[0-9a-f]{24}$/
-
-export function isMicrosoftAccountId(accountId: unknown): accountId is string {
-  return typeof accountId === 'string' && MICROSOFT_ACCOUNT_ID_RE.test(accountId)
 }
 
 /**

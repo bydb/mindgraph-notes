@@ -348,7 +348,10 @@ export interface LanguageToolSettings {
 // Email Integration Settings
 export interface EmailSettings {
   enabled: boolean
-  accounts: Array<{ id: string; name: string; host: string; port: number; user: string; tls: boolean; smtpHost: string; smtpPort: number; smtpTls: boolean; fromAddress: string }>
+  accounts: Array<{ id: string; name: string; host: string; port: number; user: string; tls: boolean; smtpHost: string; smtpPort: number; smtpTls: boolean; fromAddress: string; auth?: 'password' | 'microsoft' }>
+  /** Eigene App-Registrierung einer Organisation für die Microsoft-Anmeldung (leer = mitgelieferte). */
+  microsoftClientId?: string
+  microsoftTenant?: string
   fetchIntervalMinutes: number
   instructionNotePath: string
   inboxFolderName: string

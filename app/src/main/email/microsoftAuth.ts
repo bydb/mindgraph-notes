@@ -185,24 +185,24 @@ export function messageFor(code: MicrosoftAuthErrorCode): string {
   switch (code) {
     case 'encryption-unavailable': return 'Die sichere Ablage des Systems ist nicht verfügbar. Ohne sie wird keine Microsoft-Anmeldung gespeichert.'
     case 'storage-unreadable': return 'Die gespeicherte Microsoft-Anmeldung auf diesem Gerät ist nicht lesbar. Sie wurde nicht verändert.'
-    case 'admin-consent-required': return 'Ihre Organisation hat MindGraph Notes noch nicht freigegeben. Bitte wenden Sie sich an Ihre Administration.'
+    case 'admin-consent-required': return 'Deine Organisation hat MindGraph Notes noch nicht freigegeben. Bitte wende dich an deine Administration.'
     case 'consent-declined': return 'Die Zustimmung wurde nicht erteilt. Ohne sie kann MindGraph Notes das Postfach nicht nutzen.'
-    case 'consent-required': return 'Für diesen Zugriff fehlt noch die Zustimmung. Bitte melden Sie sich erneut bei Microsoft an.'
-    case 'access-denied': return 'Microsoft hat den Zugriff abgelehnt. Mögliche Ursache ist eine Richtlinie Ihrer Organisation.'
+    case 'consent-required': return 'Für diesen Zugriff fehlt noch die Zustimmung. Bitte melde dich erneut bei Microsoft an.'
+    case 'access-denied': return 'Microsoft hat den Zugriff abgelehnt. Mögliche Ursache ist eine Richtlinie deiner Organisation.'
     case 'cancelled': return 'Die Anmeldung wurde abgebrochen.'
     case 'timeout': return 'Die Anmeldung wurde nicht innerhalb von fünf Minuten abgeschlossen.'
     case 'reauth-required': return 'Für dieses Konto ist eine neue Anmeldung bei Microsoft nötig.'
     case 'unknown-account': return 'Dieses Konto ist nicht als Microsoft-Konto eingerichtet.'
     case 'invalid-config': return 'Anwendungs-ID oder Mandant sind ungültig.'
-    case 'offline': return 'Microsoft ist nicht erreichbar. Bitte prüfen Sie die Netzverbindung.'
+    case 'offline': return 'Microsoft ist nicht erreichbar. Bitte prüfe die Netzverbindung.'
     default: return 'Die Anmeldung bei Microsoft ist fehlgeschlagen.'
   }
 }
 
 const page = (title: string, text: string): string =>
   `<!doctype html><meta charset="utf-8"><title>MindGraph Notes</title><body style="font:16px system-ui;margin:48px;color:#222"><h2>${title}</h2><p>${text}</p></body>`
-const SUCCESS_PAGE = page('Anmeldung abgeschlossen', 'Sie können dieses Fenster schließen und zu MindGraph Notes zurückkehren.')
-const ERROR_PAGE = page('Anmeldung nicht abgeschlossen', 'Bitte kehren Sie zu MindGraph Notes zurück. Dort steht, was fehlt.')
+const SUCCESS_PAGE = page('Anmeldung abgeschlossen', 'Du kannst dieses Fenster schließen und zu MindGraph Notes zurückkehren.')
+const ERROR_PAGE = page('Anmeldung nicht abgeschlossen', 'Bitte kehre zu MindGraph Notes zurück. Dort steht, was fehlt.')
 
 export interface MicrosoftAuth {
   login(options?: LoginOptions): Promise<{ accountId: string; username: string; displayName?: string; status: MicrosoftAccountStatus }>
