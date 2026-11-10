@@ -298,11 +298,14 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new MicrosoftAuthError('storage-unreadable')
     for (const [id, value] of Object.entries(parsed as Record<string, unknown>)) {
       const b = value as Partial<MicrosoftAccountBinding> | null
-      // Nur vollständige Einträge unter einer ID in Microsoft-Form, die zu Mandant und Objekt passt.
-      if (!isMicrosoftAccountId(id) || !b || b.provider !== 'microsoft') continue
-      if (typeof b.tenantId !== 'string' || typeof b.objectId !== 'string' || typeof b.username !== 'string' || typeof b.homeAccountId !== 'string') continue
-      if (typeof b.clientId !== 'string' || !GUID_RE.test(b.clientId) || typeof b.tenant !== 'string' || !TENANT_RE.test(b.tenant)) continue
-      if (deriveMicrosoftAccountId(b.tenantId, b.objectId) !== id) continue
+      // Jeder Eintrag muss vollständig sein und unter der ID stehen, die zu Mandant und Objekt passt.
+      // Ein einzelner beschädigter Eintrag macht die ganze Ablage unlesbar: würde er still
+      // weggelassen, ginge er beim nächsten Speichern endgültig verloren.
+      const valid = isMicrosoftAccountId(id) && !!b && b.provider === 'microsoft'
+        && typeof b.tenantId === 'string' && typeof b.objectId === 'string' && typeof b.username === 'string' && typeof b.homeAccountId === 'string'
+        && typeof b.clientId === 'string' && GUID_RE.test(b.clientId) && typeof b.tenant === 'string' && TENANT_RE.test(b.tenant)
+        && deriveMicrosoftAccountId(b.tenantId, b.objectId) === id
+      if (!valid) throw new MicrosoftAuthError('storage-unreadable')
       bindings.set(id, { ...(b as MicrosoftAccountBinding), state: b.state === 'signed-in' ? 'signed-in' : 'signed-out' })
     }
     return bindings

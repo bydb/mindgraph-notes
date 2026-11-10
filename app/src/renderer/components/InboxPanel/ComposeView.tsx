@@ -6,6 +6,7 @@ import { useContactStore } from '../../stores/contactStore'
 import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import type { ComposeAttachment } from '../../../shared/types'
+import { isMicrosoftAccountId } from '../../../shared/emailAccountKind'
 import {
   hasOpenRecipientGroup,
   looksLikeRecipientList,
@@ -594,7 +595,8 @@ export const ComposeView: React.FC = () => {
       {/* Status messages */}
       {!hasSmtp && (
         <div style={{ padding: '0 4px' }}>
-          <span className="inbox-compose-warning">{t('inbox.compose.noSmtp')}</span>
+          {/* Microsoft-Konten haben keinen SMTP-Server; ihr Versand (über Graph) folgt in Plan-Abschnitt 6. */}
+          <span className="inbox-compose-warning">{t(isMicrosoftAccountId(account?.id) ? 'inbox.compose.microsoftSendPending' : 'inbox.compose.noSmtp')}</span>
         </div>
       )}
       {sendStatus === 'error' && (

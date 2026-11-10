@@ -32,4 +32,15 @@ describe('buildImapOptions', () => {
     expect(options.socketTimeout).toBe(30000)
     expect(options.greetingTimeout).toBe(15000)
   })
+
+  it('baut mit einer Zugangsmarke die OAuth-Anmeldung und nie ein Passwortfeld', () => {
+    const options = buildImapOptions(
+      { host: 'outlook.office365.com', port: 993, tls: true, user: 'erika@schule.example' },
+      { accessToken: 'marke' },
+      { socketTimeout: 30000, greetingTimeout: 15000 }
+    )
+    expect(options.auth).toStrictEqual({ user: 'erika@schule.example', accessToken: 'marke' })
+    expect('pass' in options.auth).toBe(false)
+    expect(options.secure).toBe(true)
+  })
 })

@@ -508,6 +508,15 @@ Fassung 3 vom Nutzer freigegeben (10.11.2026).
   ungeprüft in den Dateipfad (`main/email/credentialPath.ts`).
 - Abschnitt 4, Teil b (Einstellungen): Konto-Karte und Anmelde-Zeile, im Testprofil mit echtem Konto
   geprüft (anmelden, Zustand, abmelden, entfernen). Offen: Onboarding, gepackter Build.
+- Abschnitt 5 (Abruf mit Marke): `resolveImapLogin` in `app/src/main/email/ipc.ts`, `buildImapOptions`
+  nimmt Passwort oder Zugangsmarke. Im Testprofil mit echtem Konto geprüft: Verbindungstest,
+  Ordnerliste (SPECIAL-USE vorhanden), Abruf aus „Gesendete Elemente“ in den Test-Vault (Ordner, UID,
+  Anhangnamen, Message-ID erhalten), Anhang laden, Kennzeichen setzen — jeweils mit absichtlich
+  falschem Server in den Angaben des Renderers, der verworfen wurde. Nicht geprüft: Verschieben,
+  Weiterleiten mit Anhang, Abruf über die Oberfläche, Analyse der abgerufenen Mails, langer Abruf
+  über die Lebensdauer der Marke hinaus. **Kein Codex-Review** (Limit erreicht am 10.11.2026):
+  offen für die Hardening-Runde 2 (`microsoft-abschnitt-4a-review.md`), die Einstellungsseite und
+  diesen Abschnitt.
 - Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
   `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
   Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei

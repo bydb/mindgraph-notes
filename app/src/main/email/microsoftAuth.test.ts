@@ -338,17 +338,28 @@ describe('createMicrosoftAuth — Kontoart, Abmelden, Fehlerzustände', () => {
     }
   })
 
-  it('übernimmt aus der Ablage nur Einträge, deren ID zu Mandant und Objekt passt', async () => {
+  it('ein einzelner untergeschobener oder beschädigter Eintrag macht die Ablage unlesbar — nichts wird still verworfen', async () => {
     const deps = makeDeps(fakeMsal())
     await fs.mkdir(authDir(), { recursive: true })
     const entry = { provider: 'microsoft', tenantId: TENANT, objectId: OID, username: 'x@example.org', homeAccountId: 'h', clientId: DEFAULT_MICROSOFT_CLIENT_ID, tenant: 'organizations', state: 'signed-in' }
     const other = deriveMicrosoftAccountId(TENANT, 'ffffffff-ffff-ffff-ffff-ffffffffffff')
-    await fs.writeFile(bindingsPath(), deps.encrypt(JSON.stringify({ [other]: entry, 'email-1': entry, [ID]: { ...entry, clientId: 'keine-guid' } })))
-    const auth = createMicrosoftAuth(deps)
-    // untergeschobene Einträge zählen nicht: beide IDs sind „nicht angemeldet“
-    expect(await auth.status(other)).toMatchObject({ signedIn: false, errorCode: 'reauth-required' })
-    expect((await auth.status(other)).username).toBeUndefined()
-    expect((await auth.status(ID)).username).toBeUndefined()
+    const cases: Record<string, unknown>[] = [
+      { [ID]: entry, [other]: entry },                      // Eintrag unter fremder ID
+      { [ID]: entry, 'email-1': entry },                    // Schlüssel ohne Microsoft-Form
+      { [ID]: { ...entry, clientId: 'keine-guid' } },       // beschädigtes Feld
+      { [ID]: null }
+    ]
+    for (const content of cases) {
+      const bytes = deps.encrypt(JSON.stringify(content))
+      await fs.writeFile(bindingsPath(), bytes)
+      const auth = createMicrosoftAuth(deps)
+      expect(await auth.status(ID)).toMatchObject({ known: true, signedIn: false, errorCode: 'storage-unreadable' })
+      await expect(auth.login()).rejects.toMatchObject({ code: 'storage-unreadable' })
+      expect((await fs.readFile(bindingsPath())).equals(bytes)).toBe(true)
+    }
+    // Gegenprobe: ein gültiger Eintrag wird gelesen.
+    await fs.writeFile(bindingsPath(), deps.encrypt(JSON.stringify({ [ID]: entry })))
+    expect((await createMicrosoftAuth(deps).status(ID)).username).toBe('x@example.org')
   })
 
   it('kennt nur IDs in Microsoft-Form — auch keine geerbten Objektschlüssel (Codex F12)', async () => {

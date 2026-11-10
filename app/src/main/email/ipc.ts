@@ -18,9 +18,9 @@ import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSig
 import { isHardLocked as isModelHardLocked } from '../../shared/modelCompatibility'
 import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from '../llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
-import { buildImapOptions } from './connection'
+import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connection'
 import { buildOutgoingMail, renderRawMessage } from './outgoing'
-import { emailCredentialFileName } from './credentialPath'
+import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
 import { createMicrosoftAuth, MicrosoftAuthError, classifyMicrosoftError, messageFor, type LoginOptions } from './microsoftAuth'
 import { getDeviceId } from '../deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../../shared/emailMerge'
@@ -236,19 +236,44 @@ Schlüsselwörter:
     }
   })
 
+  /**
+   * Wie meldet sich dieses Konto am IMAP-Server an? EINE Stelle für alle Abrufwege.
+   *
+   * - Passwort-Konto: Verbindungsangaben wie vom Aufrufer geliefert, Passwort aus safeStorage.
+   * - Microsoft-Konto (an der Form der ID erkannt): Server, Port, TLS und Benutzer kommen
+   *   AUSSCHLIESSLICH aus dem Main (microsoftAuth) — was der Renderer mitschickt, wird
+   *   verworfen, sonst könnte er die Zugangsmarke an einen fremden Server lenken
+   *   (Codex F17). Ohne gültige Anmeldung gibt es einen Fehler, nie den Passwortweg.
+   */
+  async function resolveImapLogin(
+    accountId: string,
+    endpoint: ImapEndpoint
+  ): Promise<{ endpoint: ImapEndpoint; secret: ImapSecret } | { error: string }> {
+    if (isMicrosoftAccountId(accountId)) {
+      try {
+        const auth = await microsoftAuth.getImapAuth(accountId)
+        return { endpoint: { host: auth.host, port: auth.port, tls: auth.tls, user: auth.user }, secret: { accessToken: auth.accessToken } }
+      } catch (error) {
+        return { error: error instanceof MicrosoftAuthError ? error.message : messageFor(classifyMicrosoftError(error)) }
+      }
+    }
+    const password = await loadEmailPassword(accountId)
+    if (!password) return { error: 'Kein Passwort gespeichert' }
+    return { endpoint, secret: password }
+  }
+
   // Email-Verbindungstest
   ipcMain.handle('email-connect', async (_event, account: { host: string; port: number; user: string; tls: boolean; id: string }) => {
     try {
       const { ImapFlow } = await import('imapflow')
-      const password = await loadEmailPassword(account.id)
-
-      if (!password) {
-        return { success: false, error: 'Kein Passwort gespeichert' }
+      const login = await resolveImapLogin(account.id, { host: account.host, port: account.port, tls: account.tls, user: account.user })
+      if ('error' in login) {
+        return { success: false, error: login.error }
       }
 
       const client = new ImapFlow(buildImapOptions(
-        { host: account.host, port: account.port, tls: account.tls, user: account.user },
-        password,
+        login.endpoint,
+        login.secret,
         { socketTimeout: 15000, greetingTimeout: 10000 }
       ))
 
@@ -267,14 +292,14 @@ Schlüsselwörter:
   ipcMain.handle('email-list-folders', async (_event, account: { id: string; host: string; port: number; user: string; tls: boolean }) => {
     try {
       const { ImapFlow } = await import('imapflow')
-      const password = await loadEmailPassword(account.id)
-      if (!password) {
-        return { success: false, error: 'Kein Passwort gespeichert', folders: [] }
+      const login = await resolveImapLogin(account.id, { host: account.host, port: account.port, tls: account.tls, user: account.user })
+      if ('error' in login) {
+        return { success: false, error: login.error, folders: [] }
       }
 
       const client = new ImapFlow(buildImapOptions(
-        { host: account.host, port: account.port, tls: account.tls, user: account.user },
-        password,
+        login.endpoint,
+        login.secret,
         { socketTimeout: 15000, greetingTimeout: 10000 }
       ))
       client.on('error', () => { /* ignore */ })
@@ -333,14 +358,14 @@ Schlüsselwörter:
       }
 
       const { ImapFlow } = await import('imapflow')
-      const password = await loadEmailPassword(payload.accountId)
-      if (!password) {
-        return { success: false, error: 'Kein Passwort gespeichert' }
+      const login = await resolveImapLogin(payload.accountId, { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user })
+      if ('error' in login) {
+        return { success: false, error: login.error }
       }
 
       const client = new ImapFlow(buildImapOptions(
-        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
-        password,
+        login.endpoint,
+        login.secret,
         { socketTimeout: 15000, greetingTimeout: 10000 }
       ))
       client.on('error', () => { /* ignore */ })
@@ -434,14 +459,14 @@ Schlüsselwörter:
         return { success: false, error: 'Unvollständige Parameter' }
       }
       const { ImapFlow } = await import('imapflow')
-      const password = await loadEmailPassword(payload.accountId)
-      if (!password) {
-        return { success: false, error: 'Kein Passwort gespeichert' }
+      const login = await resolveImapLogin(payload.accountId, { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user })
+      if ('error' in login) {
+        return { success: false, error: login.error }
       }
 
       const client = new ImapFlow(buildImapOptions(
-        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
-        password,
+        login.endpoint,
+        login.secret,
         { socketTimeout: 30000, greetingTimeout: 10000 }
       ))
       client.on('error', () => { /* ignore */ })
@@ -514,13 +539,13 @@ Schlüsselwörter:
         return { success: false, error: 'Keine zulässigen Flags' }
       }
       const { ImapFlow } = await import('imapflow')
-      const password = await loadEmailPassword(payload.accountId)
-      if (!password) {
-        return { success: false, error: 'Kein Passwort gespeichert' }
+      const login = await resolveImapLogin(payload.accountId, { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user })
+      if ('error' in login) {
+        return { success: false, error: login.error }
       }
       const client = new ImapFlow(buildImapOptions(
-        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
-        password,
+        login.endpoint,
+        login.secret,
         { socketTimeout: 15000, greetingTimeout: 10000 }
       ))
       client.on('error', () => { /* ignore */ })
@@ -567,13 +592,13 @@ Schlüsselwörter:
         return { success: false, error: 'Unvollständige Parameter' }
       }
       const { ImapFlow } = await import('imapflow')
-      const password = await loadEmailPassword(payload.accountId)
-      if (!password) {
-        return { success: false, error: 'Kein Passwort gespeichert' }
+      const login = await resolveImapLogin(payload.accountId, { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user })
+      if ('error' in login) {
+        return { success: false, error: login.error }
       }
       const client = new ImapFlow(buildImapOptions(
-        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
-        password,
+        login.endpoint,
+        login.secret,
         { socketTimeout: 30000, greetingTimeout: 10000 }
       ))
       client.on('error', () => { /* ignore */ })
@@ -945,20 +970,20 @@ Schlüsselwörter:
         const fetchKey = fetchFolder === 'INBOX' ? account.id : `${account.id}::${fetchFolder}`
         let importedForAccount = 0
         try {
-          // Passwort laden
-          const password = await loadEmailPassword(account.id)
+          // Anmeldung auflösen: Passwort oder, für Microsoft-Konten, Zugangsmarke samt festem Server.
+          const login = await resolveImapLogin(account.id, { host: account.host, port: account.port, tls: account.tls, user: account.user })
 
-          if (!password) {
-            console.warn(`[Email] No password for account ${account.id}`)
-            accountResults.push({ accountId: account.id, folder: fetchFolder, ok: false, error: 'Kein Passwort gespeichert', imported: 0 })
+          if ('error' in login) {
+            console.warn(`[Email] No login for account ${account.id}`)
+            accountResults.push({ accountId: account.id, folder: fetchFolder, ok: false, error: login.error, imported: 0 })
             continue
           }
 
-          sendEmailWindowEvent('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${account.host} (${fetchFolder})...` })
+          sendEmailWindowEvent('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${login.endpoint.host} (${fetchFolder})...` })
 
           const client = new ImapFlow(buildImapOptions(
-            { host: account.host, port: account.port, tls: account.tls, user: account.user },
-            password,
+            login.endpoint,
+            login.secret,
             { socketTimeout: 30000, greetingTimeout: 15000 }
           ))
 
@@ -2439,6 +2464,13 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     // SMTP geben — sonst geht sie still nur an einen Teil der Empfänger (Codex F01).
     const allRecipients = [...(composeData.to || []), ...(composeData.cc || []), ...(composeData.bcc || [])]
     const badRecipients = allRecipients.filter(r => !isValidEmailAddress(String(r?.address ?? '').trim()))
+    // Microsoft-Konten senden nicht über SMTP (im Mandanten meist gesperrt) und haben kein
+    // Passwort. Der Versand über Graph ist Plan-Abschnitt 6; bis dahin eine klare Absage statt
+    // „Kein Passwort gespeichert“. Auch die mitgeschickte account.id zählt: sonst liefe der
+    // Gesendet-Append mit Verbindungsangaben des Renderers.
+    if (isMicrosoftAccountId(composeData.accountId) || isMicrosoftAccountId(composeData.account?.id)) {
+      return { success: false, error: 'Der Versand für Microsoft-365-Konten ist noch nicht verfügbar. Der Abruf funktioniert bereits.' }
+    }
     if (!composeData.to?.length) return { success: false, error: 'Kein Empfänger angegeben' }
     if (badRecipients.length > 0) {
       return { success: false, error: `Ungültige Empfängeradresse: ${badRecipients.map(r => r?.address || '(leer)').join(', ')}` }
