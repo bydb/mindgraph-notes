@@ -18,6 +18,7 @@ import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSig
 import { isHardLocked as isModelHardLocked } from '../../shared/modelCompatibility'
 import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from '../llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
+import { buildImapOptions } from './connection'
 import { getDeviceId } from '../deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../../shared/emailMerge'
 import { recordLlmRun, collectRunTotals } from '../llm/telemetry'
@@ -180,15 +181,11 @@ Schlüsselwörter:
         return { success: false, error: 'Kein Passwort gespeichert' }
       }
 
-      const client = new ImapFlow({
-        host: account.host,
-        port: account.port,
-        secure: account.tls,
-        auth: { user: account.user, pass: password },
-        logger: false,
-        socketTimeout: 15000,
-        greetingTimeout: 10000
-      })
+      const client = new ImapFlow(buildImapOptions(
+        { host: account.host, port: account.port, tls: account.tls, user: account.user },
+        password,
+        { socketTimeout: 15000, greetingTimeout: 10000 }
+      ))
 
       client.on('error', () => { /* ignore */ })
 
@@ -210,15 +207,11 @@ Schlüsselwörter:
         return { success: false, error: 'Kein Passwort gespeichert', folders: [] }
       }
 
-      const client = new ImapFlow({
-        host: account.host,
-        port: account.port,
-        secure: account.tls,
-        auth: { user: account.user, pass: password },
-        logger: false,
-        socketTimeout: 15000,
-        greetingTimeout: 10000
-      })
+      const client = new ImapFlow(buildImapOptions(
+        { host: account.host, port: account.port, tls: account.tls, user: account.user },
+        password,
+        { socketTimeout: 15000, greetingTimeout: 10000 }
+      ))
       client.on('error', () => { /* ignore */ })
 
       try {
@@ -280,15 +273,11 @@ Schlüsselwörter:
         return { success: false, error: 'Kein Passwort gespeichert' }
       }
 
-      const client = new ImapFlow({
-        host: payload.host,
-        port: payload.port,
-        secure: payload.tls,
-        auth: { user: payload.user, pass: password },
-        logger: false,
-        socketTimeout: 15000,
-        greetingTimeout: 10000
-      })
+      const client = new ImapFlow(buildImapOptions(
+        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
+        password,
+        { socketTimeout: 15000, greetingTimeout: 10000 }
+      ))
       client.on('error', () => { /* ignore */ })
 
       try {
@@ -385,15 +374,11 @@ Schlüsselwörter:
         return { success: false, error: 'Kein Passwort gespeichert' }
       }
 
-      const client = new ImapFlow({
-        host: payload.host,
-        port: payload.port,
-        secure: payload.tls,
-        auth: { user: payload.user, pass: password },
-        logger: false,
-        socketTimeout: 30000,
-        greetingTimeout: 10000
-      })
+      const client = new ImapFlow(buildImapOptions(
+        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
+        password,
+        { socketTimeout: 30000, greetingTimeout: 10000 }
+      ))
       client.on('error', () => { /* ignore */ })
 
       try {
@@ -468,15 +453,11 @@ Schlüsselwörter:
       if (!password) {
         return { success: false, error: 'Kein Passwort gespeichert' }
       }
-      const client = new ImapFlow({
-        host: payload.host,
-        port: payload.port,
-        secure: payload.tls,
-        auth: { user: payload.user, pass: password },
-        logger: false,
-        socketTimeout: 15000,
-        greetingTimeout: 10000
-      })
+      const client = new ImapFlow(buildImapOptions(
+        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
+        password,
+        { socketTimeout: 15000, greetingTimeout: 10000 }
+      ))
       client.on('error', () => { /* ignore */ })
       try {
         await client.connect()
@@ -525,15 +506,11 @@ Schlüsselwörter:
       if (!password) {
         return { success: false, error: 'Kein Passwort gespeichert' }
       }
-      const client = new ImapFlow({
-        host: payload.host,
-        port: payload.port,
-        secure: payload.tls,
-        auth: { user: payload.user, pass: password },
-        logger: false,
-        socketTimeout: 30000,
-        greetingTimeout: 10000
-      })
+      const client = new ImapFlow(buildImapOptions(
+        { host: payload.host, port: payload.port, tls: payload.tls, user: payload.user },
+        password,
+        { socketTimeout: 30000, greetingTimeout: 10000 }
+      ))
       client.on('error', () => { /* ignore */ })
       try {
         await client.connect()
@@ -914,15 +891,11 @@ Schlüsselwörter:
 
           sendEmailWindowEvent('email-fetch-progress', { current: 0, total: 0, status: `Verbinde mit ${account.host} (${fetchFolder})...` })
 
-          const client = new ImapFlow({
-            host: account.host,
-            port: account.port,
-            secure: account.tls,
-            auth: { user: account.user, pass: password },
-            logger: false,
-            socketTimeout: 30000,
-            greetingTimeout: 15000
-          })
+          const client = new ImapFlow(buildImapOptions(
+            { host: account.host, port: account.port, tls: account.tls, user: account.user },
+            password,
+            { socketTimeout: 30000, greetingTimeout: 15000 }
+          ))
 
           // Unhandled errors abfangen (Socket-Timeouts etc.)
           client.on('error', (err: Error) => {
@@ -2544,15 +2517,11 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
             const rawMessage: Buffer = Buffer.isBuffer(rawInfo.message) ? rawInfo.message : Buffer.from(String(rawInfo.message))
 
             const { ImapFlow } = await import('imapflow')
-            const imapClient = new ImapFlow({
-              host: account.imapHost,
-              port: account.imapPort,
-              secure: !!account.imapTls,
-              auth: { user: account.user, pass: imapPassword },
-              logger: false,
-              socketTimeout: 15000,
-              greetingTimeout: 10000
-            })
+            const imapClient = new ImapFlow(buildImapOptions(
+              { host: account.imapHost, port: account.imapPort, tls: !!account.imapTls, user: account.user },
+              imapPassword,
+              { socketTimeout: 15000, greetingTimeout: 10000 }
+            ))
             imapClient.on('error', () => { /* ignore */ })
 
             try {

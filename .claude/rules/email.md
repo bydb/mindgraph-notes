@@ -17,7 +17,9 @@ paths:
 
 ## Wo der Code liegt
 - **Alle `email-*`-Handler stehen in `main/email/ipc.ts`** (seit 10.11.2026, vorher `main/index.ts`), angemeldet über `registerEmailIpc(deps)`. Ausnahme: `email-extract-event` steht weiter in `index.ts` beim Kalender.
-- Neun Stellen öffnen eine Mailverbindung (acht `new ImapFlow`, ein `createTransport`), alle mit `auth: { user, pass }` — eine andere Anmeldeart (OAuth) muss an allen neun ankommen.
+- Neun Stellen öffnen eine Mailverbindung (acht `new ImapFlow`, ein `createTransport`). Die acht IMAP-Stellen holen ihre Optionen aus `buildImapOptions` (`main/email/connection.ts`, getestet) — eine neue IMAP-Verbindung nie mit eigenem Options-Objekt bauen. Passwortabfrage, Zeitlimits und Fehlerbehandlung bleiben je Aufrufer.
+- **Logs im Mailcode ohne Personenbezug** (seit 10.11.2026): Fehlertexte durch `redactForLog`, Mails nur als `mailRef(id)` (`shared/logRedaction.ts`, getestet). Kein Betreff, kein Notiz-Dateiname (trägt Absender und Zusammenfassung), keine Message-ID, kein Rohtext einer Modellantwort. Die Einstellungen (samt Konten) werden im `uiStore` nicht mehr ausgegeben.
+- **Microsoft-365-Anbindung** (Abruf über IMAP mit OAuth, Versand über Graph): Plan, Messungen und zwei Codex-Runden in `docs/codex-collab/microsoft-365-anbindung.md`. Dort stehen die harten Regeln (Kontoart im Main gebunden, Verbindungsangaben des Renderers für Microsoft-Konten ignorieren, BCC-Messung vor dem Versand-Bau).
 
 ## Empfang & Analyse (IMAP + Ollama)
 - IMAP-Abruf via `imapflow`, Parsing via `mailparser` (dynamic imports in `main/email/ipc.ts`)
