@@ -7,6 +7,7 @@ import { loadDrafts, saveDraft, removeDraft, draftHasContent, newDraftId, type E
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 import { createActiveMeasurement } from '../utils/activeTimeTracker'
+import { redactForLog, mailRef } from '../../shared/logRedaction'
 
 // Speichern bündeln: Jeder Speichervorgang schickt die KOMPLETTE Mailliste an den
 // Main-Prozess (real 38 MB), der sie unter einer Sperre einliest, vereinigt und
@@ -699,7 +700,7 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           }
         }
       } catch (error) {
-        console.error('[EmailStore] Failed to create note for email:', email.subject, error)
+        console.error('[EmailStore] Failed to create note for email:', mailRef(email.id), redactForLog(error))
       }
     }
 

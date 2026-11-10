@@ -23,6 +23,7 @@ import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombsto
 import { recordLlmRun, collectRunTotals } from '../llm/telemetry'
 import { fromOllamaResponse, type OllamaTimings } from '../../shared/llmTelemetry'
 import { parseLooseJsonObject } from '../../shared/looseJson'
+import { redactForLog, mailRef } from '../../shared/logRedaction'
 import { randomBytes } from 'crypto'
 import { recordActivity } from '../activityLedger'
 import { wrapIpcWithOllamaActivity } from '../rag/ollamaActivity'
@@ -159,7 +160,7 @@ Schlüsselwörter:
       await fs.writeFile(getEmailCredentialsPath(accountId), encrypted)
       return true
     } catch (error) {
-      console.error('[Email] Failed to save password:', error)
+      console.error('[Email] Failed to save password:', redactForLog(error))
       return false
     }
   })
@@ -195,7 +196,7 @@ Schlüsselwörter:
       try { await client.logout() } catch { /* ignore */ }
       return { success: true }
     } catch (error) {
-      console.error('[Email] Connection test failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] Connection test failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Verbindung fehlgeschlagen' }
     }
   })
@@ -244,7 +245,7 @@ Schlüsselwörter:
         try { await client.logout() } catch { /* ignore */ }
       }
     } catch (error) {
-      console.error('[Email] List folders failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] List folders failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Folder-Liste fehlgeschlagen', folders: [] }
     }
   })
@@ -316,7 +317,7 @@ Schlüsselwörter:
         try { await client.logout() } catch { /* ignore */ }
       }
     } catch (error) {
-      console.error('[Email] Move failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] Move failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Move fehlgeschlagen' }
     }
   })
@@ -430,7 +431,7 @@ Schlüsselwörter:
         try { await client.logout() } catch { /* ignore */ }
       }
     } catch (error) {
-      console.error('[Email] Fetch attachments failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] Fetch attachments failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht geladen werden' }
     }
   })
@@ -491,7 +492,7 @@ Schlüsselwörter:
         try { await client.logout() } catch { /* ignore */ }
       }
     } catch (error) {
-      console.error('[Email] Set flags failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] Set flags failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Markierung fehlgeschlagen' }
     }
   })
@@ -585,7 +586,7 @@ Schlüsselwörter:
         try { await client.logout() } catch { /* ignore */ }
       }
     } catch (error) {
-      console.error('[Email] Stage forward attachments failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] Stage forward attachments failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht übernommen werden' }
     }
   })
@@ -616,7 +617,7 @@ Schlüsselwörter:
       }
       return { success: true, removed }
     } catch (error) {
-      console.warn('[Email] Discard staged attachments failed:', error instanceof Error ? error.message : error)
+      console.warn('[Email] Discard staged attachments failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, removed }
     }
   })
@@ -636,7 +637,7 @@ Schlüsselwörter:
       await fs.writeFile(result.filePath, Buffer.from(contentBase64, 'base64'))
       return { success: true, path: result.filePath }
     } catch (error) {
-      console.error('[Email] Save attachment failed:', error instanceof Error ? error.message : error)
+      console.error('[Email] Save attachment failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Speichern fehlgeschlagen' }
     }
   })
@@ -721,7 +722,7 @@ Schlüsselwörter:
         await fs.writeFile(contactsPath, JSON.stringify({ version: 1, contacts: Array.from(byEmail.values()) }, null, 2), 'utf-8')
       }
     } catch (error) {
-      console.warn('[Email] Kontakt-Harvest fehlgeschlagen:', error instanceof Error ? error.message : error)
+      console.warn('[Email] Kontakt-Harvest fehlgeschlagen:', redactForLog(error instanceof Error ? error.message : error))
     }
   }
 
@@ -800,7 +801,7 @@ Schlüsselwörter:
         retainDays: await getEmailRetainDays()
       }
     } catch (error) {
-      console.error('[Email] Failed to load:', error)
+      console.error('[Email] Failed to load:', redactForLog(error))
       return null
     }
   })
@@ -828,7 +829,7 @@ Schlüsselwörter:
       // Mails nicht an.
       return { success: true, revision: result.revision, merged: result.merged }
     } catch (error) {
-      console.error('[Email] Failed to save:', error)
+      console.error('[Email] Failed to save:', redactForLog(error))
       return { success: false, conflict: false, error: error instanceof Error ? error.message : 'Speichern fehlgeschlagen' }
     }
   })
@@ -860,7 +861,7 @@ Schlüsselwörter:
       if (written.damaged) return { success: false, removed: 0, error: written.damaged }
       return { success: true, removed: written.result ?? 0, revision: written.revision }
     } catch (error) {
-      console.error('[Email] Delete local failed:', error)
+      console.error('[Email] Delete local failed:', redactForLog(error))
       return { success: false, removed: 0, error: error instanceof Error ? error.message : 'Entfernen fehlgeschlagen' }
     }
   })
@@ -925,7 +926,7 @@ Schlüsselwörter:
 
           // Unhandled errors abfangen (Socket-Timeouts etc.)
           client.on('error', (err: Error) => {
-            console.warn(`[Email] IMAP client error for ${account.id}:`, err.message)
+            console.warn(`[Email] IMAP client error for ${account.id}:`, redactForLog(err.message))
           })
 
           await client.connect()
@@ -1058,7 +1059,7 @@ Schlüsselwörter:
                       .trim()
                   }
                 } catch (parseErr) {
-                  console.warn(`[Email] mailparser failed for ${msg.uid}:`, parseErr)
+                  console.warn(`[Email] mailparser failed for ${msg.uid}:`, redactForLog(parseErr))
                 }
               }
 
@@ -1133,7 +1134,7 @@ Schlüsselwörter:
           accountResults.push({ accountId: account.id, folder: fetchFolder, ok: true, imported: importedForAccount })
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          console.error(`[Email] Fetch failed for account ${account.id}:`, message)
+          console.error(`[Email] Fetch failed for account ${account.id}:`, redactForLog(message))
           accountResults.push({ accountId: account.id, folder: fetchFolder, ok: false, error: message, imported: importedForAccount })
         }
       }
@@ -1217,7 +1218,7 @@ Schlüsselwörter:
         accountResults
       }
     } catch (error) {
-      console.error('[Email] Fetch error:', error)
+      console.error('[Email] Fetch error:', redactForLog(error))
       return { success: false, newCount: 0, totalCount: 0, error: error instanceof Error ? error.message : 'Fehler beim Abruf' }
     }
   })
@@ -1572,7 +1573,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
                   // und der User erkennt, ob das Modell (z.B. ein Reasoning-Modell) ungeeignet ist.
                   const snippet = (res.text || '').replace(/\s+/g, ' ').trim().slice(0, 160)
                   httpError = `Antwort von „${cloudResolved.model}" war kein gültiges JSON. Reasoning-Modelle (z.B. gpt-oss) liefern oft Fließtext — bitte ein Instruct-Modell wählen.${snippet ? ` Antwort-Auszug: ${snippet}…` : ' (leere Antwort)'}`
-                  console.warn(`[Email] ${cloudResolved.provider} ${cloudResolved.model} kein JSON. Raw (240): ${(res.text || '').slice(0, 240)}`)
+                  console.warn(`[Email] ${cloudResolved.provider} ${cloudResolved.model} kein JSON. (${(res.text || '').length} Zeichen Antwort)`)
                 }
                 return parsed
               } catch (err) {
@@ -1684,7 +1685,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
               model: recordedModel
             })
             if (hard.signals.length > 0) {
-              console.log(`[Email] ${email.id}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} Boost=${hard.boost} → ${combined.relevanceScore} (${hard.signals.map(s => `${s.kind}:${s.mode}`).join(',')})`)
+              console.log(`[Email] ${mailRef(email.id)}: LLM=${llmScore ?? 'n/a'} Floor=${hard.floor} Boost=${hard.boost} → ${combined.relevanceScore} (${hard.signals.map(s => `${s.kind}:${s.mode}`).join(',')})`)
             }
             analyzed++
             extractedTasks += normalizeSuggestedActions(analysis.suggestedActions).length
@@ -1694,23 +1695,23 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
                 await persistAnalyses()
               } catch (e) {
                 // Zwischenspeichern darf den Batch nicht abbrechen — der finale Persist versucht es erneut.
-                console.warn('[Email] Zwischenspeichern der Analysen fehlgeschlagen:', e instanceof Error ? e.message : e)
+                console.warn('[Email] Zwischenspeichern der Analysen fehlgeschlagen:', redactForLog(e instanceof Error ? e.message : e))
               }
             }
           } else {
             failed++
             lastError = httpError || 'Antwort des Modells war kein gültiges JSON (auch nach Retry).'
-            console.warn(`[Email] Analyse fehlgeschlagen für ${email.id}: ${lastError}`)
+            console.warn(`[Email] Analyse fehlgeschlagen für ${mailRef(email.id)}: ${redactForLog(lastError).slice(0, 160)}`)
           }
         } catch (error) {
           failed++
           if (error instanceof Error && error.name === 'AbortError') {
             lastError = `Zeitüberschreitung (>5 Min) bei „${model}" — Modell zu langsam oder ausgelastet.`
-            console.error(`[Email] Analysis timeout for email ${email.id} (>5min)`)
+            console.error(`[Email] Analysis timeout for email ${mailRef(email.id)} (>5min)`)
           } else {
             const msg = error instanceof Error ? error.message : String(error)
             lastError = `Ollama nicht erreichbar (${OLLAMA_API_URL}): ${msg}`
-            console.error(`[Email] Analysis failed for email ${email.id}:`, error)
+            console.error(`[Email] Analysis failed for email ${mailRef(email.id)}:`, redactForLog(error))
           }
         }
         // Schonmodus: nach jeder Mail (außer der letzten) kurz abkühlen lassen.
@@ -1754,7 +1755,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
         impact: impactIdForRenderer ? { id: impactIdForRenderer } : undefined
       }
     } catch (error) {
-      console.error('[Email] Analysis error:', error)
+      console.error('[Email] Analysis error:', redactForLog(error))
       return { success: false, analyzed: 0, failed: 0, total: 0, error: error instanceof Error ? error.message : 'Analyse fehlgeschlagen' }
     }
   },
@@ -1785,7 +1786,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
 
       return { success: true, folderPath: folderName, instructionPath: DEFAULT_EMAIL_INSTRUCTION_NOTE }
     } catch (error) {
-      console.error('[Email] Setup failed:', error)
+      console.error('[Email] Setup failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Setup fehlgeschlagen' }
     }
   })
@@ -1857,7 +1858,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       await writeFileSafe(full, updated)
       return { success: true, notePath: noteRel }
     } catch (error) {
-      console.error('[Email] Relevance-Config save failed:', error)
+      console.error('[Email] Relevance-Config save failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Speichern fehlgeschlagen' }
     }
   })
@@ -1889,7 +1890,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       assertApprovedVault(vaultPath, 'email-create-note')
       // Schneller Check: Wenn noteCreated schon gesetzt, direkt zurück
       if (email.noteCreated) {
-        console.log('[Email] Note already created (flag set) for:', email.subject)
+        console.log('[Email] Note already created (flag set) for:', mailRef(email.id))
         return { success: true, path: email.noteCreated, alreadyExists: true }
       }
 
@@ -1906,7 +1907,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
           try {
             const content = await fs.readFile(path.join(inboxFolder, file), 'utf-8')
             if (content.includes(`email-id: "${email.id}"`) || content.includes(`email-id: ${email.id}`)) {
-              console.log('[Email] Note for email-id already exists:', file)
+              console.log('[Email] Note for email-id already exists:', mailRef(email.id))
               return { success: true, path: path.join(inboxFolderRelative, file), alreadyExists: true }
             }
           } catch { /* Datei nicht lesbar, überspringen */ }
@@ -1930,7 +1931,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       // Prüfen ob Notiz mit gleichem Dateinamen schon existiert
       try {
         await fs.access(filePath)
-        console.log('[Email] Note already exists:', fileName)
+        console.log('[Email] Note already exists:', mailRef(email.id))
         return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: true }
       } catch { /* Noch nicht vorhanden */ }
 
@@ -2115,11 +2116,11 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
         ? setAiProvenanceInContent(noteBody, email.analysis.model, todayIsoDate())
         : noteBody
       await fs.writeFile(filePath, noteContent, 'utf-8')
-      console.log('[Email] Note created:', fileName)
+      console.log('[Email] Note created:', mailRef(email.id))
 
       return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: false }
     } catch (error) {
-      console.error('[Email] Create note failed:', error)
+      console.error('[Email] Create note failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Notiz-Erstellung fehlgeschlagen' }
     }
   })
@@ -2150,7 +2151,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
 
       return { success: true, path: destPath, dataUrl }
     } catch (error) {
-      console.error('[Email] Signature image selection failed:', error)
+      console.error('[Email] Signature image selection failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Fehler' }
     }
   })
@@ -2225,7 +2226,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       }
       return null
     } catch (error) {
-      console.warn('[Email] findSentMailbox failed:', error instanceof Error ? error.message : error)
+      console.warn('[Email] findSentMailbox failed:', redactForLog(error instanceof Error ? error.message : error))
       return null
     }
   }
@@ -2522,7 +2523,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       mailOptions.messageId = explicitMessageId
 
       const info = await transporter.sendMail(mailOptions)
-      console.log('[Email] Sent successfully:', info.messageId)
+      console.log('[Email] Sent successfully:', mailRef(info.messageId))
 
       // IMAP-Append in den Gesendet-Ordner, damit die Mail in Webmail/anderen Clients sichtbar ist.
       // Apple Mail macht das automatisch nach SMTP-Send; nodemailer nicht. Fehler hier duerfen den
@@ -2574,7 +2575,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
           }
         } catch (appendError) {
           const msg = appendError instanceof Error ? appendError.message : String(appendError)
-          console.error('[Email] IMAP append failed:', msg)
+          console.error('[Email] IMAP append failed:', redactForLog(msg))
           appendWarning = `Mail gesendet, aber Speichern im Gesendet-Ordner schlug fehl: ${msg}`
         }
       } else {
@@ -2583,7 +2584,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
 
       return { success: true, messageId: info.messageId || explicitMessageId, appendWarning, sentMailbox, sentUid }
     } catch (error) {
-      console.error('[Email] Send failed:', error)
+      console.error('[Email] Send failed:', redactForLog(error))
       return { success: false, error: error instanceof Error ? error.message : 'Senden fehlgeschlagen' }
     }
   })

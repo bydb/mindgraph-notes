@@ -1750,7 +1750,7 @@ export async function initializeUISettings(): Promise<void> {
   try {
     const savedSettings = await window.electronAPI.loadUISettings()
     if (savedSettings && Object.keys(savedSettings).length > 0) {
-      console.log('[UIStore] Loaded settings from file:', savedSettings)
+      console.log(`[UIStore] Loaded settings from file (${Object.keys(savedSettings).length} keys)`)
 
       // Defaults für persistierte Felder sammeln
       const defaultValues: Record<string, unknown> = {}
@@ -2043,7 +2043,7 @@ function writeSettingsNow(): Promise<boolean> {
     }
     try {
       const ok = (await window.electronAPI.saveUISettings(toSave)) === true
-      if (ok) console.log('[UIStore] Settings saved:', toSave)
+      if (ok) console.log(`[UIStore] Settings saved (${Object.keys(toSave).length} keys)`)
       else console.error('[UIStore] Settings NOT saved (Main meldet Schreibfehler)')
       return ok
     } catch (error) {
