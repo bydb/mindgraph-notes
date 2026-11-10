@@ -69,7 +69,7 @@ export const EmailSetupStep: React.FC<EmailSetupStepProps> = ({ onBack, onNext, 
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
   const isMicrosoft = presetId === 'outlook'
-  const microsoft = useMicrosoftSignIn()
+  const microsoft = useMicrosoftSignIn('(onboarding)')
   const [microsoftUser, setMicrosoftUser] = useState<string | null>(null)
 
   const handleMicrosoftSignIn = async () => {

@@ -57,6 +57,7 @@ export type MicrosoftAuthErrorCode =
   | 'cancelled'
   | 'timeout'
   | 'reauth-required'
+  | 'account-mismatch'
   | 'unknown-account'
   | 'invalid-config'
   | 'offline'
@@ -81,6 +82,12 @@ export interface MicrosoftAccountBinding {
   tenant: string
   /** 'signed-out' nach Abmelden: Bindung bleibt für Anzeige und spätere Neuanmeldung. */
   state: 'signed-in' | 'signed-out'
+  /**
+   * Frühere Registrierungen (Anwendungs-ID/Mandant), in deren Markenspeicher dieses Konto
+   * noch liegen kann, weil das Entfernen beim Wechsel scheiterte. Wird bei jeder Anmeldung
+   * und Abmeldung erneut versucht (Codex F22).
+   */
+  stale?: Array<{ clientId: string; tenant: string }>
 }
 
 export interface MicrosoftAccountStatus {
@@ -136,6 +143,11 @@ export interface LoginOptions {
   clientId?: string
   /** Mandant (GUID oder Domain), wenn die eigene Registrierung nur einen Mandanten zulässt. */
   tenant?: string
+  /**
+   * „Erneut anmelden“ einer bestehenden Karte: Die Anmeldung zählt nur, wenn sie genau dieses
+   * Konto ergibt. Ein anderes Konto wird nicht gebunden (Codex F18).
+   */
+  expectedAccountId?: string
 }
 
 const GUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -192,6 +204,7 @@ export function messageFor(code: MicrosoftAuthErrorCode): string {
     case 'cancelled': return 'Die Anmeldung wurde abgebrochen.'
     case 'timeout': return 'Die Anmeldung wurde nicht innerhalb von fünf Minuten abgeschlossen.'
     case 'reauth-required': return 'Für dieses Konto ist eine neue Anmeldung bei Microsoft nötig.'
+    case 'account-mismatch': return 'Du hast dich mit einem anderen Microsoft-Konto angemeldet als dem dieser Karte. Es wurde nichts geändert. Für ein weiteres Konto nutze „Mit Microsoft anmelden“ unter „Konto hinzufügen“.'
     case 'unknown-account': return 'Dieses Konto ist nicht als Microsoft-Konto eingerichtet.'
     case 'invalid-config': return 'Anwendungs-ID oder Mandant sind ungültig.'
     case 'offline': return 'Microsoft ist nicht erreichbar. Bitte prüfe die Netzverbindung.'
@@ -208,6 +221,12 @@ export interface MicrosoftAuth {
   login(options?: LoginOptions): Promise<{ accountId: string; username: string; displayName?: string; status: MicrosoftAccountStatus }>
   /** Bricht eine laufende Anmeldung ab. Kommt sie später doch noch an, wird sie verworfen. */
   cancelLogin(): void
+  /**
+   * Bewusst ausgelöster Ausweg bei unlesbarer Ablage: verschiebt ALLE gespeicherten
+   * Microsoft-Anmeldungen dieses Geräts unverändert in einen Sicherungsordner. Danach ist für
+   * jedes Microsoft-Konto eine neue Anmeldung nötig. Liefert den Namen des Sicherungsordners.
+   */
+  resetStorage(): Promise<{ backupDir: string; movedFiles: number }>
   status(accountId: string): Promise<MicrosoftAccountStatus>
   logout(accountId: string): Promise<void>
   /** Nur für Code im Main. Wirft MicrosoftAuthError, nie ein Passwort-Rückfall. */
@@ -224,6 +243,10 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
   // begonnen hat, gibt danach nichts mehr heraus.
   const revocations = new Map<string, number>()
   let activeLogin: { abandoned: boolean; cancel: (code: 'cancelled' | 'timeout') => void } | null = null
+  // Cache-Konten, die eine NICHT aufgegebene Anmeldung gerade erworben hat. Wird synchron
+  // gesetzt, sobald deren Ergebnis da ist — also bevor die Bindung auf der Platte steht. Eine
+  // aufgegebene Anmeldung, die verspätet ankommt, nimmt ein solches Konto nicht wieder weg (Codex F25).
+  const claimed = new Set<string>()
   let dirReady: Promise<string> | null = null
 
   // Alle Schreibzugriffe auf die Ablage nacheinander.
@@ -305,6 +328,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         && typeof b.tenantId === 'string' && typeof b.objectId === 'string' && typeof b.username === 'string' && typeof b.homeAccountId === 'string'
         && typeof b.clientId === 'string' && GUID_RE.test(b.clientId) && typeof b.tenant === 'string' && TENANT_RE.test(b.tenant)
         && deriveMicrosoftAccountId(b.tenantId, b.objectId) === id
+        && (b.stale === undefined || (Array.isArray(b.stale) && b.stale.every(x => !!x && typeof x.clientId === 'string' && GUID_RE.test(x.clientId) && typeof x.tenant === 'string' && TENANT_RE.test(x.tenant))))
       if (!valid) throw new MicrosoftAuthError('storage-unreadable')
       bindings.set(id, { ...(b as MicrosoftAccountBinding), state: b.state === 'signed-in' ? 'signed-in' : 'signed-out' })
     }
@@ -315,6 +339,8 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     writeEncrypted(BINDINGS_FILE, JSON.stringify(Object.fromEntries(bindings)))
 
   const clientKey = (clientId: string, tenant: string): string => `${clientId.toLowerCase()}|${tenant.toLowerCase()}`
+  const claimKey = (clientId: string, tenant: string, account: Pick<MsalAccount, 'homeAccountId' | 'tenantId'>): string =>
+    `${clientKey(clientId, tenant)}|${account.homeAccountId}|${String(account.tenantId).toLowerCase()}`
   const cacheFile = (clientId: string, tenant: string): string =>
     `cache-${createHash('sha256').update(clientKey(clientId, tenant)).digest('hex').slice(0, 20)}.enc`
 
@@ -372,10 +398,14 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     if (account) await client.getTokenCache().removeAccount(account)
   }
 
-  async function silentToken(accountId: string, binding: MicrosoftAccountBinding, scopes: string[]): Promise<string> {
+  /**
+   * `generation` MUSS der Aufrufer erfassen, BEVOR er die Bindung liest. Sonst kann eine
+   * Abmeldung zwischen Bindungslesen und Markenabruf fallen, und der Abruf übernähme den schon
+   * erhöhten Zähler samt der veralteten „angemeldet“-Bindung (Codex F15).
+   */
+  async function silentToken(accountId: string, binding: MicrosoftAccountBinding, scopes: string[], generation: number): Promise<string> {
     if (binding.state !== 'signed-in') throw new MicrosoftAuthError('reauth-required')
     requireEncryption()
-    const generation = revocations.get(accountId) || 0
     const client = await getClient(binding.clientId, binding.tenant)
     const account = await findMsalAccount(client, binding)
     if (!account) throw new MicrosoftAuthError('reauth-required')
@@ -404,7 +434,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
 
   async function probe(accountId: string, binding: MicrosoftAccountBinding, scopes: string[]): Promise<{ ok: boolean; code?: MicrosoftAuthErrorCode }> {
     try {
-      await silentToken(accountId, binding, scopes)
+      await silentToken(accountId, binding, scopes, revocations.get(accountId) || 0)
       return { ok: true }
     } catch (error) {
       return { ok: false, code: classifyMicrosoftError(error) }
@@ -448,7 +478,9 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       requireEncryption()
       const { clientId, tenant } = resolveConfig(options)
       // Unlesbare Ablage: hier abbrechen, bevor ein Browser aufgeht — nichts überschreiben.
-      await loadBindings()
+      const known = await loadBindings()
+      // Bei „Erneut anmelden“ das erwartete Konto im Microsoft-Fenster vorbelegen.
+      const loginHint = typeof options?.expectedAccountId === 'string' ? known.get(options.expectedAccountId)?.username : undefined
       const client = await getClient(clientId, tenant)
 
       // Immer nur eine Anmeldung: eine noch offene wird aufgegeben.
@@ -466,6 +498,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         // Zustimmung für die zweite Ressource im selben Fenster einholen.
         extraScopesToConsent: IMAP_SCOPES,
         prompt: 'select_account',
+        ...(loginHint ? { loginHint } : {}),
         successTemplate: SUCCESS_PAGE,
         errorTemplate: ERROR_PAGE,
         openBrowser: async (url: string) => {
@@ -473,13 +506,16 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
           await deps.openExternal(url)
         }
       })
-      // Kommt eine aufgegebene Anmeldung später doch noch an: ihr Konto wieder aus
-      // dem Cache nehmen, sofern es nicht ohnehin gebunden und angemeldet ist.
+      // Kommt eine aufgegebene Anmeldung später doch noch an: ihr Konto wieder aus dem Cache
+      // nehmen — außer eine andere, nicht aufgegebene Anmeldung hat genau dieses Konto inzwischen
+      // erworben (`claimed`, synchron gesetzt) oder es ist gebunden und angemeldet.
       interactive.then(async (late) => {
         if (!attempt.abandoned || !late?.account) return
         try {
+          if (claimed.has(claimKey(clientId, tenant, late.account))) return
           const oid = late.idTokenClaims?.oid || late.account.idTokenClaims?.oid
           const bound = oid ? (await loadBindings()).get(deriveMicrosoftAccountId(late.account.tenantId, oid)) : undefined
+          if (claimed.has(claimKey(clientId, tenant, late.account))) return
           if (!(bound && bound.state === 'signed-in' && clientKey(bound.clientId, bound.tenant) === clientKey(clientId, tenant))) {
             await client.getTokenCache().removeAccount(late.account)
           }
@@ -489,6 +525,8 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       let result: MsalResult
       try {
         result = await Promise.race([interactive, aborted])
+        // Synchron, vor jedem weiteren await: dieses Cache-Konto gehört jetzt dieser Anmeldung.
+        if (result.account) claimed.add(claimKey(clientId, tenant, result.account))
       } catch (error) {
         const code = classifyMicrosoftError(error)
         console.warn('[MicrosoftAuth] Anmeldung nicht abgeschlossen:', code, errorCodeForLog(error))
@@ -499,14 +537,51 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       }
 
       const account = result.account
+      /** Das eben erworbene Konto wieder hergeben — nur, wenn es nicht schon gebunden und angemeldet war. */
+      const discard = async (boundBefore: MicrosoftAccountBinding | undefined): Promise<void> => {
+        if (!account) return
+        const keep = !!boundBefore && boundBefore.state === 'signed-in' && clientKey(boundBefore.clientId, boundBefore.tenant) === clientKey(clientId, tenant)
+        if (keep) return
+        claimed.delete(claimKey(clientId, tenant, account))
+        await client.getTokenCache().removeAccount(account).catch(() => undefined)
+      }
       // Die Konto-ID braucht die feste Objekt-ID. MSAL füllt localAccountId aus
       // `oid`, ersatzweise aus `sub` — `sub` ist je Anwendung verschieden und taugt nicht.
       const oid = result.idTokenClaims?.oid || account?.idTokenClaims?.oid
       if (!account?.tenantId || !account.username || !account.homeAccountId || !oid || account.localAccountId?.toLowerCase() !== oid.toLowerCase()) {
-        if (account) await client.getTokenCache().removeAccount(account).catch(() => undefined)
+        await discard(undefined)
         throw new MicrosoftAuthError('failed', 'Microsoft hat kein vollständiges Organisationskonto zurückgegeben.')
       }
       const accountId = deriveMicrosoftAccountId(account.tenantId, oid)
+      const before = (await loadBindings()).get(accountId)
+
+      // „Erneut anmelden“ einer Karte: nur genau dieses Konto zählt. Ein anderes wird nicht
+      // gebunden; war es schon eingerichtet und angemeldet, bleibt es unberührt.
+      const expected = typeof options?.expectedAccountId === 'string' ? options.expectedAccountId : ''
+      if (expected && expected !== accountId) {
+        await discard(before)
+        throw new MicrosoftAuthError('account-mismatch')
+      }
+
+      // Marken früherer Registrierungen dieses Kontos entfernen (Wechsel von Anwendungs-ID oder
+      // Mandant, dazu Reste früherer Fehlversuche). Was sich nicht entfernen lässt, bleibt an der
+      // Bindung vermerkt und wird bei der nächsten An- oder Abmeldung erneut versucht.
+      const candidates: Array<{ clientId: string; tenant: string }> = [...(before?.stale || [])]
+      if (before && clientKey(before.clientId, before.tenant) !== clientKey(clientId, tenant)) candidates.push({ clientId: before.clientId, tenant: before.tenant })
+      const stale: Array<{ clientId: string; tenant: string }> = []
+      const seen = new Set<string>([clientKey(clientId, tenant)])
+      for (const c of candidates) {
+        const key = clientKey(c.clientId, c.tenant)
+        if (seen.has(key)) continue
+        seen.add(key)
+        try {
+          await removeFromCache({ homeAccountId: account.homeAccountId, tenantId: account.tenantId, objectId: oid, clientId: c.clientId, tenant: c.tenant })
+        } catch (error) {
+          console.warn('[MicrosoftAuth] Alte Anmeldung nach Wechsel der Registrierung nicht entfernt:', classifyMicrosoftError(error), errorCodeForLog(error))
+          stale.push({ clientId: c.clientId, tenant: c.tenant })
+        }
+      }
+
       const binding: MicrosoftAccountBinding = {
         provider: 'microsoft',
         tenantId: account.tenantId,
@@ -516,19 +591,14 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         homeAccountId: account.homeAccountId,
         clientId,
         tenant,
-        state: 'signed-in'
+        state: 'signed-in',
+        ...(stale.length > 0 ? { stale } : {})
       }
-      const previous = await serialized(async () => {
+      await serialized(async () => {
         const bindings = await loadBindings()
-        const before = bindings.get(accountId)
         bindings.set(accountId, binding)
         await saveBindings(bindings)
-        return before
       })
-      // Wechsel der Anwendungs-ID oder des Mandanten: Marken der alten Registrierung entfernen.
-      if (previous && clientKey(previous.clientId, previous.tenant) !== clientKey(clientId, tenant)) {
-        await removeFromCache(previous).catch(() => console.warn('[MicrosoftAuth] Alte Anmeldung nach Wechsel der Registrierung nicht entfernt'))
-      }
       return { accountId, username: binding.username, displayName: binding.displayName, status: await statusOf(accountId, binding) }
     },
 
@@ -559,23 +629,66 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         return current
       })
       if (!binding) return
-      try {
-        await removeFromCache(binding)
-      } catch (error) {
-        console.warn('[MicrosoftAuth] Marken beim Abmelden nicht entfernt:', classifyMicrosoftError(error), errorCodeForLog(error))
+      claimed.delete(claimKey(binding.clientId, binding.tenant, binding))
+      // Aktuelle Registrierung und alle vermerkten Altregistrierungen leeren.
+      const targets = [{ clientId: binding.clientId, tenant: binding.tenant }, ...(binding.stale || [])]
+      const remaining: Array<{ clientId: string; tenant: string }> = []
+      let currentFailed = false
+      for (const [index, target] of targets.entries()) {
+        try {
+          await removeFromCache({ ...binding, clientId: target.clientId, tenant: target.tenant })
+        } catch (error) {
+          console.warn('[MicrosoftAuth] Marken beim Abmelden nicht entfernt:', classifyMicrosoftError(error), errorCodeForLog(error))
+          if (index === 0) currentFailed = true
+          else remaining.push(target)
+        }
+      }
+      if ((binding.stale?.length || 0) !== remaining.length) {
+        await serialized(async () => {
+          const bindings = await loadBindings()
+          const current = bindings.get(accountId)
+          if (current) {
+            const { stale: _drop, ...rest } = current
+            bindings.set(accountId, remaining.length > 0 ? { ...rest, stale: remaining } : rest)
+            await saveBindings(bindings)
+          }
+        })
+      }
+      if (currentFailed || remaining.length > 0) {
         throw new MicrosoftAuthError('failed', 'Abgemeldet, aber die gespeicherte Anmeldung ließ sich nicht vollständig löschen.')
       }
     },
 
+    async resetStorage() {
+      activeLogin?.cancel('cancelled')
+      return serialized(async () => {
+        const dir = await storageDir()
+        const names = (await fs.readdir(dir, { withFileTypes: true })).filter(e => e.isFile()).map(e => e.name)
+        const backupDir = `zurueckgesetzt-${new Date().toISOString().replace(/[:.]/g, '-')}`
+        if (names.length > 0) {
+          await fs.mkdir(path.join(dir, backupDir), { mode: 0o700 })
+          // Unverändert verschieben: die Dateien bleiben verschlüsselt und wiederherstellbar.
+          for (const name of names) await fs.rename(path.join(dir, name), path.join(dir, backupDir, name))
+        }
+        // Speicherzustand verwerfen: Clients halten ihren Cache im Arbeitsspeicher.
+        clients.clear()
+        claimed.clear()
+        for (const id of revocations.keys()) revocations.set(id, (revocations.get(id) || 0) + 1)
+        return { backupDir: names.length > 0 ? backupDir : '', movedFiles: names.length }
+      })
+    },
+
     async getImapAuth(accountId) {
+      const generation = revocations.get(accountId) || 0
       const binding = await requireBinding(accountId)
-      const accessToken = await silentToken(accountId, binding, IMAP_SCOPES)
+      const accessToken = await silentToken(accountId, binding, IMAP_SCOPES, generation)
       return { ...MICROSOFT_IMAP_ENDPOINT, user: binding.username, accessToken }
     },
 
     async getGraphToken(accountId) {
+      const generation = revocations.get(accountId) || 0
       const binding = await requireBinding(accountId)
-      const accessToken = await silentToken(accountId, binding, GRAPH_SCOPES)
+      const accessToken = await silentToken(accountId, binding, GRAPH_SCOPES, generation)
       return { accessToken, username: binding.username, displayName: binding.displayName }
     }
   }

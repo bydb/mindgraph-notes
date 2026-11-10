@@ -28,6 +28,14 @@ export const ComposeView: React.FC = () => {
   const bodyRef = useRef<HTMLTextAreaElement>(null)
   const subjectRef = useRef<HTMLInputElement>(null)
   const [confirmEmptySubject, setConfirmEmptySubject] = useState(false)
+  // Unklarer Versand (Verbindung brach nach dem Absenden ab): Die Mail kann schon unterwegs
+  // sein. Ein zweiter Klick auf „Senden“ darf sie nicht still doppelt verschicken — erst nach
+  // ausdrücklicher Bestätigung (Codex F20, microsoft-abschnitt-4a-review.md).
+  const [uncertainSend, setUncertainSend] = useState(false)
+  const [confirmResend, setConfirmResend] = useState(false)
+  // Der Vermerk gehört zu genau einem Entwurf: bei einem anderen Entwurf gilt er nicht mehr.
+  const composeDraftId = composeState?.draftId
+  useEffect(() => { setUncertainSend(false); setConfirmResend(false) }, [composeDraftId])
   const [inputs, setInputs] = useState<Record<RecipientField, string>>({ to: '', cc: '', bcc: '' })
   const [invalid, setInvalid] = useState<Record<RecipientField, string[]>>({ to: [], cc: [], bcc: [] })
   // Nur der Fehlerpfad lebt hier. Bei Erfolg baut der Store das Fenster sofort ab;
@@ -275,7 +283,7 @@ export const ComposeView: React.FC = () => {
     setLtChecking(false)
   }, [composeState, ltSettings, setComposeState])
 
-  const handleSend = async (allowEmptySubject = false, allowMissingAttachments = false) => {
+  const handleSend = async (allowEmptySubject = false, allowMissingAttachments = false, allowResend = false) => {
     if (!vaultPath || isSending || !hasSmtp || forwardLoading) return
     // Erst alle drei Felder übernehmen. Bleibt irgendwo eine ungültige Eingabe stehen,
     // geht nichts raus — sonst erreicht die Mail nur einen Teil der Empfänger.
@@ -292,6 +300,11 @@ export const ComposeView: React.FC = () => {
       return
     }
     setConfirmMissingAttachments(false)
+    if (uncertainSend && !allowResend) {
+      setConfirmResend(true)
+      return
+    }
+    setConfirmResend(false)
     setSendStatus('idle')
     setErrorMsg('')
 
@@ -299,6 +312,9 @@ export const ComposeView: React.FC = () => {
     if (!result.success) {
       setSendStatus('error')
       setErrorMsg(result.error || t('inbox.compose.error'))
+      // Bleibt gesetzt, bis ein Versuch eindeutig endet (Erfolg schließt das Fenster,
+      // eine sichere Absage setzt zurück).
+      setUncertainSend(result.uncertain === true)
     }
   }
 
@@ -626,6 +642,19 @@ export const ComposeView: React.FC = () => {
               onClick={() => handleSend(true)}
             >
               {t('inbox.compose.sendWithoutSubject')}
+            </button>
+          </div>
+        </div>
+      )}
+      {confirmResend && (
+        <div role="alert" className="inbox-compose-warning">
+          {t('inbox.compose.uncertainResendWarning')}
+          <div className="inbox-compose-actions">
+            <button className="inbox-compose-cancel" autoFocus onClick={() => setConfirmResend(false)}>
+              {t('inbox.compose.uncertainResendCancel')}
+            </button>
+            <button className="inbox-compose-send" disabled={sendBlocked} onClick={() => handleSend(true, true, true)}>
+              {t('inbox.compose.uncertainResendConfirm')}
             </button>
           </div>
         </div>

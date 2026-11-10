@@ -162,4 +162,48 @@ describe('sendViaGraph', () => {
     await sendViaGraph(input(), deps)
     expect(searched).toBe(0)
   })
+
+  it('hängende Suche nach der Gesendet-Kopie hält die Erfolgsmeldung nicht auf (Codex F17)', async () => {
+    const { deps } = makeDeps(accepted, { locateSentCopy: () => new Promise(() => undefined), locateTimeoutMs: 30 })
+    const start = Date.now()
+    const result = await sendViaGraph(input(), deps)
+    expect(result).toMatchObject({ success: true, transport: 'graph', sentUid: undefined })
+    expect(Date.now() - start).toBeLessThan(1000)
+  })
+
+  it('sehr großer Anhang wird abgewiesen, bevor er eingelesen wird (Codex F21)', async () => {
+    const big = path.join(dir, 'gross.bin')
+    const handle = await fs.open(big, 'w')
+    await handle.truncate(60 * 1024 * 1024) // dünn besetzte Datei: 60 MB ohne Plattenplatz
+    await handle.close()
+    const { deps, calls, tokens } = makeDeps(accepted)
+    const before = process.memoryUsage().rss
+    const result = await sendViaGraph(input({ attachments: [{ path: big, filename: 'gross.bin' }] }), deps)
+    expect(result.success).toBe(false)
+    expect(result.error).toMatch(/zu groß/)
+    expect(calls).toHaveLength(0)
+    expect(tokens).toHaveLength(0)
+    // Die Datei wurde nicht in den Speicher gelesen.
+    expect(process.memoryUsage().rss - before).toBeLessThan(40 * 1024 * 1024)
+  })
+
+  it('stockender Fehlertext: die Frist gilt weiter, der Status allein entscheidet (Codex F24)', async () => {
+    const stalled = (status: number) => (call: Call): Response => {
+      const body = new ReadableStream({
+        start(controller) { (call.init.signal as AbortSignal).addEventListener('abort', () => controller.error(new Error('aborted'))) }
+      })
+      return new Response(body, { status })
+    }
+    const server = makeDeps(stalled(503), { timeoutMs: 40 })
+    const start = Date.now()
+    const uncertain = await sendViaGraph(input(), server.deps)
+    expect(Date.now() - start).toBeLessThan(1500)
+    expect(uncertain).toMatchObject({ success: false, uncertain: true })
+    expect(uncertain.error).toContain('(503)')
+    const client = makeDeps(stalled(400), { timeoutMs: 40 })
+    const rejected = await sendViaGraph(input(), client.deps)
+    expect(rejected.success).toBe(false)
+    expect(rejected.uncertain).toBeUndefined()
+    expect(rejected.error).toContain('(400)')
+  })
 })

@@ -154,6 +154,116 @@ Status: [OFFEN]
 
 Vorschlag: URL mit `new URL` auf Origin und erwarteten Autorisierungspfad prüfen; Antragparameter bei Bedarf gegen Client-ID, Mandant und lokalen Redirect abgleichen.
 
+### Runde 2
+
+### F14 — Passwort-IDs kollidieren bei Groß-/Kleinschreibung
+Schwere: mittel
+ADR-Stelle: app/src/main/email/credentialPath.ts:16
+Status: [OFFEN]
+
+Die neue Prüfung schließt Pfadtrenner, Unicode und Längen über 80 Zeichen aus; `email-` als Dateipräfix verhindert auch Windows-Gerätenamen als ganzen Dateinamen (`app/src/main/email/credentialPath.ts:16-30`). Sie erlaubt aber `Konto_2-b` und `konto_2-b` als verschiedene IDs, deren `email-<id>.enc` auf einem nicht zwischen Groß- und Kleinschreibung unterscheidenden macOS-/Windows-Dateisystem dieselbe Datei ist. `email-save-password` schreibt diese Datei und `email-load-password` gibt ihren entschlüsselten Inhalt zurück (`app/src/main/email/ipc.ts:130-135`, `app/src/main/email/ipc.ts:159-177`). Damit trennt die Prüfung zwei zulässige Passwort-Konten dort nicht. Die App erzeugt derzeit Zeitstempel-IDs (`app/src/renderer/components/Settings/EmailSettingsTab.tsx:179-180`); die IPC-Grenze akzeptiert aber auch andere Renderer-IDs. Der Test erklärt Großbuchstaben ausdrücklich für zulässig, prüft keine Kollision (`app/src/main/email/credentialPath.test.ts:6-9`, `app/src/main/email/credentialPath.test.ts:20-25`).
+
+Vorschlag: IDs an der IPC-Grenze kanonisieren oder auf ein eindeutiges, nur kleingeschriebenes Format begrenzen; Bestandskonten vor einer Migration berücksichtigen.
+
+### F15 — Abmeldung kann einen schon geladenen Bindungszustand überholen
+Schwere: hoch
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:375
+Status: [OFFEN]
+
+Die Antwort auf F06 verspricht, dass ein vor der Abmeldung begonnener Markenabruf danach nichts mehr herausgibt. `getImapAuth`/`getGraphToken` lesen jedoch zuerst die Bindung, und `silentToken` merkt den Widerrufszähler erst danach (`app/src/main/email/microsoftAuth.ts:397-402`, `app/src/main/email/microsoftAuth.ts:375-391`, `app/src/main/email/microsoftAuth.ts:570-579`). Beginnt `logout` zwischen diesen Schritten, erhöht es den Zähler und setzt die Bindung auf `signed-out` (`app/src/main/email/microsoftAuth.ts:548-560`); der Abruf kann anschließend mit der alten `signed-in`-Bindung den bereits erhöhten Zähler übernehmen. Ändert er sich bis zur Rückgabe nicht erneut, besteht die Schlussprüfung und eine Marke kann nach der Abmeldung an den aufrufenden Main-Code zurückgehen. Die Tests decken nur einen Abruf ab, der bereits in `acquireTokenSilent` hängt, nicht diese Lücke zwischen Bindungslesen und Zähleraufnahme.
+
+Vorschlag: Zähler vor dem Bindungslesen erfassen und nach dem Markenabruf vergleichen, oder Bindungslesen, Markenabruf und Abmeldung pro Konto koordinieren.
+
+### F16 — Beschädigter Eintrag sperrt alle Konten ohne Reparaturweg
+Schwere: mittel
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:299
+Status: [OFFEN]
+
+F03 ist gegen stillen Datenverlust gehärtet, aber jetzt macht jeder ungültige Eintrag die gesamte `accounts.enc` unlesbar (`app/src/main/email/microsoftAuth.ts:299-309`). `login` bricht vor dem Browser ab, `status` meldet nur einen Fehler und `logout` kann ebenfalls keine Bindung entfernen (`app/src/main/email/microsoftAuth.ts:450-452`, `app/src/main/email/microsoftAuth.ts:539-559`). Ein einzelner beschädigter oder veralteter Eintrag sperrt so auch intakte Konten; die neue Einstellungsseite entfernt eine Karte erst nach erfolgreichem `logout` (`app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:109-116`). Es gibt in diesen Pfaden keinen Export, Quarantäne- oder Zurücksetzungsweg für den Nutzer. Die Antwort auf F03 ist damit als Schutz vor Überschreiben tragfähig, aber nicht als wiederherstellbarer Zustand.
+
+Vorschlag: Einen bewusst ausgelösten, sicheren Reparaturpfad mit Sicherung der verschlüsselten Originaldatei vorsehen; intakte Einträge nicht still verlieren.
+
+### F17 — Nach Annahme durch Graph kann die Erfolgsantwort hängen
+Schwere: hoch
+ADR-Stelle: app/src/main/email/graphSend.ts:154
+Status: [OFFEN]
+
+Nach HTTP `202` wartet `sendViaGraph` vor der Rückgabe auf `locateSentCopy` (`app/src/main/email/graphSend.ts:135-161`). Diese Funktion verbindet sich erneut per IMAP, listet Ordner und sucht bis zu viermal unter Mailbox-Lock; die 2,5-Sekunden-Pausen und der Socket-Timeout sind keine Gesamtfrist für den gesamten Ablauf (`app/src/main/email/ipc.ts:2448-2472`). Hängt ein IMAP-Befehl oder dauert die Suche lange, bleibt `email-send` offen, obwohl Microsoft die Mail bereits angenommen hat. Ein Benutzer kann nach scheinbarem Stillstand erneut senden; der Erfolg ist bis zur Rückgabe weder im Store noch im Banner sichtbar (`app/src/renderer/stores/emailStore.ts:1017-1037`). Der Test deckt nur sofort auflösende Such-Fakes ab (`app/src/main/email/graphSend.test.ts:150-157`).
+
+Vorschlag: Den angenommenen Versand unabhängig von der Suche sofort als Erfolg festhalten und die UID später ergänzen, oder die Suche mit einer harten Gesamtfrist und eindeutigem Ergebnis beenden.
+
+### F18 — Erneut anmelden kann unbemerkt ein anderes Konto binden
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:37
+Status: [OFFEN]
+
+Die Karte ruft `signIn(account.id)` auf, doch der Hook legt das vom Browser gelieferte Konto bereits in `email.accounts` an oder ersetzt es, bevor er `expectedAccountId` vergleicht (`app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:43-69`, `app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:136-140`). Bei Auswahl eines anderen Microsoft-Kontos bleibt die alte Karte bestehen und eine neue erscheint; die Meldung `other-account` ist nur ein nachträglicher Hinweis. Die Anmeldung im Main bindet das neue Konto ebenfalls sofort (`app/src/main/email/microsoftAuth.ts:509-532`). Wer auf der alten Karte „Erneut anmelden“ klickt, kann dadurch einen zweiten Zugang schaffen, obwohl die Aktion auf das bestehende Konto zielt.
+
+Vorschlag: Die erwartete ID vor der Bindungsübernahme prüfen oder die Aktion explizit als „weiteres Konto hinzufügen“ bestätigen lassen; hierfür braucht der Main eine passende Vertragsgrenze.
+
+### F19 — Abbruchknopf einer Karte kann eine andere Anmeldung beenden
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:78
+Status: [OFFEN]
+
+Jede Microsoft-Karte und die Hinzufügen-Zeile erzeugen einen eigenen Hook mit lokalem `pending` (`app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:33-35`, `app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:92`, `app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:170-179`). `cancel()` schickt dagegen einen globalen IPC-Aufruf ohne Versuchskennung; im Main bricht er die jeweils aktuelle `activeLogin` ab (`app/src/main/email/ipc.ts:217-220`, `app/src/main/email/microsoftAuth.ts:535-536`). Startet B, während A noch auf Antwort wartet, kann der weiterhin sichtbare Abbruchknopf von A die Anmeldung von B beenden. Ein Klick ist damit nicht dem angezeigten Vorgang zugeordnet.
+
+Vorschlag: Eine Versuchskennung durch UI und IPC führen oder alle Anmeldeknöpfe und Abbruchknöpfe über einen gemeinsamen Zustand koordinieren.
+
+### F20 — Unklarer Graph-Versand wird im Schreibfenster wie eine sichere Absage behandelt
+Schwere: hoch
+ADR-Stelle: app/src/renderer/components/InboxPanel/ComposeView.tsx:298
+Status: [OFFEN]
+
+Graph liefert bei Verbindungsabbruch nach dem Abschicken oder bei Serverfehler `success:false, uncertain:true` samt Message-ID (`app/src/main/email/graphSend.ts:125-151`). Der Store reicht das Ergebnis zwar durch (`app/src/renderer/stores/emailStore.ts:1017-1077`), das Schreibfenster prüft aber nur `success` und zeigt die allgemeine Fehlerdarstellung (`app/src/renderer/components/InboxPanel/ComposeView.tsx:298-302`). Der Entwurf bleibt sendbar; ein erneuter Klick kann eine zweite Mail erzeugen. Der Fehlertext fordert zwar zum Nachsehen im Ordner „Gesendet“ auf, doch `uncertain` und die Message-ID werden nicht als Zustand gespeichert oder für eine Nachprüfung verwendet. Das ist gerade bei verzögerter Gesendet-Kopie ein realer Doppelversandpfad.
+
+Vorschlag: Einen gesonderten unklaren Versandzustand mit Message-ID im Entwurf führen und erneutes Senden erst nach bewusstem Entscheid ermöglichen.
+
+### F21 — Größenprüfung erfolgt erst nach vollständigem Einlesen aller Anhänge
+Schwere: mittel
+ADR-Stelle: app/src/main/email/graphSend.ts:106
+Status: [OFFEN]
+
+Die 25-MB-Grenze wird erst nach `renderRawMessage(mailOptions)` geprüft (`app/src/main/email/graphSend.ts:106-111`). Dieser Aufruf lässt Nodemailer alle Anhangdateien in einen `Buffer` serialisieren (`app/src/main/email/outgoing.ts:65-68`, `app/src/main/email/outgoing.ts:155-159`); anschließend entsteht für den Graph-Request noch eine Base64-Zeichenkette (`app/src/main/email/graphSend.ts:119-123`). Bei einem sehr großen Anhang kann der Main-Prozess daher viel Speicher verbrauchen oder scheitern, bevor die freundliche Größenabsage möglich ist. `findMissingAttachments` prüft nur Erreichbarkeit, nicht Größe (`app/src/main/email/outgoing.ts:30-41`). Der Test verwendet nur einen großen Mailtext mit künstlich kleiner Grenze, keinen großen Dateianhang (`app/src/main/email/graphSend.test.ts:98-105`).
+
+Vorschlag: Gesamtgröße der Dateien vor dem MIME-Aufbau konservativ abschätzen und große Anhänge früh abweisen; die tatsächliche MIME-Grenze danach beibehalten.
+
+### F22 — Alte Marken können beim Registrierungswechsel erhalten bleiben
+Schwere: mittel
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:529
+Status: [OFFEN]
+
+Die Antwort auf F04 behauptet, beim Wechsel der Anwendungs-ID oder des Mandanten werde das alte Cache-Konto entfernt. Der Code schreibt zuerst die neue Bindung und unterdrückt danach jeden Fehler von `removeFromCache(previous)` mit einer Warnung (`app/src/main/email/microsoftAuth.ts:521-532`). Die Anmeldung meldet also Erfolg, obwohl der alte verschlüsselte Cache samt erneuerbarer Marke auf der Platte bleiben kann (`app/src/main/email/microsoftAuth.ts:337-346`, `app/src/main/email/microsoftAuth.ts:369-373`). Ein späteres `logout` entfernt nur das Konto aus dem Cache der *neuen* Bindung (`app/src/main/email/microsoftAuth.ts:552-566`). Der F04-Test prüft nur die erfolgreiche Entfernung (`app/src/main/email/microsoftAuth.test.ts:397-410`).
+
+Vorschlag: Fehlgeschlagene Alt-Cache-Bereinigung als überprüfbaren Zustand festhalten und beim nächsten Start/Logout erneut versuchen; Erfolg nicht als vollständige Bereinigung darstellen.
+
+### F23 — Der entscheidende Handler ist weiterhin nicht als Ganzes geprüft
+Schwere: mittel
+ADR-Stelle: app/src/main/email/ipc.ts:2507
+Status: [OFFEN]
+
+`chooseSendTransport` ist isoliert getestet (`app/src/shared/emailAccountKind.test.ts:17-35`), `sendViaGraph` mit nachgebautem `fetch` und nachgebauter Gesendet-Suche (`app/src/main/email/graphSend.test.ts:25-38`, `app/src/main/email/graphSend.test.ts:150-164`). Der tatsächliche `email-send`-Handler verbindet beides jedoch mit Empfängerprüfung, IPC-Rückgaben, Fehlerfang, Passwortzweig und IMAP-Append (`app/src/main/email/ipc.ts:2499-2541`, `app/src/main/email/ipc.ts:2543-2640`). Es gibt für diesen Handler keinen Test, der bei widersprüchlichen IDs sicher nur einen Transport beobachtet oder nach `202` einen langsamen/fehlerhaften IMAP-Abgleich und einen UI-Neustart prüft. Die Aussage „je Aufruf genau ein Transportweg“ ist für die reine Wahlfunktion belegt, nicht für die gesamte Nebenwirkungskette.
+
+Vorschlag: Den Handler mit kontrollierten SMTP-, Graph- und IMAP-Adaptern prüfen; insbesondere Annahme durch Graph plus Ausfall der Gesendet-Suche und beide ID-Widersprüche abdecken.
+
+### F24 — Graph-Zeitlimit endet vor dem Lesen der Fehlerantwort
+Schwere: mittel
+ADR-Stelle: app/src/main/email/graphSend.ts:131
+Status: [OFFEN]
+
+Der `AbortController` überwacht nur das Warten auf `fetch(...)`; im `finally` wird sein Timer sofort gelöscht (`app/src/main/email/graphSend.ts:114-133`). Bei einem Status ungleich `202` wird danach `response.text()` ohne Frist gelesen (`app/src/main/email/graphSend.ts:135-151`). Trifft ein Fehlerstatus mit langsamem oder nie abgeschlossenem Body ein, hängt `email-send` trotz nomineller 180-Sekunden-Grenze. Bei einem `5xx` ist zudem gerade unklar, ob Microsoft die Mail bereits angenommen hat; der UI-Entwurf bleibt in einem unentschiedenen, weiterhin sendbaren Zustand. Die Tests benutzen fertige `Response`-Bodies, keinen stockenden Body (`app/src/main/email/graphSend.test.ts:107-127`).
+
+Vorschlag: Den Abort bis nach dem begrenzten Lesen der Antwort aktiv lassen und die maximale Fehlerbody-Größe begrenzen; bei ausbleibender Antwort den unklaren Zustand mit Message-ID melden.
+
+### F25 — Verspätete Anmeldung kann die neue Anmeldung aus dem Cache entfernen
+Schwere: hoch
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:478
+Status: [OFFEN]
+
+Wird Anmeldung A durch B aufgegeben, entfernt der späte Erfolg von A das MSAL-Konto, solange `loadBindings()` noch keine `signed-in`-Bindung derselben Registrierung sieht (`app/src/main/email/microsoftAuth.ts:475-487`). B schreibt diese Bindung aber erst *nach* dem erfolgreichen interaktiven Ergebnis und weiteren `await`-Schritten (`app/src/main/email/microsoftAuth.ts:489-525`). Kommt A genau in diesem Fenster mit demselben MSAL-Konto zurück, kann `removeAccount` dessen Cache-Eintrag entfernen, den B für die anschließende stille Erneuerung braucht. B kann dann bereits eine Konto-ID an die Oberfläche liefern, deren Abruf-/Versandstatus fehlende Marken meldet (`app/src/main/email/microsoftAuth.ts:529-532`). Der vorhandene Test gibt A erst frei, nachdem `await auth.login()` für B vollständig zurückgekehrt ist (`app/src/main/email/microsoftAuth.test.ts:436-448`); er beweist diese Überschneidung nicht. Ob die echte Bibliothek die beiden interaktiven Vorgänge am selben Client in diesem Zeitfenster zulässt, ist nicht gemessen.
+
+Vorschlag: Verspätete Ergebnisse und Bindungsänderungen je Cache-Konto serialisieren; den Race-Test so steuern, dass A während Bs Bindungsschreiben endet, und mit echter MSAL im gepackten Build gegenprüfen.
+
 ## Claude-Antwort
 
 Alle dreizehn Befunde tragen. Nachgestellt bzw. nachgeschlagen: F01 (Pfadrechnung, Handler), F02,
@@ -206,6 +316,59 @@ Fälle, echte Proben am gepackten Build.
 
 Nicht Teil dieses Commits: der Dev-Profil-Zugriff vor `app.name` (`app/src/main/index.ts:38-43`).
 
+### Antworten auf Runde 2 (Nachtlauf 10./11.11.2026)
+
+Der Nutzer hat für diese Nacht auf die Vorlage verzichtet („erledigt alles“). Umgesetzt ist, was
+trägt und eindeutig zu beheben war; liegen geblieben ist, was eine Produktentscheidung braucht oder
+bestehende Passwort-Konten berührt. Alle zwölf Befunde tragen.
+
+- **F14 [DISKUSSION]** — trägt. Nicht umgesetzt: Eine Beschränkung auf Kleinbuchstaben ändert, welche
+  Konto-IDs bestehender Passwort-Konten gelten; ob es Altbestand mit Großbuchstaben gibt, weiß ich
+  nicht. Kein neuer Zugriff: Wer `Konto` abfragen kann, kann auch `konto` abfragen. Entscheidung
+  des Nutzers.
+- **F15 [ADRESSIERT]** — `getImapAuth`/`getGraphToken` erfassen den Widerrufszähler vor dem Lesen der
+  Bindung und reichen ihn an `silentToken`. Test löst die Abmeldung genau während des Bindungslesens
+  aus; per Gegenprobe belegt, dass er ohne die Korrektur fehlschlägt.
+- **F16 [ADRESSIERT]** — `resetStorage()` verschiebt alle Dateien der Ablage unverändert in einen
+  Unterordner `zurueckgesetzt-<Zeit>` (nichts wird gelöscht), IPC `email-microsoft-reset-storage`,
+  in der Karte und der Hinzufügen-Zeile ein Hinweis mit Knopf, der nur bei `storage-unreadable`
+  erscheint. Danach meldet jedes Konto „Anmeldung nötig“. Nur per Test geprüft, nicht an der
+  laufenden App (hätte das Testkonto des Nutzers abgemeldet).
+- **F17 [ADRESSIERT]** — die Suche nach der Gesendet-Kopie hat in `sendViaGraph` eine harte Frist
+  (`GRAPH_LOCATE_TIMEOUT_MS`, 12 s); hängt sie, kommt der Erfolg trotzdem zurück. Die IMAP-Verbindung
+  der hängenden Suche läuft in ihr eigenes Socket-Zeitlimit.
+- **F18 [ADRESSIERT]** — `login({ expectedAccountId })`: ergibt die Anmeldung ein anderes Konto, wird
+  nichts gebunden und das fremde Konto wieder aus dem Cache genommen (außer es war schon eingerichtet
+  und angemeldet), Fehler `account-mismatch`. Das Microsoft-Fenster ist mit dem erwarteten Konto
+  vorbelegt (`loginHint`). Die Oberfläche legt bei einer Karte kein Konto mehr an.
+- **F19 [ADRESSIERT]** — ein gemeinsamer Anmeldezustand für alle Karten und die Hinzufügen-Zeile:
+  läuft eine Anmeldung, sind die übrigen Anmeldeknöpfe gesperrt, und „Abbrechen“ wirkt nur dort, wo
+  sie gestartet wurde. Nur per Typprüfung und Build geprüft, nicht auf dem Bildschirm.
+- **F20 [ADRESSIERT]** — das Schreibfenster merkt sich einen unklaren Versand je Entwurf; der nächste
+  Klick auf „Senden“ verlangt eine ausdrückliche Bestätigung („Erst nachsehen“ / „Trotzdem erneut
+  senden“). Die Message-ID wird nicht für eine automatische Nachprüfung benutzt. Nicht auf dem
+  Bildschirm geprüft.
+- **F21 [ADRESSIERT]** — Größe wird vor dem Aufbau aus den Dateigrößen abgeschätzt (Faktor 1,37);
+  Test mit einer dünn besetzten 60-MB-Datei: Absage ohne Einlesen, ohne Markenabruf.
+- **F22 [ADRESSIERT]** — scheitert das Entfernen aus dem Cache einer früheren Registrierung, steht sie
+  als `stale` an der Bindung und wird bei jeder An- und Abmeldung erneut versucht; die Abmeldung
+  meldet ehrlich, wenn etwas liegen bleibt.
+- **F23 [DISKUSSION]** — trägt. Nicht umgesetzt: Ein Test des ganzen Handlers verlangt, den SMTP-Zweig
+  aus `ipc.ts` herauszulösen — eine Änderung am Versand aller bestehenden Konten, die ich nicht
+  ohne Gegenprobe des Nutzers machen wollte.
+- **F24 [ADRESSIERT]** — die Frist bleibt aktiv, bis die Antwort samt Fehlertext gelesen ist; kommt
+  der Text nicht, entscheidet der Status allein (5xx bleibt „unklar“).
+- **F25 [ADRESSIERT, Beweis fehlt]** — ein Cache-Konto, das eine nicht aufgegebene Anmeldung
+  erworben hat, wird synchron vermerkt (`claimed`), bevor irgendetwas anderes läuft; eine verspätete
+  aufgegebene Anmeldung nimmt es nicht weg. Der zugehörige Test besteht aber auch OHNE die Korrektur
+  (Gegenprobe gemacht): Mit dem nachgebauten Client lässt sich das Zeitfenster nicht herstellen.
+  Belegt ist also das gewünschte Verhalten, nicht die Schließung der Lücke.
+
+Geprüft: typecheck, build, vitest gesamt 3732 grün (shellExecution.test.ts im Gesamtlauf ein
+Zeitlimit-Ausfall, einzeln grün). Gebaute App mit dem Testprofil des Nutzers, nur lesend: das zuvor
+angemeldete Konto ist weiter berechtigt (alte Bindung ohne `stale` wird gelesen), Verbindungstest
+und Ordnerliste gehen, ein vom Renderer genannter fremder Server wird nicht kontaktiert.
+
 ## Status
 
-Runde 1 beantwortet, Korrekturen umgesetzt. Abnahme des Nutzers offen.
+Runde 2 beantwortet (Nachtlauf). Offen für den Nutzer: F14, F23; Sichtprüfung der Oberfläche zu F16, F19, F20.

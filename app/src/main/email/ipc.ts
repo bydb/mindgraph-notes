@@ -207,7 +207,8 @@ Schlüsselwörter:
     try {
       const safeOptions: LoginOptions = {
         clientId: typeof options?.clientId === 'string' ? options.clientId : undefined,
-        tenant: typeof options?.tenant === 'string' ? options.tenant : undefined
+        tenant: typeof options?.tenant === 'string' ? options.tenant : undefined,
+        expectedAccountId: typeof options?.expectedAccountId === 'string' ? options.expectedAccountId : undefined
       }
       const result = await microsoftAuth.login(safeOptions)
       return { success: true, account: { id: result.accountId, username: result.username, displayName: result.displayName }, status: result.status }
@@ -219,6 +220,18 @@ Schlüsselwörter:
   ipcMain.handle('email-microsoft-cancel-login', async () => {
     microsoftAuth.cancelLogin()
     return { success: true }
+  })
+
+  // Ausweg bei unlesbarer Ablage: verschiebt alle gespeicherten Microsoft-Anmeldungen dieses
+  // Geräts unverändert in einen Sicherungsordner. Löscht nichts.
+  ipcMain.handle('email-microsoft-reset-storage', async () => {
+    try {
+      const result = await microsoftAuth.resetStorage()
+      console.warn(`[MicrosoftAuth] Ablage zurückgesetzt, ${result.movedFiles} Datei(en) gesichert`)
+      return { success: true, movedFiles: result.movedFiles }
+    } catch (error) {
+      return microsoftFailure(error)
+    }
   })
 
   ipcMain.handle('email-microsoft-status', async (_event, accountId: string) => {

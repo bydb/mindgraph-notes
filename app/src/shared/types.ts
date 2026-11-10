@@ -1318,7 +1318,9 @@ export interface ElectronAPI {
   emailSavePassword: (accountId: string, password: string) => Promise<boolean>;
   emailLoadPassword: (accountId: string) => Promise<string | null>;
   /** Microsoft 365: Anmeldung im Systembrowser. Gibt nie eine Zugangsmarke zurück. */
-  emailMicrosoftLogin: (options?: { clientId?: string; tenant?: string }) => Promise<
+  /** Verschiebt alle gespeicherten Microsoft-Anmeldungen dieses Geräts in einen Sicherungsordner (Ausweg bei unlesbarer Ablage). */
+  emailMicrosoftResetStorage: () => Promise<{ success: true; movedFiles: number } | { success: false; error: string; errorCode: string }>;
+  emailMicrosoftLogin: (options?: { clientId?: string; tenant?: string; expectedAccountId?: string }) => Promise<
     | { success: true; account: { id: string; username: string; displayName?: string }; status: MicrosoftMailStatus }
     | { success: false; error: string; errorCode: string }
   >;

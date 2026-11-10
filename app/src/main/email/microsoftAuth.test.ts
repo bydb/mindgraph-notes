@@ -29,6 +29,8 @@ interface Behaviour {
   configs?: Record<string, unknown>[]
   requests?: Record<string, unknown>[]
   removed?: MsalAccount[]
+  /** Lässt das Entfernen aus dem Cache einer bestimmten Anwendungs-ID scheitern. */
+  removeError?: (clientId: string) => unknown
 }
 
 // Nachbau von MSAL: ein Cache je Client, über das Plugin geladen und gespeichert.
@@ -82,6 +84,8 @@ function fakeMsal(b: Behaviour = {}): MsalModule {
         getAllAccounts: async () => { await this.plugin.beforeCacheAccess(this.ctx(false)); return this.accounts },
         removeAccount: async (acc: MsalAccount) => {
           await this.plugin.beforeCacheAccess(this.ctx(false))
+          const failure = b.removeError?.(this.clientId)
+          if (failure) throw failure
           b.removed?.push(acc)
           this.accounts = this.accounts.filter(a => !(a.homeAccountId === acc.homeAccountId && a.tenantId === acc.tenantId))
           await this.plugin.afterCacheAccess(this.ctx(true))
@@ -446,5 +450,131 @@ describe('createMicrosoftAuth — Abbruch und Zeitlimit (Codex F08)', () => {
     await new Promise(r => setTimeout(r, 30))
     // die verspätete erste Anmeldung nimmt der zweiten das Konto nicht weg
     expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
+  })
+})
+
+describe('createMicrosoftAuth — Befunde der zweiten Prüfrunde', () => {
+  it('Abmeldung zwischen Bindungslesen und Markenabruf: keine Marke (Codex F15)', async () => {
+    let armed = false
+    let auth: ReturnType<typeof createMicrosoftAuth>
+    const base = makeDeps(fakeMsal())
+    const deps = makeDeps(fakeMsal(), {
+      decrypt: (enc) => {
+        // Genau während getImapAuth die Bindung liest, beginnt eine Abmeldung.
+        if (armed) { armed = false; void auth.logout(ID).catch(() => undefined) }
+        return base.decrypt(enc)
+      }
+    })
+    auth = createMicrosoftAuth(deps)
+    await auth.login()
+    armed = true
+    await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+  })
+
+  // Zeigt das gewünschte Verhalten, BEWEIST die Lücke aus F25 aber nicht: Mit dem nachgebauten
+  // Client besteht der Test auch ohne die `claimed`-Sperre, weil dessen verspätetes Ergebnis erst
+  // nach dem Bindungsschreiben ankommt. Das enge Zeitfenster lässt sich so nicht herstellen.
+  it('verspätete aufgegebene Anmeldung nimmt der neuen das Konto nicht weg (Codex F25)', async () => {
+    const gate = hang()
+    let first = true
+    let releaseOnBindingWrite = false
+    const removed: MsalAccount[] = []
+    const base = makeDeps(fakeMsal())
+    const msal = fakeMsal({ removed, beforeFinish: () => { if (first) { first = false; return gate.promise } return Promise.resolve() } })
+    const auth = createMicrosoftAuth(makeDeps(msal, {
+      encrypt: (plain) => {
+        // Anmeldung B schreibt gerade ihre Bindung: genau jetzt kommt A verspätet zurück.
+        if (releaseOnBindingWrite && plain.includes('"provider"')) { releaseOnBindingWrite = false; gate.release() }
+        return base.encrypt(plain)
+      }
+    }))
+    const one = auth.login().catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    releaseOnBindingWrite = true
+    const two = await auth.login()
+    expect(await one).toMatchObject({ code: 'cancelled' })
+    await new Promise(r => setTimeout(r, 40))
+    expect(removed).toHaveLength(0)
+    expect(two.status).toMatchObject({ fetchReady: true, sendReady: true })
+    expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
+  })
+
+  it('„Erneut anmelden“ mit einem anderen Konto bindet nichts und räumt das fremde Konto wieder weg (Codex F18)', async () => {
+    const removed: MsalAccount[] = []
+    const requests: Record<string, unknown>[] = []
+    const otherOid = 'cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const other = account({ homeAccountId: `${otherOid}.${TENANT}`, localAccountId: otherOid, username: 'anna@schule.example', idTokenClaims: { oid: otherOid, tid: TENANT } })
+    let next = account()
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ removed, requests, signIn: () => next })))
+    await auth.login()
+    next = other
+    await expect(auth.login({ expectedAccountId: ID })).rejects.toMatchObject({ code: 'account-mismatch' })
+    // Das Fenster war mit dem erwarteten Konto vorbelegt.
+    expect(requests[1].loginHint).toBe('erika@schule.example')
+    expect(removed.map(a => a.username)).toEqual(['anna@schule.example'])
+    const otherId = deriveMicrosoftAccountId(TENANT, otherOid)
+    expect(await auth.status(otherId)).toMatchObject({ signedIn: false, errorCode: 'reauth-required' })
+    expect((await auth.status(otherId)).username).toBeUndefined()
+    // Das eigentliche Konto ist unberührt.
+    expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
+  })
+
+  it('„Erneut anmelden“ mit einem anderen, schon eingerichteten Konto lässt dieses angemeldet (Codex F18)', async () => {
+    const removed: MsalAccount[] = []
+    const otherOid = 'cccccccc-bbbb-cccc-dddd-eeeeeeeeeeee'
+    const other = account({ homeAccountId: `${otherOid}.${TENANT}`, localAccountId: otherOid, username: 'anna@schule.example', idTokenClaims: { oid: otherOid, tid: TENANT } })
+    let next = account()
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ removed, signIn: () => next })))
+    await auth.login()
+    next = other
+    const otherLogin = await auth.login()
+    await expect(auth.login({ expectedAccountId: ID })).rejects.toMatchObject({ code: 'account-mismatch' })
+    expect(removed).toHaveLength(0)
+    expect(await auth.status(otherLogin.accountId)).toMatchObject({ signedIn: true, fetchReady: true })
+  })
+
+  it('scheitert das Aufräumen der alten Registrierung, bleibt das vermerkt und wird beim Abmelden nachgeholt (Codex F22)', async () => {
+    const own = '99999999-8888-7777-6666-555555555555'
+    let failOld = true
+    const removed: MsalAccount[] = []
+    const deps = makeDeps(fakeMsal({ removed, removeError: (clientId) => (failOld && clientId === DEFAULT_MICROSOFT_CLIENT_ID ? new Error('Platte voll') : null) }))
+    const auth = createMicrosoftAuth(deps)
+    await auth.login()
+    await auth.login({ clientId: own, tenant: 'schule.example' })
+    const read = async (): Promise<Record<string, { stale?: unknown[]; state: string }>> => JSON.parse(deps.decrypt(await fs.readFile(bindingsPath())))
+    expect((await read())[ID].stale).toEqual([{ clientId: DEFAULT_MICROSOFT_CLIENT_ID, tenant: 'organizations' }])
+    // Abmelden, solange das Entfernen weiter scheitert: abgemeldet, aber ehrlich gemeldet.
+    await expect(auth.logout(ID)).rejects.toMatchObject({ code: 'failed' })
+    expect((await read())[ID]).toMatchObject({ state: 'signed-out', stale: [{ clientId: DEFAULT_MICROSOFT_CLIENT_ID, tenant: 'organizations' }] })
+    await expect(auth.getImapAuth(ID)).rejects.toMatchObject({ code: 'reauth-required' })
+    // Zweiter Versuch gelingt: der Vermerk verschwindet.
+    failOld = false
+    await auth.logout(ID)
+    expect((await read())[ID].stale).toBeUndefined()
+    expect(removed.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('unlesbare Ablage lässt sich bewusst zurücksetzen; die Originaldatei bleibt unverändert erhalten (Codex F16)', async () => {
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login()
+    const damaged = Buffer.from('nicht entschlüsselbar')
+    await fs.writeFile(bindingsPath(), damaged)
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    expect(await auth.status(ID)).toMatchObject({ errorCode: 'storage-unreadable' })
+    const { backupDir, movedFiles } = await auth.resetStorage()
+    expect(backupDir).toMatch(/^zurueckgesetzt-/)
+    expect(movedFiles).toBe(2)
+    expect((await fs.readFile(path.join(authDir(), backupDir, 'accounts.enc'))).equals(damaged)).toBe(true)
+    expect((await fs.readdir(authDir())).filter(n => n.endsWith('.enc'))).toEqual([])
+    // Danach: kein Fehlerzustand mehr, sondern schlicht „Anmeldung nötig“ — und anmelden geht wieder.
+    expect(await auth.status(ID)).toMatchObject({ known: true, signedIn: false, errorCode: 'reauth-required' })
+    expect((await auth.login()).accountId).toBe(ID)
+    expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
+    // Die Sicherung wird beim nächsten Start nicht angefasst.
+    await createMicrosoftAuth(makeDeps(fakeMsal())).status(ID)
+    expect((await fs.readFile(path.join(authDir(), backupDir, 'accounts.enc'))).equals(damaged)).toBe(true)
+  })
+
+  it('Zurücksetzen ohne gespeicherte Anmeldung tut nichts', async () => {
+    expect(await createMicrosoftAuth(makeDeps(fakeMsal())).resetStorage()).toEqual({ backupDir: '', movedFiles: 0 })
   })
 })
