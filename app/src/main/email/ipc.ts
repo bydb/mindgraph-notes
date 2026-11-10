@@ -2458,20 +2458,25 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
    * Die Kopie erscheint nicht immer sofort (gemessen 10.11.2026): ein paar kurze Versuche,
    * danach gleicht der nächste Abruf des Gesendet-Ordners über die Message-ID ab.
    */
-  async function locateMicrosoftSentCopy(accountId: string, messageId: string): Promise<{ mailbox?: string; uid?: number }> {
+  async function locateMicrosoftSentCopy(accountId: string, messageId: string, signal?: AbortSignal): Promise<{ mailbox?: string; uid?: number }> {
     const login = await resolveImapLogin(accountId, { host: '', port: 0, tls: true, user: '' })
-    if ('error' in login) return {}
+    if ('error' in login || signal?.aborted) return {}
     const { ImapFlow } = await import('imapflow')
     const client = new ImapFlow(buildImapOptions(login.endpoint, login.secret, { socketTimeout: 15000, greetingTimeout: 10000 }))
     client.on('error', () => { /* ignore */ })
+    // Läuft die Frist des Aufrufers ab, die Verbindung hart schließen: die Suche darf den
+    // Gesendet-Ordner nicht weiter gesperrt halten.
+    const onAbort = (): void => { try { client.close() } catch { /* ignore */ } }
+    signal?.addEventListener('abort', onAbort, { once: true })
     try {
       await client.connect()
       const mailbox = await findSentMailbox(client)
-      if (!mailbox) return {}
+      if (!mailbox || signal?.aborted) return {}
       const lock = await client.getMailboxLock(mailbox)
       try {
         for (let attempt = 0; attempt < 4; attempt++) {
           if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 2500))
+          if (signal?.aborted) return { mailbox }
           const found = await client.search({ header: { 'message-id': messageId } }, { uid: true })
           const uid = Array.isArray(found) && found.length > 0 ? found[found.length - 1] : 0
           if (typeof uid === 'number' && uid > 0) return { mailbox, uid }
@@ -2481,7 +2486,8 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
         lock.release()
       }
     } finally {
-      try { await client.logout() } catch { /* ignore */ }
+      signal?.removeEventListener('abort', onAbort)
+      if (!signal?.aborted) { try { await client.logout() } catch { /* ignore */ } }
     }
   }
 

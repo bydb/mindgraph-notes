@@ -163,12 +163,14 @@ describe('sendViaGraph', () => {
     expect(searched).toBe(0)
   })
 
-  it('hängende Suche nach der Gesendet-Kopie hält die Erfolgsmeldung nicht auf (Codex F17)', async () => {
-    const { deps } = makeDeps(accepted, { locateSentCopy: () => new Promise(() => undefined), locateTimeoutMs: 30 })
+  it('hängende Suche nach der Gesendet-Kopie hält die Erfolgsmeldung nicht auf und wird abgebrochen (Codex F17, F33)', async () => {
+    let aborted = false
+    const { deps } = makeDeps(accepted, { locateSentCopy: (_id, _mid, signal) => new Promise(() => { signal.addEventListener('abort', () => { aborted = true }) }), locateTimeoutMs: 30 })
     const start = Date.now()
     const result = await sendViaGraph(input(), deps)
     expect(result).toMatchObject({ success: true, transport: 'graph', sentUid: undefined })
     expect(Date.now() - start).toBeLessThan(1000)
+    expect(aborted).toBe(true)
   })
 
   it('sehr großer Anhang wird abgewiesen, bevor er eingelesen wird (Codex F21)', async () => {

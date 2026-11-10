@@ -31,6 +31,8 @@ interface Behaviour {
   removed?: MsalAccount[]
   /** Lässt das Entfernen aus dem Cache einer bestimmten Anwendungs-ID scheitern. */
   removeError?: (clientId: string) => unknown
+  /** Der stille Abruf ändert den Cache (wie eine erneuerte Marke) und schreibt ihn zurück. */
+  silentWrites?: boolean
 }
 
 // Nachbau von MSAL: ein Cache je Client, über das Plugin geladen und gespeichert.
@@ -76,6 +78,7 @@ function fakeMsal(b: Behaviour = {}): MsalModule {
       const err = b.silentError?.(scopes)
       if (err) throw err
       await b.duringSilent?.()
+      if (b.silentWrites) await this.plugin.afterCacheAccess(this.ctx(true))
       const acc = request.account as MsalAccount
       return { accessToken: `${scopes === IMAP_SCOPES ? 'imap' : 'graph'}-marke-${acc.tenantId.slice(0, 4)}`, account: acc }
     }
@@ -576,5 +579,85 @@ describe('createMicrosoftAuth — Befunde der zweiten Prüfrunde', () => {
 
   it('Zurücksetzen ohne gespeicherte Anmeldung tut nichts', async () => {
     expect(await createMicrosoftAuth(makeDeps(fakeMsal())).resetStorage()).toEqual({ backupDir: '', movedFiles: 0 })
+  })
+})
+
+describe('createMicrosoftAuth — Befunde der dritten Prüfrunde', () => {
+  const mainFiles = async (): Promise<string[]> => (await fs.readdir(authDir(), { withFileTypes: true })).filter(e => e.isFile()).map(e => e.name)
+
+  it('Zurücksetzen: ein schon laufender Markenabruf gibt danach nichts heraus (Codex F26)', async () => {
+    const gate = hang()
+    let block = false
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ duringSilent: () => (block ? gate.promise : Promise.resolve()) })))
+    await auth.login()
+    block = true
+    const pending = auth.getGraphToken(ID).catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    block = false
+    await auth.resetStorage()
+    gate.release()
+    expect(await pending).toMatchObject({ code: 'reauth-required' })
+  })
+
+  it('Zurücksetzen: ein noch lebender Client legt den Cache danach nicht wieder an (Codex F27)', async () => {
+    const gate = hang()
+    let block = false
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ silentWrites: true, duringSilent: () => (block ? gate.promise : Promise.resolve()) })))
+    await auth.login()
+    block = true
+    const pending = auth.getImapAuth(ID).catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    block = false
+    await auth.resetStorage()
+    expect(await mainFiles()).toEqual([])
+    gate.release() // der alte Client will jetzt seinen Cache zurückschreiben
+    await pending
+    await new Promise(r => setTimeout(r, 30))
+    expect(await mainFiles()).toEqual([])
+  })
+
+  it('Zurücksetzen überholt eine fast fertige Anmeldung nicht: sie zählt dann nicht (Codex F34)', async () => {
+    let armed = false
+    let auth: ReturnType<typeof createMicrosoftAuth>
+    const base = makeDeps(fakeMsal())
+    const msal = fakeMsal({ signIn: () => { armed = true; return account() } })
+    auth = createMicrosoftAuth(makeDeps(msal, {
+      decrypt: (enc) => {
+        // Das interaktive Ergebnis ist da; während die Anmeldung ihre Bindung liest, wird zurückgesetzt.
+        if (armed) { armed = false; void auth.resetStorage() }
+        return base.decrypt(enc)
+      }
+    }))
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login() // eine Bindung existiert schon, damit gelesen wird
+    await expect(auth.login()).rejects.toMatchObject({ code: 'cancelled' })
+    await new Promise(r => setTimeout(r, 30))
+    expect(await mainFiles()).toEqual([])
+    expect(await auth.status(ID)).toMatchObject({ signedIn: false, errorCode: 'reauth-required' })
+  })
+
+  it('Zustandsabfrage meldet nach einer gleichzeitigen Abmeldung nicht mehr „berechtigt“ (Codex F28)', async () => {
+    let armed = false
+    let auth: ReturnType<typeof createMicrosoftAuth>
+    const base = makeDeps(fakeMsal())
+    auth = createMicrosoftAuth(makeDeps(fakeMsal(), {
+      decrypt: (enc) => {
+        if (armed) { armed = false; void auth.logout(ID).catch(() => undefined) }
+        return base.decrypt(enc)
+      }
+    }))
+    await auth.login()
+    armed = true
+    expect(await auth.status(ID)).toMatchObject({ signedIn: false, fetchReady: false, sendReady: false })
+  })
+
+  it('„Erneut anmelden“ fragt ohne Kontoauswahl mit dem erwarteten Konto als Hinweis, sonst mit Kontoauswahl (Codex F36)', async () => {
+    const requests: Record<string, unknown>[] = []
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal({ requests })))
+    await auth.login()
+    await auth.login({ expectedAccountId: ID })
+    expect(requests[0]).toMatchObject({ prompt: 'select_account' })
+    expect(requests[0].loginHint).toBeUndefined()
+    expect(requests[1].loginHint).toBe('erika@schule.example')
+    expect(requests[1].prompt).toBeUndefined()
   })
 })

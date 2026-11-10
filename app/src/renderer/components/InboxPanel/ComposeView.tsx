@@ -18,6 +18,10 @@ import {
 type RecipientField = 'to' | 'cc' | 'bcc'
 const RECIPIENT_FIELDS: RecipientField[] = ['to', 'cc', 'bcc']
 
+// Entwürfe, bei denen ein Versand unklar blieb (Verbindung brach nach dem Absenden ab). Lebt für
+// die App-Sitzung; ein Neustart der App vergisst den Vermerk (bekannte Grenze, Codex F30).
+const UNCERTAIN_DRAFTS = new Set<string>()
+
 export const ComposeView: React.FC = () => {
   const { t } = useTranslation()
   const { composeState, setComposeState, sendEmail, isSending, closeCompose, discardDraft, draftSaveError } = useEmailStore()
@@ -33,9 +37,17 @@ export const ComposeView: React.FC = () => {
   // ausdrücklicher Bestätigung (Codex F20, microsoft-abschnitt-4a-review.md).
   const [uncertainSend, setUncertainSend] = useState(false)
   const [confirmResend, setConfirmResend] = useState(false)
-  // Der Vermerk gehört zu genau einem Entwurf: bei einem anderen Entwurf gilt er nicht mehr.
+  // Der Vermerk gehört zum Entwurf, nicht zum Fenster: er übersteht Schließen und Wiederöffnen
+  // (UNCERTAIN_DRAFTS, bis zum Ende der App-Sitzung) und gilt für einen anderen Entwurf nicht.
   const composeDraftId = composeState?.draftId
-  useEffect(() => { setUncertainSend(false); setConfirmResend(false) }, [composeDraftId])
+  // In diesem Sendeablauf schon bestätigte Rückfragen. „Trotzdem erneut senden“ übernimmt nur,
+  // was der Nutzer wirklich bestätigt hat, statt Betreff- und Anhangprüfung zu überspringen (Codex F31).
+  const approved = useRef({ subject: false, attachments: false })
+  useEffect(() => {
+    setUncertainSend(!!composeDraftId && UNCERTAIN_DRAFTS.has(composeDraftId))
+    setConfirmResend(false)
+    approved.current = { subject: false, attachments: false }
+  }, [composeDraftId])
   const [inputs, setInputs] = useState<Record<RecipientField, string>>({ to: '', cc: '', bcc: '' })
   const [invalid, setInvalid] = useState<Record<RecipientField, string[]>>({ to: [], cc: [], bcc: [] })
   // Nur der Fehlerpfad lebt hier. Bei Erfolg baut der Store das Fenster sofort ab;
@@ -284,6 +296,8 @@ export const ComposeView: React.FC = () => {
   }, [composeState, ltSettings, setComposeState])
 
   const handleSend = async (allowEmptySubject = false, allowMissingAttachments = false, allowResend = false) => {
+    if (allowEmptySubject) approved.current.subject = true
+    if (allowMissingAttachments) approved.current.attachments = true
     if (!vaultPath || isSending || !hasSmtp || forwardLoading) return
     // Erst alle drei Felder übernehmen. Bleibt irgendwo eine ungültige Eingabe stehen,
     // geht nichts raus — sonst erreicht die Mail nur einen Teil der Empfänger.
@@ -308,13 +322,20 @@ export const ComposeView: React.FC = () => {
     setSendStatus('idle')
     setErrorMsg('')
 
+    const draftId = composeDraftId
     const result = await sendEmail(vaultPath)
-    if (!result.success) {
-      setSendStatus('error')
-      setErrorMsg(result.error || t('inbox.compose.error'))
-      // Bleibt gesetzt, bis ein Versuch eindeutig endet (Erfolg schließt das Fenster,
-      // eine sichere Absage setzt zurück).
-      setUncertainSend(result.uncertain === true)
+    approved.current = { subject: false, attachments: false }
+    if (result.success) {
+      if (draftId) UNCERTAIN_DRAFTS.delete(draftId)
+      return
+    }
+    setSendStatus('error')
+    setErrorMsg(result.error || t('inbox.compose.error'))
+    // Ein unklarer Versuch bleibt vermerkt, auch wenn ein späterer Versuch sicher abgelehnt
+    // wird: die Absage des zweiten klärt nicht, ob der erste hinausging (Codex F35).
+    if (result.uncertain === true) {
+      if (draftId) UNCERTAIN_DRAFTS.add(draftId)
+      setUncertainSend(true)
     }
   }
 
@@ -653,7 +674,7 @@ export const ComposeView: React.FC = () => {
             <button className="inbox-compose-cancel" autoFocus onClick={() => setConfirmResend(false)}>
               {t('inbox.compose.uncertainResendCancel')}
             </button>
-            <button className="inbox-compose-send" disabled={sendBlocked} onClick={() => handleSend(true, true, true)}>
+            <button className="inbox-compose-send" disabled={sendBlocked} onClick={() => handleSend(approved.current.subject, approved.current.attachments, true)}>
               {t('inbox.compose.uncertainResendConfirm')}
             </button>
           </div>

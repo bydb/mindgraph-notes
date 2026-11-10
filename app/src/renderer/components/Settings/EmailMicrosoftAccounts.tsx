@@ -99,6 +99,13 @@ export function useMicrosoftSignIn(owner: string): {
     }
   }, [owner])
 
+  // Verschwindet der Knopf, der die Anmeldung gestartet hat (Onboarding-Schritt verlassen,
+  // Einstellungen geschlossen), wird sie abgebrochen. Sonst bliebe sie bis zum Zeitlimit des Main
+  // offen, sperrte alle anderen Anmeldeknöpfe und ließe sich nirgends abbrechen (Codex F32).
+  useEffect(() => () => {
+    if (activeSignIn === owner) void window.electronAPI.emailMicrosoftCancelLogin()
+  }, [owner])
+
   const cancel = useCallback(() => {
     // Nur die eigene Anmeldung abbrechen — der IPC-Aufruf trifft sonst die eines anderen Knopfs.
     if (activeSignIn === owner) void window.electronAPI.emailMicrosoftCancelLogin()

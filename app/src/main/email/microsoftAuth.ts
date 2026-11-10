@@ -247,6 +247,14 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
   // gesetzt, sobald deren Ergebnis da ist — also bevor die Bindung auf der Platte steht. Eine
   // aufgegebene Anmeldung, die verspätet ankommt, nimmt ein solches Konto nicht wieder weg (Codex F25).
   const claimed = new Set<string>()
+  // Epoche der Ablage: resetStorage() erhöht sie. Alles, was davor begonnen hat — Markenabrufe,
+  // eine fast fertige Anmeldung, das Cache-Plugin eines noch lebenden Clients — darf danach weder
+  // eine Marke herausgeben noch etwas in die Ablage schreiben (Codex F26, F27, F34).
+  let epoch = 0
+  /** Vor dem Lesen der Bindung erfassen, nach dem Markenabruf prüfen (Codex F15, F26, F28). */
+  const stampOf = (accountId: string): { generation: number; epoch: number } => ({ generation: revocations.get(accountId) || 0, epoch })
+  const stillValid = (accountId: string, stamp: { generation: number; epoch: number }): boolean =>
+    (revocations.get(accountId) || 0) === stamp.generation && epoch === stamp.epoch
   let dirReady: Promise<string> | null = null
 
   // Alle Schreibzugriffe auf die Ablage nacheinander.
@@ -359,16 +367,23 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       client = (async () => {
         const msal = await (deps.loadMsal ? deps.loadMsal() : (import('@azure/msal-node') as unknown as Promise<MsalModule>))
         const name = cacheFile(clientId, tenant)
+        const born = epoch
         return new msal.PublicClientApplication({
           auth: { clientId, authority: `${AUTHORITY_ORIGIN}/${tenant}` },
           cache: {
             cachePlugin: {
+              // Ein Client aus der Zeit vor einem Zurücksetzen liest und schreibt nichts mehr.
               beforeCacheAccess: async (ctx: MsalCacheContext) => {
+                if (born !== epoch) return
                 const stored = await readEncrypted(name)
                 if (stored) ctx.tokenCache.deserialize(stored)
               },
               afterCacheAccess: async (ctx: MsalCacheContext) => {
-                if (ctx.cacheHasChanged) await serialized(() => writeEncrypted(name, ctx.tokenCache.serialize()))
+                if (!ctx.cacheHasChanged) return
+                await serialized(async () => {
+                  if (born !== epoch) return
+                  await writeEncrypted(name, ctx.tokenCache.serialize())
+                })
               }
             }
           },
@@ -399,12 +414,13 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
   }
 
   /**
-   * `generation` MUSS der Aufrufer erfassen, BEVOR er die Bindung liest. Sonst kann eine
+   * Den Stempel (`stampOf`) MUSS der Aufrufer erfassen, BEVOR er die Bindung liest. Sonst kann eine
    * Abmeldung zwischen Bindungslesen und Markenabruf fallen, und der Abruf übernähme den schon
    * erhöhten Zähler samt der veralteten „angemeldet“-Bindung (Codex F15).
    */
-  async function silentToken(accountId: string, binding: MicrosoftAccountBinding, scopes: string[], generation: number): Promise<string> {
+  async function silentToken(accountId: string, binding: MicrosoftAccountBinding, scopes: string[], stamp: { generation: number; epoch: number }): Promise<string> {
     if (binding.state !== 'signed-in') throw new MicrosoftAuthError('reauth-required')
+    if (!stillValid(accountId, stamp)) throw new MicrosoftAuthError('reauth-required')
     requireEncryption()
     const client = await getClient(binding.clientId, binding.tenant)
     const account = await findMsalAccount(client, binding)
@@ -419,8 +435,8 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       console.warn('[MicrosoftAuth] Stille Erneuerung fehlgeschlagen:', code, errorCodeForLog(error))
       throw new MicrosoftAuthError(code)
     }
-    // Wurde inzwischen abgemeldet, gibt dieser Aufruf nichts mehr heraus.
-    if ((revocations.get(accountId) || 0) !== generation) throw new MicrosoftAuthError('reauth-required')
+    // Wurde inzwischen abgemeldet oder die Ablage zurückgesetzt, gibt dieser Aufruf nichts mehr heraus.
+    if (!stillValid(accountId, stamp)) throw new MicrosoftAuthError('reauth-required')
     return token
   }
 
@@ -432,23 +448,24 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     return binding
   }
 
-  async function probe(accountId: string, binding: MicrosoftAccountBinding, scopes: string[]): Promise<{ ok: boolean; code?: MicrosoftAuthErrorCode }> {
+  async function probe(accountId: string, binding: MicrosoftAccountBinding, scopes: string[], stamp: { generation: number; epoch: number }): Promise<{ ok: boolean; code?: MicrosoftAuthErrorCode }> {
     try {
-      await silentToken(accountId, binding, scopes, revocations.get(accountId) || 0)
+      await silentToken(accountId, binding, scopes, stamp)
       return { ok: true }
     } catch (error) {
       return { ok: false, code: classifyMicrosoftError(error) }
     }
   }
 
-  async function statusOf(accountId: string, binding: MicrosoftAccountBinding | undefined): Promise<MicrosoftAccountStatus> {
+  /** `stamp` vor dem Lesen von `binding` erfassen — sonst meldet der Zustand nach einer Abmeldung noch „berechtigt“ (Codex F28). */
+  async function statusOf(accountId: string, binding: MicrosoftAccountBinding | undefined, stamp: { generation: number; epoch: number }): Promise<MicrosoftAccountStatus> {
     const off = { signedIn: false, fetchReady: false, sendReady: false }
     if (!binding) return { known: true, ...off, errorCode: 'reauth-required' }
     const base = { known: true, username: binding.username, displayName: binding.displayName }
     if (binding.state !== 'signed-in') return { ...base, ...off, errorCode: 'reauth-required' }
     if (!deps.isEncryptionAvailable()) return { ...base, ...off, errorCode: 'encryption-unavailable' }
-    const fetch = await probe(accountId, binding, IMAP_SCOPES)
-    const send = await probe(accountId, binding, GRAPH_SCOPES)
+    const fetch = await probe(accountId, binding, IMAP_SCOPES, stamp)
+    const send = await probe(accountId, binding, GRAPH_SCOPES, stamp)
     return { ...base, signedIn: fetch.ok || send.ok, fetchReady: fetch.ok, sendReady: send.ok, errorCode: fetch.code || send.code }
   }
 
@@ -476,6 +493,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
   return {
     async login(options) {
       requireEncryption()
+      const startEpoch = epoch
       const { clientId, tenant } = resolveConfig(options)
       // Unlesbare Ablage: hier abbrechen, bevor ein Browser aufgeht — nichts überschreiben.
       const known = await loadBindings()
@@ -497,8 +515,9 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         scopes: GRAPH_SCOPES,
         // Zustimmung für die zweite Ressource im selben Fenster einholen.
         extraScopesToConsent: IMAP_SCOPES,
-        prompt: 'select_account',
-        ...(loginHint ? { loginHint } : {}),
+        // Die Bibliothek verwirft `loginHint` bei `select_account` (Codex F36). Für „Erneut
+        // anmelden“ deshalb ohne Kontoauswahl, dafür mit dem erwarteten Konto als Hinweis.
+        ...(loginHint ? { loginHint } : { prompt: 'select_account' }),
         successTemplate: SUCCESS_PAGE,
         errorTemplate: ERROR_PAGE,
         openBrowser: async (url: string) => {
@@ -537,6 +556,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       }
 
       const account = result.account
+      try {
       /** Das eben erworbene Konto wieder hergeben — nur, wenn es nicht schon gebunden und angemeldet war. */
       const discard = async (boundBefore: MicrosoftAccountBinding | undefined): Promise<void> => {
         if (!account) return
@@ -595,11 +615,21 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         ...(stale.length > 0 ? { stale } : {})
       }
       await serialized(async () => {
+        // Wurde die Ablage seit Beginn dieser Anmeldung zurückgesetzt, zählt sie nicht mehr:
+        // nichts in die frisch geleerte Ablage schreiben (Codex F34). Reset und dieses
+        // Speichern laufen beide in der Schreibkette, die Reihenfolge ist also eindeutig.
+        if (epoch !== startEpoch) throw new MicrosoftAuthError('cancelled')
         const bindings = await loadBindings()
         bindings.set(accountId, binding)
         await saveBindings(bindings)
       })
-      return { accountId, username: binding.username, displayName: binding.displayName, status: await statusOf(accountId, binding) }
+      const stamp = stampOf(accountId)
+      return { accountId, username: binding.username, displayName: binding.displayName, status: await statusOf(accountId, binding, stamp) }
+      } finally {
+        // Der Vermerk schützt nur das Fenster bis zum Speichern der Bindung; danach schützt die
+        // Bindung selbst. Auch nach einem Fehler freigeben, sonst bleibt er für immer stehen (Codex F29).
+        if (account) claimed.delete(claimKey(clientId, tenant, account))
+      }
     },
 
     cancelLogin() {
@@ -609,7 +639,8 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     async status(accountId) {
       if (!isMicrosoftAccountId(accountId)) return { known: false, signedIn: false, fetchReady: false, sendReady: false }
       try {
-        return await statusOf(accountId, (await loadBindings()).get(accountId))
+        const stamp = stampOf(accountId)
+        return await statusOf(accountId, (await loadBindings()).get(accountId), stamp)
       } catch (error) {
         return { known: true, signedIn: false, fetchReady: false, sendReady: false, errorCode: classifyMicrosoftError(error) }
       }
@@ -662,6 +693,9 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     async resetStorage() {
       activeLogin?.cancel('cancelled')
       return serialized(async () => {
+        // Zuerst die Epoche erhöhen: ab hier gibt kein früher begonnener Vorgang mehr eine Marke
+        // heraus oder schreibt in die Ablage, auch nicht nach dem Verschieben.
+        epoch++
         const dir = await storageDir()
         const names = (await fs.readdir(dir, { withFileTypes: true })).filter(e => e.isFile()).map(e => e.name)
         const backupDir = `zurueckgesetzt-${new Date().toISOString().replace(/[:.]/g, '-')}`
@@ -673,22 +707,21 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
         // Speicherzustand verwerfen: Clients halten ihren Cache im Arbeitsspeicher.
         clients.clear()
         claimed.clear()
-        for (const id of revocations.keys()) revocations.set(id, (revocations.get(id) || 0) + 1)
         return { backupDir: names.length > 0 ? backupDir : '', movedFiles: names.length }
       })
     },
 
     async getImapAuth(accountId) {
-      const generation = revocations.get(accountId) || 0
+      const stamp = stampOf(accountId)
       const binding = await requireBinding(accountId)
-      const accessToken = await silentToken(accountId, binding, IMAP_SCOPES, generation)
+      const accessToken = await silentToken(accountId, binding, IMAP_SCOPES, stamp)
       return { ...MICROSOFT_IMAP_ENDPOINT, user: binding.username, accessToken }
     },
 
     async getGraphToken(accountId) {
-      const generation = revocations.get(accountId) || 0
+      const stamp = stampOf(accountId)
       const binding = await requireBinding(accountId)
-      const accessToken = await silentToken(accountId, binding, GRAPH_SCOPES, generation)
+      const accessToken = await silentToken(accountId, binding, GRAPH_SCOPES, stamp)
       return { accessToken, username: binding.username, displayName: binding.displayName }
     }
   }

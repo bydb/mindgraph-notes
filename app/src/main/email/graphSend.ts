@@ -57,8 +57,12 @@ export interface GraphSendDeps {
   renderEmailHtml: (body: string) => string
   /** Macht aus einem Anmeldefehler eine Meldung für die Oberfläche. */
   describeAuthError: (error: unknown) => string
-  /** Sucht die von Graph abgelegte Kopie im Gesendet-Ordner. Darf scheitern oder nichts finden. */
-  locateSentCopy?: (accountId: string, messageId: string) => Promise<{ mailbox?: string; uid?: number }>
+  /**
+   * Sucht die von Graph abgelegte Kopie im Gesendet-Ordner. Darf scheitern oder nichts finden.
+   * `signal` wird ausgelöst, wenn die Frist abläuft: die Suche soll dann ihre Verbindung schließen
+   * und nicht weiterlaufen (Codex F33).
+   */
+  locateSentCopy?: (accountId: string, messageId: string, signal: AbortSignal) => Promise<{ mailbox?: string; uid?: number }>
   fetch?: typeof fetch
   timeoutMs?: number
   maxBytes?: number
@@ -187,12 +191,15 @@ export async function sendViaGraph(input: GraphSendInput, deps: GraphSendDeps): 
   let located: { mailbox?: string; uid?: number } = {}
   if (deps.locateSentCopy) {
     let giveUp: ReturnType<typeof setTimeout> | undefined
+    const stopSearch = new AbortController()
     try {
-      const search = deps.locateSentCopy(input.accountId, messageId)
+      const search = deps.locateSentCopy(input.accountId, messageId, stopSearch.signal)
       search.catch(() => undefined) // ein spätes Scheitern nach der Frist darf nicht unbehandelt bleiben
       located = await Promise.race([
         search,
-        new Promise<{ mailbox?: string; uid?: number }>(resolve => { giveUp = setTimeout(() => resolve({}), deps.locateTimeoutMs ?? GRAPH_LOCATE_TIMEOUT_MS) })
+        new Promise<{ mailbox?: string; uid?: number }>(resolve => {
+          giveUp = setTimeout(() => { stopSearch.abort(); resolve({}) }, deps.locateTimeoutMs ?? GRAPH_LOCATE_TIMEOUT_MS)
+        })
       ])
     } catch { /* bleibt leer */ } finally {
       if (giveUp) clearTimeout(giveUp)
