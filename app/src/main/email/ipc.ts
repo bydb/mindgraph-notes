@@ -20,6 +20,7 @@ import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBack
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
 import { buildImapOptions } from './connection'
 import { buildOutgoingMail, renderRawMessage } from './outgoing'
+import { emailCredentialFileName } from './credentialPath'
 import { getDeviceId } from '../deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../../shared/emailMerge'
 import { recordLlmRun, collectRunTotals } from '../llm/telemetry'
@@ -51,7 +52,8 @@ export function registerEmailIpc(deps: EmailIpcDeps): void {
   } = deps
 
   function getEmailCredentialsPath(accountId: string): string {
-    return path.join(app.getPath('userData'), `email-${accountId}.enc`)
+    // Wirft bei einer ID, die nicht nach Konto aussieht (siehe credentialPath.ts).
+    return path.join(app.getPath('userData'), emailCredentialFileName(accountId))
   }
 
   type EmailSettingsSnapshot = {
