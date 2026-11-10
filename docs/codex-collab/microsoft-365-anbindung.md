@@ -449,4 +449,12 @@ F26 (MIME entsteht erst nach dem SMTP-Versand).
 
 ## Status
 
-Fassung 3 vom Nutzer freigegeben (10.11.2026). Abschnitte 0 und 1 in Arbeit; Prüfung durch Codex je Bauabschnitt am Code.
+Fassung 3 vom Nutzer freigegeben (10.11.2026).
+
+- Abschnitt 0 und 1: erledigt, von Codex am Code geprüft (`microsoft-abschnitt-0-1-review.md`), auf master.
+- Abschnitt 2: Aufbau der Mail nach `app/src/main/email/outgoing.ts` gezogen (`buildOutgoingMail`,
+  `renderRawMessage`, 8 Tests; der verschobene Code ist per Parser tokengleich). Die Reihenfolge der
+  Prüfungen im Handler (Passwort, SMTP-Host, Anhänge) ist bewusst unverändert; die Trennung in zwei
+  Transportzweige entsteht erst mit dem Graph-Versand (Abschnitt 6), weil es vorher keinen zweiten
+  Zweig gibt. Festgestellt und per Test festgehalten: Der Rohtext für die Gesendet-Kopie enthält die
+  `Bcc:`-Zeile — die Kopie auf dem Server trägt sie heute schon.

@@ -19,6 +19,7 @@ import { isHardLocked as isModelHardLocked } from '../../shared/modelCompatibili
 import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from '../llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
 import { buildImapOptions } from './connection'
+import { buildOutgoingMail, renderRawMessage } from './outgoing'
 import { getDeviceId } from '../deviceId'
 import { readDeviceCursor, writeDeviceCursor, flattenDeviceCursors, pruneTombstones, dedupeEmailsById } from '../../shared/emailMerge'
 import { recordLlmRun, collectRunTotals } from '../llm/telemetry'
@@ -2421,79 +2422,8 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
         }
       })
 
-      // HTML aus Body generieren: Plain Text/Markdown-Links werden gerendert,
-      // explizites HTML aus Body/Signatur wird auf eine sichere E-Mail-Teilmenge reduziert.
-      let htmlBody = renderEmailHtml(composeData.body)
+      const { mailOptions, messageId: explicitMessageId } = await buildOutgoingMail(composeData, renderEmailHtml)
 
-      // Signatur-Bild als CID-Attachment einbetten
-      const attachments: Array<{ filename: string; path: string; cid?: string }> = []
-
-      // File-Anhaenge hinzufuegen (Existenz ist oben bereits geprueft)
-      for (const att of composeData.attachments || []) {
-        attachments.push({ filename: att.filename, path: att.path })
-      }
-      if (composeData.signatureImagePath) {
-        try {
-          await fs.access(composeData.signatureImagePath)
-          const ext = path.extname(composeData.signatureImagePath).toLowerCase()
-          attachments.push({
-            filename: `signature${ext}`,
-            path: composeData.signatureImagePath,
-            cid: 'signature-image'
-          })
-          const imgTag = `<img src="cid:signature-image" width="250" style="display:block; max-width:250px; height:auto;" />`
-          // Bild direkt nach dem "--" Trennstrich einfuegen
-          const sigMarker = '--<br>'
-          const sigDivider = htmlBody.lastIndexOf(sigMarker)
-          if (sigDivider !== -1) {
-            const afterSig = sigDivider + sigMarker.length
-            htmlBody = htmlBody.substring(0, afterSig) + `<br>${imgTag}<br>` + htmlBody.substring(afterSig)
-          } else {
-            htmlBody += `<br>${imgTag}`
-          }
-        } catch { /* Bild nicht gefunden, ignorieren */ }
-      }
-
-      // fromAddress ist die volle Email-Adresse (user kann nur Username sein)
-      const senderAddress = account.fromAddress || account.user
-      const mailOptions: Record<string, unknown> = {
-        from: account.name ? { name: account.name, address: senderAddress } : senderAddress,
-        sender: senderAddress,
-        envelope: {
-          from: senderAddress,
-          to: [
-            ...composeData.to.map(r => r.address),
-            ...(composeData.cc || []).map(r => r.address),
-            ...(composeData.bcc || []).map(r => r.address)
-          ]
-        },
-        // Adressobjekte: nodemailer kodiert Namen mit " oder \\ selbst korrekt (Codex F08).
-        to: composeData.to.map(r => r.name ? { name: r.name, address: r.address } : r.address),
-        subject: composeData.subject,
-        text: composeData.body,
-        html: htmlBody,
-        attachments
-      }
-
-      if (composeData.cc && composeData.cc.length > 0) {
-        mailOptions.cc = composeData.cc.map(r => r.name ? { name: r.name, address: r.address } : r.address)
-      }
-      // BCC: nodemailer setzt die Empfaenger in den SMTP-Umschlag, laesst die
-      // Kopfzeile aber weg (auch im streamTransport fuer die IMAP-Kopie — dort
-      // waere `keepBcc` noetig, das bewusst nicht gesetzt ist).
-      if (composeData.bcc && composeData.bcc.length > 0) {
-        mailOptions.bcc = composeData.bcc.map(r => r.name ? { name: r.name, address: r.address } : r.address)
-      }
-      if (composeData.inReplyTo) {
-        mailOptions.inReplyTo = composeData.inReplyTo
-        mailOptions.references = composeData.references || composeData.inReplyTo
-      }
-
-      // Konsistente Message-ID setzen, damit SMTP-Versand und IMAP-Append dieselbe Mail referenzieren
-      const messageIdHost = (account.fromAddress || account.user || account.smtpHost || 'mindgraph').split('@').pop() || 'mindgraph'
-      const { randomUUID } = await import('crypto')
-      const explicitMessageId = `<${randomUUID()}@${messageIdHost}>`
-      mailOptions.messageId = explicitMessageId
 
       const info = await transporter.sendMail(mailOptions)
       console.log('[Email] Sent successfully:', mailRef(info.messageId))
@@ -2512,9 +2442,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
             appendWarning = 'Mail gesendet, aber IMAP-Passwort fehlt — Kopie im Gesendet-Ordner uebersprungen.'
           } else {
             // Raw RFC-822 Bytes mit demselben mailOptions-Objekt erzeugen
-            const rawTransporter = nodemailer.default.createTransport({ streamTransport: true, buffer: true, newline: 'unix' })
-            const rawInfo = await rawTransporter.sendMail(mailOptions)
-            const rawMessage: Buffer = Buffer.isBuffer(rawInfo.message) ? rawInfo.message : Buffer.from(String(rawInfo.message))
+            const rawMessage = await renderRawMessage(mailOptions)
 
             const { ImapFlow } = await import('imapflow')
             const imapClient = new ImapFlow(buildImapOptions(
