@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.2] - 2026-11-11
+
+**Sie können jetzt ein Postfach bei Microsoft 365 einbinden: Sie melden sich im Browser bei Microsoft an, und MindGraph ruft Ihre Mails ab, wertet sie lokal aus und versendet Antworten über Ihr Konto.** Ein Passwort geben Sie in MindGraph dafür nicht ein. Die Anmeldung finden Sie unter Einstellungen → E-Mail und im Einrichtungsassistenten. In den meisten Organisationen muss die Administration die Anwendung vorher einmal freigeben.
+
+### Hintergrund
+
+- **Auslöser:** Behörden, Schulen und viele Unternehmen arbeiten mit Microsoft 365. Dort nimmt Microsoft für den Mailabruf keine Passwörter mehr an; der bisherige Weg mit Server, Benutzername und Passwort scheiterte deshalb beim ersten Versuch.
+- **Anmeldung:** Sie läuft im Browser direkt bei Microsoft, einschließlich der dort eingerichteten zweiten Stufe. MindGraph sieht Ihr Passwort nie. Die Anmeldung wird verschlüsselt auf Ihrem Rechner gespeichert und nicht zwischen Geräten abgeglichen.
+- **Rechte:** MindGraph fragt vier Rechte an, alle nur für das eigene Postfach: Name und Anmeldename lesen, angemeldet bleiben, Mails abrufen, Mails senden. Kalender, Kontakte, Dateien, Teams und SharePoint gehören nicht dazu.
+- **Abruf und Versand:** Mails gehen direkt zwischen Ihrem Rechner und Microsoft, ohne einen Server dazwischen. Gesendete Mails erscheinen wie gewohnt im Ordner „Gesendete Elemente“ Ihres Postfachs. Nach dem Senden meldet MindGraph „An Microsoft übergeben“; bleibt nach einem Verbindungsabbruch unklar, ob eine Mail hinausging, behält MindGraph den Entwurf und fragt vor einem zweiten Versuch nach.
+- **Freigabe durch die Administration:** Ohne Freigabe zeigt Microsoft bei der Anmeldung „Administratorgenehmigung erforderlich“. Die Anwendung wird derzeit als „nicht überprüft“ angezeigt, weil die Prüfung des Herausgebers bei Microsoft noch aussteht. Organisationen, die nur selbst registrierte Anwendungen zulassen, können unter „Eigene App-Registrierung der Organisation“ ihre eigene eintragen.
+- **Voraussetzung:** Für das Postfach muss IMAP eingeschaltet sein. Die klassische SMTP-Anmeldung wird nicht gebraucht.
+- **Sicherheit:** Eine Lücke bei den gespeicherten Mailpasswörtern ist geschlossen: Ein manipulierter Kontoname hätte innerhalb der App andere gespeicherte Zugangsdaten lesbar machen können. Außerdem enthalten die Diagnoseausgaben des Mailbereichs keine Betreffzeilen und Adressen mehr.
+- **Grenzen:** Nur Konten von Organisationen; private Outlook.com-Adressen und die nationalen Microsoft-Clouds werden nicht unterstützt. Funktionspostfächer, Kalender und SharePoint sind nicht angebunden. Die eigene App-Registrierung ist gebaut, aber noch nicht in einer zweiten Organisation erprobt.
+
 ## [1.3.1] - 2026-11-09
 
 **Während eine E-Mail offen ist, können Sie jetzt Text aus dem Chat oder vom Agenten kopieren und in die Mail einfügen.** Das Schreibfenster lässt sich verschieben, in der Größe ändern und zu einer Leiste verkleinern. Eine eingefügte Liste von Adressen, etwa eine pro Zeile aus einer Tabelle, wird zu einzelnen Empfängern.
