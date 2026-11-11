@@ -43,6 +43,9 @@ export const ComposeView: React.FC = () => {
   // In diesem Sendeablauf schon bestätigte Rückfragen. „Trotzdem erneut senden“ übernimmt nur,
   // was der Nutzer wirklich bestätigt hat, statt Betreff- und Anhangprüfung zu überspringen (Codex F31).
   const approved = useRef({ subject: false, attachments: false })
+  // Ändert sich der Betreff, gilt eine frühere Freigabe „ohne Betreff“ nicht mehr.
+  const composeSubject = composeState?.subject
+  useEffect(() => { approved.current.subject = false }, [composeSubject])
   useEffect(() => {
     setUncertainSend(!!composeDraftId && UNCERTAIN_DRAFTS.has(composeDraftId))
     setConfirmResend(false)
@@ -296,8 +299,11 @@ export const ComposeView: React.FC = () => {
   }, [composeState, ltSettings, setComposeState])
 
   const handleSend = async (allowEmptySubject = false, allowMissingAttachments = false, allowResend = false) => {
-    if (allowEmptySubject) approved.current.subject = true
-    if (allowMissingAttachments) approved.current.attachments = true
+    // Eine Freigabe zählt nur, wenn die Rückfrage in diesem Moment wirklich zutrifft: Der Knopf
+    // „Ohne Anhänge senden“ ruft handleSend(true, true) auf und darf damit keinen leeren Betreff
+    // freigeben, der gar nicht gefragt war (Codex F42).
+    if (allowEmptySubject && !composeState.subject.trim()) approved.current.subject = true
+    if (allowMissingAttachments && forwardIncomplete) approved.current.attachments = true
     if (!vaultPath || isSending || !hasSmtp || forwardLoading) return
     // Erst alle drei Felder übernehmen. Bleibt irgendwo eine ungültige Eingabe stehen,
     // geht nichts raus — sonst erreicht die Mail nur einen Teil der Empfänger.

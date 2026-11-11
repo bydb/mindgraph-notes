@@ -661,3 +661,71 @@ describe('createMicrosoftAuth — Befunde der dritten Prüfrunde', () => {
     expect(requests[1].prompt).toBeUndefined()
   })
 })
+
+describe('createMicrosoftAuth — Befunde der vierten Prüfrunde', () => {
+  const mainFiles = async (): Promise<string[]> => (await fs.readdir(authDir(), { withFileTypes: true })).filter(e => e.isFile()).map(e => e.name)
+
+  it('Abmeldung zwischen den beiden Proben: die Zustandsabfrage meldet keinen Teilerfolg (Codex F37)', async () => {
+    let armed = false
+    let auth: ReturnType<typeof createMicrosoftAuth>
+    auth = createMicrosoftAuth(makeDeps(fakeMsal({
+      silentError: (scopes) => {
+        // Die erste Probe (Abruf) ist schon durch; während der zweiten (Versand) wird abgemeldet.
+        if (armed && scopes === GRAPH_SCOPES) { armed = false; void auth.logout(ID).catch(() => undefined) }
+        return null
+      }
+    })))
+    await auth.login()
+    armed = true
+    expect(await auth.status(ID)).toMatchObject({ signedIn: false, fetchReady: false, sendReady: false })
+  })
+
+  it('ein Client, dessen Erzeugung ein Zurücksetzen überdauert, schreibt danach nichts (Codex F38)', async () => {
+    await createMicrosoftAuth(makeDeps(fakeMsal())).login()
+    const gate = hang()
+    const msal = fakeMsal({ silentWrites: true })
+    // Neue Instanz: der Client entsteht erst beim Abruf, und das Laden der Bibliothek hängt.
+    const auth = createMicrosoftAuth(makeDeps(msal, { loadMsal: async () => { await gate.promise; return msal } }))
+    const pending = auth.getImapAuth(ID).catch(e => e)
+    await new Promise(r => setTimeout(r, 20))
+    await auth.resetStorage()
+    expect(await mainFiles()).toEqual([])
+    gate.release()
+    expect(await pending).toMatchObject({ code: 'reauth-required' })
+    await new Promise(r => setTimeout(r, 30))
+    expect(await mainFiles()).toEqual([])
+  })
+
+  it('ein Markenabruf, der während des Zurücksetzens beginnt, wartet es ab und bekommt nichts (Codex F44)', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    await auth.login()
+    const reset = auth.resetStorage()
+    const during = auth.getGraphToken(ID).catch(e => e)
+    await reset
+    expect(await during).toMatchObject({ code: 'reauth-required' })
+    expect(await mainFiles()).toEqual([])
+  })
+
+  it('eine Anmeldung, die während des Zurücksetzens beginnt, wartet es ab und ist danach vollständig (Codex F40)', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    await auth.login()
+    const reset = auth.resetStorage()
+    const during = auth.login()
+    await reset
+    const result = await during
+    expect(result.status).toMatchObject({ signedIn: true, fetchReady: true, sendReady: true })
+    expect((await auth.getImapAuth(ID)).accessToken).toBe('imap-marke-1111')
+    // Bindung und Marken liegen in der neuen Ablage, die alten im Sicherungsordner.
+    expect((await mainFiles()).sort()).toEqual(['accounts.enc', expect.stringMatching(/^cache-/)])
+  })
+
+  it('nach einem Zurücksetzen arbeitet dieselbe Instanz normal weiter (Codex F39)', async () => {
+    const auth = createMicrosoftAuth(makeDeps(fakeMsal()))
+    await auth.login()
+    await auth.resetStorage()
+    await auth.resetStorage() // zweites Mal ohne Dateien: kein Fehler, keine hängende Sperre
+    expect((await auth.login()).status).toMatchObject({ signedIn: true, fetchReady: true })
+    await auth.logout(ID)
+    expect(await auth.status(ID)).toMatchObject({ signedIn: false })
+  })
+})

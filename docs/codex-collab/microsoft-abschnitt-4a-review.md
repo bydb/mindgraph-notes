@@ -379,6 +379,96 @@ Die F20-Korrektur hält solange derselbe Entwurf geöffnet bleibt: Ein unklarer 
 
 Nach empfangenem HTTP 202 kann die Gesendet-Suche keinen Misserfolg mehr an die Oberfläche liefern: Fehler und Frist werden abgefangen, anschließend wird `success:true` zurückgegeben (`app/src/main/email/graphSend.ts:185-201`).
 
+### Runde 4
+
+### F37 — Status kann nach Abmeldung einen alten Teilerfolg melden
+Schwere: mittel
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:469
+Status: [OFFEN]
+
+F28 erfasst den Stempel jetzt vor `loadBindings()` (`app/src/main/email/microsoftAuth.ts:639-645`). `statusOf` prüft aber IMAP und Graph nacheinander und kombiniert ihre Ergebnisse ohne abschließende Stempelprüfung (`app/src/main/email/microsoftAuth.ts:461-469`). Wenn die IMAP-Probe erfolgreich war und danach `logout()` den Zähler erhöht oder `resetStorage()` die Epoche wechselt, schlägt nur die Graph-Probe fehl; `fetchReady:true` und `signedIn:true` können noch nach Abmeldung oder Reset zurückkommen (`app/src/main/email/microsoftAuth.ts:649-658`, `app/src/main/email/microsoftAuth.ts:693-710`). Der `catch`-Zweig in `status()` gibt zwar nur `false` zurück, greift bei diesem normalen Mischresultat aber nicht.
+
+Vorschlag: Vor der Status-Rückgabe `stillValid(accountId, stamp)` erneut prüfen und bei Ungültigkeit beide Fähigkeiten auf `false` setzen; den Wechsel genau zwischen den beiden Proben testen.
+
+### F38 — Verspätete Client-Erzeugung übernimmt die neue Ablage-Epoche
+Schwere: hoch
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:370
+Status: [OFFEN]
+
+`getClient()` legt die Promise sofort in `clients` ab, erfasst `born` aber erst **nach** dem asynchronen Laden von MSAL (`app/src/main/email/microsoftAuth.ts:365-370`, `app/src/main/email/microsoftAuth.ts:393-397`). Beginnt ein Client vor `resetStorage()`, wartet beim Import, und wird die Map beim Reset geleert, kann seine Promise danach mit `born` der **neuen** Epoche fertig werden (`app/src/main/email/microsoftAuth.ts:693-709`). Das Cache-Plugin dieses alten, noch vom Aufrufer gehaltenen Clients darf dann wieder aus dem neuen Hauptordner lesen und dorthin schreiben (`app/src/main/email/microsoftAuth.ts:375-386`). Gerade eine verspätete interaktive MSAL-Rückgabe kann so nach dem Reset erneut Cache-Dateien erzeugen; die Stempelprüfung verhindert nur die Herausgabe einer Marke über `getImapAuth`/`getGraphToken`. F27 ist an dieser Import-Grenze nicht geschlossen.
+
+Vorschlag: `born` synchron vor dem ersten `await` in `getClient()` erfassen und den Client nach dem Import bei Epochenwechsel verwerfen; einen verzögerten `loadMsal`-Test über Reset hinweg ergänzen.
+
+### F39 — Fehlgeschlagener Reset lässt lebende Clients dauerhaft veraltet
+Schwere: hoch
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:698
+Status: [OFFEN]
+
+Die Epoche steigt am Anfang der Reset-Operation, bevor Verzeichnislesen, Sicherungsordner und alle `rename`-Schritte erfolgreich waren (`app/src/main/email/microsoftAuth.ts:693-705`). Scheitert einer davon, erreicht der Code `clients.clear()` nicht (`app/src/main/email/microsoftAuth.ts:707-709`). Die vorhandenen Client-Promises bleiben in der Map, ihr `born` hat nun dauerhaft die alte Epoche und ihr Cache-Plugin liest oder schreibt nichts mehr (`app/src/main/email/microsoftAuth.ts:365-386`). Selbst eine anschließende neue Anmeldung kann denselben funktionslosen Client aus der Map erhalten; bestehende Bindungen können noch vorliegen, aber Cache und Anmeldung bleiben bis zu einem weiteren erfolgreichen Reset oder App-Neustart inkonsistent. Bei teilweisem Verschieben ist zusätzlich unklar, welche Dateien aktiv und welche gesichert sind.
+
+Vorschlag: Clients beim Epochenwechsel auch auf dem Fehlerpfad invalidieren; Reset-Dateioperationen und anschließende Wiederherstellung bei `readdir`-, `mkdir`- und `rename`-Fehlern gezielt testen.
+
+### F40 — Anmeldung während eines erfolgreichen Resets kann ohne gespeicherte Marke enden
+Schwere: hoch
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:698
+Status: [OFFEN]
+
+`resetStorage()` erhöht `epoch` zu Beginn seiner asynchronen Schreibketten-Operation, leert `clients` aber erst **nach** dem Verschieben der Dateien (`app/src/main/email/microsoftAuth.ts:693-709`). Eine in diesem Fenster gestartete Anmeldung erfasst bereits die neue `startEpoch`, kann aber aus `getClient()` noch einen alten Client mit `born` der vorigen Epoche erhalten (`app/src/main/email/microsoftAuth.ts:365-386`, `app/src/main/email/microsoftAuth.ts:493-502`). Dessen Cache-Plugin verwirft die interaktive Cache-Änderung. Nach Ende des Resets besteht die Epochenprüfung beim Speichern der Bindung, weil `startEpoch` schon neu ist (`app/src/main/email/microsoftAuth.ts:617-625`): Die Anmeldung kann als `signed-in` gespeichert werden, obwohl der neue Cache keine Marke enthält; die anschließende Statusprobe meldet dann `reauth-required` (`app/src/main/email/microsoftAuth.ts:425-427`, `app/src/main/email/microsoftAuth.ts:626-627`). Die bloße Map-Leerung am Ende tauscht den bereits an `login` ausgegebenen Client nicht aus.
+
+Vorschlag: Während der gesamten Reset-Operation neue Anmeldungen sperren oder sie auf die abgeschlossene Epoche und einen frisch erstellten Client warten lassen.
+
+### F41 — Abbruch während des IMAP-Imports verpasst den Listener
+Schwere: mittel
+ADR-Stelle: app/src/main/email/ipc.ts:2464
+Status: [OFFEN]
+
+`locateMicrosoftSentCopy` prüft `signal.aborted` vor dem asynchronen `import('imapflow')`, hängt den Abbruch-Listener aber erst **danach** an den neuen Client (`app/src/main/email/ipc.ts:2461-2470`). Läuft die 12-Sekunden-Frist während des Imports ab, ist das Signal bereits ausgelöst und `addEventListener` ruft `onAbort` nicht rückwirkend auf. Der Code startet dann trotzdem `client.connect()`; erst nach `findSentMailbox` prüft er erneut auf Abbruch (`app/src/main/email/ipc.ts:2471-2475`). Damit kann die Hintergrundsuche weiter eine Verbindung öffnen und bis zu den IMAP-Zeitlimits warten, obwohl `sendViaGraph` bereits Erfolg meldete (`app/src/main/email/graphSend.ts:193-208`). Der neue Test prüft nur die Auslösung des Signals, nicht diesen Import-Zeitpunkt oder `client.close()` an einer echten Verbindung (`app/src/main/email/graphSend.test.ts:166-175`).
+
+Vorschlag: Nach dem Import und unmittelbar nach dem Registrieren des Listeners den Abbruchzustand prüfen und gegebenenfalls sofort schließen, bevor `connect()` beginnt.
+
+### F42 — Anhangbestätigung genehmigt unbeabsichtigt leeren Betreff
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/InboxPanel/ComposeView.tsx:696
+Status: [OFFEN]
+
+Der Knopf „Ohne Anhänge senden“ ruft weiterhin `handleSend(true, true)` auf (`app/src/renderer/components/InboxPanel/ComposeView.tsx:683-699`). Die neue Logik deutet das erste `true` nun als ausdrückliche Betreff-Freigabe und schreibt `approved.current.subject = true`, selbst wenn der Betreff beim Anzeigen der Anhangwarnung gefüllt war (`app/src/renderer/components/InboxPanel/ComposeView.tsx:298-300`). Bei einem Entwurf mit unklarem früheren Versand kann anschließend die Wiederholungswarnung erscheinen (`app/src/renderer/components/InboxPanel/ComposeView.tsx:307-320`). Leert der Nutzer den Betreff in diesem Zustand, übergibt „Trotzdem erneut senden“ die unverdiente Freigabe und sendet ohne Betreff-Rückfrage (`app/src/renderer/components/InboxPanel/ComposeView.tsx:670-679`). F31 ist für diesen Ablauf nicht geschlossen. Der reguläre Passwortversand gelangt mangels `uncertain:true` im SMTP-Ergebnis nicht in diese Wiederholungswarnung (`app/src/main/email/ipc.ts:2655`).
+
+Vorschlag: Der Anhangknopf darf nur `allowMissingAttachments` freigeben; Bestätigungen an die geprüften aktuellen Werte des Entwurfs binden.
+
+### F43 — Unmount-Abbruch greift nach dem Browser-Ergebnis nicht mehr
+Schwere: mittel
+ADR-Stelle: app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:105
+Status: [OFFEN]
+
+Die neue Effect-Cleanup ruft beim Verschwinden des startenden Knopfs `emailMicrosoftCancelLogin()` auf (`app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:102-107`). Im Main wird `activeLogin` jedoch bereits unmittelbar nach dem interaktiven Ergebnis auf `null` gesetzt; danach laufen Kontoprüfung, Cache-Bereinigung, Bindungsspeicherung und Statusabfrage weiter (`app/src/main/email/microsoftAuth.ts:544-555`, `app/src/main/email/microsoftAuth.ts:558-627`). Verschwindet die Karte in diesem Fenster, trifft der Abbruch keinen aktiven Versuch mehr (`app/src/main/email/microsoftAuth.ts:635-637`). Der ausgehängte Hook verarbeitet den späteren Erfolg trotzdem und schreibt das Konto in `email.accounts` (`app/src/renderer/components/Settings/EmailMicrosoftAccounts.tsx:63-98`). F32 ist damit für die interaktive Wartezeit verbessert, aber nicht für den gesamten Anmeldeabschluss geschlossen.
+
+Vorschlag: Eine Versuchs-ID bis zum abgeschlossenen Bindungsschreiben im Main aktiv halten und im Renderer Ergebnisse nach Unmount verwerfen; den Abbruch genau nach dem interaktiven Ergebnis testen.
+
+### F44 — Markenabruf kann in der laufenden Reset-Operation die neue Epoche übernehmen
+Schwere: hoch
+ADR-Stelle: app/src/main/email/microsoftAuth.ts:698
+Status: [OFFEN]
+
+Die Epoche wird erhöht, bevor `resetStorage()` die Dateien verschiebt und die alte `clients`-Map leert; dazwischen liegen mehrere `await`-Grenzen (`app/src/main/email/microsoftAuth.ts:693-709`). Ein **erst in diesem Fenster** gestarteter `getImapAuth`-/`getGraphToken`-Aufruf erfasst bereits die neue Epoche, kann aber noch die alte Bindung aus der noch aktiven Datei lesen und den alten Client aus der Map erhalten (`app/src/main/email/microsoftAuth.ts:443-448`, `app/src/main/email/microsoftAuth.ts:714-725`, `app/src/main/email/microsoftAuth.ts:365-397`). Dessen Plugin liest zwar wegen `born` nichts mehr von der Platte, ein schon geladener MSAL-Cache bleibt aber im Client-Speicher: Die echte Bibliothek fragt nach `beforeCacheAccess` ihre interne `storage` ab, ohne sie zuvor zu leeren (`app/node_modules/@azure/msal-node/dist/cache/TokenCache.mjs:90-102`); `findMsalAccount` und `acquireTokenSilent` können ihn verwenden (`app/src/main/email/microsoftAuth.ts:400-407`, `app/src/main/email/microsoftAuth.ts:421-440`). Die Schlussprüfung sieht denselben neuen Epochenwert und kann damit eine Marke **nach Abschluss** des Resets herausgeben. F26 ist nur für vor der Erhöhung gestartete Abrufe geschlossen.
+
+Vorschlag: Reset als eigenen gesperrten Zwischenzustand führen; bis nach Verschiebung und Client-Austausch keine neue Bindung und keine Marke aus dem alten Cache zulassen. Den Abruf direkt nach `epoch++` testen.
+
+Die F26-Korrektur trägt für einen bereits laufenden Markenabruf: `getImapAuth` und `getGraphToken` erfassen die Epoche vor dem Bindungslesen, und `silentToken` prüft sie vor der Rückgabe erneut (`app/src/main/email/microsoftAuth.ts:421-440`, `app/src/main/email/microsoftAuth.ts:714-725`).
+
+Die F27-Korrektur trägt für einen vor dem Reset vollständig erzeugten Client: Sein Cache-Plugin vergleicht `born` beim Lesen und vor dem serialisierten Schreiben mit `epoch` (`app/src/main/email/microsoftAuth.ts:370-386`).
+
+Die F34-Korrektur trägt für eine vor dem Reset gestartete Anmeldung: Die Bindungsspeicherung prüft `startEpoch` innerhalb derselben Schreibkette wie der Reset (`app/src/main/email/microsoftAuth.ts:496`, `app/src/main/email/microsoftAuth.ts:617-625`, `app/src/main/email/microsoftAuth.ts:693-710`).
+
+Die F29-Korrektur trägt für den normalen Anmeldeabschluss und seine geworfenen Fehler: Der `try`-Block umfasst `discard`, Bindungsspeicherung und Rückgabestatus, und das `finally` entfernt den Claim (`app/src/main/email/microsoftAuth.ts:558-583`, `app/src/main/email/microsoftAuth.ts:617-632`).
+
+Die F36-Korrektur trägt für die Auswahlparameter: Nur bei bekanntem erwarteten Konto wird `loginHint` ohne `select_account` übergeben; der spätere Vergleich der abgeleiteten ID bleibt bestehen, sodass eine andere Browseridentität nicht gebunden wird (`app/src/main/email/microsoftAuth.ts:499-520`, `app/src/main/email/microsoftAuth.ts:575-584`). Ob Microsoft ohne Browsersitzung eine neue Anmeldung fordert oder eine andere bestehende Sitzung anbietet, ist hier nicht live geprüft.
+
+Die F33-Korrektur trägt für einen bereits registrierten Abbruch-Listener: Der Fristablauf signalisiert `abort`, `locateMicrosoftSentCopy` ruft darauf `client.close()` und überspringt bei Abbruch `logout()`; ein späteres Scheitern der Suche hat einen Catch-Handler (`app/src/main/email/graphSend.ts:193-208`, `app/src/main/email/ipc.ts:2467-2490`).
+
+Die F30/F35-Korrektur trägt innerhalb derselben App-Sitzung: Ein unklarer Versand wird unter der Entwurfs-ID gespeichert und erst nach erfolgreichem Versand entfernt, während eine sichere Absage den Vermerk stehen lässt (`app/src/renderer/components/InboxPanel/ComposeView.tsx:21-50`, `app/src/renderer/components/InboxPanel/ComposeView.tsx:325-339`). Der Vermerk geht nach App-Neustart verloren, wie im Code ausdrücklich festgehalten (`app/src/renderer/components/InboxPanel/ComposeView.tsx:21-23`).
+
+Merge-Einschaetzung: Aus meiner Sicht sprechen F38 bis F40 und F44 als hohe Befunde gegen den Merge auf master; insbesondere die Reset-Rennen können nach dem Zurücksetzen wieder Marken-Dateien, eine angemeldete Bindung ohne nutzbaren Cache oder eine noch herausgegebene Marke hinterlassen. Die echten Browser-, Versand- und Oberflächenwege dieses Commits sind außerdem noch nicht live geprüft.
+
 ## Claude-Antwort
 
 Alle dreizehn Befunde tragen. Nachgestellt bzw. nachgeschlagen: F01 (Pfadrechnung, Handler), F02,
@@ -524,6 +614,38 @@ Ordnerliste geht, fremder Server aus den Renderer-Angaben wird nicht kontaktiert
 Änderungen (Hinzufügen und „Erneut anmelden“), Senden über das Schreibfenster, die geänderte
 Einstellungsseite und die neuen Rückfragen auf dem Bildschirm, das Zurücksetzen an der laufenden App.
 
+### Antworten auf Runde 4 (11.11.2026)
+
+Codex' Merge-Einschätzung war: nicht mergen, wegen F38–F40 und F44. Alle vier betreffen das
+Zurücksetzen der Ablage (`resetStorage`) im Zusammenspiel mit gleichzeitig laufenden Vorgängen.
+Ich habe deshalb NICHT gemergt, sondern korrigiert und lege es dem Nutzer vor. Die folgenden
+Korrekturen hat wieder kein Prüfer gesehen.
+
+- **F37 [ADRESSIERT]** — `statusOf` prüft den Stempel nach beiden Proben erneut; Test mit Abmeldung
+  genau während der zweiten Probe.
+- **F38 [ADRESSIERT]** — `born` wird in `getClient` synchron vor dem Laden der Bibliothek erfasst;
+  Test mit hängendem `loadMsal` über ein Zurücksetzen hinweg.
+- **F39, F40, F44 [ADRESSIERT]** — `resetStorage` ist kein `async` mehr: Epoche erhöhen, Clients
+  verwerfen und die Sperre (`resetting`) setzen laufen beim Aufruf synchron in einem Stück; das
+  Verschieben folgt danach in der Schreibkette. Jeder Einstieg (Anmelden, Abmelden, Zustand,
+  Markenabruf) nimmt seinen Stempel synchron beim Eintritt und wartet dann auf ein laufendes
+  Zurücksetzen. Tests: Markenabruf und Anmeldung, die während des Zurücksetzens beginnen. Der Test
+  zu F44 war zunächst rot und hat die Lücke gezeigt; die Umstellung auf den synchronen Block hat ihn
+  grün gemacht. Für F39 gibt es nur einen Test des Gutfalls (zweimal zurücksetzen, weiterarbeiten),
+  keinen mit scheiterndem Verschieben.
+- **F41 [ADRESSIERT]** — nach dem Registrieren des Listeners wird der Abbruch erneut geprüft, vor
+  `connect()`.
+- **F42 [ADRESSIERT]** — eine Freigabe zählt nur, wenn die Rückfrage in dem Moment zutrifft; die
+  Betreff-Freigabe verfällt, wenn sich der Betreff ändert.
+- **F43 [DISKUSSION]** — trägt als Beobachtung. Nicht geändert: Wer die Anmeldung im Browser
+  abgeschlossen hat und danach den Schritt verlässt, bekommt das Konto trotzdem in die
+  Einstellungen. Das halte ich für das richtige Ergebnis (er HAT sich angemeldet); die Alternative
+  wäre eine angemeldete Bindung ohne sichtbares Konto.
+
+Geprüft: typecheck, build, vitest gesamt 3742 grün (shellExecution.test.ts ein Zeitlimit-Ausfall im
+Gesamtlauf, einzeln grün), 48 Tests im Anmeldemodul. Test-App mit dem Testprofil neu gestartet, nur
+lesend: Konto berechtigt, Ordnerliste, kein Kontakt zu einem vom Renderer genannten Server.
+
 ## Status
 
-Runden 2 und 3 beantwortet (Nachtlauf). Offen für den Nutzer: F14, F23, dauerhafter Vermerk aus F30; Gegenprobe mit echter Anmeldung und auf dem Bildschirm. Die Korrekturen zu Runde 3 sind ungeprüft.
+Vier Runden beantwortet. Codex riet in Runde 4 vom Merge ab (F38–F40, F44, alle zum Zurücksetzen der Ablage); die Korrekturen dazu sind umgesetzt, aber ungeprüft. Entscheidung über den Merge liegt beim Nutzer.

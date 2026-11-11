@@ -2468,6 +2468,9 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     // Gesendet-Ordner nicht weiter gesperrt halten.
     const onAbort = (): void => { try { client.close() } catch { /* ignore */ } }
     signal?.addEventListener('abort', onAbort, { once: true })
+    // Lief die Frist schon während des Ladens von imapflow ab, kommt das Ereignis nicht mehr:
+    // dann gar nicht erst verbinden (Codex F41).
+    if (signal?.aborted) { signal.removeEventListener('abort', onAbort); return {} }
     try {
       await client.connect()
       const mailbox = await findSentMailbox(client)

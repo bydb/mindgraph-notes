@@ -251,6 +251,12 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
   // eine fast fertige Anmeldung, das Cache-Plugin eines noch lebenden Clients — darf danach weder
   // eine Marke herausgeben noch etwas in die Ablage schreiben (Codex F26, F27, F34).
   let epoch = 0
+  // Läuft gerade ein Zurücksetzen, warten ALLE Einstiege (Anmelden, Abmelden, Zustand,
+  // Markenabruf) darauf, bevor sie irgendetwas lesen oder einen Stempel nehmen. Sonst könnte ein
+  // Vorgang, der mitten im Zurücksetzen beginnt, schon die neue Epoche tragen, aber noch die alte
+  // Bindung und den alten Client erwischen (Codex F40, F44).
+  let resetting: Promise<unknown> | null = null
+  const settled = async (): Promise<void> => { while (resetting) await resetting }
   /** Vor dem Lesen der Bindung erfassen, nach dem Markenabruf prüfen (Codex F15, F26, F28). */
   const stampOf = (accountId: string): { generation: number; epoch: number } => ({ generation: revocations.get(accountId) || 0, epoch })
   const stillValid = (accountId: string, stamp: { generation: number; epoch: number }): boolean =>
@@ -364,10 +370,12 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     const key = clientKey(clientId, tenant)
     let client = clients.get(key)
     if (!client) {
+      // Synchron erfassen, VOR dem Laden der Bibliothek: ein Client, dessen Erzeugung ein
+      // Zurücksetzen überdauert, gehört zur alten Epoche (Codex F38).
+      const born = epoch
       client = (async () => {
         const msal = await (deps.loadMsal ? deps.loadMsal() : (import('@azure/msal-node') as unknown as Promise<MsalModule>))
         const name = cacheFile(clientId, tenant)
-        const born = epoch
         return new msal.PublicClientApplication({
           auth: { clientId, authority: `${AUTHORITY_ORIGIN}/${tenant}` },
           cache: {
@@ -466,6 +474,8 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
     if (!deps.isEncryptionAvailable()) return { ...base, ...off, errorCode: 'encryption-unavailable' }
     const fetch = await probe(accountId, binding, IMAP_SCOPES, stamp)
     const send = await probe(accountId, binding, GRAPH_SCOPES, stamp)
+    // Zwischen den beiden Proben abgemeldet oder zurückgesetzt: kein Teilerfolg (Codex F37).
+    if (!stillValid(accountId, stamp)) return { ...base, ...off, errorCode: 'reauth-required' }
     return { ...base, signedIn: fetch.ok || send.ok, fetchReady: fetch.ok, sendReady: send.ok, errorCode: fetch.code || send.code }
   }
 
@@ -493,7 +503,11 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
   return {
     async login(options) {
       requireEncryption()
+      // Reihenfolge wie bei allen Einstiegen: erst (synchron) die Epoche festhalten, dann auf ein
+      // laufendes Zurücksetzen warten. Beginnt das Zurücksetzen erst danach, passt die Epoche
+      // am Ende nicht mehr; lief es schon, ist die neue Epoche bereits erfasst.
       const startEpoch = epoch
+      await settled()
       const { clientId, tenant } = resolveConfig(options)
       // Unlesbare Ablage: hier abbrechen, bevor ein Browser aufgeht — nichts überschreiben.
       const known = await loadBindings()
@@ -640,6 +654,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       if (!isMicrosoftAccountId(accountId)) return { known: false, signedIn: false, fetchReady: false, sendReady: false }
       try {
         const stamp = stampOf(accountId)
+        await settled()
         return await statusOf(accountId, (await loadBindings()).get(accountId), stamp)
       } catch (error) {
         return { known: true, signedIn: false, fetchReady: false, sendReady: false, errorCode: classifyMicrosoftError(error) }
@@ -648,6 +663,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
 
     async logout(accountId) {
       if (!isMicrosoftAccountId(accountId)) throw new MicrosoftAuthError('unknown-account')
+      await settled()
       // Zuerst im Speicher sperren: ab hier gibt kein laufender Abruf mehr eine Marke heraus.
       revocations.set(accountId, (revocations.get(accountId) || 0) + 1)
       const binding = await serialized(async () => {
@@ -690,12 +706,18 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
       }
     },
 
-    async resetStorage() {
+    resetStorage() {
+      // Bewusst KEIN `async` und kein `await` vor dem Setzen der Sperre: Dieser Block läuft beim
+      // Aufruf synchron in einem Stück. Epoche erhöhen, lebende Clients verwerfen und die Sperre
+      // setzen gehören zusammen — sonst gäbe es einen Moment, in dem ein neuer Vorgang die neue
+      // Epoche trägt, aber noch die alte Bindung und den alten Cache liest. Auch wenn das
+      // Verschieben unten scheitert, bleibt kein veralteter Client in der Map (Codex F39, F40, F44).
+      const previous = resetting
       activeLogin?.cancel('cancelled')
-      return serialized(async () => {
-        // Zuerst die Epoche erhöhen: ab hier gibt kein früher begonnener Vorgang mehr eine Marke
-        // heraus oder schreibt in die Ablage, auch nicht nach dem Verschieben.
-        epoch++
+      epoch++
+      clients.clear()
+      claimed.clear()
+      const run = (previous ?? Promise.resolve()).then(() => serialized(async () => {
         const dir = await storageDir()
         const names = (await fs.readdir(dir, { withFileTypes: true })).filter(e => e.isFile()).map(e => e.name)
         const backupDir = `zurueckgesetzt-${new Date().toISOString().replace(/[:.]/g, '-')}`
@@ -704,15 +726,16 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
           // Unverändert verschieben: die Dateien bleiben verschlüsselt und wiederherstellbar.
           for (const name of names) await fs.rename(path.join(dir, name), path.join(dir, backupDir, name))
         }
-        // Speicherzustand verwerfen: Clients halten ihren Cache im Arbeitsspeicher.
-        clients.clear()
-        claimed.clear()
         return { backupDir: names.length > 0 ? backupDir : '', movedFiles: names.length }
-      })
+      }))
+      const gate: Promise<void> = run.then(() => undefined, () => undefined).finally(() => { if (resetting === gate) resetting = null })
+      resetting = gate
+      return run
     },
 
     async getImapAuth(accountId) {
       const stamp = stampOf(accountId)
+      await settled()
       const binding = await requireBinding(accountId)
       const accessToken = await silentToken(accountId, binding, IMAP_SCOPES, stamp)
       return { ...MICROSOFT_IMAP_ENDPOINT, user: binding.username, accessToken }
@@ -720,6 +743,7 @@ export function createMicrosoftAuth(deps: MicrosoftAuthDeps): MicrosoftAuth {
 
     async getGraphToken(accountId) {
       const stamp = stampOf(accountId)
+      await settled()
       const binding = await requireBinding(accountId)
       const accessToken = await silentToken(accountId, binding, GRAPH_SCOPES, stamp)
       return { accessToken, username: binding.username, displayName: binding.displayName }
