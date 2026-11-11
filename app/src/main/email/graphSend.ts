@@ -18,7 +18,7 @@
 //   automatische Wiederholung.
 
 import * as fs from 'fs/promises'
-import { buildOutgoingMail, renderRawMessage, findMissingAttachments, type OutgoingMailInput } from './outgoing'
+import { buildOutgoingMail, renderRawMessage, findMissingAttachments, type OutgoingMailInput, type OutgoingAttachment } from './outgoing'
 
 const GRAPH_SEND_URL = 'https://graph.microsoft.com/v1.0/me/sendMail'
 
@@ -48,7 +48,7 @@ export interface GraphSendInput {
   inReplyTo?: string
   references?: string
   signatureImagePath?: string
-  attachments?: { path: string; filename: string }[]
+  attachments?: OutgoingAttachment[]
 }
 
 export interface GraphSendDeps {

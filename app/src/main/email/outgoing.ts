@@ -7,6 +7,56 @@
 // samt fester Message-ID, renderRawMessage() daraus die RFC-822-Bytes.
 import * as path from 'path'
 import * as fs from 'fs/promises'
+import { inlineTokensToPlainText, replaceInlineTokens, splitInlineAttachments } from '../../shared/emailInlineImages'
+
+/** Anhang eines Entwurfs. Mit `inlineId` ist es ein Bild im Text (Platzhalter `![…](bild:<id>)`). */
+export interface OutgoingAttachment {
+  path: string
+  filename: string
+  inlineId?: string
+  /** Pixelbreite des Bildes, falls bekannt — begrenzt die Anzeigebreite. */
+  width?: number
+}
+
+/** Breiter wird ein Bild im Text nicht gezeigt; Retina-Screenshots haben doppelt so viele Pixel. */
+export const INLINE_IMAGE_MAX_WIDTH = 640
+
+const escapeAttr = (value: string): string =>
+  value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** `<img>` für ein Bild im Text. Die feste Breite braucht Outlook, das `max-width` übergeht. */
+export function inlineImageTag(src: string, label: string, width?: number): string {
+  const shown = width && width > 0 ? Math.min(Math.round(width), INLINE_IMAGE_MAX_WIDTH) : 0
+  const widthAttr = shown ? ` width="${shown}"` : ''
+  return `<img src="${escapeAttr(src)}" alt="${escapeAttr(label)}"${widthAttr} style="display:block; max-width:100%; height:auto; margin:8px 0;" />`
+}
+
+/**
+ * Rendert den Text zu HTML und setzt für jeden Bild-Platzhalter das Tag aus
+ * `tagFor` ein. Die Platzhalter werden VOR dem Rendern gegen eine neutrale
+ * Marke getauscht: sonst liefe der Dateiname durch Hervorhebung, Verlinkung
+ * und Bereinigung (ein Name wie `www.x.png` würde zum Link). `tagFor` liefert
+ * `null` für unbekannte Kennungen — der Platzhalter verschwindet dann.
+ */
+export function renderBodyWithInlineImages(
+  body: string,
+  renderEmailHtml: (body: string) => string,
+  tagFor: (inlineId: string, label: string) => string | null,
+  nonce: string
+): string {
+  const tags: string[] = []
+  const marked = replaceInlineTokens(body, (id, label) => {
+    const tag = tagFor(id, label)
+    if (tag === null) return ''
+    tags.push(tag)
+    return `MGINLINE${nonce}N${tags.length - 1}E`
+  })
+  const html = renderEmailHtml(marked)
+  if (tags.length === 0) return html
+  return html.replace(new RegExp(`MGINLINE${nonce}N(\\d+)E`, 'g'), (_m, index: string) => tags[Number(index)] || '')
+}
+
+export const inlineImageCid = (inlineId: string): string => `mg-inline-${inlineId}`
 
 export interface OutgoingMailInput {
   to: { name: string; address: string }[]
@@ -24,7 +74,7 @@ export interface OutgoingMailInput {
     fromAddress?: string
   }
   signatureImagePath?: string
-  attachments?: { path: string; filename: string }[]
+  attachments?: OutgoingAttachment[]
 }
 
 /** Dateinamen der Anhänge, die nicht (mehr) lesbar sind. Vor JEDEM Versand prüfen. */
@@ -57,14 +107,31 @@ export async function buildOutgoingMail(
   const { account } = composeData
   // HTML aus Body generieren: Plain Text/Markdown-Links werden gerendert,
   // explizites HTML aus Body/Signatur wird auf eine sichere E-Mail-Teilmenge reduziert.
-  let htmlBody = renderEmailHtml(composeData.body)
+  // Bilder im Text: nur was einen Platzhalter hat, geht mit — eingebettet über
+  // eine Content-ID. Ein Bild ohne Platzhalter hat der Nutzer aus dem Text
+  // gelöscht; es wird weder eingebettet noch angehängt.
+  const { inline, regular } = splitInlineAttachments(composeData.body, composeData.attachments)
+  const inlineById = new Map(inline.map(att => [att.inlineId as string, att]))
+  const { randomUUID } = await import('crypto')
+  let htmlBody = renderBodyWithInlineImages(
+    composeData.body,
+    renderEmailHtml,
+    (id, label) => {
+      const att = inlineById.get(id)
+      return att ? inlineImageTag(`cid:${inlineImageCid(id)}`, label || att.filename, att.width) : null
+    },
+    randomUUID().replace(/-/g, '')
+  )
 
   // Signatur-Bild als CID-Attachment einbetten
-  const attachments: Array<{ filename: string; path: string; cid?: string }> = []
+  const attachments: Array<{ filename: string; path: string; cid?: string; contentDisposition?: 'inline' }> = []
 
   // File-Anhaenge hinzufuegen (Existenz ist oben bereits geprueft)
-  for (const att of composeData.attachments || []) {
+  for (const att of regular) {
     attachments.push({ filename: att.filename, path: att.path })
+  }
+  for (const att of inline) {
+    attachments.push({ filename: att.filename, path: att.path, cid: inlineImageCid(att.inlineId as string), contentDisposition: 'inline' })
   }
   if (composeData.signatureImagePath) {
     try {
@@ -104,7 +171,8 @@ export async function buildOutgoingMail(
     // Adressobjekte: nodemailer kodiert Namen mit " oder \\ selbst korrekt (Codex F08).
     to: composeData.to.map(r => r.name ? { name: r.name, address: r.address } : r.address),
     subject: composeData.subject,
-    text: composeData.body,
+    // Reintext-Fassung: lesbarer Hinweis statt Platzhalter.
+    text: inlineTokensToPlainText(composeData.body, inlineById.keys()),
     html: htmlBody,
     attachments
   }
@@ -125,7 +193,6 @@ export async function buildOutgoingMail(
 
   // Konsistente Message-ID setzen, damit SMTP-Versand und IMAP-Append dieselbe Mail referenzieren
   const messageIdHost = (account.fromAddress || account.user || account.smtpHost || 'mindgraph').split('@').pop() || 'mindgraph'
-  const { randomUUID } = await import('crypto')
   const explicitMessageId = `<${randomUUID()}@${messageIdHost}>`
   mailOptions.messageId = explicitMessageId
   return { mailOptions, messageId: explicitMessageId }

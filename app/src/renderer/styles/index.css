@@ -13738,6 +13738,39 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative;
+}
+
+/* Datei wird über das Schreibfenster gezogen */
+.inbox-compose-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border: 2px dashed var(--accent-color);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-color) 10%, var(--bg-primary));
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.inbox-compose-attachment-inline {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent-color) 14%, transparent);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+}
+
+.inbox-compose-preview img {
+  max-width: 100%;
+  height: auto;
 }
 
 .inbox-compose-row {

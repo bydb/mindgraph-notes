@@ -173,3 +173,54 @@ describe('renderRawMessage', () => {
     expect(captured.to).toEqual(['erika@example.org', 'bcc@example.org'])
   })
 })
+
+describe('Bilder im Text', () => {
+  const ID = 'a1b2c3d4e5f6'
+  const withImage = (body: string): OutgoingMailInput => ({
+    ...base(),
+    body,
+    attachments: [
+      { path: attachmentPath, filename: 'bericht.txt' },
+      { path: signaturePath, filename: 'www.foto *neu*.png', inlineId: ID, width: 1600 }
+    ]
+  })
+
+  it('bettet ein Bild mit Platzhalter über eine Content-ID an seiner Stelle ein', async () => {
+    const { mailOptions } = await buildOutgoingMail(withImage(`Oben\n![www.foto *neu*.png](bild:${ID})\nUnten`), html)
+    const out = String(mailOptions.html)
+    expect(out).toMatch(/Oben<br><img src="cid:mg-inline-a1b2c3d4e5f6" alt="www\.foto \*neu\*\.png" width="640"[^>]*><br>Unten/)
+    expect(out).not.toContain('bild:')
+    expect(out).not.toContain('MGINLINE')
+    expect(mailOptions.attachments).toEqual([
+      { filename: 'bericht.txt', path: attachmentPath },
+      { filename: 'www.foto *neu*.png', path: signaturePath, cid: 'mg-inline-a1b2c3d4e5f6', contentDisposition: 'inline' }
+    ])
+    expect(mailOptions.text).toBe('Oben\n[Bild: www.foto *neu*.png]\nUnten')
+  })
+
+  it('lässt ein Bild weg, dessen Platzhalter gelöscht wurde', async () => {
+    const { mailOptions } = await buildOutgoingMail(withImage('Nur Text'), html)
+    expect(mailOptions.attachments).toEqual([{ filename: 'bericht.txt', path: attachmentPath }])
+    expect(String(mailOptions.html)).not.toContain('<img')
+  })
+
+  it('entfernt einen Platzhalter ohne zugehöriges Bild aus HTML und Reintext', async () => {
+    const { mailOptions } = await buildOutgoingMail({ ...base(), body: 'A ![weg](bild:ffffffffffff) B' }, html)
+    expect(mailOptions.html).toBe('<div>A  B</div>')
+    expect(mailOptions.text).toBe('A  B')
+  })
+
+  it('schützt die Beschriftung im alt-Attribut', async () => {
+    const input = withImage(`![a"><script>x](bild:${ID})`)
+    const { mailOptions } = await buildOutgoingMail(input, html)
+    expect(String(mailOptions.html)).toContain('alt="a&quot;&gt;&lt;script&gt;x"')
+  })
+
+  it('legt das Bild im Rohtext als eingebetteten Teil mit Content-ID ab', async () => {
+    const { mailOptions } = await buildOutgoingMail(withImage(`![foto](bild:${ID})`), html)
+    const raw = (await renderRawMessage(mailOptions)).toString()
+    expect(raw).toContain('multipart/related')
+    expect(raw).toContain('Content-ID: <mg-inline-a1b2c3d4e5f6>')
+    expect(raw).toMatch(/Content-Disposition: inline/)
+  })
+})

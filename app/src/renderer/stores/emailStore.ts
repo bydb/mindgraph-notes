@@ -3,6 +3,7 @@ import type { EmailMessage, EmailFilter, EmailFetchResult, EmailFolder, ComposeE
 import { isSentMail } from '../../shared/emailRelevance'
 import { collectOwnAddresses, collectReplyAllRecipients, resolveReplyAccountId, resolveReplyTarget } from '../../shared/emailReply'
 import { emailMatchesQuery } from '../../shared/emailSearch'
+import { inlineTokensToPlainText, sendableAttachments, splitInlineAttachments } from '../../shared/emailInlineImages'
 import { loadDrafts, saveDraft, removeDraft, draftHasContent, newDraftId, type EmailDraft } from '../utils/emailDrafts'
 import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
@@ -1016,7 +1017,8 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
     try {
       const result = await window.electronAPI.emailSend({
         ...composeState,
-        attachments: composeState.attachments || [],
+        // Bilder, deren Platzhalter nicht mehr im Text steht, gehen nicht mit.
+        attachments: sendableAttachments(composeState.body, composeState.attachments),
         account: {
           id: account.id,
           smtpHost: account.smtpHost,
@@ -1034,6 +1036,10 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
       if (result.success) {
         // Gesendete Email tracken. folder = wo die Mail per IMAP-Append abgelegt wurde
         // (Sent/Gesendet). Damit erscheint sie nur im Sent-Folder, nicht in jedem.
+        const sentParts = splitInlineAttachments(composeState.body, composeState.attachments)
+        const sentAttachmentNames = sentParts.regular.map(a => a.filename)
+        // Lokale Kopie ohne Platzhalter: lesbarer Hinweis, wie im Reintext-Teil der Mail.
+        const sentBodyText = inlineTokensToPlainText(composeState.body, sentParts.inline.map(a => a.inlineId as string))
         const sentEmail: EmailMessage = {
           id: result.messageId || `sent-${Date.now()}`,
           uid: result.sentUid || 0,
@@ -1044,17 +1050,16 @@ export const useEmailStore = create<EmailState>()((set, get) => ({
           cc: composeState.cc && composeState.cc.length > 0 ? composeState.cc : undefined,
           subject: composeState.subject,
           date: new Date().toISOString(),
-          snippet: composeState.body.substring(0, 200),
-          bodyText: composeState.body,
+          snippet: sentBodyText.substring(0, 200),
+          bodyText: sentBodyText,
           flags: ['\\Seen'],
           fetchedAt: new Date().toISOString(),
           sent: true,
           // Eigene Anhänge in der lokalen Kopie festhalten — die Anhang-Anzeige
           // prüft diese Felder; APPENDUID allein macht sie nicht sichtbar.
-          hasAttachments: (composeState.attachments?.length ?? 0) > 0 || undefined,
-          attachmentNames: composeState.attachments && composeState.attachments.length > 0
-            ? composeState.attachments.map(a => a.filename)
-            : undefined
+          // Bilder im Text zählen nicht als Anhang (wie beim Empfang eingebettete Bilder).
+          hasAttachments: sentAttachmentNames.length > 0 || undefined,
+          attachmentNames: sentAttachmentNames.length > 0 ? sentAttachmentNames : undefined
         }
         if (pendingDraftSave) { clearTimeout(pendingDraftSave.timer); pendingDraftSave = null }
         const drafts = composeState.draftId

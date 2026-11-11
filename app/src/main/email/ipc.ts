@@ -7,7 +7,7 @@
 // Was der Block aus index.ts braucht (Pfadprüfung, Hauptfenster, Cloud-Auflösung),
 // kommt über EmailIpcDeps herein — index.ts ist der Einstiegspunkt und lässt sich
 // von hier aus nicht importieren.
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage, safeStorage, shell } from 'electron'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { selectFetchBatch, shouldAdvanceCursor, type FetchCandidate } from '../../shared/emailFetchWindow'
@@ -19,7 +19,8 @@ import { isHardLocked as isModelHardLocked } from '../../shared/modelCompatibili
 import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from '../llm/chatClient'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
 import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connection'
-import { buildOutgoingMail, renderRawMessage, findMissingAttachments } from './outgoing'
+import { buildOutgoingMail, renderRawMessage, findMissingAttachments, renderBodyWithInlineImages, inlineImageTag, type OutgoingAttachment } from './outgoing'
+import { isInlineImageId } from '../../shared/emailInlineImages'
 import { sendViaGraph } from './graphSend'
 import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
 import { chooseSendTransport } from '../../shared/emailAccountKind'
@@ -670,6 +671,79 @@ Schlüsselwörter:
     } catch (error) {
       console.error('[Email] Stage forward attachments failed:', redactForLog(error instanceof Error ? error.message : error))
       return { success: false, error: error instanceof Error ? error.message : 'Anhänge konnten nicht übernommen werden' }
+    }
+  })
+
+  // Ablegen/Einfuegen im Schreibfenster: die Bytes kommen aus dem Renderer und
+  // werden SOFORT kopiert. Ein Screenshot ist oft keine dauerhafte Datei — das
+  // gezogene Vorschaubild liegt in einem Wegwerf-Ordner, ein Bild aus der
+  // Zwischenablage hat gar keinen Pfad. Abgelegt wird im selben Verzeichnis wie
+  // die Weiterleitungs-Anhaenge, damit Entfernen, Verwerfen und Aufraeumen nach
+  // dem Senden ohne zweiten Weg greifen. Der Handler nimmt keinen Pfad entgegen
+  // und liest deshalb nichts von der Platte.
+  const COMPOSE_STAGE_MAX_BYTES = 30 * 1024 * 1024
+  const COMPOSE_STAGE_MAX_FILES = 20
+  const sniffImageExt = (buf: Buffer): '.png' | '.jpg' | '.gif' | '.webp' | null => {
+    if (buf.length >= 8 && buf.readUInt32BE(0) === 0x89504e47 && buf.readUInt32BE(4) === 0x0d0a1a0a) return '.png'
+    if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return '.jpg'
+    if (buf.length >= 6 && (buf.toString('latin1', 0, 6) === 'GIF87a' || buf.toString('latin1', 0, 6) === 'GIF89a')) return '.gif'
+    if (buf.length >= 12 && buf.toString('latin1', 0, 4) === 'RIFF' && buf.toString('latin1', 8, 12) === 'WEBP') return '.webp'
+    return null
+  }
+
+  ipcMain.handle('email-stage-compose-files', async (_event, files: Array<{ name?: unknown; data?: unknown }>) => {
+    const staged: Array<{ path: string; filename: string; size: number; inlineId?: string; width?: number }> = []
+    const skipped: string[] = []
+    try {
+      const list = Array.isArray(files) ? files.slice(0, COMPOSE_STAGE_MAX_FILES) : []
+      if (Array.isArray(files)) for (const extra of files.slice(COMPOSE_STAGE_MAX_FILES)) skipped.push(String(extra?.name || 'Datei'))
+      if (list.length === 0) return { success: true, attachments: staged, skipped }
+      const { randomUUID, randomBytes } = await import('crypto')
+      const dir = path.join(forwardStagingRoot(), randomUUID())
+      await fs.mkdir(dir, { recursive: true })
+      const usedNames = new Set<string>()
+      for (let idx = 0; idx < list.length; idx++) {
+        const item = list[idx]
+        const rawName = typeof item?.name === 'string' ? item.name : ''
+        const data = item?.data
+        const buf = data instanceof Uint8Array ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+          : data instanceof ArrayBuffer ? Buffer.from(data) : null
+        if (!buf || buf.length === 0 || buf.length > COMPOSE_STAGE_MAX_BYTES) {
+          skipped.push(rawName || `Datei ${idx + 1}`)
+          continue
+        }
+        const imageExt = sniffImageExt(buf)
+        // Nur Basisname, keine Pfadtrenner. Ein Bild ohne brauchbaren Namen
+        // (Zwischenablage liefert „image.png") bekommt Datum und Uhrzeit.
+        let safe = path.basename(rawName).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim()
+        if (imageExt && (!safe || /^image\.(png|jpe?g|gif|webp)$/i.test(safe))) {
+          const d = new Date()
+          const two = (n: number): string => String(n).padStart(2, '0')
+          safe = `Bildschirmfoto ${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}.${two(d.getMinutes())}.${two(d.getSeconds())}${imageExt}`
+        }
+        if (!safe) safe = `anhang-${idx + 1}`
+        if (usedNames.has(safe.toLowerCase())) {
+          const ext = path.extname(safe)
+          safe = `${path.basename(safe, ext)}-${idx + 1}${ext}`
+        }
+        usedNames.add(safe.toLowerCase())
+        const target = path.join(dir, safe)
+        await fs.writeFile(target, buf)
+        if (!imageExt) {
+          staged.push({ path: target, filename: safe, size: buf.length })
+          continue
+        }
+        let width: number | undefined
+        try {
+          const size = nativeImage.createFromBuffer(buf).getSize()
+          if (size.width > 0) width = size.width
+        } catch { /* Breite unbekannt: das Bild geht ohne feste Breite mit */ }
+        staged.push({ path: target, filename: safe, size: buf.length, inlineId: randomBytes(6).toString('hex'), width })
+      }
+      return { success: true, attachments: staged, skipped }
+    } catch (error) {
+      console.error('[Email] Stage compose files failed:', redactForLog(error instanceof Error ? error.message : error))
+      return { success: false, attachments: staged, skipped, error: 'Die Datei konnte nicht übernommen werden.' }
     }
   })
 
@@ -2447,8 +2521,42 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
   }
 
   // Vorschau: liefert exakt das HTML, das beim Senden erzeugt würde (für Compose-Preview).
-  ipcMain.handle('email-render-html', async (_event, body: string) => {
-    return renderEmailHtml(body || '')
+  // Bilder im Text werden für die Vorschau als data:-Adresse eingesetzt (beim Senden
+  // als Content-ID). Gelesen wird NUR aus dem Zwischenverzeichnis des Schreibfensters
+  // und nur, was wirklich ein Bild ist — der Pfad kommt aus dem Renderer, und ohne
+  // diese Grenze wäre die Vorschau ein Weg, beliebige Dateien auszulesen.
+  ipcMain.handle('email-render-html', async (_event, body: string, inlineImages?: Array<{ inlineId?: unknown; path?: unknown; width?: unknown }>) => {
+    const text = typeof body === 'string' ? body : ''
+    const sources = new Map<string, { src: string; width?: number }>()
+    const root = await fs.realpath(forwardStagingRoot()).catch(() => null)
+    if (root && Array.isArray(inlineImages)) {
+      const mimeByExt: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+      for (const img of inlineImages.slice(0, COMPOSE_STAGE_MAX_FILES)) {
+        if (!isInlineImageId(img?.inlineId) || typeof img.path !== 'string') continue
+        try {
+          const real = await fs.realpath(img.path)
+          if (!real.startsWith(root + path.sep)) continue
+          if ((await fs.stat(real)).size > COMPOSE_STAGE_MAX_BYTES) continue
+          const buf = await fs.readFile(real)
+          const ext = sniffImageExt(buf)
+          if (!ext) continue
+          sources.set(img.inlineId, {
+            src: `data:${mimeByExt[ext]};base64,${buf.toString('base64')}`,
+            width: typeof img.width === 'number' ? img.width : undefined
+          })
+        } catch { /* Datei fehlt: in der Vorschau erscheint dann nur die Beschriftung */ }
+      }
+    }
+    const { randomUUID } = await import('crypto')
+    return renderBodyWithInlineImages(
+      text,
+      renderEmailHtml,
+      (id, label) => {
+        const found = sources.get(id)
+        return found ? inlineImageTag(found.src, label, found.width) : `[Bild fehlt: ${escapeEmailHtml(label)}]`
+      },
+      randomUUID().replace(/-/g, '')
+    )
   })
 
   /**
@@ -2516,7 +2624,7 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       fromAddress?: string
     }
     signatureImagePath?: string
-    attachments?: { path: string; filename: string }[]
+    attachments?: OutgoingAttachment[]
   }) => {
     // Zweite Grenze hinter dem Schreibfenster: keine Mail mit kaputter Adresse an
     // SMTP geben — sonst geht sie still nur an einen Teil der Empfänger (Codex F01).

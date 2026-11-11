@@ -7,6 +7,10 @@ import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import type { ComposeAttachment } from '../../../shared/types'
 import { isMicrosoftAccountId } from '../../../shared/emailAccountKind'
+import { inlineImageToken, insertInlineTokens, referencedInlineIds, removeInlineToken } from '../../../shared/emailInlineImages'
+
+// Dieselbe Grenze wie im Main (email-stage-compose-files): größere Dateien werden gar nicht erst gelesen.
+const COMPOSE_DROP_MAX_BYTES = 30 * 1024 * 1024
 import {
   hasOpenRecipientGroup,
   looksLikeRecipientList,
@@ -68,10 +72,14 @@ export const ComposeView: React.FC = () => {
   useEffect(() => {
     if (!previewOpen) return
     let cancelled = false
-    window.electronAPI.emailRenderHtml(useEmailStore.getState().composeState?.body || '')
+    const current = useEmailStore.getState().composeState
+    const inlineImages = (current?.attachments || [])
+      .filter(a => a.inlineId)
+      .map(a => ({ inlineId: a.inlineId as string, path: a.path, width: a.width }))
+    window.electronAPI.emailRenderHtml(current?.body || '', inlineImages)
       .then(html => { if (!cancelled) setPreviewHtml(html) })
     return () => { cancelled = true }
-  }, [previewOpen, composeState?.body])
+  }, [previewOpen, composeState?.body, composeState?.attachments])
 
   // Signatur-Bild laden
   useEffect(() => {
@@ -86,6 +94,13 @@ export const ComposeView: React.FC = () => {
   const [showDropdown, setShowDropdown] = useState<Record<RecipientField, boolean>>({ to: false, cc: false, bcc: false })
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const [confirmMissingAttachments, setConfirmMissingAttachments] = useState(false)
+  // Ablegen/Einfügen von Dateien. Das Textfeld merkt sich die Cursorstelle auch dann,
+  // wenn es den Fokus verliert oder die Vorschau offen ist (dann ist es abgebaut).
+  const cursorRef = useRef<{ start: number; end: number } | null>(null)
+  const dragDepth = useRef(0)
+  const [dropActive, setDropActive] = useState(false)
+  const [dropNote, setDropNote] = useState('')
+  useEffect(() => { cursorRef.current = null; setDropNote('') }, [composeDraftId])
 
   // Kontakte bei jedem Öffnen neu aufbauen — sonst fehlen seit dem letzten
   // Build gesendete/abgerufene Adressen (Liste ist flüchtig, kein Cache nötig)
@@ -107,6 +122,71 @@ export const ComposeView: React.FC = () => {
   )
   // Getippte, noch nicht übernommene Adresse in „An“ zählt: Senden übernimmt sie zuerst.
   const sendBlocked = isSending || !hasSmtp || (composeState.to.length === 0 && !inputs.to.trim()) || forwardLoading
+
+  const dragHasFiles = (dt: DataTransfer | null): boolean => !!dt && Array.from(dt.types || []).includes('Files')
+
+  /** Abgelegte oder eingefügte Dateien übernehmen: Bilder kommen als Platzhalter an die
+   *  Cursorstelle, alles andere wird Anhang. Die Bytes gehen sofort an den Main, der sie
+   *  kopiert — ein Screenshot liegt oft nur in einem Wegwerf-Ordner oder gar nicht auf der Platte. */
+  const addDroppedFiles = async (files: File[]) => {
+    if (files.length === 0) return
+    const draftId = composeState.draftId
+    setDropNote('')
+    const skipped: string[] = []
+    const payload: Array<{ name: string; data: Uint8Array }> = []
+    for (const file of files) {
+      if (file.size > COMPOSE_DROP_MAX_BYTES) { skipped.push(file.name); continue }
+      try {
+        payload.push({ name: file.name, data: new Uint8Array(await file.arrayBuffer()) })
+      } catch {
+        skipped.push(file.name) // Ordner oder nicht lesbar
+      }
+    }
+    let staged: ComposeAttachment[] = []
+    let failed = false
+    if (payload.length > 0) {
+      try {
+        const res = await window.electronAPI.emailStageComposeFiles(payload)
+        staged = res.attachments || []
+        skipped.push(...(res.skipped || []))
+        failed = !res.success
+      } catch {
+        failed = true
+      }
+    }
+    // Inzwischen ein anderer Entwurf offen (oder keiner): Kopien wieder wegräumen.
+    const current = useEmailStore.getState().composeState
+    if (!current || current.draftId !== draftId) {
+      if (staged.length > 0) void window.electronAPI.emailDiscardStagedAttachments(staged.map(a => a.path))
+      return
+    }
+    if (staged.length > 0) {
+      const tokens = staged.filter(a => a.inlineId).map(a => inlineImageToken(a.filename, a.inlineId as string))
+      const pos = cursorRef.current ?? { start: 0, end: 0 }
+      const inserted = insertInlineTokens(current.body, pos.start, pos.end, tokens)
+      setComposeState({ ...current, body: inserted.body, attachments: [...(current.attachments || []), ...staged] })
+      if (tokens.length > 0) {
+        setLtHighlights([])
+        cursorRef.current = { start: inserted.cursor, end: inserted.cursor }
+        requestAnimationFrame(() => {
+          const el = bodyRef.current
+          if (!el) return
+          el.focus()
+          el.setSelectionRange(inserted.cursor, inserted.cursor)
+        })
+      }
+    }
+    if (failed) setDropNote(t('inbox.compose.dropFailed'))
+    else if (skipped.length > 0) setDropNote(t('inbox.compose.dropSkipped').replace('{names}', skipped.join(', ')))
+  }
+
+  const rememberCursor = (el: HTMLTextAreaElement) => {
+    cursorRef.current = { start: el.selectionStart, end: el.selectionEnd }
+  }
+
+  // Bilder im Text erscheinen in der Anhangsleiste nur, solange ihr Platzhalter im Text steht.
+  const inlineIdsInBody = new Set(referencedInlineIds(composeState.body))
+  const shownAttachments = (composeState.attachments || []).filter(a => !a.inlineId || inlineIdsInBody.has(a.inlineId))
 
   const recipientsOf = (field: RecipientField): Recipient[] =>
     field === 'to' ? composeState.to : (composeState[field] || [])
@@ -376,7 +456,47 @@ export const ComposeView: React.FC = () => {
   }
 
   return (
-    <div className="inbox-compose">
+    <div
+      className={`inbox-compose${dropActive ? ' is-dragover' : ''}`}
+      onDragEnter={e => {
+        if (!dragHasFiles(e.dataTransfer)) return
+        e.preventDefault()
+        dragDepth.current += 1
+        setDropActive(true)
+      }}
+      onDragOver={e => {
+        if (!dragHasFiles(e.dataTransfer)) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'copy'
+      }}
+      onDragLeave={e => {
+        if (!dragHasFiles(e.dataTransfer)) return
+        dragDepth.current = Math.max(0, dragDepth.current - 1)
+        if (dragDepth.current === 0) setDropActive(false)
+      }}
+      onDrop={e => {
+        if (!dragHasFiles(e.dataTransfer)) return
+        e.preventDefault()
+        e.stopPropagation()
+        dragDepth.current = 0
+        setDropActive(false)
+        void addDroppedFiles(Array.from(e.dataTransfer.files))
+      }}
+      onPaste={e => {
+        // Nur reine Datei-/Bild-Inhalte. Text aus Word oder Excel bringt zusätzlich ein Bild
+        // seiner selbst mit — dort soll weiter der Text eingefügt werden.
+        const dt = e.clipboardData
+        if (!dt || !dt.files || dt.files.length === 0 || Array.from(dt.types || []).includes('text/plain')) return
+        e.preventDefault()
+        e.stopPropagation()
+        void addDroppedFiles(Array.from(dt.files))
+      }}
+    >
+      {dropActive && (
+        <div className="inbox-compose-drop-overlay" aria-hidden="true">
+          <span>{t('inbox.compose.dropHint')}</span>
+        </div>
+      )}
       {/* Account selector */}
       {emailSettings.accounts.length > 1 && (
         <div className="inbox-compose-row">
@@ -590,37 +710,52 @@ export const ComposeView: React.FC = () => {
             setComposeState({ ...composeState, body: e.target.value })
             setLtHighlights([])
           }}
+          onSelect={e => rememberCursor(e.currentTarget)}
+          onBlur={e => rememberCursor(e.currentTarget)}
           placeholder={t('inbox.compose.body')}
         />
         </>
         )}
       </div>
 
+      {dropNote && (
+        <div className="inbox-compose-forward-note is-warning" role="status">{dropNote}</div>
+      )}
+
       {/* Anhaenge */}
-      {composeState.attachments && composeState.attachments.length > 0 && (
+      {shownAttachments.length > 0 && (
         <div className="inbox-compose-attachments">
-          {composeState.attachments.map((att, i) => (
-            <div key={i} className="inbox-compose-attachment">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-              </svg>
+          {shownAttachments.map((att, i) => (
+            <div key={`${att.path}#${i}`} className={`inbox-compose-attachment${att.inlineId ? ' is-inline' : ''}`}>
+              {att.inlineId ? (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+                </svg>
+              )}
               <span className="inbox-compose-attachment-name">{att.filename}</span>
+              {att.inlineId && <span className="inbox-compose-attachment-inline">{t('inbox.compose.inlineBadge')}</span>}
               <span className="inbox-compose-attachment-size">
                 {att.size < 1024 ? `${att.size} B` : att.size < 1048576 ? `${(att.size / 1024).toFixed(0)} KB` : `${(att.size / 1048576).toFixed(1)} MB`}
               </span>
               <button
                 className="inbox-compose-attachment-remove"
                 onClick={() => {
-                  // Zwischengespeicherte Weiterleitungs-Anhänge gleich mit wegräumen.
+                  // Zwischengespeicherte Kopien (Weiterleitung, abgelegte Dateien) gleich mit wegräumen.
                   if (att.path.includes('forward-attachments')) {
                     void window.electronAPI.emailDiscardStagedAttachments([att.path])
                   }
                   setComposeState({
                     ...composeState,
-                    attachments: composeState.attachments!.filter((_, idx) => idx !== i)
+                    // Ein Bild im Text verschwindet samt Platzhalter.
+                    body: att.inlineId ? removeInlineToken(composeState.body, att.inlineId) : composeState.body,
+                    attachments: (composeState.attachments || []).filter(other => other !== att)
                   })
                 }}
-                title={t('inbox.compose.removeAttachment')}
+                title={t(att.inlineId ? 'inbox.compose.removeInlineImage' : 'inbox.compose.removeAttachment')}
               >
                 &times;
               </button>

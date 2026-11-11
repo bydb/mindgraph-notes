@@ -1484,7 +1484,10 @@ export interface ElectronAPI {
   brainConsolidateDay: (input: BrainConsolidateInput) => Promise<BrainConsolidateResult>;
 
   // E-Mail Markdown-Vorschau
-  emailRenderHtml: (body: string) => Promise<string>;
+  emailRenderHtml: (body: string, inlineImages?: Array<{ inlineId: string; path: string; width?: number }>) => Promise<string>;
+  /** Abgelegte oder eingefügte Dateien in die Zwischenablage des Schreibfensters kopieren.
+   *  Bilder (PNG/JPEG/GIF/WebP) kommen mit `inlineId` zurück. */
+  emailStageComposeFiles: (files: Array<{ name: string; data: Uint8Array }>) => Promise<{ success: boolean; attachments: ComposeAttachment[]; skipped: string[]; error?: string }>;
 
   // Workflow Canvas
   workflowLoad: (vaultPath: string) => Promise<import('./workflow/model').WorkflowFile | null>;
@@ -1858,6 +1861,11 @@ export interface ComposeAttachment {
   path: string
   filename: string
   size: number
+  /** Gesetzt = Bild im Text. Der Platzhalter `![…](bild:<inlineId>)` im Mailtext
+   *  verweist darauf (shared/emailInlineImages.ts). Ohne Platzhalter geht das Bild nicht mit. */
+  inlineId?: string
+  /** Pixelbreite des Bildes, falls lesbar. */
+  width?: number
 }
 
 export interface ComposeEmail {

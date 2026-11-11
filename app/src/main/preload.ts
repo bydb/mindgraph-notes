@@ -97,7 +97,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveVaultSettings: (vaultPath: string, settings: object) => ipcRenderer.invoke('vault-settings-save', vaultPath, settings),
 
   // E-Mail Markdown-Vorschau (exakt das gesendete HTML)
-  emailRenderHtml: (body: string) => ipcRenderer.invoke('email-render-html', body),
+  emailRenderHtml: (body: string, inlineImages?: Array<{ inlineId: string; path: string; width?: number }>) => ipcRenderer.invoke('email-render-html', body, inlineImages),
+  emailStageComposeFiles: (files: Array<{ name: string; data: Uint8Array }>) => ipcRenderer.invoke('email-stage-compose-files', files),
 
   // Workflow Canvas
   workflowLoad: (vaultPath: string) => ipcRenderer.invoke('workflow-load', vaultPath),
