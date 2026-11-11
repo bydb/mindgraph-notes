@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.3] - 2026-11-11
+
+**Sie können jetzt Screenshots und andere Bilder direkt in eine E-Mail ziehen oder aus der Zwischenablage einfügen; das Bild erscheint in der Mail an der Stelle, an der der Cursor steht.** Andere Dateien, etwa ein PDF, werden auf demselben Weg zum Anhang. Die Vorschau zeigt die Mail mit Bild so, wie sie verschickt wird.
+
+### Hintergrund
+
+- **Auslöser:** Wer in einer Mail etwas zeigen wollte, musste den Screenshot erst speichern und dann über die Büroklammer auswählen. Im Text selbst ließ sich kein Bild unterbringen.
+- **Ablegen und Einfügen:** Ziehen Sie eine Datei auf das Schreibfenster oder fügen Sie einen Screenshot mit ⌘V bzw. Strg+V ein. Das funktioniert auch mit dem kleinen Vorschaubild, das macOS nach einem Screenshot einblendet, und mit Bildern, die nur in der Zwischenablage liegen.
+- **Im Schreibfeld:** Dort steht für jedes Bild eine Platzhalter-Zeile mit dem Dateinamen, weil das Feld reiner Text ist. Das Bild selbst sehen Sie in der Vorschau. Löschen Sie die Zeile, ist das Bild aus der Mail genommen; das Kreuz in der Anhangsleiste entfernt beides.
+- **Schutz vor Mails ohne Bild:** Solange eine Datei noch übernommen wird, ist Senden gesperrt. Steht im Text ein Platzhalter, zu dem kein Bild mehr gehört, geht die Mail nicht hinaus, und das Fenster sagt, welche Zeile betroffen ist. Die Rechtschreibprüfung lässt die Platzhalter unverändert.
+- **Darstellung beim Empfänger:** Das Bild ist in die Mail eingebettet und muss nicht nachgeladen werden. Breite Bilder werden auf höchstens 640 Bildpunkte Anzeigebreite begrenzt. In der Nur-Text-Fassung der Mail steht an der Stelle ein Hinweis mit dem Dateinamen.
+- **Grenzen:** Im Text erscheinen PNG, JPEG, GIF und WebP; andere Bildformate werden zum Anhang. Je Ablage gelten 20 Dateien, 30 MB je Datei und 100 MB insgesamt; was nicht übernommen wird, nennt das Fenster beim Namen. Das Bild landet an der Cursorstelle, nicht an der Mausposition beim Ablegen.
+
 ## [1.3.2] - 2026-11-11
 
 **Sie können jetzt ein Postfach bei Microsoft 365 einbinden: Sie melden sich im Browser bei Microsoft an, und MindGraph ruft Ihre Mails ab, wertet sie lokal aus und versendet Antworten über Ihr Konto.** Ein Passwort geben Sie in MindGraph dafür nicht ein. Die Anmeldung finden Sie unter Einstellungen → E-Mail und im Einrichtungsassistenten. In den meisten Organisationen muss die Administration die Anwendung vorher einmal freigeben.
