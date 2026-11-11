@@ -43,6 +43,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
   // State für neue Notiz Dialog
   const [newNoteDialogOpen, setNewNoteDialogOpen] = useState(false)
   const [newNoteName, setNewNoteName] = useState('')
+  const [newNoteError, setNewNoteError] = useState<string | null>(null)
   const newNoteInputRef = useRef<HTMLInputElement>(null)
   // Fokus vor dem Öffnen (meist der Editor) — Abbrechen gibt ihn zurück.
   const newNoteReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -177,6 +178,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
     const active = document.activeElement
     newNoteReturnFocusRef.current = active instanceof HTMLElement && active !== document.body ? active : null
     setNewNoteName('')
+    setNewNoteError(null)
     setNewNoteDialogOpen(true)
     setTimeout(() => newNoteInputRef.current?.focus(), 50)
   }, [vaultPath, handleOpenVault])
@@ -221,8 +223,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
       setNewNoteName('')
     } catch (error) {
       console.error('Fehler beim Erstellen der Notiz:', error)
+      // Der Hauptprozess legt exklusiv an und überschreibt nie: ein vergebener Name kommt als EEXIST zurück.
+      setNewNoteError(String(error).includes('EEXIST') ? t('sidebar.newNoteExists') : t('sidebar.newNoteFailed'))
     }
-  }, [vaultPath, newNoteName, notesRootFolder, setFileTree, addNote, selectNote])
+  }, [vaultPath, newNoteName, notesRootFolder, setFileTree, addNote, selectNote, t])
 
   const handleNewFolder = useCallback(async () => {
     if (!window.electronAPI) return
@@ -456,13 +460,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onOpenSearch }) => {
           type="text"
           placeholder="Name der neuen Notiz..."
           value={newNoteName}
-          onChange={(e) => setNewNoteName(e.target.value)}
+          onChange={(e) => { setNewNoteName(e.target.value); setNewNoteError(null) }}
+          aria-invalid={newNoteError ? true : undefined}
+          aria-describedby={newNoteError ? 'new-note-error' : undefined}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && newNoteName.trim()) handleSubmitNewNote()
             if (e.key === 'Escape') cancelNewNoteDialog()
           }}
           autoFocus
         />
+        {newNoteError && <p id="new-note-error" className="new-note-dialog-error" role="alert">{newNoteError}</p>}
         <div className="new-note-dialog-buttons">
           <button onClick={cancelNewNoteDialog}>
             Abbrechen

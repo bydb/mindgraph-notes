@@ -192,6 +192,22 @@ export async function readActivityEvents(vaultPath: string): Promise<ActivityEve
 }
 
 /**
+ * Zustand der Protokolldatei — getrennt von der Bilanz, weil `readFile` oben bei fehlender oder
+ * kaputter Datei bewusst eine leere Liste liefert. Wer „0“ von „nicht lesbar“ unterscheiden muss
+ * (Tagesüberblick des Agenten), fragt hier.
+ */
+export async function activityLedgerState(vaultPath: string): Promise<'ok' | 'missing' | 'broken'> {
+  const file = ledgerFile(vaultPath)
+  return enqueue(file, async () => {
+    try {
+      return Array.isArray(JSON.parse(await fs.readFile(file, 'utf-8'))) ? 'ok' as const : 'broken' as const
+    } catch (error) {
+      return (error as NodeJS.ErrnoException)?.code === 'ENOENT' ? 'missing' as const : 'broken' as const
+    }
+  })
+}
+
+/**
  * Bilanz eines Zeitraums. Die Auswertung bekommt ALLE Ereignisse, nicht nur den
  * Zeitraum — sonst fehlt die Laufzeit zu einer Übernahme, deren Lauf vor Mitternacht
  * endete (siehe summarizeActivity).

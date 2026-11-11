@@ -3,7 +3,7 @@ import { clearFetchStats, getFetchStatsSummary } from './webResearch/fetchStats'
 import { IGNORED_DIRECTORY_NAMES } from '../shared/ignoredDirectories'
 import * as path from 'path'
 import * as fs from 'fs/promises'
-import { existsSync } from 'fs'
+import { existsSync, constants as fsConstants } from 'fs'
 import type { FileEntry, SecretStorageResult, SyncRestoreResult } from '../shared/types'
 import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
 import { webSearch as webResearchSearch } from './webResearch/providers'
@@ -242,6 +242,9 @@ import { createCampaign, createCase, startWork, markResultReady, addSession, cor
 import { campaignReport } from '../shared/comparison/metrics'
 import { toCsv, toMarkdown, type ExportLabels } from '../shared/comparison/export'
 import type { ComparisonCase, Quality, WorkSession } from '../shared/comparison/types'
+import { recordNoteWrite, recordNoteMove, readDayLog } from './dayLog'
+import { buildDayOverview } from './noteAgent/dayOverview'
+import type { DayLogOrigin } from '../shared/dayLog'
 import { readActivityEvents, recordActivity, appendActivityEvent, readActivitySummary, onActivityChanged, setEmailForegroundMs, raiseJobActiveMs, appendTimeCorrection } from './activityLedger'
 import { VALUED_TYPES, MAX_RUN_SKILLS, deriveActivityType, isActivityEvent, normalizeSkillReferences, normalizeSkillIdList, type ActivityEvent } from '../shared/activityLog'
 import { skillActivityId, vaultActivityKey } from './skillActivityId'
@@ -1485,16 +1488,23 @@ function registerHtmlPreviewProtocol(): void {
 }
 
 
-async function backupMarkdownBeforeWrite(filePath: string, nextContent: string): Promise<void> {
+// `known`: Vorfassung, die der Aufrufer schon gelesen hat (writeFileSafe liest sie EINMAL für
+// Backup und Tagesprotokoll, Codex F13). null darin = Datei fehlt oder war nicht lesbar.
+async function backupMarkdownBeforeWrite(filePath: string, nextContent: string, known?: { content: string | null }): Promise<void> {
   if (path.extname(filePath).toLowerCase() !== '.md') return
 
   let existingContent: string
-  try {
-    const stats = await fs.stat(filePath)
-    if (stats.size === 0) return
-    existingContent = await fs.readFile(filePath, 'utf-8')
-  } catch {
-    return
+  if (known) {
+    if (known.content === null || known.content.length === 0) return
+    existingContent = known.content
+  } else {
+    try {
+      const stats = await fs.stat(filePath)
+      if (stats.size === 0) return
+      existingContent = await fs.readFile(filePath, 'utf-8')
+    } catch {
+      return
+    }
   }
 
   if (existingContent === nextContent) return
@@ -2073,7 +2083,10 @@ ipcMain.handle('create-note', async (_event, filePath: string) => {
   const content = `# ${fileName.replace('.md', '')}\n\n`
 
   try {
-    await fs.writeFile(safe, content, 'utf-8')
+    // Exklusiv: eine vorhandene Notiz gleichen Namens wird nie durch die leere Vorlage ersetzt (Codex F31).
+    // Unter der Notiz-Sperre, wie jeder andere Markdown-Schreiber (Codex F35).
+    await withNoteWriteLock(safe, () => writeExclusive(safe, content))
+    noteWriteForDayLog(safe, null, content, 'renderer')
     return { path: safe, fileName, content }
   } catch (error) {
     console.error('Fehler beim Erstellen der Notiz:', error)
@@ -2250,60 +2263,167 @@ function healCorruptedMarkdown(content: string): { healed: string; changed: bool
 // Einzige abgesicherte Schreibgrenze für .md/Dateien: assertSafePath +
 // Empty-Write-Block + Auto-Heal + Backup. Wird vom write-file-IPC-Handler UND
 // vom Workflow-Runner genutzt (Decision #3 — kein zweiter Schreibpfad).
-async function writeFileSafe(filePath: string, content: string, opts: { exclusive?: boolean } = {}): Promise<void> {
-  const safe = await assertSafePath(filePath, 'write-file')
-  const isMarkdown = path.extname(safe).toLowerCase() === '.md'
-
-  if (isMarkdown && content.length === 0) {
-    try {
-      const existing = await fs.stat(safe)
-      if (existing.size > 0) {
-        throw new Error(`Blocked empty write to non-empty Markdown file: ${safe}`)
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message.startsWith('Blocked empty write')) {
-        throw error
-      }
-    }
+// Tagesprotokoll (main/dayLog.ts): jeden gelungenen Markdown-Schreibvorgang dieser App vermerken.
+// Der Sync schreibt an writeFileSafe vorbei und taucht deshalb nicht auf — das ist der Zweck.
+// `before`: null = Datei gab es nicht, undefined = unbekannt. Darf NIE werfen: die Notiz ist an
+// dieser Stelle schon geschrieben, ein Fehler hier sähe für den Aufrufer wie ein gescheiterter
+// Schreibvorgang aus (Codex F11).
+function noteWriteForDayLog(
+  absPath: string, before: string | null | undefined, after: string | undefined, origin: DayLogOrigin, created?: boolean
+): void {
+  try {
+    if (path.extname(absPath).toLowerCase() !== '.md') return
+    const root = findApprovedRootForPath(absPath)
+    if (!root) return
+    const note = path.relative(root, absPath).split(path.sep).join('/')
+    void recordNoteWrite({ vaultPath: root, note, before, after, origin, created })
+  } catch (error) {
+    console.warn('[daylog] nicht vermerkt:', error instanceof Error ? error.message : error)
   }
+}
 
+// Umbenennen/Verschieben einer Notiz oder eines Ordners im Tagesprotokoll nachziehen. Wirft nie.
+function noteMovedForDayLog(oldAbs: string, newAbs: string, isDirectory: boolean): void {
+  try {
+    const root = findApprovedRootForPath(newAbs)
+    if (!root || findApprovedRootForPath(oldAbs) !== root) return
+    const rel = (p: string) => path.relative(root, p).split(path.sep).join('/')
+    void recordNoteMove({ vaultPath: root, from: rel(oldAbs), to: rel(newAbs), isDirectory, origin: 'renderer' })
+  } catch (error) {
+    console.warn('[daylog] Verschieben nicht vermerkt:', error instanceof Error ? error.message : error)
+  }
+}
+
+// Je Notiz EIN Lesen–Backup–Schreiben gleichzeitig: sonst lesen zwei Schreiber dieselbe Vorfassung
+// und das Tagesprotokoll vermerkt einen Übergang, den der spätere wieder aufhebt (Codex F13).
+const noteWriteLocks = new Map<string, Promise<unknown>>()
+function withNoteWriteLock<T>(key: string, job: () => Promise<T>): Promise<T> {
+  const previous = noteWriteLocks.get(key) ?? Promise.resolve()
+  const next = previous.catch(() => undefined).then(job)
+  const tail = next.catch(() => undefined)
+  noteWriteLocks.set(key, tail)
+  void tail.then(() => { if (noteWriteLocks.get(key) === tail) noteWriteLocks.delete(key) })
+  return next
+}
+
+type WriteFileOpts = { exclusive?: boolean; origin?: DayLogOrigin; created?: boolean }
+
+// Exklusiv anlegen: `wx` scheitert mit EEXIST, wenn die Datei inzwischen existiert — „nie
+// überschreiben“ wird damit am Dateisystem erzwungen, nicht nur vorher geprüft.
+async function writeExclusive(safe: string, content: string): Promise<void> {
+  // Erst exklusiv öffnen (gehört damit sicher diesem Versuch), dann schreiben. Scheitert das
+  // Schreiben (Platte voll …), wird genau diese halbe Datei wieder entfernt (Codex F29) —
+  // sonst bliebe ein Torso unter dem endgültigen Namen, und ein zweiter Versuch legte „(2)“ an.
+  const handle = await fs.open(safe, 'wx')
+  try {
+    await handle.writeFile(content, 'utf-8')
+    await handle.close()
+  } catch (error) {
+    // Nur löschen, wenn unter dem Namen noch GENAU diese Datei liegt (Codex F32) — sonst
+    // träfe das Aufräumen eine Datei, die inzwischen ein anderer Vorgang angelegt hat.
+    const own = await handle.stat().catch(() => null)
+    await handle.close().catch(() => {})
+    const now = await fs.lstat(safe).catch(() => null)
+    if (own && now && own.ino === now.ino && own.dev === now.dev) await fs.unlink(safe).catch(() => {})
+    throw error
+  }
+}
+
+// Vorfassung einer Notiz lesen. null = Datei fehlt, undefined = nicht lesbar (Codex F14).
+async function readNoteBefore(safe: string): Promise<string | null | undefined> {
+  try {
+    return await fs.readFile(safe, 'utf-8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return null
+    console.warn('[write-file] Vorfassung nicht lesbar — kein Backup für diesen Schreibvorgang:', safe, (error as NodeJS.ErrnoException)?.code ?? error)
+    return undefined
+  }
+}
+
+// Markdown schreiben. NUR innerhalb von `withNoteWriteLock(safe, …)` aufrufen: Leerschreib-Schutz,
+// Lesen der Vorfassung, Backup, Schreiben und Protokoll müssen EIN Schritt sein — vorher lag die
+// Leer-Prüfung außerhalb der Sperre, und ein leerer Schreiber konnte frischen Inhalt
+// überschreiben (Codex F25). `before`: vom Aufrufer unter derselben Sperre schon gelesen.
+async function writeMarkdownLocked(safe: string, content: string, opts: WriteFileOpts, known?: { before: string | null | undefined }): Promise<void> {
+  const before = known ? known.before : (opts.exclusive ? null : await readNoteBefore(safe))
+  if (content.length === 0 && !opts.exclusive) {
+    // Nicht lesbar heißt nicht leer: dann entscheidet die Dateigröße.
+    const nonEmpty = before === undefined
+      ? await fs.stat(safe).then(st => st.size > 0).catch(() => false)
+      : (before?.length ?? 0) > 0
+    if (nonEmpty) throw new Error(`Blocked empty write to non-empty Markdown file: ${safe}`)
+  }
   let finalContent = content
-  if (isMarkdown) {
-    const { healed, changed } = healCorruptedMarkdown(content)
-    if (changed) {
-      console.warn('[write-file] Auto-healed corrupted wikilink escapes in', safe)
-      finalContent = healed
-    }
+  const { healed, changed } = healCorruptedMarkdown(content)
+  if (changed) {
+    console.warn('[write-file] Auto-healed corrupted wikilink escapes in', safe)
+    finalContent = healed
   }
-
-  // Neuanlage (`exclusive`): `wx` scheitert mit EEXIST, wenn die Datei inzwischen existiert —
-  // „nie überschreiben“ wird damit am Dateisystem erzwungen, nicht nur vorher geprüft.
   if (opts.exclusive) {
-    // Erst exklusiv öffnen (gehört damit sicher diesem Versuch), dann schreiben. Scheitert das
-    // Schreiben (Platte voll …), wird genau diese halbe Datei wieder entfernt (Codex F29) —
-    // sonst bliebe ein Torso unter dem endgültigen Namen, und ein zweiter Versuch legte „(2)“ an.
-    const handle = await fs.open(safe, 'wx')
-    try {
-      await handle.writeFile(finalContent, 'utf-8')
-      await handle.close()
-    } catch (error) {
-      // Nur löschen, wenn unter dem Namen noch GENAU diese Datei liegt (Codex F32) — sonst
-      // träfe das Aufräumen eine Datei, die inzwischen ein anderer Vorgang angelegt hat.
-      const own = await handle.stat().catch(() => null)
-      await handle.close().catch(() => {})
-      const now = await fs.lstat(safe).catch(() => null)
-      if (own && now && own.ino === now.ino && own.dev === now.dev) await fs.unlink(safe).catch(() => {})
-      throw error
-    }
+    await writeExclusive(safe, finalContent)
+    noteWriteForDayLog(safe, null, finalContent, opts.origin ?? 'app')
     return
   }
-  await backupMarkdownBeforeWrite(safe, finalContent)
+  // Vorfassung EINMAL gelesen — für das Backup und fürs Tagesprotokoll (abgehakte Checkboxen =
+  // Unterschied vorher/nachher). Nur „Datei fehlt“ heißt neu.
+  await backupMarkdownBeforeWrite(safe, finalContent, { content: before ?? null })
   await fs.writeFile(safe, finalContent, 'utf-8')
+  noteWriteForDayLog(safe, opts.created ? null : before, finalContent, opts.origin ?? 'app', opts.created)
+}
+
+/** `created`: als Neuanlage vermerken, obwohl die Datei schon (leer, reserviert) existiert. */
+async function writeFileSafe(filePath: string, content: string, opts: WriteFileOpts = {}): Promise<void> {
+  const safe = await assertSafePath(filePath, 'write-file')
+  if (path.extname(safe).toLowerCase() !== '.md') {
+    if (opts.exclusive) await writeExclusive(safe, content)
+    else await fs.writeFile(safe, content, 'utf-8')
+    return
+  }
+  await withNoteWriteLock(safe, () => writeMarkdownLocked(safe, content, opts))
+}
+
+/**
+ * Lesen–Ändern–Schreiben einer Notiz als EIN Schritt unter der Notiz-Sperre (Codex F26). Wer die
+ * Notiz erst liest und dann `writeFileSafe` ruft, schreibt eine veraltete Fassung zurück, wenn
+ * dazwischen der Editor gespeichert hat. `change` bekommt den aktuellen Inhalt (null = Datei
+ * fehlt) und liefert den neuen; wirft es, wird nichts geschrieben. Eine nicht lesbare Notiz wird
+ * nicht verändert.
+ */
+async function updateMarkdownSafe(filePath: string, change: (existing: string | null) => string, opts: WriteFileOpts = {}): Promise<void> {
+  const safe = await assertSafePath(filePath, 'write-file')
+  if (path.extname(safe).toLowerCase() !== '.md') throw new Error('updateMarkdownSafe: nur für Markdown')
+  await withNoteWriteLock(safe, async () => {
+    const before = await readNoteBefore(safe)
+    if (before === undefined) throw new Error('Notiz ist gerade nicht lesbar — nichts geändert')
+    await writeMarkdownLocked(safe, change(before), opts, { before })
+  })
+}
+
+/**
+ * Neue Datei unter dem ersten freien Namen anlegen, ohne je eine vorhandene zu überschreiben
+ * (Codex F31): `nameFor(0)` ist der Wunschname, `nameFor(n)` die n-te Ausweichform. Vorher wurde
+ * mit `access` geprüft und dann normal geschrieben — legte dazwischen ein anderer Vorgang die
+ * Datei an, war ihr Inhalt weg.
+ */
+async function writeNewFileUnique(nameFor: (attempt: number) => string, content: string): Promise<string> {
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    // Kanonischer Pfad = Schlüssel der Notiz-Sperre. Auch die exklusive Neuanlage läuft unter ihr:
+    // sonst liest ein normaler Schreiber „Datei fehlt“, die Neuanlage legt an, und der normale
+    // Schreiber überschreibt sie gleich wieder (Codex F35).
+    const target = await assertSafePath(nameFor(attempt), 'write-new-file')
+    try {
+      await withNoteWriteLock(target, () => writeExclusive(target, content))
+      return target
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') throw error
+    }
+  }
+  throw new Error('Kein freier Dateiname gefunden')
 }
 
 ipcMain.handle('write-file', async (_event, filePath: string, content: string) => {
   try {
-    await writeFileSafe(filePath, content)
+    await writeFileSafe(filePath, content, { origin: 'renderer' })
   } catch (error) {
     console.error('Fehler beim Schreiben der Datei:', error)
     throw error
@@ -2314,7 +2434,7 @@ ipcMain.handle('write-file', async (_event, filePath: string, content: string) =
 // `exists: true` heißt: der Name ist inzwischen vergeben, der Renderer nimmt den nächsten.
 ipcMain.handle('write-file-new', async (_event, filePath: string, content: string) => {
   try {
-    await writeFileSafe(filePath, content, { exclusive: true })
+    await writeFileSafe(filePath, content, { exclusive: true, origin: 'renderer' })
     return { success: true }
   } catch (error) {
     if ((error as NodeJS.ErrnoException)?.code === 'EEXIST') return { success: false, exists: true }
@@ -2701,23 +2821,25 @@ ipcMain.handle('workflow-run', async (_event, payload: WorkflowRunPayload) => {
       // Erst validieren (wirft bei Traversal), DANN lesen/mkdir — sonst Info-Disclosure
       // + Arbitrary-mkdir außerhalb des Vaults, bevor writeFileSafe greift.
       const abs = validatePath(vaultPath, noteRel)
-      let existing = ''
-      try { existing = await fs.readFile(abs, 'utf-8') } catch { existing = '' }
-      const sep = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
       await fs.mkdir(path.dirname(abs), { recursive: true })
-      const next = existing + sep + text + '\n'
-      await writeFileSafe(abs, aiModel ? setAiProvenanceInContent(next, aiModel, todayIsoDate()) : next)
+      await updateMarkdownSafe(abs, current => {
+        const existing = current ?? ''
+        const sep = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
+        const next = existing + sep + text + '\n'
+        return aiModel ? setAiProvenanceInContent(next, aiModel, todayIsoDate()) : next
+      })
       return noteRel
     },
     searchNotes: async (query) => searchWorkflowNotes(vaultPath, query),
     createTask: async (taskLine) => {
       const rel = '000 - 📥 inbox/Workflow-Aufgaben.md'
       const abs = path.join(vaultPath, rel)
-      let existing = ''
-      try { existing = await fs.readFile(abs, 'utf-8') } catch { existing = '# Workflow-Aufgaben\n\n' }
-      const sep = existing.endsWith('\n') ? '' : '\n'
       await fs.mkdir(path.dirname(abs), { recursive: true })
-      await writeFileSafe(abs, existing + sep + taskLine + '\n')
+      await updateMarkdownSafe(abs, current => {
+        const existing = current ?? '# Workflow-Aufgaben\n\n'
+        const sep = existing.endsWith('\n') ? '' : '\n'
+        return existing + sep + taskLine + '\n'
+      })
       return rel
     }
   }
@@ -2742,22 +2864,24 @@ ipcMain.handle('tasks-update-line', async (_event, data: {
   try {
     assertApprovedVault(data.vaultPath, 'tasks-update-line')
     const fullPath = validatePath(data.vaultPath, data.relativePath)
-    const content = await fs.readFile(fullPath, 'utf-8')
-    const lines = content.split('\n')
-
-    const idx = data.lineIndex - 1
-    if (idx < 0 || idx >= lines.length) {
-      return { success: false, error: 'Zeile nicht gefunden (Notiz wurde geändert)' }
+    // Lesen, Zeile prüfen und Schreiben als EIN Schritt unter der Notiz-Sperre: sonst schriebe
+    // dieser Handler eine veraltete Fassung zurück, wenn dazwischen der Editor speichert (Codex F26).
+    let conflict: string | null = null
+    try {
+      await updateMarkdownSafe(fullPath, content => {
+        if (content === null) { conflict = 'Zeile nicht gefunden (Notiz wurde geändert)'; throw new Error(conflict) }
+        const lines = content.split('\n')
+        const idx = data.lineIndex - 1
+        if (idx < 0 || idx >= lines.length) { conflict = 'Zeile nicht gefunden (Notiz wurde geändert)'; throw new Error(conflict) }
+        if (lines[idx] !== data.expectedOldLine) { conflict = 'Notiz wurde zwischenzeitlich geändert — Task nicht überschrieben'; throw new Error(conflict) }
+        lines[idx] = data.newLine
+        return lines.join('\n')
+      }, { origin: 'tasks' })
+    } catch (error) {
+      // Ein erkannter Konflikt ist kein Fehler im Log, nur eine Absage an den Aufrufer.
+      if (conflict) return { success: false, error: conflict }
+      throw error
     }
-
-    if (lines[idx] !== data.expectedOldLine) {
-      return { success: false, error: 'Notiz wurde zwischenzeitlich geändert — Task nicht überschrieben' }
-    }
-
-    lines[idx] = data.newLine
-    const joined = lines.join('\n')
-    // Eine Schreibgrenze: writeFileSafe erledigt Auto-Heal + Backup + Empty-Write-Block.
-    await writeFileSafe(fullPath, joined)
     return { success: true }
   } catch (error) {
     console.error('[tasks-update-line] Fehler:', error)
@@ -2778,19 +2902,14 @@ ipcMain.handle('tasks-create', async (_event, data: {
     // Zielverzeichnis anlegen, falls nötig
     await fs.mkdir(path.dirname(fullPath), { recursive: true })
 
-    let existing = ''
-    try {
-      existing = await fs.readFile(fullPath, 'utf-8')
-    } catch {
+    // Lesen und Anhängen unter der Notiz-Sperre (Codex F26): zwei Anlagen oder ein Autosave
+    // dazwischen überschrieben sich sonst gegenseitig.
+    await updateMarkdownSafe(fullPath, current => {
       // Datei existiert noch nicht — wird mit minimalem Header angelegt
-      const title = path.basename(data.relativePath).replace(/\.md$/, '')
-      existing = `# ${title}\n\n`
-    }
-
-    const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
-    const newContent = existing + separator + data.taskLine + '\n'
-    // Eine Schreibgrenze: writeFileSafe erledigt Auto-Heal + Backup + Empty-Write-Block.
-    await writeFileSafe(fullPath, newContent)
+      const existing = current ?? `# ${path.basename(data.relativePath).replace(/\.md$/, '')}\n\n`
+      const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n'
+      return existing + separator + data.taskLine + '\n'
+    }, { origin: 'tasks' })
     recordActivity(data.vaultPath, { at: Date.now(), kind: 'task-created', count: 1 })
     return { success: true, relativePath: data.relativePath }
   } catch (error) {
@@ -3072,6 +3191,8 @@ ipcMain.handle('rename-file', async (_event, oldPath: string, newPath: string) =
     }
 
     await fs.rename(safeOld, safeNew)
+    const renamedDir = await fs.stat(safeNew).then(st => st.isDirectory()).catch(() => false)
+    noteMovedForDayLog(safeOld, safeNew, renamedDir)
     return { success: true, newPath: safeNew }
   } catch (error) {
     console.error('Fehler beim Umbenennen:', error)
@@ -3110,6 +3231,8 @@ ipcMain.handle('move-file', async (_event, sourcePath: string, targetDir: string
     }
 
     await fs.rename(safeSource, targetPath)
+    const movedDir = await fs.stat(targetPath).then(st => st.isDirectory()).catch(() => false)
+    noteMovedForDayLog(safeSource, targetPath, movedDir)
     return { success: true, newPath: targetPath }
   } catch (error) {
     console.error('Fehler beim Verschieben:', error)
@@ -3125,24 +3248,24 @@ ipcMain.handle('duplicate-file', async (_event, filePath: string) => {
     const ext = path.extname(safeSource)
     const baseName = path.basename(safeSource, ext)
 
-    // Finde einen freien Namen
-    let counter = 1
-    let newPath = path.join(dir, `${baseName} Kopie${ext}`)
-    while (true) {
+    // Ersten freien Namen nehmen — exklusiv kopieren, damit nie eine vorhandene Datei ersetzt wird (Codex F31).
+    let newPath = ''
+    for (let counter = 1; ; counter++) {
+      // Ziel muss ebenfalls in einem erlaubten Vault liegen (Defense-in-Depth); der kanonische
+      // Pfad ist zugleich der Schlüssel der Notiz-Sperre (Codex F35).
+      newPath = await assertSafePath(
+        path.join(dir, counter === 1 ? `${baseName} Kopie${ext}` : `${baseName} Kopie ${counter}${ext}`),
+        'duplicate-file (target)'
+      )
+      const target = newPath
       try {
-        await fs.access(newPath)
-        counter++
-        newPath = path.join(dir, `${baseName} Kopie ${counter}${ext}`)
-      } catch {
-        break // Datei existiert nicht - Name ist frei
+        await withNoteWriteLock(target, () => fs.copyFile(safeSource, target, fsConstants.COPYFILE_EXCL))
+        break
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST' || counter >= 1000) throw error
       }
     }
-
-    // Ziel muss ebenfalls in einem erlaubten Vault liegen (sollte automatisch gegeben sein,
-    // da newPath im Verzeichnis von safeSource liegt — Prüfung als Defense-in-Depth)
-    await assertSafePath(newPath, 'duplicate-file (target)')
-
-    await fs.copyFile(safeSource, newPath)
+    noteWriteForDayLog(newPath, null, undefined, 'renderer')
     return { success: true, newPath }
   } catch (error) {
     console.error('Fehler beim Duplizieren:', error)
@@ -4912,6 +5035,15 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     } catch { /* ohne Index kein Werkzeug */ }
 
+    // Tagesüberblick (day_overview): Vault und Brain-Ordner stehen hier fest, das Modell wählt
+    // nur das Datum. Reine Lesewege auf Protokolle dieses Rechners.
+    const overviewVault = params.vaultPath
+    const overviewBrainFolder = await loadUISettings()
+      .then(ui => ((ui as Record<string, unknown>).brain as { folderPath?: string } | undefined)?.folderPath || '800 - 🧠 brain')
+      .catch(() => '800 - 🧠 brain')
+    const dayOverview = (isoDate: string, range: { from: number; to: number }) =>
+      buildDayOverview({ vaultPath: overviewVault, isoDate, range, brainFolder: overviewBrainFolder })
+
     // Hausdesign: einmal beim Start laden; aus, kaputt oder Logo-Prüfsumme falsch → kein Hausdesign.
     const brand = await loadBrandForRun(params.vaultPath, skills.map(s => ({ ...s, enabled: true }))).catch(() => null)
 
@@ -4936,6 +5068,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       imageGen,
       route,
       vaultSearch,
+      dayOverview,
       ...(brand ? { brand } : {})
     })
     if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
@@ -5299,7 +5432,7 @@ ipcMain.handle('note-agent-accept-result', async (event, runId: string, resultId
       // Die KI-Provenienz wird hier gesetzt — beim Übernehmen, nicht schon im
       // write_note-Tool: verworfene Ergebnisse sollen keinen Stempel bekommen.
       const content = await fs.readFile(real, 'utf-8')
-      await writeFileSafe(destPath, setAiProvenanceInContent(content, run.model, todayIsoDate()))
+      await writeFileSafe(destPath, setAiProvenanceInContent(content, run.model, todayIsoDate()), { origin: 'agent', created: true })
     } else {
       // Platzhalter (leer, gerade reserviert) wird überschrieben — der Name gehört uns.
       await fs.copyFile(real, destPath)
@@ -5677,6 +5810,18 @@ ipcMain.handle('activity-events', async (event, vaultPath: string) => {
   try {
     assertApprovedVault(vaultPath, 'activity-events')
     return { success: true, events: await readActivityEvents(vaultPath) }
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+  }
+})
+
+// Tagesprotokoll lesen (Brain-Sensoren, Dashboard). Nur lesend; geschrieben wird an writeFileSafe.
+ipcMain.handle('day-log-read', async (event, vaultPath: string, range?: { from: number; to: number }) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+  try {
+    assertApprovedVault(vaultPath, 'day-log-read')
+    const valid = range && Number.isFinite(range.from) && Number.isFinite(range.to) && range.to > range.from
+    return { success: true, log: await readDayLog(vaultPath, valid ? range : undefined) }
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
   }
@@ -6206,6 +6351,7 @@ ipcMain.handle('project-status-mark', async (
     const marker: ProjectStatusMarker = { project: projectName, keywords: keywords.map(k => k.trim()).filter(Boolean), priority }
     const content = buildStatusMarkerFile(marker, 'de')
     await fs.writeFile(safeTarget, content, 'utf-8')
+    noteWriteForDayLog(safeTarget, undefined, content, 'app')
 
     return { success: true, statusFilePath: safeTarget }
   } catch (err) {
@@ -6389,6 +6535,7 @@ ipcMain.handle('project-status-set-status', async (
       return { success: false, error: 'Frontmatter konnte nicht aktualisiert werden.' }
     }
     await fs.writeFile(safeTarget, updated, 'utf-8')
+    noteWriteForDayLog(safeTarget, undefined, updated, 'app')
 
     return { success: true }
   } catch (err) {
@@ -12954,13 +13101,8 @@ ipcMain.handle('office-import-docx', async (_event, vaultPath: string, sourcePat
       markdown = fb.markdown
     }
 
-    let targetPath = path.join(folder, `${baseName}.md`)
-    let i = 1
-    while (await fs.access(targetPath).then(() => true).catch(() => false)) {
-      targetPath = path.join(folder, `${baseName}-${i}.md`)
-      i++
-    }
-    await fs.writeFile(targetPath, markdown, 'utf-8')
+    const targetPath = await writeNewFileUnique(n => path.join(folder, n === 0 ? `${baseName}.md` : `${baseName}-${n}.md`), markdown)
+    noteWriteForDayLog(targetPath, null, markdown, 'app')
     const relativePath = path.relative(vaultPath, targetPath)
     return { success: true, relativePath }
   } catch (error) {
@@ -13010,13 +13152,8 @@ ipcMain.handle('office-import-pptx', async (_event, vaultPath: string, sourcePat
     const attachmentsDir = validatePath(vaultPath, '.attachments')
     const { markdown } = await importPptxAsMarkdown(safeSource, attachmentsDir, baseName)
 
-    let targetPath = path.join(folder, `${baseName}.md`)
-    let i = 1
-    while (await fs.access(targetPath).then(() => true).catch(() => false)) {
-      targetPath = path.join(folder, `${baseName}-${i}.md`)
-      i++
-    }
-    await fs.writeFile(targetPath, markdown, 'utf-8')
+    const targetPath = await writeNewFileUnique(n => path.join(folder, n === 0 ? `${baseName}.md` : `${baseName}-${n}.md`), markdown)
+    noteWriteForDayLog(targetPath, null, markdown, 'app')
     const relativePath = path.relative(vaultPath, targetPath)
     return { success: true, relativePath }
   } catch (error) {
@@ -13122,18 +13259,13 @@ ipcMain.handle('transport-save-note', async (_event, data: {
     const frontmatter = frontmatterLines.join('\n')
 
     // Datei schreiben
-    let filePath = path.join(destPath, filename)
-
-    // Eindeutigen Pfad sicherstellen
-    let counter = 1
-    while (await fs.access(filePath).then(() => true).catch(() => false)) {
-      const base = filename.endsWith('.md') ? filename.slice(0, -3) : filename
-      filePath = path.join(destPath, `${base}-${counter}.md`)
-      counter++
-      if (counter > 999) break
-    }
-
-    await fs.writeFile(filePath, frontmatter + content, 'utf-8')
+    // Eindeutiger Pfad, exklusiv angelegt (Codex F31).
+    const transportBase = filename.endsWith('.md') ? filename.slice(0, -3) : filename
+    const filePath = await writeNewFileUnique(
+      n => path.join(destPath, n === 0 ? filename : `${transportBase}-${n}.md`),
+      frontmatter + content
+    )
+    noteWriteForDayLog(filePath, null, frontmatter + content, 'app')
 
     const relativePath = path.relative(vaultPath, filePath)
 
@@ -13344,16 +13476,11 @@ ipcMain.handle('transport-save-zettel', async (_event, data: {
       now
     })
 
-    let filePath = path.join(destPath, fileName)
-    let counter = 1
-    while (await fs.access(filePath).then(() => true).catch(() => false)) {
-      const base = fileName.slice(0, -3)
-      filePath = path.join(destPath, `${base} (${counter}).md`)
-      counter++
-      if (counter > 999) break
-    }
-
-    await fs.writeFile(filePath, content, 'utf-8')
+    const filePath = await writeNewFileUnique(
+      n => path.join(destPath, n === 0 ? fileName : `${fileName.slice(0, -3)} (${n}).md`),
+      content
+    )
+    noteWriteForDayLog(filePath, null, content, 'app')
     const relativePath = path.relative(vaultPath, filePath)
 
     if (mainWindow && !mainWindow.isDestroyed()) {

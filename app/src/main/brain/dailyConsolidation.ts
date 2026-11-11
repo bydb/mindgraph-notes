@@ -53,11 +53,11 @@ export function buildPrompt(input: BrainConsolidateInput): string {
     : ''
 
   const tasksBlock = lang === 'de'
-    ? `- abgeschlossen: ${input.sensors.tasks.completed}\n- neu: ${input.sensors.tasks.created}` +
+    ? `- Checkboxen auf erledigt gesetzt: ${input.sensors.tasks.completedKnown === false ? 'nicht gemessen (keine Zahl nennen)' : input.sensors.tasks.completed}\n- neu: ${input.sensors.tasks.created}` +
       (input.sensors.tasks.examples.length > 0
         ? `\n- Beispiele: ${input.sensors.tasks.examples.map(e => `"${e}"`).join(', ')}`
         : '')
-    : `- completed: ${input.sensors.tasks.completed}\n- created: ${input.sensors.tasks.created}` +
+    : `- checkboxes ticked: ${input.sensors.tasks.completedKnown === false ? 'not measured (do not state a number)' : input.sensors.tasks.completed}\n- created: ${input.sensors.tasks.created}` +
       (input.sensors.tasks.examples.length > 0
         ? `\n- examples: ${input.sensors.tasks.examples.map(e => `"${e}"`).join(', ')}`
         : '')
@@ -277,7 +277,7 @@ ${sourcesYaml}
 counts:
   notes_touched: ${input.sensors.notes.length}
   notes_created: ${notesCreated}
-  tasks_completed: ${input.sensors.tasks.completed}
+  tasks_completed: ${input.sensors.tasks.completedKnown === false ? 'null' : input.sensors.tasks.completed}
   tasks_created: ${input.sensors.tasks.created}
   emails_received: ${input.sensors.emails.received}
   emails_replied: ${input.sensors.emails.replied}

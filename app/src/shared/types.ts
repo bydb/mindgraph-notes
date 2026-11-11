@@ -947,6 +947,7 @@ export interface ElectronAPI {
   noteSkillsImportDialog: (vaultPath: string) => Promise<{ success: boolean; cancelled?: boolean; relPath?: string; folderName?: string; includedScripts?: boolean; error?: string }>;
   noteAgentAcceptResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; fileName?: string; relPath?: string; absPath?: string; error?: string }>;
   activityAppend: (vaultPath: string, entry: ActivityEvent) => Promise<{ success: boolean; error?: string }>;
+  dayLogRead: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; log?: { state: 'ok' | 'missing' | 'broken'; since: number | null; events: import('./dayLog').DayLogEvent[]; gaps?: import('./dayLog').DayLogGap[] }; error?: string }>;
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) => Promise<{ success: boolean; summary?: ActivitySummary; error?: string }>;
   /** Alle Tätigkeits-Ereignisse des Vaults (90 Tage), ohne Inhalte — für die Messgeschichte. */
   activityEvents: (vaultPath: string) => Promise<{ success: boolean; events?: ActivityEvent[]; error?: string }>;
@@ -1542,6 +1543,8 @@ export interface BrainSensorNote {
 
 export interface BrainSensorTasks {
   completed: number;
+  /** false: kein lesbares Tagesprotokoll — `completed` ist dann unbekannt, nicht 0. Fehlt = bekannt. */
+  completedKnown?: boolean
   created: number;
   examples: string[];
 }

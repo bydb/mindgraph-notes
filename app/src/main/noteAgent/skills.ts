@@ -3,6 +3,8 @@
 // native Freigabe pro Lauf und darf direkte Nebenwirkungen haben.
 // Entscheidung 11: Write-Skills nehmen strukturierte Daten, nie Binärformate vom LLM.
 
+import { dayKey, localDayBounds } from '../../shared/dayLog'
+import { DAY_OVERVIEW_MAX_CHARS, dayOverviewDateError, formatDayOverview } from '../../shared/dayOverview'
 import { clampResults, formatVaultSearchResult, VAULT_SEARCH_MAX_QUERY } from './vaultSearchFormat'
 import { sheetColumnWidths, autofilterRef } from '../../shared/sheetLayout'
 import { promises as fs } from 'fs'
@@ -785,8 +787,11 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     parameters: noteReadTool.parameters,
     isWrite: false,
     run: async (args, ctx) => {
-      const res = await noteReadTool.run(args, telegramCtx(ctx))
-      const rel = requireString(args, 'path')
+      // Pfad ohne Endung („…/2026/08/19“) ist fast immer eine Notiz: .md ergänzen statt ablehnen —
+      // der Fehlversuch kostete real einen ganzen Schritt (11.11.2026).
+      const given = requireString(args, 'path')
+      const rel = given && !path.extname(given) ? `${given}.md` : given
+      const res = await noteReadTool.run({ ...args, path: rel }, telegramCtx(ctx))
       if (res.ok && rel) ctx.run.sources.add(`[[${path.basename(rel, '.md')}]]`)
       // Ablehnung bei Nicht-Markdown umformulieren: die Telegram-Fassung sagt nur, was
       // NICHT geht. Ein Modell ohne Ausweg erfindet sich dann einen („lade die Datei
@@ -827,6 +832,43 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         } catch { /* „Keine Treffer.“ o. ä. — kein JSON, nichts zu markieren */ }
       }
       return { ...res, content, display: query ? `note_search: „${query}"` : undefined }
+    }
+  })
+
+  // Tagesüberblick: gemessene Daten eines Kalendertags (Plan + Review:
+  // docs/codex-collab/agent-tagesueberblick.md). Nur lesend; ohne dieses Werkzeug suchte der
+  // Agent bei „was habe ich heute erledigt“ nach Stichworten und gab einen drei Monate alten
+  // Eintrag als aktuellen aus (real, 11.11.2026).
+  registry.register({
+    name: 'day_overview',
+    description: 'Tagesüberblick für EINEN Kalendertag aus den Protokollen dieses Rechners: in MindGraph auf erledigt gesetzte Checkboxen, angelegte, gespeicherte und verschobene Notizen, App-Läufe und ob es eine Brain-Tagesnotiz gibt. Für Fragen wie „was habe ich heute/gestern gemacht oder erledigt“. Enthält keine Mails und nichts von außerhalb der App.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'Datum als JJJJ-MM-TT. Ohne Angabe: heute.' }
+      },
+      required: []
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const overview = ctx.run.dayOverview
+      if (!overview) return { ok: false, content: 'Fehler: Der Tagesüberblick ist in diesem Lauf nicht verfügbar.' }
+      const now = Date.now()
+      const given = typeof args.date === 'string' ? args.date.trim() : ''
+      const isoDate = given || dayKey(now)
+      const range = localDayBounds(isoDate)
+      const bad = dayOverviewDateError(isoDate, range, now)
+      if (bad || !range) return { ok: false, content: bad ?? 'Fehler: ungültiges Datum.', display: 'day_overview: ungültiges Datum' }
+      try {
+        const data = await overview(isoDate, range)
+        // Budget des Laufs achten (Zeichen ≈ 4 je Token), nie über der eigenen Obergrenze.
+        const budget = ctx.maxResultTokens ? Math.min(DAY_OVERVIEW_MAX_CHARS, Math.max(0, ctx.maxResultTokens() * 3)) : DAY_OVERVIEW_MAX_CHARS
+        ctx.run.sources.add(`Tagesüberblick ${isoDate} (Protokolle dieses Rechners)`)
+        return { ok: true, content: formatDayOverview(data, budget), display: `day_overview: ${isoDate}` }
+      } catch (err) {
+        if (ctx.run.abort.signal.aborted) return { ok: false, content: 'Abgebrochen.', display: 'day_overview: abgebrochen' }
+        return { ok: false, content: `Fehler beim Lesen der Tagesprotokolle: ${err instanceof Error ? err.message : String(err)}. Sag dem Nutzer, dass für diesen Tag keine Messung gelesen werden konnte.`, display: 'day_overview: Fehler' }
+      }
     }
   })
 

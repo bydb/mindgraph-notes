@@ -3,6 +3,7 @@
 // opake Result-Handles (der Renderer sieht nie Staging-Pfade), Results höchstens
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
+import type { DayOverviewData } from '../../shared/dayOverview'
 import type { BrandRunContext } from '../brand/brandService'
 import type { ChatMessage } from '../llm/chatClient'
 import type { AgentRoute } from '../../shared/agentRoute'
@@ -117,6 +118,9 @@ export interface AgentRun {
   // Suche nach Bedeutung über den Vault-Index — nur gesetzt, wenn der Index für diesen Vault
   // abfragbar ist (Main-seitig beim Start geprüft). Die Einbettung der Anfrage bleibt lokal.
   vaultSearch?: (query: string, topK: number, signal: AbortSignal) => Promise<VaultQueryResult>
+  // Tagesüberblick (day_overview): gemessene Tagesdaten dieses Rechners, beim Start Main-seitig
+  // an Vault und Brain-Ordner gebunden. Das Werkzeug wählt nur das Datum.
+  dayOverview?: (isoDate: string, range: { from: number; to: number }) => Promise<DayOverviewData>
   // Bild-Generierung (Opt-in-Modul image-generation): beim Run-Start Main-seitig
   // bestimmt (Modul aktiv + Imagen-Key hinterlegt) → schaltet das generate_image-Tool frei.
   imageGen?: boolean
@@ -197,6 +201,7 @@ export function startRun(params: {
   brand?: BrandRunContext
   route?: AgentRoute
   vaultSearch?: AgentRun['vaultSearch']
+  dayOverview?: AgentRun['dayOverview']
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
@@ -231,7 +236,8 @@ export function startRun(params: {
     imageGen: params.imageGen,
     ...(params.brand ? { brand: params.brand } : {}),
     route: params.route,
-    vaultSearch: params.vaultSearch
+    vaultSearch: params.vaultSearch,
+    dayOverview: params.dayOverview
   }
   activeBySender.set(params.senderId, run)
   runsById.set(run.runId, run)

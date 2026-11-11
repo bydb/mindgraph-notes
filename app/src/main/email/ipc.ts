@@ -2279,7 +2279,15 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
       const noteContent = email.analysis?.model
         ? setAiProvenanceInContent(noteBody, email.analysis.model, todayIsoDate())
         : noteBody
-      await fs.writeFile(filePath, noteContent, 'utf-8')
+      // Exklusiv anlegen: liegt die Notiz inzwischen da (zweiter Klick, anderer Vorgang), wird sie
+      // nicht überschrieben, sondern als vorhanden gemeldet (Codex F31).
+      try {
+        // Über die eine Schreibgrenze: Notiz-Sperre, exklusiv, Eintrag im Tagesprotokoll (Codex F35).
+        await writeFileSafe(filePath, noteContent, { exclusive: true })
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException)?.code !== 'EEXIST') throw error
+        return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: true }
+      }
       console.log('[Email] Note created:', mailRef(email.id))
 
       return { success: true, path: path.join(inboxFolderRelative, fileName), alreadyExists: false }

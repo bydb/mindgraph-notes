@@ -238,6 +238,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Tätigkeitsprotokoll (Effizienzindex). Anhängen darf der Renderer nur
   // Sprachbefehl-Ereignisse — alles andere schreibt der Main selbst.
   activityAppend: (vaultPath: string, entry: unknown) => ipcRenderer.invoke('activity-append', vaultPath, entry),
+  dayLogRead: (vaultPath: string, range?: { from: number; to: number }) =>
+    ipcRenderer.invoke('day-log-read', vaultPath, range),
   activitySummary: (vaultPath: string, range?: { from: number; to: number }) =>
     ipcRenderer.invoke('activity-summary', vaultPath, range),
   // Rohereignisse (ohne Inhalte) für die Messgeschichte im Leistungsfenster.

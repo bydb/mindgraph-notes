@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import { buildBrainSensors, getDayBoundsMs } from '../../utils/brainSensors'
+import { buildBrainSensors, getDayBoundsMs, loadDayLog } from '../../utils/brainSensors'
 import { createNoteFromFile, useNotesStore } from '../../stores/notesStore'
 import { useUIStore } from '../../stores/uiStore'
 import { useEmailStore } from '../../stores/emailStore'
@@ -467,8 +467,9 @@ const ActivityWidget: React.FC<ActivityWidgetProps> = ({ snapshot, t, vaultPath,
     setBrainNotePath('')
     try {
       const { startMs, endMs, isoDate } = getDayBoundsMs()
+      const dayLog = await loadDayLog(vaultPath, startMs, endMs)
       const { sensors, hasContent } = buildBrainSensors({
-        notes, emails, vaultPath, dayStartMs: startMs, dayEndMs: endMs,
+        notes, emails, vaultPath, dayStartMs: startMs, dayEndMs: endMs, dayLog,
         dailyNote: { folderPath: dailyNoteFolderPath, dateFormat: dailyNoteDateFormat }
       })
       if (!hasContent) {
