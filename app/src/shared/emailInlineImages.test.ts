@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
+  findBrokenInlineTokens,
   inlineImageToken,
+  inlineTokenRanges,
   insertInlineTokens,
   inlineTokensToPlainText,
   referencedInlineIds,
@@ -97,5 +99,32 @@ describe('replaceInlineTokens / inlineTokensToPlainText', () => {
 
   it('macht aus Platzhaltern einen lesbaren Hinweis und streicht verwaiste', () => {
     expect(inlineTokensToPlainText(`Siehe ![foto.png](bild:${A})![weg](bild:${B})`, [A])).toBe('Siehe [Bild: foto.png]')
+  })
+})
+
+describe('inlineTokenRanges', () => {
+  it('nennt Anfang und Ende jedes gültigen Platzhalters', () => {
+    const token = `![a](bild:${A})`
+    const body = `vor ${token} nach`
+    expect(inlineTokenRanges(body)).toEqual([{ start: 4, end: 4 + token.length }])
+    expect(inlineTokenRanges('![x](https://example.org/a.png)')).toEqual([])
+  })
+})
+
+describe('findBrokenInlineTokens', () => {
+  const atts = [{ path: '/s/1.png', filename: '1.png', inlineId: A }]
+
+  it('ist leer, wenn jeder Platzhalter ein Bild hat', () => {
+    expect(findBrokenInlineTokens(`Hallo ![1](bild:${A})`, atts)).toEqual([])
+    expect(findBrokenInlineTokens('Nur Text (bild: siehe unten)', atts)).toEqual([])
+  })
+
+  it('nennt einen Platzhalter, dessen Kennung zu keinem Bild gehört', () => {
+    expect(findBrokenInlineTokens(`![foto.png](bild:${B})`, atts)).toEqual(['foto.png'])
+    expect(findBrokenInlineTokens(`![foto.png](bild:${A})`, undefined)).toEqual(['foto.png'])
+  })
+
+  it('erkennt beschädigte Reste, etwa nach einer Korrektur der Kennung', () => {
+    expect(findBrokenInlineTokens('![foto.png](bild:Aaaa aaaa)', atts)).toEqual(['beschädigter Platzhalter'])
   })
 })

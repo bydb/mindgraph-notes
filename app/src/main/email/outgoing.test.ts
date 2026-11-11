@@ -193,7 +193,7 @@ describe('Bilder im Text', () => {
     expect(out).not.toContain('MGINLINE')
     expect(mailOptions.attachments).toEqual([
       { filename: 'bericht.txt', path: attachmentPath },
-      { filename: 'www.foto *neu*.png', path: signaturePath, cid: 'mg-inline-a1b2c3d4e5f6', contentDisposition: 'inline' }
+      { filename: 'www.foto *neu*.png', path: signaturePath, cid: 'mg-inline-a1b2c3d4e5f6', contentDisposition: 'inline', contentType: 'image/png' }
     ])
     expect(mailOptions.text).toBe('Oben\n[Bild: www.foto *neu*.png]\nUnten')
   })
@@ -222,5 +222,19 @@ describe('Bilder im Text', () => {
     expect(raw).toContain('multipart/related')
     expect(raw).toContain('Content-ID: <mg-inline-a1b2c3d4e5f6>')
     expect(raw).toMatch(/Content-Disposition: inline/)
+  })
+})
+
+describe('Bildart eingebetteter Bilder', () => {
+  it('setzt die Bildart ausdrücklich, statt sie nur aus dem Namen abzuleiten', async () => {
+    const id = 'c0ffee00c0ff'
+    const { mailOptions } = await buildOutgoingMail({
+      ...base(),
+      body: `![scan](bild:${id})`,
+      attachments: [{ path: signaturePath, filename: 'scan.pdf', inlineId: id }]
+    }, html)
+    expect((mailOptions.attachments as Array<{ contentType?: string }>)[0].contentType).toBe('image/png')
+    const raw = (await renderRawMessage(mailOptions)).toString()
+    expect(raw).toMatch(/Content-Type: image\/png; name=scan\.pdf/)
   })
 })

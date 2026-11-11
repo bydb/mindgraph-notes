@@ -157,3 +157,41 @@ it('übernimmt eine abgelegte Datei und überspringt zu große, ohne sie zu lese
   expect(stage.mock.calls[0][0]).toHaveLength(1)
   expect(container.querySelector('[role="status"]')!.textContent).toContain('inbox.compose.dropSkipped')
 })
+it('sperrt Senden, solange eine abgelegte Datei noch übernommen wird', async () => {
+  const stage = stubStaging()
+  let release!: (value: unknown) => void
+  stage.mockReturnValueOnce(new Promise(resolve => { release = resolve }))
+  state.composeState.subject = 'Termin'
+  await act(async () => root.render(<ComposeView />))
+  const event = new window.Event('drop', { bubbles: true, cancelable: true }) as Event & { dataTransfer: unknown }
+  event.dataTransfer = { files: [imageFile()], types: ['Files'] }
+  await act(async () => { container.querySelector('.inbox-compose')!.dispatchEvent(event) })
+  await flush()
+  const send = [...container.querySelectorAll('button')].find(b => b.textContent === 'inbox.compose.send')!
+  expect(send.disabled).toBe(true)
+  await act(async () => send.click())
+  expect(state.sendEmail).not.toHaveBeenCalled()
+  await act(async () => { release({ success: true, attachments: [], skipped: [] }) })
+  await flush()
+  expect([...container.querySelectorAll('button')].find(b => b.textContent === 'inbox.compose.send')!.disabled).toBe(false)
+})
+it('sendet nicht, wenn im Text ein Bildplatzhalter ohne Bild steht', async () => {
+  state.composeState.subject = 'Termin'
+  state.composeState.body = 'Siehe ![foto.png](bild:a1b2c3d4e5f6)'
+  await act(async () => root.render(<ComposeView />))
+  await click('send')
+  expect(state.sendEmail).not.toHaveBeenCalled()
+  expect(container.querySelector('.inbox-compose-error')!.textContent).toContain('inbox.compose.brokenInlineImage')
+  state.composeState.body = 'Test'
+})
+it('liest höchstens 20 abgelegte Dateien und nennt die übrigen', async () => {
+  const stage = stubStaging()
+  await act(async () => root.render(<ComposeView />))
+  const extra = { name: 'zuviel.png', size: 4, arrayBuffer: vi.fn() }
+  const event = new window.Event('drop', { bubbles: true, cancelable: true }) as Event & { dataTransfer: unknown }
+  event.dataTransfer = { files: [...Array.from({ length: 20 }, imageFile), extra], types: ['Files'] }
+  await act(async () => { container.querySelector('.inbox-compose')!.dispatchEvent(event) })
+  await flush()
+  expect(extra.arrayBuffer).not.toHaveBeenCalled()
+  expect(stage.mock.calls[0][0]).toHaveLength(20)
+})

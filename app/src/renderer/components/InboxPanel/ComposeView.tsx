@@ -7,10 +7,17 @@ import { useTranslation } from '../../utils/translations'
 import { sanitizeHtml } from '../../utils/sanitize'
 import type { ComposeAttachment } from '../../../shared/types'
 import { isMicrosoftAccountId } from '../../../shared/emailAccountKind'
-import { inlineImageToken, insertInlineTokens, referencedInlineIds, removeInlineToken } from '../../../shared/emailInlineImages'
-
-// Dieselbe Grenze wie im Main (email-stage-compose-files): größere Dateien werden gar nicht erst gelesen.
-const COMPOSE_DROP_MAX_BYTES = 30 * 1024 * 1024
+import {
+  COMPOSE_STAGE_MAX_BYTES,
+  COMPOSE_STAGE_MAX_FILES,
+  COMPOSE_STAGE_MAX_TOTAL_BYTES,
+  findBrokenInlineTokens,
+  inlineImageToken,
+  inlineTokenRanges,
+  insertInlineTokens,
+  referencedInlineIds,
+  removeInlineToken
+} from '../../../shared/emailInlineImages'
 import {
   hasOpenRecipientGroup,
   looksLikeRecipientList,
@@ -100,6 +107,10 @@ export const ComposeView: React.FC = () => {
   const dragDepth = useRef(0)
   const [dropActive, setDropActive] = useState(false)
   const [dropNote, setDropNote] = useState('')
+  // Laufende Übernahmen. Solange eine läuft, ist Senden gesperrt — sonst ginge die Mail
+  // ohne das gerade abgelegte Bild hinaus (Codex F01).
+  const [dropBusy, setDropBusy] = useState(0)
+  const dropBusyRef = useRef(0)
   useEffect(() => { cursorRef.current = null; setDropNote('') }, [composeDraftId])
 
   // Kontakte bei jedem Öffnen neu aufbauen — sonst fehlen seit dem letzten
@@ -121,7 +132,7 @@ export const ComposeView: React.FC = () => {
     (composeState.forwardAttachments.status === 'done' && (composeState.forwardAttachments.skipped?.length ?? 0) > 0)
   )
   // Getippte, noch nicht übernommene Adresse in „An“ zählt: Senden übernimmt sie zuerst.
-  const sendBlocked = isSending || !hasSmtp || (composeState.to.length === 0 && !inputs.to.trim()) || forwardLoading
+  const sendBlocked = isSending || !hasSmtp || (composeState.to.length === 0 && !inputs.to.trim()) || forwardLoading || dropBusy > 0
 
   const dragHasFiles = (dt: DataTransfer | null): boolean => !!dt && Array.from(dt.types || []).includes('Files')
 
@@ -134,25 +145,38 @@ export const ComposeView: React.FC = () => {
     setDropNote('')
     const skipped: string[] = []
     const payload: Array<{ name: string; data: Uint8Array }> = []
-    for (const file of files) {
-      if (file.size > COMPOSE_DROP_MAX_BYTES) { skipped.push(file.name); continue }
-      try {
-        payload.push({ name: file.name, data: new Uint8Array(await file.arrayBuffer()) })
-      } catch {
-        skipped.push(file.name) // Ordner oder nicht lesbar
-      }
-    }
     let staged: ComposeAttachment[] = []
     let failed = false
-    if (payload.length > 0) {
-      try {
-        const res = await window.electronAPI.emailStageComposeFiles(payload)
-        staged = res.attachments || []
-        skipped.push(...(res.skipped || []))
-        failed = !res.success
-      } catch {
-        failed = true
+    dropBusyRef.current += 1
+    setDropBusy(dropBusyRef.current)
+    try {
+      // Grenzen VOR dem Lesen: Anzahl, Einzelgröße, Gesamtgröße (Codex F06).
+      let total = 0
+      for (const [index, file] of files.entries()) {
+        if (index >= COMPOSE_STAGE_MAX_FILES || file.size > COMPOSE_STAGE_MAX_BYTES || total + file.size > COMPOSE_STAGE_MAX_TOTAL_BYTES) {
+          skipped.push(file.name)
+          continue
+        }
+        try {
+          payload.push({ name: file.name, data: new Uint8Array(await file.arrayBuffer()) })
+          total += file.size
+        } catch {
+          skipped.push(file.name) // Ordner oder nicht lesbar
+        }
       }
+      if (payload.length > 0) {
+        try {
+          const res = await window.electronAPI.emailStageComposeFiles(payload)
+          staged = res.attachments || []
+          skipped.push(...(res.skipped || []))
+          failed = !res.success
+        } catch {
+          failed = true
+        }
+      }
+    } finally {
+      dropBusyRef.current = Math.max(0, dropBusyRef.current - 1)
+      setDropBusy(dropBusyRef.current)
     }
     // Inzwischen ein anderer Entwurf offen (oder keiner): Kopien wieder wegräumen.
     const current = useEmailStore.getState().composeState
@@ -321,19 +345,29 @@ export const ComposeView: React.FC = () => {
     setLtChecking(true)
     setLtCorrectionCount(0)
     try {
+      const checkedBody = composeState.body
       const result = await window.electronAPI.languagetoolAnalyze(
-        composeState.body,
+        checkedBody,
         ltSettings.language || 'auto',
         ltSettings.mode,
         ltSettings.url,
         ltSettings.apiUsername,
         ltSettings.apiKey
       )
-      if (result.success && result.matches && result.matches.length > 0) {
+      // Der Text hat sich während der Prüfung geändert (getippt, Bild abgelegt): Das Ergebnis
+      // passt nicht mehr und würde den neuen Stand überschreiben — verwerfen.
+      const latest = useEmailStore.getState().composeState
+      if (!latest || latest.draftId !== composeState.draftId || latest.body !== checkedBody) { setLtChecking(false); return }
+      // Bildplatzhalter sind keine Sprache: Eine „Korrektur" darin ließe das Bild beim
+      // Versand wegfallen (Codex F03). Treffer, die einen Platzhalter berühren, entfallen.
+      const protectedRanges = inlineTokenRanges(checkedBody)
+      const usable = (result.matches || []).filter((m: { offset: number; length: number; replacements: { value: string }[] }) =>
+        m.replacements && m.replacements.length > 0 &&
+        !protectedRanges.some(r => m.offset < r.end && m.offset + m.length > r.start))
+      if (result.success && usable.length > 0) {
         // Korrekturen vorwaerts sammeln, dann rueckwaerts anwenden
-        let correctedText = composeState.body
-        const sorted = [...result.matches]
-          .filter((m: { replacements: { value: string }[] }) => m.replacements && m.replacements.length > 0)
+        let correctedText = checkedBody
+        const sorted = [...usable]
           .sort((a: { offset: number }, b: { offset: number }) => b.offset - a.offset)
 
         // Positionen der Korrekturen im neuen Text tracken
@@ -352,8 +386,7 @@ export const ComposeView: React.FC = () => {
         // Offsets korrigieren (vorwaerts berechnen fuer die Highlights)
         // Da wir rueckwaerts angewandt haben, sind die Offsets im finalen Text verschoben
         // Sortiere vorwaerts und berechne kumulative Verschiebung
-        const forwardSorted = [...result.matches]
-          .filter((m: { replacements: { value: string }[] }) => m.replacements && m.replacements.length > 0)
+        const forwardSorted = [...usable]
           .sort((a: { offset: number }, b: { offset: number }) => a.offset - b.offset)
         const highlights: { offset: number; length: number }[] = []
         let shift = 0
@@ -364,7 +397,7 @@ export const ComposeView: React.FC = () => {
         }
 
         if (count > 0) {
-          setComposeState({ ...composeState, body: correctedText })
+          setComposeState({ ...latest, body: correctedText })
           setLtCorrectionCount(count)
           setLtHighlights(highlights)
           // Highlights + Badge nach 4s ausblenden
@@ -384,7 +417,14 @@ export const ComposeView: React.FC = () => {
     // freigeben, der gar nicht gefragt war (Codex F42).
     if (allowEmptySubject && !composeState.subject.trim()) approved.current.subject = true
     if (allowMissingAttachments && forwardIncomplete) approved.current.attachments = true
-    if (!vaultPath || isSending || !hasSmtp || forwardLoading) return
+    if (!vaultPath || isSending || !hasSmtp || forwardLoading || dropBusyRef.current > 0) return
+    // Ein Bildplatzhalter ohne Bild: nichts senden, sondern sagen, was nicht stimmt (Codex F03).
+    const brokenImages = findBrokenInlineTokens(composeState.body, composeState.attachments)
+    if (brokenImages.length > 0) {
+      setSendStatus('error')
+      setErrorMsg(t('inbox.compose.brokenInlineImage').replace('{names}', brokenImages.join(', ')))
+      return
+    }
     // Erst alle drei Felder übernehmen. Bleibt irgendwo eine ungültige Eingabe stehen,
     // geht nichts raus — sonst erreicht die Mail nur einen Teil der Empfänger.
     const leftovers = RECIPIENT_FIELDS.flatMap(field => commitField(field))
@@ -718,6 +758,9 @@ export const ComposeView: React.FC = () => {
         )}
       </div>
 
+      {dropBusy > 0 && (
+        <div className="inbox-compose-forward-note" role="status">{t('inbox.compose.dropBusy')}</div>
+      )}
       {dropNote && (
         <div className="inbox-compose-forward-note is-warning" role="status">{dropNote}</div>
       )}

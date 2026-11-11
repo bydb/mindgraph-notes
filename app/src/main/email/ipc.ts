@@ -20,7 +20,7 @@ import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBack
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
 import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connection'
 import { buildOutgoingMail, renderRawMessage, findMissingAttachments, renderBodyWithInlineImages, inlineImageTag, type OutgoingAttachment } from './outgoing'
-import { isInlineImageId } from '../../shared/emailInlineImages'
+import { isInlineImageId, findBrokenInlineTokens, referencedInlineIds, COMPOSE_STAGE_MAX_BYTES, COMPOSE_STAGE_MAX_FILES, COMPOSE_STAGE_MAX_TOTAL_BYTES } from '../../shared/emailInlineImages'
 import { sendViaGraph } from './graphSend'
 import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
 import { chooseSendTransport } from '../../shared/emailAccountKind'
@@ -681,8 +681,6 @@ Schlüsselwörter:
   // die Weiterleitungs-Anhaenge, damit Entfernen, Verwerfen und Aufraeumen nach
   // dem Senden ohne zweiten Weg greifen. Der Handler nimmt keinen Pfad entgegen
   // und liest deshalb nichts von der Platte.
-  const COMPOSE_STAGE_MAX_BYTES = 30 * 1024 * 1024
-  const COMPOSE_STAGE_MAX_FILES = 20
   const sniffImageExt = (buf: Buffer): '.png' | '.jpg' | '.gif' | '.webp' | null => {
     if (buf.length >= 8 && buf.readUInt32BE(0) === 0x89504e47 && buf.readUInt32BE(4) === 0x0d0a1a0a) return '.png'
     if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return '.jpg'
@@ -702,17 +700,29 @@ Schlüsselwörter:
       const dir = path.join(forwardStagingRoot(), randomUUID())
       await fs.mkdir(dir, { recursive: true })
       const usedNames = new Set<string>()
+      let totalBytes = 0
       for (let idx = 0; idx < list.length; idx++) {
         const item = list[idx]
         const rawName = typeof item?.name === 'string' ? item.name : ''
         const data = item?.data
         const buf = data instanceof Uint8Array ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
           : data instanceof ArrayBuffer ? Buffer.from(data) : null
-        if (!buf || buf.length === 0 || buf.length > COMPOSE_STAGE_MAX_BYTES) {
+        if (!buf || buf.length === 0 || buf.length > COMPOSE_STAGE_MAX_BYTES || totalBytes + buf.length > COMPOSE_STAGE_MAX_TOTAL_BYTES) {
           skipped.push(rawName || `Datei ${idx + 1}`)
           continue
         }
-        const imageExt = sniffImageExt(buf)
+        totalBytes += buf.length
+        let imageExt = sniffImageExt(buf)
+        // PNG und JPEG lassen sich hier wirklich öffnen: Trägt eine Datei nur die
+        // Anfangsbytes, ist sie kein Bild im Text, sondern ein gewöhnlicher Anhang.
+        let width: number | undefined
+        if (imageExt === '.png' || imageExt === '.jpg') {
+          try {
+            const decoded = nativeImage.createFromBuffer(buf)
+            if (decoded.isEmpty()) imageExt = null
+            else if (decoded.getSize().width > 0) width = decoded.getSize().width
+          } catch { imageExt = null }
+        }
         // Nur Basisname, keine Pfadtrenner. Ein Bild ohne brauchbaren Namen
         // (Zwischenablage liefert „image.png") bekommt Datum und Uhrzeit.
         let safe = path.basename(rawName).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim()
@@ -722,6 +732,13 @@ Schlüsselwörter:
           safe = `Bildschirmfoto ${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())} ${two(d.getHours())}.${two(d.getMinutes())}.${two(d.getSeconds())}${imageExt}`
         }
         if (!safe) safe = `anhang-${idx + 1}`
+        // Name und Bildart müssen zusammenpassen: Mailprogramme (und nodemailer) lesen
+        // die Art am Namen ab — ein PNG namens „scan.pdf" käme als defektes Bild an.
+        if (imageExt) {
+          const ext = path.extname(safe).toLowerCase()
+          const fits = imageExt === '.jpg' ? (ext === '.jpg' || ext === '.jpeg') : ext === imageExt
+          if (!fits) safe = `${safe}${imageExt}`
+        }
         if (usedNames.has(safe.toLowerCase())) {
           const ext = path.extname(safe)
           safe = `${path.basename(safe, ext)}-${idx + 1}${ext}`
@@ -733,11 +750,6 @@ Schlüsselwörter:
           staged.push({ path: target, filename: safe, size: buf.length })
           continue
         }
-        let width: number | undefined
-        try {
-          const size = nativeImage.createFromBuffer(buf).getSize()
-          if (size.width > 0) width = size.width
-        } catch { /* Breite unbekannt: das Bild geht ohne feste Breite mit */ }
         staged.push({ path: target, filename: safe, size: buf.length, inlineId: randomBytes(6).toString('hex'), width })
       }
       return { success: true, attachments: staged, skipped }
@@ -2529,14 +2541,20 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     const text = typeof body === 'string' ? body : ''
     const sources = new Map<string, { src: string; width?: number }>()
     const root = await fs.realpath(forwardStagingRoot()).catch(() => null)
-    if (root && Array.isArray(inlineImages)) {
+    const wanted = new Set(referencedInlineIds(text))
+    let previewBytes = 0
+    if (root && wanted.size > 0 && Array.isArray(inlineImages)) {
       const mimeByExt: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
       for (const img of inlineImages.slice(0, COMPOSE_STAGE_MAX_FILES)) {
         if (!isInlineImageId(img?.inlineId) || typeof img.path !== 'string') continue
+        // Nur was im Text steht, und insgesamt nicht mehr als eine Ablage fassen darf.
+        if (!wanted.has(img.inlineId) || sources.has(img.inlineId)) continue
         try {
           const real = await fs.realpath(img.path)
           if (!real.startsWith(root + path.sep)) continue
-          if ((await fs.stat(real)).size > COMPOSE_STAGE_MAX_BYTES) continue
+          const size = (await fs.stat(real)).size
+          if (size > COMPOSE_STAGE_MAX_BYTES || previewBytes + size > COMPOSE_STAGE_MAX_TOTAL_BYTES) continue
+          previewBytes += size
           const buf = await fs.readFile(real)
           const ext = sniffImageExt(buf)
           if (!ext) continue
@@ -2633,6 +2651,13 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     if (!composeData.to?.length) return { success: false, error: 'Kein Empfänger angegeben' }
     if (badRecipients.length > 0) {
       return { success: false, error: `Ungültige Empfängeradresse: ${badRecipients.map(r => r?.address || '(leer)').join(', ')}` }
+    }
+    // Zweite Grenze hinter dem Schreibfenster: Ein Bildplatzhalter ohne Bild (Kennung
+    // verändert, Klammern beschädigt) ließe das Bild still wegfallen oder stünde roh
+    // in der Mail. Dann geht nichts raus (Codex F03, email-bilder-im-text.md).
+    const brokenImages = findBrokenInlineTokens(String(composeData.body ?? ''), composeData.attachments)
+    if (brokenImages.length > 0) {
+      return { success: false, error: `Im Text steht ein Bildplatzhalter ohne Bild: ${brokenImages.join(', ')}. Bitte die Zeile entfernen oder das Bild neu einfügen.` }
     }
     // ── Weiche zwischen den Transportwegen, VOR allem, was SMTP anfasst ──
     // Microsoft-Konten senden über Graph (SMTP ist im Mandanten meist gesperrt, ein Passwort

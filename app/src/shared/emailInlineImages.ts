@@ -26,6 +26,39 @@ export function isInlineImageId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-f0-9]{8,32}$/.test(value)
 }
 
+/** Grenzen einer Ablage — im Schreibfenster (vor dem Lesen) und im Main (vor dem Schreiben) dieselben. */
+export const COMPOSE_STAGE_MAX_FILES = 20
+export const COMPOSE_STAGE_MAX_BYTES = 30 * 1024 * 1024
+export const COMPOSE_STAGE_MAX_TOTAL_BYTES = 100 * 1024 * 1024
+
+/** Stellen aller gültigen Platzhalter im Text (für die Rechtschreibprüfung: dort nichts ändern). */
+export function inlineTokenRanges(body: string): Array<{ start: number; end: number }> {
+  const ranges: Array<{ start: number; end: number }> = []
+  for (const m of (body || '').matchAll(tokenRegex())) {
+    ranges.push({ start: m.index ?? 0, end: (m.index ?? 0) + m[0].length })
+  }
+  return ranges
+}
+
+/**
+ * Platzhalter, hinter denen kein Bild (mehr) steht: gültige mit unbekannter
+ * Kennung (Beschriftung wird genannt) und beschädigte Reste (`](bild:` ohne
+ * gültige Form). Leer = der Text ist in Ordnung. Mit so einem Text darf nichts
+ * verschickt werden — das Bild fiele still weg oder der rohe Platzhalter
+ * stünde in der Mail.
+ */
+export function findBrokenInlineTokens(body: string, attachments: InlineCapableAttachment[] | undefined): string[] {
+  const known = new Set((attachments || []).map(a => a.inlineId).filter(isInlineImageId))
+  const broken: string[] = []
+  const rest = replaceInlineTokens(body, (id, label) => {
+    if (!known.has(id)) broken.push(label || 'Bild')
+    return ''
+  })
+  const stray = rest.match(/\]\(bild:/g)
+  if (stray) for (let i = 0; i < stray.length; i++) broken.push('beschädigter Platzhalter')
+  return broken
+}
+
 /** Platzhalter für das Schreibfeld. Der Name wird so entschärft, dass er die Klammern nicht sprengt. */
 export function inlineImageToken(filename: string, inlineId: string): string {
   const label = filename.replace(/[[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim() || 'Bild'

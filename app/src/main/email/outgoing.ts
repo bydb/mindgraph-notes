@@ -56,6 +56,8 @@ export function renderBodyWithInlineImages(
   return html.replace(new RegExp(`MGINLINE${nonce}N(\\d+)E`, 'g'), (_m, index: string) => tags[Number(index)] || '')
 }
 
+const INLINE_IMAGE_MIME: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' }
+
 export const inlineImageCid = (inlineId: string): string => `mg-inline-${inlineId}`
 
 export interface OutgoingMailInput {
@@ -124,14 +126,16 @@ export async function buildOutgoingMail(
   )
 
   // Signatur-Bild als CID-Attachment einbetten
-  const attachments: Array<{ filename: string; path: string; cid?: string; contentDisposition?: 'inline' }> = []
+  const attachments: Array<{ filename: string; path: string; cid?: string; contentDisposition?: 'inline'; contentType?: string }> = []
 
   // File-Anhaenge hinzufuegen (Existenz ist oben bereits geprueft)
   for (const att of regular) {
     attachments.push({ filename: att.filename, path: att.path })
   }
   for (const att of inline) {
-    attachments.push({ filename: att.filename, path: att.path, cid: inlineImageCid(att.inlineId as string), contentDisposition: 'inline' })
+    // Bildart ausdrücklich setzen: nodemailer leitet sie sonst aus dem Dateinamen ab.
+    const contentType = INLINE_IMAGE_MIME[path.extname(att.path).toLowerCase()] || INLINE_IMAGE_MIME[path.extname(att.filename).toLowerCase()]
+    attachments.push({ filename: att.filename, path: att.path, cid: inlineImageCid(att.inlineId as string), contentDisposition: 'inline', ...(contentType ? { contentType } : {}) })
   }
   if (composeData.signatureImagePath) {
     try {
