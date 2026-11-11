@@ -248,8 +248,8 @@ const HelpGraphInner: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const handleAction = useCallback((topic: HelpTopic) => {
     if (!topic.action) return
     const a = topic.action
-    // Tabs liegen im Editor-Modus: im Brain-Modus verdeckt der Canvas die Tab-Leiste.
-    const toEditor = () => useUIStore.getState().setViewMode('editor')
+    // Im Brain-Modus verdeckt der Canvas die Tab-Fläche; in Split bleibt Split.
+    const toEditor = () => useUIStore.getState().showTabArea()
     switch (a.kind) {
       case 'dashboard': toEditor(); openDashboardTab(); onClose(); break
       case 'workflow': toEditor(); openWorkflowCanvasTab(); onClose(); break

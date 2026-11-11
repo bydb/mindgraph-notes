@@ -578,12 +578,12 @@ h2 { letter-spacing: -0.016em; }
   }
 }
 
-/* Schwerpunkt „Agent“ (uiStore.workFocus): der Agent-Knopf ist getönt und behält seine
+/* Schwerpunkt „Agent“ (uiStore.workFocus): der Agent-Knopf ist farbig (Symbol + Text) und behält seine
    Beschriftung auch dort, wo die übrigen Knöpfe nur Symbole zeigen. Ein Knopf mehr mit
    Text — die 1300-px-Schwelle oben hat dafür Luft. */
 .view-mode-btn.is-focus:not(.active) {
+  /* Nur Farbe, keine Füllung: gefüllt ist allein, was wirklich vorn ist. */
   color: var(--category-color);
-  background-color: color-mix(in srgb, var(--category-color) 12%, transparent);
 }
 .view-mode-btn.is-focus:not(.active) svg {
   stroke: var(--category-color);
@@ -6747,6 +6747,13 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .new-note-dialog input:focus {
   border-color: var(--accent-color);
   box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.new-note-dialog-error {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--color-danger);
 }
 
 .new-note-dialog-buttons {
@@ -17301,6 +17308,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   flex: 0 0 3px;
 }
 
+/* Alleinige Brain-/Graph-Ansicht: der aktive Tab ist verdeckt, also nicht als „vorn" zeigen. */
+.tab-bar--background .tab-item {
+  opacity: 0.6;
+}
+.tab-bar--background .tab-item:hover {
+  opacity: 1;
+}
+
 .tab-item.active::before {
   background: var(--tab-tone);
 }
@@ -22651,26 +22666,47 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 .brain-lens-enter:hover { border-color: var(--brain-color); color: var(--text-primary); }
 
-.brain-constellation { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg-primary); }
+.brain-constellation { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--bg-primary); container-type: inline-size; container-name: brain; }
 .brain-constellation .react-flow { flex: 1; min-height: 0; }
 
-.bc-toolbar {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: 8px 14px; border-bottom: 1px solid var(--border-color); flex-shrink: 0;
+/* Seitenkopf nach Dashboard-Muster (DashboardView.css .dashboard-view-header). */
+.bc-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 22px 32px 18px; border-bottom: 1px solid var(--border-subtle, var(--border-color)); flex-shrink: 0;
+}
+.bc-head-title { min-width: 0; }
+.bc-title {
+  display: flex; align-items: center; gap: 9px; margin: 0;
+  font-size: 22px; font-weight: 700; letter-spacing: -0.3px; color: var(--text-primary);
+}
+.bc-title svg { color: var(--brain-color); flex-shrink: 0; }
+.bc-subtitle { margin: 4px 0 0; font-size: 13px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bc-head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.bc-head [data-tooltip]::after { bottom: auto; top: calc(100% + 6px); }
+/* Schmale Fläche (Split): Kopf zweizeilig, weniger Rand. */
+@container brain (max-width: 640px) {
+  .bc-head { flex-direction: column; align-items: flex-start; gap: 12px; padding: 16px 18px 14px; }
+  .bc-head-actions { justify-content: flex-start; }
+  .bc-digest-wrap { padding: 20px 18px 28px; }
 }
 .bc-btn {
-  font-size: 12px; padding: 5px 11px; border-radius: 7px;
-  border: 1px solid var(--border-color); background: var(--bg-secondary);
-  color: var(--text-secondary); cursor: pointer;
+  height: 30px; box-sizing: border-box; font-size: 11.5px; font-weight: 600; padding: 0 12px; border-radius: 8px;
+  border: 1px solid var(--border-color); background: transparent;
+  color: var(--text-secondary); cursor: pointer; white-space: nowrap;
 }
 .bc-btn:hover { background: var(--bg-tertiary); color: var(--text-primary); }
-.bc-month { display: flex; align-items: center; gap: 10px; }
-.bc-month-label { display: inline-flex; align-items: center; gap: 7px; font-weight: 600; font-size: 13px; color: var(--text-primary); }
+.bc-month { display: flex; align-items: center; gap: 6px; }
 .bc-nav {
-  width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border-color);
-  background: var(--bg-secondary); color: var(--text-secondary); cursor: pointer; font-size: 12px;
+  width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-color);
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; padding: 0;
 }
-.bc-nav:hover { background: var(--bg-tertiary); }
+.bc-nav:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.bc-nav-next svg { transform: rotate(180deg); }
+.bc-nav:focus-visible, .bc-btn:focus-visible, .bc-seg-btn:focus-visible, .bc-today-btn:focus-visible,
+.bc-link:focus-visible, .bc-toggle-graph:focus-visible {
+  outline: 2px solid var(--brain-color); outline-offset: 2px; border-radius: 4px;
+}
 .bc-empty {
   flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; color: var(--text-muted); text-align: center;
@@ -22689,16 +22725,17 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   border: none; border-radius: 7px; background: transparent;
   color: var(--text-muted); font-size: 11.5px; font-weight: 600; cursor: pointer;
 }
-.bc-seg-btn:hover { color: var(--text-primary); }
+.bc-seg-btn:hover:not(:disabled) { color: var(--text-primary); }
+.bc-seg-btn:disabled { opacity: 0.5; cursor: default; }
 .bc-seg-btn.active {
   background: var(--bg-primary); color: var(--brain-color);
   box-shadow: 0 1px 3px rgba(0,0,0,0.07);
 }
 
 .bc-today-btn {
-  font-size: 11.5px; font-weight: 600; color: var(--brain-color);
+  height: 30px; box-sizing: border-box; font-size: 11.5px; font-weight: 600; color: var(--brain-color);
   border: 1px solid color-mix(in srgb, var(--brain-color) 30%, transparent);
-  border-radius: 7px; padding: 4px 10px; background: transparent; cursor: pointer;
+  border-radius: 8px; padding: 0 12px; background: transparent; cursor: pointer;
 }
 .bc-today-btn:hover { background: color-mix(in srgb, var(--brain-color) 10%, transparent); }
 
@@ -22800,13 +22837,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 }
 
 /* Brain-Rückblick (das Brain spricht) */
-.bc-digest-wrap { flex: 1; min-height: 0; overflow-y: auto; display: flex; justify-content: center; padding: clamp(2rem, 7vh, 5rem) 2rem; }
-.bc-digest { max-width: 640px; width: 100%; }
-.bc-digest-head { display: flex; align-items: center; gap: 12px; margin-bottom: 1.75rem; }
-.bc-digest-head h2 { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text-primary); }
-.bc-digest p { font-size: 1.16rem; line-height: 1.7; color: var(--text-secondary); margin-bottom: 1.05rem; }
-.bc-digest p.bc-lead { font-size: 1.3rem; color: var(--text-primary); }
+/* Lesespalte direkt unter dem Kopf, am Seitenraster (32 px) ausgerichtet. Die Sätze bleiben
+   größer als Modultext (13 px) — das Brain spricht —, aber im Maß der App (Titel 22 px). */
+.bc-digest-wrap { flex: 1; min-height: 0; overflow-y: auto; padding: 28px 32px 40px; }
+.bc-digest { max-width: 700px; width: 100%; }
+.bc-digest p { font-size: 16.5px; line-height: 1.6; color: var(--text-secondary); margin: 0 0 14px; }
+.bc-digest p.bc-lead { font-size: 18px; color: var(--text-primary); margin-bottom: 18px; }
 .bc-digest p b { color: var(--text-primary); font-weight: 600; }
+.bc-theme { white-space: nowrap; }
 .bc-link {
   background: none; border: none; padding: 0; font: inherit; font-weight: 600; cursor: pointer;
   color: var(--brain-color); border-bottom: 1px solid color-mix(in srgb, var(--brain-color) 35%, transparent);
@@ -22814,10 +22852,14 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .bc-link:hover { border-bottom-color: var(--brain-color); }
 .bc-quiet { color: var(--text-muted) !important; }
 .bc-toggle-graph {
-  margin-top: 1.5rem; background: none; border: none; padding: 0;
-  color: var(--text-muted); font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  margin-top: 14px; background: none; border: none; padding: 0;
+  color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer;
 }
 .bc-toggle-graph:hover { color: var(--brain-color); }
+.bc-digest p.bc-about {
+  margin: 28px 0 0; padding-top: 14px; border-top: 1px solid var(--border-subtle, var(--border-color));
+  font-size: 12.5px; line-height: 1.5; color: var(--text-muted);
+}
 
 /* ============================================================================
    Präsentationsmodus

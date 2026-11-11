@@ -13,6 +13,7 @@ import { isBrainNote, brainNoteDate, brainNoteLabel, BRAIN_FOLDER_DEFAULT } from
 import { getNoteKind, stripNoteKindMarker, splitZettelTitle, NOTE_KINDS, type NoteKindId } from '../../utils/noteKind'
 import { resolveLink } from '../../utils/linkExtractor'
 import { BrainIcon } from '../BrainIcon'
+import { IconChevronLeft } from '../Shared/Icons'
 import type { Note } from '../../../shared/types'
 
 // Brain-Rückblick — das Brain *spricht* über deinen Monat: welcher Tag komplex war,
@@ -104,6 +105,12 @@ const ConstNoteNode: React.FC<NodeProps> = ({ data }) => (
 )
 
 // „Das Brain sagt" — die Rückblick-Essenz als Karte IM Zeitstrahl (1c ②).
+// Themen mit „ · " verbinden; ein einzelnes Thema bricht nie mitten im Wort um („vibe-/coding").
+const themeList = (themes: string[]): React.ReactNode =>
+  themes.map((th, i) => (
+    <React.Fragment key={th + i}>{i > 0 ? ' · ' : null}<span className="bc-theme">{th}</span></React.Fragment>
+  ))
+
 const BrainSayNode: React.FC<NodeProps> = ({ data }) => {
   const { t } = useTranslation()
   const selectNote = useNotesStore(s => s.selectNote)
@@ -115,11 +122,11 @@ const BrainSayNode: React.FC<NodeProps> = ({ data }) => {
       <div className="bc-say-text">
         {data.densest && (
           <>Am <button className="bc-link" onClick={() => open(data.densest.noteId)}>{data.densest.label}</button> war
-            richtig viel los: <b>{data.densest.links} Notizen</b>
-            {data.densest.themes.length > 0 && <> — vor allem rund um <b>{data.densest.themes.join(' · ')}</b></>}. </>
+            am meisten los: <b>{data.densest.links} Notizen</b>
+            {data.densest.themes.length > 0 && <> — vor allem rund um <b>{themeList(data.densest.themes)}</b></>}. </>
         )}
         {data.thread && (
-          <>Durchgehend beschäftigt hat dich <button className="bc-link" onClick={() => open(data.thread.noteId)}>{data.thread.title}</button> — an <b>{data.thread.days} Tagen</b> kam es wieder hoch.</>
+          <>Am häufigsten wiederkehrend: <button className="bc-link" onClick={() => open(data.thread.noteId)}>{data.thread.title}</button> — in <b>{data.thread.days} Tagesnotizen</b> erwähnt.</>
         )}
       </div>
     </div>
@@ -351,37 +358,50 @@ const Inner: React.FC = () => {
     if (x !== undefined) rf.setCenter(x, -60, { zoom: 0.9, duration: 400 })
   }
 
+  const isEmpty = monthBrains.length === 0 || !digest
   const LEGEND_KINDS: NoteKindId[] = ['problem', 'solution', 'info']
 
   return (
     <div className="brain-constellation">
-      <div className="bc-toolbar">
-        {/* Zustands-Control (1b ①): Label = Zustand, nie Aktion */}
-        <div className="bc-seg">
-          <button
-            className={`bc-seg-btn ${view === 'digest' ? 'active' : ''}`}
-            onClick={() => setView('digest')}
-          >{t('brain.view.digest')}</button>
-          <button
-            className={`bc-seg-btn ${view === 'timeline' ? 'active' : ''}`}
-            onClick={() => setView('timeline')}
-          ><BrainIcon size={12} /> {t('brain.view.timeline')}</button>
-          <button
-            className="bc-seg-btn"
-            onClick={() => setBrainLensActive(false)}
-          >{t('brain.view.fullGraph')}</button>
+      {/* Ein Seitenkopf für Rückblick, Zeitstrahl und Leerzustand (Muster: Dashboard-Kopf).
+          Monat nur hier; „Ganzer Graph" ist eine Aktion (verlässt die Brain-Ansicht), kein Zustand. */}
+      <div className="bc-head">
+        <div className="bc-head-title">
+          <h1 className="bc-title">
+            <BrainIcon size={18} />
+            {view === 'timeline' && !isEmpty ? t('brain.view.timeline') : t('brain.view.digest')}
+          </h1>
+          <p className="bc-subtitle">{monthName}</p>
         </div>
-        <div className="bc-month">
-          <button className="bc-nav" onClick={prevMonth} aria-label="Vorheriger Monat">◂</button>
-          <span className="bc-month-label"><BrainIcon size={14} /> {monthName}</span>
-          <button className="bc-nav" onClick={nextMonth} aria-label="Nächster Monat">▸</button>
-          {!isCurrentMonth && (
-            <button className="bc-today-btn" onClick={goToday}>{t('brain.today')}</button>
-          )}
+        <div className="bc-head-actions">
+          <div className="bc-month">
+            <button className="bc-nav" onClick={prevMonth} aria-label={t('brain.prevMonth')} data-tooltip={t('brain.prevMonth')}>
+              <IconChevronLeft size={14} />
+            </button>
+            <button className="bc-nav bc-nav-next" onClick={nextMonth} aria-label={t('brain.nextMonth')} data-tooltip={t('brain.nextMonth')}>
+              <IconChevronLeft size={14} />
+            </button>
+            {!isCurrentMonth && (
+              <button className="bc-today-btn" onClick={goToday}>{t('brain.today')}</button>
+            )}
+          </div>
+          {/* Zwei echte Zustände. Ohne Brain-Tage gibt es nichts umzuschalten. */}
+          <div className="bc-seg" role="tablist">
+            <button
+              role="tab" aria-selected={!isEmpty && view === 'digest'} disabled={isEmpty}
+              className={`bc-seg-btn ${!isEmpty && view === 'digest' ? 'active' : ''}`}
+              onClick={() => setView('digest')}
+            >{t('brain.view.digest')}</button>
+            <button
+              role="tab" aria-selected={!isEmpty && view === 'timeline'} disabled={isEmpty}
+              className={`bc-seg-btn ${!isEmpty && view === 'timeline' ? 'active' : ''}`}
+              onClick={() => setView('timeline')}
+            >{t('brain.view.timeline')}</button>
+          </div>
+          <button className="bc-btn" onClick={() => setBrainLensActive(false)}>{t('brain.view.fullGraph')}</button>
         </div>
       </div>
-
-      {monthBrains.length === 0 || !digest ? (
+      {isEmpty || !digest ? (
         <div className="bc-empty"><BrainIcon size={28} /><p>Keine Brain-Tage in {monthName}.</p><span>Wechsle den Monat oder erzeuge eine Tageszusammenfassung.</span></div>
       ) : view === 'timeline' ? (
         <ReactFlow
@@ -425,26 +445,28 @@ const Inner: React.FC = () => {
       ) : (
         <div className="bc-digest-wrap">
           <div className="bc-digest">
-            <div className="bc-digest-head"><BrainIcon size={22} /><h2>Dein {monthName}</h2></div>
             <p className="bc-lead">
-              An <b>{digest.dayCount} {digest.dayCount === 1 ? 'Tag' : 'Tagen'}</b> hat dein Brain mitgedacht — rund <b>{digest.totalTouched} Notizen</b> berührt{digest.totalCreated > 0 ? <>, <b>{digest.totalCreated} neue</b> angelegt</> : null}.
+              An <b>{digest.dayCount} {digest.dayCount === 1 ? 'Tag' : 'Tagen'}</b> hat dein Brain mitgedacht — über die Tage zusammen rund <b>{digest.totalTouched} Notizen</b> berührt{digest.totalCreated > 0 ? <>, <b>{digest.totalCreated} neue</b> angelegt</> : null}.
             </p>
             {digest.densest && (
-              <p>Am <button className="bc-link" onClick={() => openNote(digest.densest.noteId)}>{digest.densest.label}</button> war richtig viel los: <b>{digest.densest.links} Notizen</b>{digest.densest.themes.filter(t => !GENERIC_THEMES.has(t.toLowerCase())).length > 0 ? <> — vor allem rund um <b>{digest.densest.themes.filter(t => !GENERIC_THEMES.has(t.toLowerCase())).slice(0, 2).join(' · ')}</b></> : null}. Dein dichtester Tag.</p>
+              <p>Am <button className="bc-link" onClick={() => openNote(digest.densest.noteId)}>{digest.densest.label}</button> war am meisten los: <b>{digest.densest.links} Notizen</b>{digest.densest.themes.filter(t => !GENERIC_THEMES.has(t.toLowerCase())).length > 0 ? <> — vor allem rund um <b>{themeList(digest.densest.themes.filter(t => !GENERIC_THEMES.has(t.toLowerCase())).slice(0, 2))}</b></> : null}. Dein dichtester Tag.</p>
             )}
             {digest.topThread && (
-              <p>Durchgehend beschäftigt hat dich <button className="bc-link" onClick={() => openNote(digest.topThread!.note.id)}>{digest.topThread.note.title}</button> — an <b>{digest.topThread.days} Tagen</b> kam es wieder hoch.</p>
+              <p>Am häufigsten wiederkehrend: <button className="bc-link" onClick={() => openNote(digest.topThread!.note.id)}>{digest.topThread.note.title}</button> — in <b>{digest.topThread.days} Tagesnotizen</b> erwähnt.</p>
             )}
             {digest.totalTasks > 0 && (
               <p>Geklärt hast du dabei <b>{digest.totalTasks} {digest.totalTasks === 1 ? 'Aufgabe' : 'Aufgaben'}</b>.</p>
             )}
             {digest.topThemes.length > 0 && (
-              <p>Themen, die sich durchzogen: <b>{digest.topThemes.join(' · ')}</b>.</p>
+              <p>Häufigste Schlagworte der Tagesnotizen: <b>{themeList(digest.topThemes)}</b>.</p>
             )}
             {digest.quiet.length > 0 && digest.quiet[0].links < (digest.densest?.links ?? 0) && (
-              <p className="bc-quiet">Ruhiger war's am {digest.quiet.map(q => q.label).join(' und ')}.</p>
+              <p className="bc-quiet">Ruhiger war es am {digest.quiet.map(q => q.label).join(' und ')}.</p>
             )}
             <button className="bc-toggle-graph" onClick={() => setView('timeline')}>{t('brain.showTimeline')}</button>
+            {/* Ehrliche Zusage (docs/codex-collab/brain-zweck-offene-faeden.md, F08): der Rückblick
+                zählt Tagesnotizen zusammen — kein Erledigt-Status, kein Arbeitskontext. */}
+            <p className="bc-about">{t('brain.digestAbout')}</p>
           </div>
         </div>
       )}

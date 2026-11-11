@@ -123,6 +123,10 @@ TabItem.displayName = 'TabItem'
 export const TabBar: React.FC<TabBarProps> = memo(({ className }) => {
   const { tabs, activeTabId, setActiveTab, closeTab } = useTabStore()
   const setViewMode = useUIStore(s => s.setViewMode)
+  // Alleinige Brain-/Graph-Ansicht: der aktive Tab ist verdeckt. Die Leiste bleibt bedienbar,
+  // zeigt ihn aber nicht mehr als „vorn" — außer er ist selbst ein Canvas-Tab.
+  const activeType = tabs.find(tab => tab.id === activeTabId)?.type
+  const inBackground = useUIStore(s => s.viewMode === 'canvas') && activeType !== 'canvas' && activeType !== 'global-canvas'
 
   // Only show TabBar if there are tabs
   if (tabs.length === 0) {
@@ -130,7 +134,7 @@ export const TabBar: React.FC<TabBarProps> = memo(({ className }) => {
   }
 
   return (
-    <div className={`tab-bar ${className || ''}`}>
+    <div className={`tab-bar ${inBackground ? 'tab-bar--background' : ''} ${className || ''}`}>
       <div className="tab-bar-content">
         {tabs.map(tab => (
           <TabItem
@@ -145,7 +149,8 @@ export const TabBar: React.FC<TabBarProps> = memo(({ className }) => {
                 useUIStore.getState().setBrainLensActive(false)
                 setViewMode('canvas')
               } else {
-                setViewMode('editor')
+                // Nur aus der alleinigen Brain-Ansicht zurück; Split bleibt Split.
+                useUIStore.getState().showTabArea()
               }
             }}
             onClose={() => closeTab(tab.id)}

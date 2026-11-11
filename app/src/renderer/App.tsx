@@ -62,7 +62,7 @@ import { useSyncStore } from './stores/syncStore'
 import { useVaultSettingsStore } from './stores/vaultSettingsStore'
 import { useIsModuleEnabled } from './utils/modules'
 import { getVaultTaskStats } from './utils/linkExtractor'
-import { buildBrainSensors, getDayBoundsMs } from './utils/brainSensors'
+import { buildBrainSensors, getDayBoundsMs, loadDayLog } from './utils/brainSensors'
 import './styles/index.css'
 import { LlmSpeedIndicator } from './components/Shared/LlmSpeedIndicator'
 import { ImpactIndicator } from './components/Shared/ImpactIndicator'
@@ -138,6 +138,7 @@ const ViewModeButton: React.FC<{
 )
 
 const App: React.FC = () => {
+  const showTabArea = useUIStore(state => state.showTabArea)
   const { viewMode, setViewMode, toggleSidebar, sidebarVisible, splitPosition, setSplitPosition, sidebarWidth, setSidebarWidth, theme, setTheme, accentColor, backgroundColor, fontFamily, setPendingTemplateInsert, textSplitEnabled, setTextSplitEnabled, textSplitPosition, setTextSplitPosition, smartConnectionsEnabled, notesChatEnabled, flashcardsEnabled, semanticScholarEnabled, customLogo, customAccentColor, customBackgroundColorLight, customBackgroundColorDark, setHelpGuideOpen, taskExcludedFolders, taskIncludedFolders } = useUIStore()
   const { notes, vaultPath, selectNote, selectedPdfPath, selectedImagePath, selectedOfficePath, selectedOfficeType, secondarySelectedNoteId, navigateBack, navigateForward, selectedNoteId, noteSelectionNonce, pdfRevision } = useNotesStore()
   const { tabs, activeTabId } = useTabStore()
@@ -592,12 +593,14 @@ const App: React.FC = () => {
       autoBrainRunningRef.current = true
       try {
         const emails = useEmailStore.getState().emails
+        const dayLog = await loadDayLog(currentVaultPath, startMs, endMs)
         const { sensors, hasContent } = buildBrainSensors({
           notes: currentNotes,
           emails,
           vaultPath: currentVaultPath,
           dayStartMs: startMs,
           dayEndMs: endMs,
+          dayLog,
           dailyNote: {
             folderPath: state.dailyNote.folderPath,
             dateFormat: state.dailyNote.dateFormat
@@ -1178,12 +1181,12 @@ const App: React.FC = () => {
     'view-editor': () => setViewMode('editor'),
     'view-split': () => setViewMode('split'),
     'view-brain': () => setViewMode('canvas'),
-    'open-dashboard': () => openDashboardTab(),
-    'open-workflow': () => openWorkflowCanvasTab(),
-    // setViewMode('editor') ist Pflicht: im Brain-Modus verdeckt der Canvas die
-    // Tab-Fläche, der Agent-Tab wäre zwar aktiv, aber unsichtbar (gleiches Muster
-    // wie bei den Werkzeug-Knöpfen für Dashboard und Workflow-Canvas).
-    'open-agent': () => { setViewMode('editor'); openAgentTab() },
+    // showTabArea() ist Pflicht: im Brain-Modus verdeckt der Canvas die Tab-Fläche,
+    // der Tab wäre zwar aktiv, aber unsichtbar. In Split bleibt Split. Gleiches Muster
+    // für alle Einstiege (Knopf, Palette, Sprachbefehl, Hilfe).
+    'open-dashboard': () => { showTabArea(); openDashboardTab() },
+    'open-workflow': () => { showTabArea(); openWorkflowCanvasTab() },
+    'open-agent': () => { showTabArea(); openAgentTab() },
     'panel-tasks': () => switchRightPanel('overdue'),
     'panel-tags': () => switchRightPanel('tags'),
     'panel-smart': () => switchRightPanel('smartConnections'),
@@ -1257,7 +1260,7 @@ const App: React.FC = () => {
   // (rechte Leiste, QuickSearch, Ansichtswechsel). Semantische Aufrufe, keine Klicks.
   useEffect(() => {
     return registerVoiceUiBridge({
-      openDashboard: () => { setViewMode('editor'); openDashboardTab() },
+      openDashboard: () => { showTabArea(); openDashboardTab() },
       openQuickSearch: (query: string) => { setQuickSearchQuery(query); setQuickSearchOpen(true) },
       openTasksPanel: () => switchRightPanel('overdue'),
       // Der Zustand des Dialogs liegt in der Seitenleiste. Ereignis statt Prop-Kette,
@@ -1274,11 +1277,13 @@ const App: React.FC = () => {
   // Modul-Gate, wie openAgentTab selbst.
   // Beim Schwerpunkt „Agent“ steht er vor Dashboard/Workflow und behält seinen Text auch
   // unter 1300 px (`.is-focus` in index.css). Es verschwindet kein anderer Knopf.
+  // In der alleinigen Brain-/Graph-Ansicht ist die Tab-Fläche verdeckt: kein Ziel-Knopf ist „vorn".
+  const tabAreaVisible = viewMode !== 'canvas'
   const agentTitlebarButton = (
     <button
-      className={`view-mode-btn cat-ai ${activeTab?.type === 'agent' ? 'active' : ''} ${workFocus === 'agent' ? 'is-focus' : ''}`}
+      className={`view-mode-btn cat-ai ${tabAreaVisible && activeTab?.type === 'agent' ? 'active' : ''} ${workFocus === 'agent' ? 'is-focus' : ''}`}
       onClick={() => {
-        setViewMode('editor')
+        showTabArea()
         openAgentTab()
       }}
       data-tooltip={t('commandPalette.openAgent')}
@@ -1330,7 +1335,7 @@ const App: React.FC = () => {
           
           <div className="titlebar-center">
             <div className="view-mode-switcher">
-              <ViewModeButton mode="editor" currentMode={viewMode} onClick={() => setViewMode('editor')} title={t('viewMode.editor')} label="Editor">
+              <ViewModeButton mode="editor" currentMode={viewMode} onClick={() => setViewMode('editor')} title={t('viewMode.editorHint')} label={t('viewMode.editor')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
                   <polyline points="14 2 14 8 20 8"/>
@@ -1338,7 +1343,7 @@ const App: React.FC = () => {
                   <line x1="16" y1="17" x2="8" y2="17"/>
                 </svg>
               </ViewModeButton>
-              <ViewModeButton mode="split" currentMode={viewMode} onClick={() => setViewMode('split')} title={t('viewMode.split')} label="Split">
+              <ViewModeButton mode="split" currentMode={viewMode} onClick={() => setViewMode('split')} title={t('viewMode.splitHint')} label={t('viewMode.split')}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="4" width="18" height="16" rx="2"/>
                   <line x1="12" y1="4" x2="12" y2="20"/>
@@ -1350,9 +1355,9 @@ const App: React.FC = () => {
               {workFocus === 'agent' && agentTitlebarButton}
               {dashboardEnabled && (
                 <button
-                  className={`view-mode-btn cat-organize ${activeTab?.type === 'dashboard' ? 'active' : ''}`}
+                  className={`view-mode-btn cat-organize ${tabAreaVisible && activeTab?.type === 'dashboard' ? 'active' : ''}`}
                   onClick={() => {
-                    setViewMode('editor')
+                    showTabArea()
                     openDashboardTab()
                   }}
                   data-tooltip={t('dashboard.title')}
@@ -1369,9 +1374,9 @@ const App: React.FC = () => {
               )}
               {vaultWorkflowCanvasActive && (
                 <button
-                  className={`view-mode-btn cat-ai ${activeTab?.type === 'workflow-canvas' ? 'active' : ''}`}
+                  className={`view-mode-btn cat-ai ${tabAreaVisible && activeTab?.type === 'workflow-canvas' ? 'active' : ''}`}
                   onClick={() => {
-                    setViewMode('editor')
+                    showTabArea()
                     openWorkflowCanvasTab()
                   }}
                   data-tooltip="Workflow Canvas"
@@ -1388,11 +1393,12 @@ const App: React.FC = () => {
               {workFocus !== 'agent' && agentTitlebarButton}
               <span className="view-mode-separator" />
               <button
-                className={`view-mode-btn cat-editor ${textSplitEnabled ? 'active' : ''}`}
+                className={`view-mode-btn cat-editor ${viewMode === 'editor' && textSplitEnabled ? 'active' : ''}`}
                 onClick={() => setTextSplitEnabled(!textSplitEnabled)}
                 disabled={viewMode !== 'editor'}
-                data-tooltip={t('titlebar.textSplit')}
+                data-tooltip={viewMode !== 'editor' && textSplitEnabled ? t('titlebar.textSplitParked') : t('titlebar.textSplit')}
                 aria-label={t('titlebar.textSplit')}
+                aria-pressed={viewMode === 'editor' && textSplitEnabled}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="8" height="18" rx="1"/>
@@ -1931,7 +1937,7 @@ const App: React.FC = () => {
           onClose={() => setBriefingOpen(false)}
           onOpenDashboard={() => {
             setBriefingOpen(false)
-            setViewMode('editor')
+            showTabArea()
             openDashboardTab()
           }}
         />

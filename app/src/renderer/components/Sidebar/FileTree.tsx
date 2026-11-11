@@ -1008,7 +1008,7 @@ const FileItem: React.FC<FileItemProps> = ({
     // Doppelt-Anhängen verhindert der Store selbst — über den vollen Pfad, denn
     // „Projekt A/Rückmeldungen" und „Projekt B/Rückmeldungen" heißen beide gleich.
     void useNoteAgentStore.getState().attachVaultPath(tabId, vaultPath, relPath)
-    setViewMode('editor')
+    useUIStore.getState().showTabArea()
     setContextMenu(null)
   }, [contextMenu, vaultPath, setViewMode])
 

@@ -39,7 +39,7 @@ export interface CommandDescriptor {
 }
 
 const RAW_COMMAND_CATALOG = [
-  { id: 'view-editor', labelKey: 'commandPalette.viewEditor', categoryKey: 'commandPalette.cat.view', keywords: 'editor view ansicht' },
+  { id: 'view-editor', labelKey: 'commandPalette.viewEditor', categoryKey: 'commandPalette.cat.view', keywords: 'editor einzeln single view ansicht' },
   { id: 'view-split', labelKey: 'commandPalette.viewSplit', categoryKey: 'commandPalette.cat.view', keywords: 'split view ansicht' },
   { id: 'view-brain', labelKey: 'commandPalette.viewBrain', categoryKey: 'commandPalette.cat.view', keywords: 'graph canvas brain mindgraph netzwerk verknuepfungen beziehungen' },
   { id: 'open-dashboard', labelKey: 'commandPalette.openDashboard', categoryKey: 'commandPalette.cat.view', keywords: 'dashboard widgets', requires: 'dashboard' },

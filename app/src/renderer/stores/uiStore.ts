@@ -884,6 +884,9 @@ interface UIState {
 
   // Actions
   setViewMode: (mode: ViewMode) => void
+  /** Tab-Fläche sichtbar machen: nur aus der alleinigen Brain-/Graph-Ansicht zurück zu einer
+   *  Fläche. Split bleibt Split (docs/codex-collab/ansichts-leiste-logik.md, F04). */
+  showTabArea: () => void
   setTheme: (theme: Theme) => void
   setAccentColor: (color: AccentColor) => void
   setBackgroundColor: (color: BackgroundColor) => void
@@ -1392,6 +1395,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
 
   // Actions
   setViewMode: (mode) => set({ viewMode: mode }),
+  showTabArea: () => set((s) => (s.viewMode === 'canvas' ? { viewMode: 'editor' } : {})),
   setTheme: (theme) => set({ theme }),
   setAccentColor: (color) => set({ accentColor: color }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
