@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.5] - 2026-11-12
+
+**Wenn Sie Text mit beschrifteten Links in eine E-Mail einfügen, behalten die Links jetzt ihr Ziel und kommen beim Empfänger anklickbar an.** Das gilt für Text aus Webseiten, aus Notizen und aus dem Chat. Auch der Eintrag „Kopieren“ im Rechtsklick-Menü einer Notiz nimmt die Links jetzt mit.
+
+### Hintergrund
+
+- **Auslöser:** Das Schreibfeld der Mail ist reiner Text. Stand in der Quelle ein beschrifteter Link, etwa das Wort „Anmeldung“ mit einer Adresse dahinter, kam nur das Wort an, und die Mail ging ohne Link hinaus.
+- **Im Schreibfeld:** Ein eingefügter Link steht dort in der Form `[Anmeldung](https://…)`. Anklickbar sehen Sie ihn in der Vorschau, und so wird er auch verschickt. Adressen, die schon ausgeschrieben im Text stehen, bleiben unverändert und werden wie bisher beim Versand zu Links.
+- **Rechtsklick in der Notiz:** Im Lesen-Modus legte „Kopieren“ aus dem Rechtsklick-Menü nur den Text ab, anders als das Tastenkürzel. Beide Wege kopieren jetzt gleich.
+- **Rückgängig:** ⌘Z bzw. Strg+Z nimmt ein Einfügen wie gewohnt zurück.
+- **Grenzen:** Übernommen werden Web- und Mailadressen. Lässt sich die Beschriftung eines Links im eingefügten Text nicht eindeutig wiederfinden, bleibt der Text unverändert, damit kein Link am falschen Wort landet. Text, der vor diesem Update eingefügt wurde, bekommt seine Links nicht nachträglich.
+
 ## [1.3.4] - 2026-11-12
 
 **Der Agent kann jetzt auch viele Notizen in einem Auftrag auswerten, und Sie sehen während des Laufs, wie viel Platz er noch hat und in welcher Runde er steht.** Wird der Platz knapp, fasst er das bisher Gelesene zusammen und liest weiter, statt abzubrechen. Auf die Frage „Was habe ich heute erledigt?“ antwortet er aus einem Tagesprotokoll, das nur auf Ihrem Rechner liegt. Die Leiste zum Umschalten der Ansichten ist klarer beschriftet.
