@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.4] - 2026-11-12
+
+**Der Agent kann jetzt auch viele Notizen in einem Auftrag auswerten, und Sie sehen während des Laufs, wie viel Platz er noch hat und in welcher Runde er steht.** Wird der Platz knapp, fasst er das bisher Gelesene zusammen und liest weiter, statt abzubrechen. Auf die Frage „Was habe ich heute erledigt?“ antwortet er aus einem Tagesprotokoll, das nur auf Ihrem Rechner liegt. Die Leiste zum Umschalten der Ansichten ist klarer beschriftet.
+
+### Hintergrund
+
+- **Auslöser:** Aufträge über mehr als etwa zehn Notizen endeten ohne Ergebnis und ohne Erklärung. Ein Sprachmodell kann nur eine begrenzte Textmenge gleichzeitig im Blick behalten, und jede gelesene Notiz blieb bis zum Schluss vollständig darin liegen.
+- **Platz-Anzeige:** Ein Balken im Agent-Tab zeigt drei Zustände: genug Platz, es wird eng, fast voll. Daneben steht „Runde n von max“; in jeder Runde entscheidet der Agent neu, was er tut. Endet ein Lauf vorzeitig, steht dabei, ob der Platz oder die Rundenzahl der Grund war.
+- **Zusammenfassen beim Lesen:** Wird es eng, ersetzt der Agent gelesene Texte durch eine Kurzfassung, die auf den Auftrag zugeschnitten ist. Sätze mit Zahlen und Kennungen werden dabei wörtlich übernommen. Das Protokoll des Laufs nennt jede Zusammenfassung, und das Ergebnis sagt, wie viele Quellen nur als Kurzfassung vorlagen.
+- **Folgeaufträge:** Stellen Sie über „Antworten und weitermachen“ eine neue Frage, liest der Agent die zusammengefassten Quellen dafür neu. Das dauert länger als bisher, je nach Modell mehrere Minuten.
+- **Mehr Runden, kein stilles Ende:** Ein Lauf hat jetzt 20 statt 12 Runden, bei Cloud-Modellen mit bekannt großem Fenster 30. Kurz vor Schluss wird der Agent darauf hingewiesen und schreibt das Ergebnis aus dem, was er hat.
+- **Notizen finden und stückweise lesen:** Schreibt der Agent einen Notizpfad falsch ab, etwa bei Umlauten, findet die App die gemeinte Notiz, sofern es genau eine mit diesem Namen gibt. Lange Notizen liest er in Stücken weiter, statt nach 8000 Zeichen abzuschneiden.
+- **Tagesüberblick:** Die App hält auf Ihrem Rechner fest, wann Notizen gespeichert, angelegt oder umbenannt und wann Aufgaben abgehakt wurden. Im Protokoll steht kein Aufgabentext, und es wird nicht zwischen Geräten abgeglichen. Der Agent kennt jetzt außerdem das heutige Datum. Die Brain-Tageszusammenfassung zählt erledigte Aufgaben aus diesem Protokoll und schreibt „nicht gemessen“, wo keine Messung vorliegt.
+- **Notizen sicherer schreiben:** „Neue Notiz“, Duplizieren, Importe, Schnellerfassung und „Mail zu Notiz“ überschreiben keine vorhandene Datei mehr. Ist ein Name schon vergeben, sagt der Dialog das.
+- **Ansichts-Leiste:** Agent, Dashboard und Workflow öffnen ihren Tab, ohne eine geteilte Ansicht aufzulösen. „Editor“ heißt jetzt „Einzeln“. Der Brain-Rückblick hat denselben Seitenkopf wie das Dashboard.
+- **Grenzen:** Eine Kurzfassung kann Einzelheiten weglassen; bei Aufträgen, in denen es auf den genauen Wortlaut ankommt, das Ergebnis mit den Quellen vergleichen. Im Recherche-Auftrag wird nicht zusammengefasst. Gemessen wurde mit zwei lokalen Modellen an Aufträgen der Art „viele Notizen lesen, Werte in eine Tabelle schreiben“ mit bis zu 28 Notizen; für andere Auftragsarten liegt keine Messung vor. Bei LM Studio und LLMBase ist die Fenstergröße eine Annahme, der Balken sagt das dazu.
+
 ## [1.3.3] - 2026-11-11
 
 **Sie können jetzt Screenshots und andere Bilder direkt in eine E-Mail ziehen oder aus der Zwischenablage einfügen; das Bild erscheint in der Mail an der Stelle, an der der Cursor steht.** Andere Dateien, etwa ein PDF, werden auf demselben Weg zum Anhang. Die Vorschau zeigt die Mail mit Bild so, wie sie verschickt wird.
