@@ -4663,7 +4663,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     copyBtn.className = 'format-menu-item'
     copyBtn.innerHTML = '<span class="format-menu-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></span><span class="format-menu-label">' + t('format.copy') + '</span><span class="format-menu-shortcut">Cmd+C</span>'
     copyBtn.onclick = async () => {
-      await writeClipboardText(selectedText)
+      // Wie ⌘C kopieren: der Browser legt neben dem Text auch das HTML ab. Nur Text
+      // (selection.toString) verlor die Adressen beschrifteter Links — beim Einfügen
+      // in die Mail kam „Merkur“ ohne Ziel an (real, 12.11.2026).
+      let copied = false
+      try {
+        const live = window.getSelection()
+        if (annoRange && live && live.toString() !== selectedText) {
+          live.removeAllRanges()
+          live.addRange(annoRange)
+        }
+        copied = document.execCommand('copy')
+      } catch { copied = false }
+      if (!copied) await writeClipboardText(selectedText)
       menu.remove()
     }
     menu.appendChild(copyBtn)

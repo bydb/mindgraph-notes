@@ -134,6 +134,28 @@ it('setzt ein eingefügtes Bild als Platzhalter in den Text und merkt es als Anh
   expect(next.body).toBe('![Bildschirmfoto.png](bild:a1b2c3d4e5f6)\nTest')
   expect(next.attachments).toHaveLength(1)
 })
+it('behält beim Einfügen die Adresse eines beschrifteten Links', async () => {
+  vi.stubGlobal('requestAnimationFrame', () => 0)
+  vi.stubGlobal('DOMParser', (window as unknown as { DOMParser: unknown }).DOMParser)
+  await act(async () => root.render(<ComposeView />))
+  const event = new window.Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown }
+  const data: Record<string, string> = {
+    'text/plain': 'Zur Anmeldung bitte',
+    'text/html': '<html><body><!--StartFragment--><p>Zur <a href="https://example.org/anmelden">Anmeldung</a> bitte</p><!--EndFragment--></body></html>'
+  }
+  event.clipboardData = { files: [], types: Object.keys(data), getData: (type: string) => data[type] || '' }
+  await act(async () => { container.querySelector('textarea')!.dispatchEvent(event) })
+  expect(event.defaultPrevented).toBe(true)
+  const next = state.setComposeState.mock.calls.at(-1)![0]
+  expect(next.body).toContain('Zur [Anmeldung](https://example.org/anmelden) bitte')
+})
+it('lässt gewöhnlichen Text ohne Links vom Browser einfügen', async () => {
+  await act(async () => root.render(<ComposeView />))
+  const event = new window.Event('paste', { bubbles: true, cancelable: true }) as Event & { clipboardData: unknown }
+  event.clipboardData = { files: [], types: ['text/plain'], getData: (type: string) => type === 'text/plain' ? 'Nur Text' : '' }
+  await act(async () => { container.querySelector('textarea')!.dispatchEvent(event) })
+  expect(event.defaultPrevented).toBe(false)
+})
 it('lässt eingefügten Text mit beiliegendem Bild (Word, Excel) als Text durch', async () => {
   const stage = stubStaging()
   await act(async () => root.render(<ComposeView />))

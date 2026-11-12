@@ -26,6 +26,9 @@ import {
   type Recipient
 } from '../../../shared/emailRecipients'
 
+import { insertPastedText, linkedPasteText, uriListPasteText } from '../../../shared/emailPasteLinks'
+import { anchorsFromClipboardHtml } from '../../utils/clipboardAnchors'
+
 type RecipientField = 'to' | 'cc' | 'bcc'
 const RECIPIENT_FIELDS: RecipientField[] = ['to', 'cc', 'bcc']
 
@@ -206,6 +209,42 @@ export const ComposeView: React.FC = () => {
 
   const rememberCursor = (el: HTMLTextAreaElement) => {
     cursorRef.current = { start: el.selectionStart, end: el.selectionEnd }
+  }
+
+  // Links beim Einfügen erhalten: das Textfeld nimmt nur Klartext, ein beschrifteter Link
+  // aus Webseite, Chat oder Notiz verlöre seine Adresse. Ändert sich nichts, fügt der
+  // Browser wie gewohnt ein.
+  const handleBodyPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const dt = e.clipboardData
+    if (!dt) return
+    const plain = dt.getData('text/plain') || ''
+    // Reine Datei-/Bildinhalte übernimmt die Ablage am Fensterrahmen.
+    if (!plain && dt.files && dt.files.length > 0) return
+    const text = plain
+      ? linkedPasteText(plain, anchorsFromClipboardHtml(dt.getData('text/html') || ''))
+      : uriListPasteText(dt.getData('text/uri-list') || '')
+    if (text === null) return
+    e.preventDefault()
+    e.stopPropagation()
+    const el = e.currentTarget
+    // insertText hält die Rückgängig-Kette des Textfelds; onChange übernimmt den Rest.
+    let done = false
+    try {
+      el.focus()
+      done = typeof document.execCommand === 'function' && document.execCommand('insertText', false, text)
+    } catch { done = false }
+    if (done) return
+    const current = useEmailStore.getState().composeState
+    if (!current) return
+    const inserted = insertPastedText(current.body, el.selectionStart ?? current.body.length, el.selectionEnd ?? current.body.length, text)
+    setComposeState({ ...current, body: inserted.body })
+    setLtHighlights([])
+    cursorRef.current = { start: inserted.cursor, end: inserted.cursor }
+    requestAnimationFrame(() => {
+      const field = bodyRef.current
+      if (!field) return
+      field.setSelectionRange(inserted.cursor, inserted.cursor)
+    })
   }
 
   // Bilder im Text erscheinen in der Anhangsleiste nur, solange ihr Platzhalter im Text steht.
@@ -750,6 +789,7 @@ export const ComposeView: React.FC = () => {
             setComposeState({ ...composeState, body: e.target.value })
             setLtHighlights([])
           }}
+          onPaste={handleBodyPaste}
           onSelect={e => rememberCursor(e.currentTarget)}
           onBlur={e => rememberCursor(e.currentTarget)}
           placeholder={t('inbox.compose.body')}
