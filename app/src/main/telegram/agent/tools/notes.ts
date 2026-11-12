@@ -78,14 +78,38 @@ export const noteSearchTool: AppTool = {
   }
 }
 
+export const NOTE_READ_MAX_CHARS = 8000
+
+/**
+ * Ein Stück einer Notiz ab `offset`, höchstens `maxChars` Zeichen, möglichst an einem
+ * Zeilenende geschnitten. Bleibt etwas übrig, nennt die letzte Zeile den offset für das
+ * nächste Stück — vorher stand dort nur „[…gekürzt]“, der Rest war unerreichbar.
+ */
+export function sliceNotePiece(content: string, offset?: number, maxChars?: number): string {
+  const start = Number.isFinite(offset) && offset! > 0 ? Math.min(Math.floor(offset!), content.length) : 0
+  const max = Number.isFinite(maxChars) && maxChars! > 0 ? Math.min(Math.floor(maxChars!), NOTE_READ_MAX_CHARS) : NOTE_READ_MAX_CHARS
+  let end = Math.min(content.length, start + max)
+  if (end < content.length) {
+    const lineEnd = content.lastIndexOf('\n', end)
+    if (lineEnd > start + max / 2) end = lineEnd + 1
+  }
+  const piece = content.slice(start, end)
+  if (start >= content.length && content.length > 0) return `[Ende der Notiz — sie hat ${content.length} Zeichen]`
+  const head = start > 0 ? `[Stück ab Zeichen ${start} von ${content.length}]\n` : ''
+  const tail = end < content.length ? `\n\n[…gekürzt: ${content.length - end} Zeichen fehlen noch — weiterlesen mit offset=${end}]` : ''
+  return head + piece + tail
+}
+
 export const noteReadTool: AppTool = {
   name: 'note_read',
-  description: 'Liest den vollen Inhalt einer Notiz. Pfad ist relativ zum Vault-Root.',
+  description: 'Liest den Inhalt einer Notiz (höchstens 8000 Zeichen je Aufruf). Lange Notizen in Stücken lesen: Das Ergebnis nennt am Ende den offset für das nächste Stück. Pfad ist relativ zum Vault-Root.',
   isWrite: false,
   parameters: {
     type: 'object',
     properties: {
-      path: { type: 'string', description: 'Vault-relativer Pfad zur .md-Datei.' }
+      path: { type: 'string', description: 'Vault-relativer Pfad zur .md-Datei.' },
+      offset: { type: 'number', description: 'Optional: Zeichenposition, ab der gelesen wird (für das nächste Stück einer langen Notiz).' },
+      max_chars: { type: 'number', description: 'Optional: höchstens so viele Zeichen lesen (Standard und Obergrenze 8000).' }
     },
     required: ['path']
   },
@@ -98,8 +122,8 @@ export const noteReadTool: AppTool = {
     const abs = await resolveInVaultSafe(ctx.vaultPath, rel)
     try {
       const content = await fs.readFile(abs, 'utf-8')
-      const truncated = content.length > 8000 ? content.slice(0, 8000) + '\n\n[…gekürzt]' : content
-      return { ok: true, content: truncated, display: `📄 _gelesen: ${rel} (${content.length} Zeichen)_` }
+      const piece = sliceNotePiece(content, Number(args.offset), Number(args.max_chars))
+      return { ok: true, content: piece, display: `📄 _gelesen: ${rel} (${content.length} Zeichen)_` }
     } catch (err) {
       return { ok: false, content: `Fehler beim Lesen: ${err instanceof Error ? err.message : String(err)}` }
     }

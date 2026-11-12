@@ -124,6 +124,28 @@ export function recordServerPromptTokens(budget: ContextBudget, promptTokens: nu
   budget.tokensSinceReport = 0
 }
 
+/**
+ * Nach dem Verdichten älterer Leseergebnisse: Der Server hat die Originale zuletzt mitgezählt,
+ * sie stehen jetzt nicht mehr in der Konversation. Die Schätzung liegt bis zu 71 % über der
+ * Messung (siehe Kopf) — abgezogen wird deshalb nur der sicher belegte Teil, die neue Fassung
+ * zählt voll. Der nächste Server-Wert ersetzt die Rechnung ohnehin.
+ */
+export const COMPACTION_CREDIT = 0.58
+export function creditCompaction(budget: ContextBudget, removedEstimate: number, addedEstimate: number, removedUnseenEstimate = 0): void {
+  // Noch nicht gemeldete Ergebnisse stehen mit ihrer vollen Schätzung im Budget — die geht ganz zurück.
+  const unseen = Math.max(0, Math.min(removedUnseenEstimate, removedEstimate))
+  budget.tokensSinceReport = Math.max(0, budget.tokensSinceReport - unseen)
+  const credit = Math.floor(Math.max(0, removedEstimate - unseen) * COMPACTION_CREDIT)
+  if (typeof budget.reportedPromptTokens === 'number') {
+    budget.reportedPromptTokens = Math.max(0, budget.reportedPromptTokens - credit)
+  } else {
+    // Noch kein Messwert (Beginn eines Folgelaufs): der Stand ist übernommen oder geschätzt —
+    // auch hier nur den sicher belegten Teil gutschreiben.
+    budget.tokensSinceReport = Math.max(0, budget.tokensSinceReport - credit)
+  }
+  budget.tokensSinceReport += Math.max(0, addedEstimate)
+}
+
 export function usedTokens(budget: ContextBudget): number {
   return (budget.reportedPromptTokens ?? 0) + budget.tokensSinceReport
 }
@@ -163,4 +185,59 @@ export function linesFittingTokens(lines: string[], maxTokens: number): number {
     if (used > maxTokens) return i
   }
   return lines.length
+}
+
+// --- Anzeige (Kontext-Balken im Lauf-Panel) -------------------------------------------
+//
+// Die Anzeige erfindet keine eigenen Schwellen: Die Stufen sind genau die Punkte, an denen
+// der Lauf sich tatsächlich anders verhält (Werkzeugergebnisse werden kleiner, Lesen wird
+// gesperrt). Eine Aussage „Qualität in Prozent“ gibt es bewusst nicht — die wäre nicht gemessen.
+
+/** Momentaufnahme des Budgets, wie sie an die Oberfläche geht. */
+export interface ContextSnapshot {
+  window: number
+  used: number
+  outputReserve: number
+  source: ContextWindowSource
+  /** false, solange der Server noch keine Tokenzahl gemeldet hat — dann ist `used` reine Schätzung. */
+  measured: boolean
+}
+
+export function snapshotBudget(budget: ContextBudget, source: ContextWindowSource): ContextSnapshot {
+  return {
+    window: budget.window,
+    used: usedTokens(budget),
+    outputReserve: budget.outputReserve,
+    source,
+    measured: typeof budget.reportedPromptTokens === 'number'
+  }
+}
+
+/**
+ * 'ok' = ein Leseergebnis in voller Größe passt noch.
+ * 'tight' = Leseergebnisse passen nur noch verkleinert (der Agent muss blättern).
+ * 'full' = Lesen gesperrt, nur noch Platz für die Antwort.
+ */
+export type ContextLevel = 'ok' | 'tight' | 'full'
+
+export interface ContextGauge {
+  level: ContextLevel
+  /** Belegter Anteil des Fensters, 0–1. */
+  usedShare: number
+  /** Für die Antwort freigehaltener Anteil am rechten Rand, 0–1 (nie mehr als der freie Rest). */
+  reserveShare: number
+  /** Token, die noch gelesen werden dürfen (nie negativ). */
+  readable: number
+}
+
+export function contextGauge(s: ContextSnapshot): ContextGauge {
+  const window = Math.max(1, s.window)
+  const used = Math.max(0, s.used)
+  const usedShare = Math.min(1, used / window)
+  const reserveShare = Math.max(0, Math.min(s.outputReserve / window, 1 - usedShare))
+  const remaining = s.window - s.outputReserve - used
+  const level: ContextLevel = remaining <= 0
+    ? 'full'
+    : remaining < Math.floor(s.window * TOOL_RESULT_SHARE) ? 'tight' : 'ok'
+  return { level, usedShare, reserveShare, readable: Math.max(0, remaining) }
 }

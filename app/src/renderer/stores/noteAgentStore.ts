@@ -10,6 +10,7 @@
 // „Bereich" (scopeId) ist die Notiz-ID (Editor) oder die Tab-ID (Agent-Tab).
 
 import type { AgentRoute } from '../../shared/agentRoute'
+import type { ContextSnapshot } from '../../shared/contextBudget'
 import { dropComposeMeasurement } from '../utils/activeTimeTracker'
 import { create } from 'zustand'
 import { useNotesStore } from './notesStore'
@@ -66,6 +67,10 @@ export interface AgentRunUiState {
   hitMaxIterations: boolean
   /** Startzeitpunkt (Renderer-Uhr) — für die laufende Zeitanzeige im Panel. */
   startedAt: number | null
+  /** Letzter gemeldeter Stand des Kontextbudgets — Grundlage des Balkens im Panel. */
+  context?: ContextSnapshot
+  /** Verbrauchte und erlaubte Modellaufrufe — der zweite Grund, aus dem ein Lauf enden kann. */
+  turns?: { used: number; max: number }
   web?: AgentUiWeb
   // Provenienz des Laufs: Modell + Datenweg (lokal vs. Cloud-Provider-Label) —
   // beim Start festgehalten, damit die Review-Karten sie anzeigen können.
@@ -594,6 +599,10 @@ export function initNoteAgentEvents(): void {
       ...run,
       steps: [...run.steps, { seq: p.seq, skill: p.skill, summary: p.summary }]
     })) ?? {})
+  })
+
+  window.electronAPI.onNoteAgentContext(p => {
+    store.setState(s => patchRun(s, p.runId, run => ({ ...run, context: p.context, turns: p.turns ?? run.turns })) ?? {})
   })
 
   window.electronAPI.onNoteAgentDone(p => {

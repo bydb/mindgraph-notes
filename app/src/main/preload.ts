@@ -298,6 +298,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners('note-agent-progress')
     ipcRenderer.on('note-agent-progress', (_event, p) => callback(p))
   },
+  onNoteAgentContext: (callback: (p: { runId: string; context: { window: number; used: number; outputReserve: number; source: 'num_ctx' | 'catalog' | 'assumed'; measured: boolean }; turns?: { used: number; max: number } }) => void) => {
+    ipcRenderer.removeAllListeners('note-agent-context')
+    ipcRenderer.on('note-agent-context', (_event, p) => callback(p))
+  },
   onNoteAgentDone: (callback: (p: {
     runId: string
     ok: boolean

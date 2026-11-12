@@ -967,6 +967,7 @@ export interface ElectronAPI {
   noteAgentDiscardResult: (runId: string, resultId: string, timings?: { reviewMs?: number; waitingMs?: number }) => Promise<{ success: boolean; error?: string }>;
   noteAgentPreviewResult: (runId: string, resultId: string) => Promise<{ success: boolean; kind?: string; binary?: boolean; text?: string; truncated?: boolean; sizeBytes?: number; error?: string }>;
   onNoteAgentProgress: (callback: (p: NoteAgentProgressEvent) => void) => void;
+  onNoteAgentContext: (callback: (p: { runId: string; context: import('./contextBudget').ContextSnapshot; turns?: { used: number; max: number } }) => void) => void;
   onNoteAgentDone: (callback: (p: NoteAgentDoneEvent) => void) => void;
   onNoteAgentRunEvicted: (callback: (p: { runId: string }) => void) => void;
   onNoteAgentMemorySuggestion: (callback: (p: { runId: string; text: string }) => void) => void;

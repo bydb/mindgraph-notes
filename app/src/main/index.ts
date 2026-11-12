@@ -4835,7 +4835,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     // Folgelauf: Verlauf und Datensätze des Vorgängers JETZT sichern — startRun entfernt einen
     // beendeten Vorgänger ohne offene Karten sofort. Nur derselbe Absender, derselbe Vault,
     // ein erfolgreich beendeter Lauf, keine Webrecherche (dort gilt „genau ein Ergebnis“).
-    let continuation: { priorMessages: ChatMessage[]; answer: string; prev: RunContinuation } | undefined
+    let continuation: { priorMessages: ChatMessage[]; answer: string; priorTokens?: number; prev: RunContinuation } | undefined
     if (typeof params.continueFromRunId === 'string') {
       if (params.webResearch?.enabled) {
         return { success: false, error: 'Läufe mit Webrecherche lassen sich nicht fortsetzen — starte den Auftrag neu.' }
@@ -4844,7 +4844,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       if (!prev || prev.vaultPath !== params.vaultPath) {
         return { success: false, error: 'Dieser Lauf lässt sich nicht mehr fortsetzen — starte den Auftrag neu.' }
       }
-      continuation = { priorMessages: prev.transcript, answer: params.instruction.trim(), prev }
+      continuation = { priorMessages: prev.transcript, answer: params.instruction.trim(), priorTokens: prev.transcriptTokens, prev }
     }
     if (params.shellAccess === true) {
       // Zweistufiges Opt-in wie bei der Webrecherche, HIER durchgesetzt und nicht nur im
@@ -5178,9 +5178,12 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
           noteContent: params.noteContent || '',
           agentMemory,
           chatOptions,
-          continuation: continuation ? { priorMessages: continuation.priorMessages, answer: continuation.answer } : undefined,
+          continuation: continuation ? { priorMessages: continuation.priorMessages, answer: continuation.answer, priorTokens: continuation.priorTokens } : undefined,
           onStep: (seq, skill, summary) => {
             if (!sender.isDestroyed()) sender.send('note-agent-progress', { runId: run.runId, seq, skill, summary })
+          },
+          onContext: (context, turns) => {
+            if (!sender.isDestroyed()) sender.send('note-agent-context', { runId: run.runId, context, turns })
           }
         })
         finishRun(run, 'done')

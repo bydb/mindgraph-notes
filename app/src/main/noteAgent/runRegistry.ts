@@ -144,6 +144,10 @@ export interface AgentRun {
   // Gesprächsverlauf am Ende eines erfolgreichen Laufs — Grundlage für „Antworten und
   // weitermachen“ (Folgelauf mit allem bisher Gelesenen). Nur Main-seitig, nie an den Renderer.
   transcript?: ChatMessage[]
+  // Stand des Kontextbudgets zum Verlauf (gemessen + seither geschätzt). Der Folgelauf rechnet
+  // damit weiter, statt den ganzen Verlauf neu zu schätzen — die Schätzung liegt bis zu 71 %
+  // zu hoch und lehnte Folgeaufträge nach längeren Läufen als „Kontext voll“ ab (gemessen 12.11.2026).
+  transcriptTokens?: number
 }
 
 // Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
@@ -278,6 +282,7 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
       vaultPath: run.vaultPath,
       instruction: run.instruction,
       transcript: run.transcript,
+      transcriptTokens: run.transcriptTokens,
       datasets: new Map(run.datasets),
       folderReads: new Map(run.folderReads),
       collectedFolders: new Set(run.collectedFolders)
@@ -286,6 +291,7 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
     continuations.delete(run.senderId)
   }
   run.transcript = undefined
+  run.transcriptTokens = undefined
 }
 
 export interface RunContinuation {
@@ -293,6 +299,7 @@ export interface RunContinuation {
   vaultPath: string
   instruction: string
   transcript: ChatMessage[]
+  transcriptTokens?: number
   datasets: Map<string, CollectedTable>
   folderReads: Map<string, number>
   collectedFolders: Set<string>

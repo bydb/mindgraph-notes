@@ -17,6 +17,7 @@ vi.stubGlobal('window', {
     noteAgentAcceptResult: (...a: unknown[]) => acceptResult(...(a as [string, string, Timings?])),
     noteAgentDiscardResult: (...a: unknown[]) => discardResult(...(a as [string, string, Timings?])),
     onNoteAgentProgress: () => () => {},
+    onNoteAgentContext: () => () => {},
     onNoteAgentDone: (cb: (p: unknown) => void) => { doneCallback = cb; return () => {} },
     onNoteAgentRunEvicted: () => () => {},
     onNoteAgentMemorySuggestion: () => () => {}

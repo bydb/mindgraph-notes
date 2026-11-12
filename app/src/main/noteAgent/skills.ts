@@ -10,7 +10,13 @@ import { sheetColumnWidths, autofilterRef } from '../../shared/sheetLayout'
 import { promises as fs } from 'fs'
 import * as path from 'path'
 import { ToolRegistry, type ToolResult } from '../llm/toolRegistry'
-import { noteReadTool, noteSearchTool } from '../telegram/agent/tools/notes'
+import { noteReadTool, noteSearchTool, NOTE_READ_MAX_CHARS } from '../telegram/agent/tools/notes'
+import { listVaultNotes, repairNotePath } from './notePathRepair'
+
+/** Platz für den Hinweis „liegt außerhalb der angehängten Ordner“ und die Stück-Markierung. */
+const NOTE_HINT_RESERVE = 80
+/** Darunter lohnt kein Stück mehr — dann soll der Agent schreiben statt weiterlesen. */
+const NOTE_MIN_PIECE_TOKENS = 400
 import type { ToolContext as TelegramToolContext } from '../telegram/agent/tools/registry'
 import {
   getContextAttachmentInfos, readAttachmentRaw, extractFileContentRaw,
@@ -790,8 +796,43 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       // Pfad ohne Endung („…/2026/08/19“) ist fast immer eine Notiz: .md ergänzen statt ablehnen —
       // der Fehlversuch kostete real einen ganzen Schritt (11.11.2026).
       const given = requireString(args, 'path')
-      const rel = given && !path.extname(given) ? `${given}.md` : given
-      const res = await noteReadTool.run({ ...args, path: rel }, telegramCtx(ctx))
+      // Passend zum verbleibenden Kontext lesen statt abgelehnt zu werden: Vorher lieferte
+      // note_read immer bis zu 8000 Zeichen, der Loop lehnte das bei knappem Platz ab, und
+      // das Modell probierte die nächste Notiz — bis zum Schrittlimit (real, 11.11.2026).
+      const limit = ctx.maxResultTokens?.()
+      let rel = given && !path.extname(given) ? `${given}.md` : given
+      let res = await noteReadTool.run({ ...args, path: rel }, telegramCtx(ctx))
+      // Pfad falsch abgeschrieben (Emojis, Sonderzeichen): die EINE gemeinte Notiz selbst finden,
+      // statt den Fehlversuch ans Modell zurückzugeben (notePathRepair.ts).
+      let repairedFrom = ''
+      if (!res.ok && rel && rel.toLowerCase().endsWith('.md') && /ENOENT|no such file/i.test(res.content)) {
+        const repair = repairNotePath(await listVaultNotes(ctx.run.vaultPath), rel)
+        if (repair.match) {
+          repairedFrom = rel
+          rel = repair.match
+          res = await noteReadTool.run({ ...args, path: rel }, telegramCtx(ctx))
+        } else {
+          return {
+            ok: false,
+            content: repair.candidates.length > 0
+              ? `Fehler: Unter „${rel}“ gibt es keine Notiz. Mehrere Notizen tragen diesen Namen — lies die gemeinte mit ihrem genauen Pfad:\n${repair.candidates.map(c => `- ${c}`).join('\n')}`
+              : `Fehler: Unter „${rel}“ gibt es keine Notiz, und keine andere Notiz im Vault trägt diesen Namen. Übernimm Pfade wörtlich aus den Suchergebnissen (note_search, vault_search).`,
+            display: `note_read: ${rel}`
+          }
+        }
+      }
+      if (res.ok && typeof limit === 'number' && estimateTokens(res.content) + NOTE_HINT_RESERVE > limit) {
+        if (limit < NOTE_MIN_PIECE_TOKENS) {
+          return { ok: false, content: 'Fehler: Für weitere Notizen ist kein Platz mehr im Kontext. Lies nichts mehr nach — schreibe JETZT das Ergebnis aus dem, was du schon gelesen hast, und nenne im Ergebnis, was ungelesen blieb.', display: `note_read: ${rel}` }
+        }
+        // Zeichen je Token schwanken (Fließtext ~3, Tabellen ~1,9): klein anfangen, halbieren.
+        let maxChars = Math.min(NOTE_READ_MAX_CHARS, Math.floor((limit - NOTE_HINT_RESERVE) * 2.4))
+        for (let attempt = 0; attempt < 4; attempt++) {
+          res = await noteReadTool.run({ ...args, path: rel, max_chars: maxChars }, telegramCtx(ctx))
+          if (!res.ok || estimateTokens(res.content) + NOTE_HINT_RESERVE <= limit) break
+          maxChars = Math.floor(maxChars / 2)
+        }
+      }
       if (res.ok && rel) ctx.run.sources.add(`[[${path.basename(rel, '.md')}]]`)
       // Ablehnung bei Nicht-Markdown umformulieren: die Telegram-Fassung sagt nur, was
       // NICHT geht. Ein Modell ohne Ausweg erfindet sich dann einen („lade die Datei
@@ -806,9 +847,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         }
       }
       const outside = res.ok && rel ? outsideAttachedFolders(ctx, rel) : null
-      const content = outside
+      const withOutside = outside
         ? `HINWEIS: Diese Notiz liegt ${OUTSIDE_NOTE} — verwende sie nur, wenn der Auftrag sie meint.\n\n${res.content}`
         : res.content
+      const content = res.ok && repairedFrom
+        ? `HINWEIS: Unter „${repairedFrom}“ gab es keine Notiz. Gelesen wurde die einzige Notiz dieses Namens: ${rel}\n\n${withOutside}`
+        : withOutside
       // display neutral halten (Telegram-Displays tragen Emojis — hier Klartext-Protokoll).
       return { ...res, content, display: rel ? `note_read: ${rel}` : undefined }
     }

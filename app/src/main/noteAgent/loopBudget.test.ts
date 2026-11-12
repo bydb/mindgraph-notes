@@ -13,6 +13,7 @@ vi.mock('../llm/chatClient', async (orig) => ({
 
 import { chatWithTools } from '../llm/chatClient'
 import { runNoteAgentLoop } from './loop'
+import { estimateTokens } from '../../shared/contextBudget'
 import type { AgentRun } from './runRegistry'
 
 const mockChat = chatWithTools as unknown as ReturnType<typeof vi.fn>
@@ -75,7 +76,9 @@ describe('Kontextbudget im Loop', () => {
     expect(toolMessages(1)[0].content).toContain('Inhalt der Notiz')
   })
 
-  it('ersetzt ein zu großes Leseergebnis durch einen Hinweis zum Blättern, statt es anzuhängen', async () => {
+  // Seit 11.11.2026 liest note_read ein passendes Stück, statt abgelehnt zu werden — die
+  // Ablehnung ließ das Modell die nächste Notiz probieren, bis das Schrittlimit kam.
+  it('liest von einer zu großen Notiz nur ein passendes Stück und nennt den offset fürs nächste', async () => {
     // 7 900 Ziffern ≈ 11 000 Token geschätzt — mehr als ein Viertel von 32 768.
     await fs.writeFile(path.join(vault, 'zahlen.md'), '1234567890'.repeat(790), 'utf8')
     mockChat
@@ -83,8 +86,10 @@ describe('Kontextbudget im Loop', () => {
       .mockResolvedValueOnce(done(3_200))
     await run(makeRun())
     const content = toolMessages(1)[0].content
-    expect(content).toContain('zu groß für den verbleibenden Kontext')
-    expect(content).not.toContain('1234567890')
+    expect(content).not.toContain('zu groß für den verbleibenden Kontext')
+    expect(content).toMatch(/weiterlesen mit offset=\d+/)
+    // Ein Viertel des Fensters (8 192 Token) ist die Obergrenze für EIN Ergebnis.
+    expect(estimateTokens(content)).toBeLessThanOrEqual(8_192)
   })
 
   it('stoppt vor dem Senden, wenn der Kontext voll ist — laut statt still überzulaufen', async () => {

@@ -16,8 +16,9 @@ import { endsWithQuestion } from '../../shared/agentClosingQuestion'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import {
   addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, maxToolResultTokens,
-  recordServerPromptTokens, resolveContextWindow, ASSUMED_OUTPUT_RESERVE
+  recordServerPromptTokens, remainingForInput, resolveContextWindow, usedTokens, snapshotBudget, creditCompaction, ASSUMED_OUTPUT_RESERVE, TOOL_RESULT_SHARE, type ContextSnapshot
 } from '../../shared/contextBudget'
+import { compactReadResults, refreshCompacted, COMPACTED_PREFIX } from './compaction'
 import { getContextAttachmentInfos, getShellAttachmentPaths } from './contextFiles'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { nextSeq, recordToolUse, type AgentRun } from './runRegistry'
@@ -27,7 +28,18 @@ import { CUT_AFTER_RESULT_NOTE, CUT_TEXT_MESSAGE, MAX_OUTPUT_CUTS, cutToolCallMe
 // 12 statt 8: recherche-lastige Läufe (viele note_read/note_search vor dem Schreiben)
 // brauchen Luft für die Schreib-Iteration plus eine Fehler-Korrektur — real lief ein
 // 20-Tool-Call-Lauf mit GLM 5.2 ins Limit, bevor das Ergebnis fertig war.
-const MAX_ITERATIONS = 12
+// 20 statt 12 (12.11.2026): Seit Gelesenes verdichtet wird, begrenzt nicht mehr der Platz,
+// sondern die Rundenzahl. Ein Modell, das je Runde EINE Notiz liest, braucht für 14 Notizen
+// 15 Runden — im Mess-Harness endeten solche Läufe bei 12 ohne Ergebnis.
+const MAX_ITERATIONS = 20
+// 10 (vorher 6): bei 28 Notizen sind allein fünf bis sieben Verdichtungen nötig; die Grenze ist
+// nur die Notbremse gegen Endlosschleifen.
+const MAX_COMPACTIONS = 10
+// Großes, sicher bekanntes Fenster (heute: OpenRouter mit Katalogwert): dort beendeten die
+// zwölf Runden den Lauf bei 18 % Kontext (real, 11.11.2026). Gekoppelt ans Fenster, nicht an
+// „Cloud“ — bei angenommenem Fenster (LLMBase, LM Studio) ist vorher der Platz zu Ende.
+// Preis: jede Runde schickt das ganze Gespräch neu, lange Läufe kosten überproportional.
+export const MAX_ITERATIONS_LARGE_WINDOW = 30
 // So lange darf der Start auf das Kontextfenster aus dem Anbieterkatalog warten (Codex F04).
 // Der Katalog ist meist schon warm (Preise); kalt kostet er sonst bis zu 10 s Startverzug.
 const CATALOG_WAIT_MS = 3_000
@@ -56,9 +68,16 @@ export interface NoteAgentLoopParams {
   agentMemory: string
   chatOptions: ChatOptions // Backend/Modell/Key vom Aufrufer; signal wird hier ergänzt
   onStep: (seq: number, skill: string, summary: string) => void
+  // Kontext-Balken im Lauf-Panel: Stand des Budgets nach jedem Modellaufruf und jedem
+  // angehängten Werkzeugergebnis. Reine Anzeige — steuert nichts.
+  onContext?: (snapshot: ContextSnapshot, turns?: { used: number; max: number }) => void
+  // Verdichten älterer Leseergebnisse (compaction.ts). Standard an; `false` nur für den
+  // Vergleichslauf im Mess-Harness (eval/contextEval.live.test.ts).
+  compaction?: boolean
   // Folgelauf („Antworten und weitermachen“): Verlauf des Vorgängers (ohne dessen
   // Systemprompt, der wird für diesen Lauf frisch gebaut) plus die Antwort des Nutzers.
-  continuation?: { priorMessages: ChatMessage[]; answer: string }
+  // `priorTokens`: Budgetstand des Vorgängers zum übernommenen Verlauf (siehe AgentRun.transcriptTokens).
+  continuation?: { priorMessages: ChatMessage[]; answer: string; priorTokens?: number }
 }
 
 export interface NoteAgentLoopResult {
@@ -319,7 +338,15 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         : 'Das Modell hat das Mindmap-Werkzeug nicht erfolgreich aufgerufen. Starte den Auftrag erneut oder wähle ein anderes Modell.'
     return `${subject} ${why}`
   }
-  const formatHint = (): string => [pptxHint(), mindmapHint()].filter(Boolean).join(' ')
+  // Verdichtete Leseergebnisse (compaction.ts) gehören in den Abschlusstext: Das Modell schrieb
+  // real „vollständig gelesen“ ins Ergebnis, obwohl es am Ende mit Kurzfassungen arbeitete.
+  let compactedResults = 0
+  // Modellaufrufe vor der ersten Runde (Kurzfassungen erneuern) — gehen in die Lauf-Bilanz ein.
+  const pendingUsages: Array<CallUsage | null> = []
+  const compactionHint = (): string => compactedResults > 0
+    ? `Der Platz im Kontext reichte nicht für alles im Wortlaut: ${compactedResults} Leseergebnisse hat der Agent während des Laufs zu Kurzfassungen verdichtet und daraus weitergearbeitet — er hatte diese Quellen am Ende also nicht mehr vollständig vorliegen. Einzelheiten und Zitate im Ergebnis bitte an den Originalen prüfen.`
+    : ''
+  const formatHint = (): string => [pptxHint(), mindmapHint(), compactionHint()].filter(Boolean).join(' ')
   const withFormatHint = (text: string): string => {
     const hint = formatHint()
     return hint ? `${text}\n\n**Hinweis:** ${hint}`.trim() : text
@@ -336,7 +363,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     ? [
         systemMessage,
         ...params.continuation.priorMessages.filter(m => m.role !== 'system'),
-        { role: 'user', content: `Antwort auf deine letzte Nachricht: ${params.continuation.answer}\n\nSetze den Auftrag damit fort. Alles, was du oben schon gelesen hast, gilt weiter — lies es nicht erneut.` }
+        { role: 'user', content: `Antwort auf deine letzte Nachricht: ${params.continuation.answer}\n\nSetze den Auftrag damit fort. Alles, was du oben schon gelesen hast, gilt weiter — lies es nicht erneut.${compactedPriorHint(params.continuation.priorMessages)}` }
       ]
     : [systemMessage, { role: 'user', content: run.instruction + (run.chatContext ? chatContextBlock(run.chatContext) : '') }]
   // 10-Minuten-Fenster pro Request: große lokale Modelle (z.B. qwen3.6:27b-mlx) brauchen
@@ -364,8 +391,16 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   const contextWindow = resolveContextWindow(chatOptions.backend, chatOptions.numCtx, catalogTokens)
   ctx.contextWindowTokens = contextWindow.tokens
   const budget = createContextBudget(contextWindow.tokens, chatOptions.maxTokens ?? ASSUMED_OUTPUT_RESERVE)
-  addToBudget(budget, messages.map(m => m.content ?? '').join('\n'))
-  addToBudget(budget, JSON.stringify(tools.map(t => ({ type: 'function', function: t }))))
+  const priorTokens = params.continuation?.priorTokens
+  if (typeof priorTokens === 'number' && priorTokens > 0) {
+    // Folgelauf: mit dem Stand des Vorgängers weiterrechnen (enthält Systemprompt und
+    // Werkzeug-Schemata schon), nur die neue Nachricht kommt als Schätzung dazu.
+    budget.tokensSinceReport = priorTokens
+    addToBudget(budget, messages[messages.length - 1].content ?? '')
+  } else {
+    addToBudget(budget, messages.map(m => m.content ?? '').join('\n'))
+    addToBudget(budget, JSON.stringify(tools.map(t => ({ type: 'function', function: t }))))
+  }
   ctx.maxResultTokens = () => maxToolResultTokens(budget)
   ctx.chatOptions = chatOptions
   if (contextWindow.source === 'catalog') {
@@ -373,9 +408,51 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   } else if (contextWindow.source === 'assumed') {
     onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
   }
+  const maxIterations = contextWindow.source === 'catalog'
+    ? MAX_ITERATIONS_LARGE_WINDOW
+    : hasFolder || run.shell || run.computer ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
+  let currentTurn = 0
+  const reportContext = (): void => { params.onContext?.(snapshotBudget(budget, contextWindow.source), currentTurn > 0 ? { used: currentTurn, max: maxIterations } : undefined) }
+  reportContext()
+  // Folgeauftrag: Kurzfassungen aus dem Vorgängerlauf für den NEUEN Auftrag erneuern — die App
+  // liest die Quellen selbst neu (compaction.ts, refreshCompacted). Zählt nicht als Runde.
+  if (params.continuation && params.compaction !== false && messages.some(m => m.role === 'tool' && (m.content ?? '').startsWith(COMPACTED_PREFIX))) {
+    const refreshUsages: Array<CallUsage | null> = []
+    // Vorher melden: Das Neulesen dauert bei einem großen lokalen Modell Minuten — ohne diese
+    // Zeile stand der Lauf im GUI-Test scheinbar still.
+    const staleCount = messages.filter(m => m.role === 'tool' && (m.content ?? '').startsWith(COMPACTED_PREFIX)).length
+    onStep(nextSeq(run), 'kontext', `Für den Nachtrag werden ${staleCount} verdichtete Quellen neu gelesen und zusammengefasst …`)
+    const refreshed = await refreshCompacted({
+      messages, instruction: run.instruction, chatOptions, window: budget.window, runId: run.runId,
+      recordUsage: usage => { refreshUsages.push(usage) },
+      reread: async (toolName, args) => {
+        const tool = registry.get(toolName)
+        if (!tool || !allowed.has(toolName)) return null
+        // Das Neulesen dient nur dem Verdichten und landet nie im Wortlaut im Kontext — deshalb
+        // gilt hier die volle Größe eines Leseergebnisses, nicht der gerade knappe Restplatz.
+        const saved = ctx.maxResultTokens
+        ctx.maxResultTokens = () => Math.floor(budget.window * TOOL_RESULT_SHARE)
+        try {
+          const res = await tool.run(args, ctx)
+          return res.ok ? res.content : null
+        } finally {
+          ctx.maxResultTokens = saved
+        }
+      }
+    })
+    if (run.abort.signal.aborted) throw new Error('Abgebrochen')
+    pendingUsages.push(...refreshUsages)
+    budget.tokensSinceReport += Math.max(0, refreshed.afterTokens - refreshed.beforeTokens)
+    if (refreshed.count > 0) {
+      compactedResults += refreshed.count
+      onStep(nextSeq(run), 'kontext', `Kurzfassungen für den Nachtrag erneuert: ${refreshed.count} Quellen neu gelesen${refreshed.kept > 0 ? `, ${refreshed.kept} unverändert` : ''}`)
+    }
+    reportContext()
+  }
   const pushMessage = (message: ChatMessage): void => {
     messages.push(message)
     addToBudget(budget, message.content ?? '')
+    reportContext()
   }
 
   let lastText = ''
@@ -383,26 +460,83 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   let nudgedForQuestion = false
   let previousPromptTokens: number | undefined
   let outputCuts = 0
+  // Abgelehnte Leseversuche in Folge (Kontext voll). Ab zwei gibt es nur noch Schreibwerkzeuge:
+  // Vorher las das Modell trotz Ablehnung weiter, bis das Schrittlimit kam (real, 11.11.2026).
+  let rejectedReads = 0
+  // Verdichtungen je Lauf begrenzen: jede kostet einen Modellaufruf und etwas Genauigkeit.
+  let compactions = 0
+  // Zwei Verdichtungsaufrufe ohne verwertbare Antwort: dieses Modell kann es nicht — nicht weiter versuchen.
+  let failedCompactions = 0
+  let writeOnly = false
+  let warnedLastTurns = false
+  // Ergebnis-Werkzeuge für den Schluss: write_* und das Übergeben einer Shell-Datei.
+  const resultTools = tools.filter(t => t.name.startsWith('write_') || t.name === 'shell_stage_file')
+  const hasResult = (): boolean => run.web ? run.web.wrote : run.results.size > 0
   // Shell-Läufe brauchen Luft für Erkunden/Schreiben/Korrigieren — dasselbe Budget wie Ordner-Läufe.
   // Rechner-Läufe wie Shell-/Ordner-Läufe: das Ergebnis wird erst geschrieben und DANN
   // noch weitergereicht (öffnen, anhängen, drucken) — das sind Iterationen nach dem Schreiben.
-  const maxIterations = hasFolder || run.shell || run.computer ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   // Verbrauch jeder Iteration einzeln — daraus wird am Ende die Lauf-Bilanz.
-  const callUsages: Array<CallUsage | null> = []
+  const callUsages: Array<CallUsage | null> = [...pendingUsages]
   // Zusätzliche Modellaufrufe von Werkzeugen (folder_digest) zählen in die Lauf-Bilanz.
   ctx.recordUsage = usage => { callUsages.push(usage) }
   // Preise jetzt holen, nicht erst beim Bilanzieren: sonst wartet der Nutzer am
   // Ende des Laufs auf eine Netzabfrage, die längst hätte laufen können.
   warmPricingCache(chatOptions)
 
+  // Platz knapp: Leseergebnisse verdichten (compaction.ts). Zwischen zwei Runden nur schon
+  // Gesehenes; mitten in einer Runde (`midRound`), bevor ein Leseaufruf abgelehnt würde, auch
+  // die Ergebnisse dieser Runde. Nicht im Recherche-Lauf — dort hängen Belege am Wortlaut.
+  const compactIfTight = async (midRound: boolean): Promise<boolean> => {
+    if (params.compaction === false || run.web || writeOnly || compactions >= MAX_COMPACTIONS || failedCompactions >= 2) return false
+    if (remainingForInput(budget) >= Math.floor(budget.window * TOOL_RESULT_SHARE)) return false
+    const outcome = await compactReadResults({
+      messages, instruction: run.instruction, chatOptions, window: budget.window, runId: run.runId,
+      recordUsage: usage => { callUsages.push(usage) }, includeUnseen: midRound
+    })
+    if (run.abort.signal.aborted) throw new Error('Abgebrochen')
+    if (!outcome) return false
+    if (outcome.count === 0) { failedCompactions++; return false }
+    compactions++
+    compactedResults += outcome.count
+    creditCompaction(budget, outcome.removedTokens, outcome.addedTokens, outcome.removedUnseenTokens)
+    // Der Prompt ist jetzt absichtlich kleiner — sonst hielte der Überlauf-Wächter das für eine stille Kürzung.
+    previousPromptTokens = undefined
+    if (!isReadLocked(budget)) rejectedReads = 0
+    onStep(nextSeq(run), 'kontext', `Gelesenes verdichtet, um Platz zu schaffen: ${outcome.count} Leseergebnisse, etwa ${outcome.removedTokens.toLocaleString('de-DE')} → ${outcome.addedTokens.toLocaleString('de-DE')} Token`)
+    reportContext()
+    return true
+  }
+
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
     // Vor dem Senden: Reicht der Platz noch für eine Antwort? Sonst laut stoppen statt
     // still überzulaufen (F23) — mit Hinweis, wie der Auftrag doch gelingt.
+    // Erst Platz schaffen, dann prüfen: Ein Folgelauf beginnt oft mit vollem Verlauf — ohne diese
+    // Reihenfolge scheiterte er an „Kontext voll“, bevor das Verdichten eine Chance hatte.
+    await compactIfTight(false)
     if (!hasRoomForNextCall(budget)) {
       throw failWithHint(`Der Arbeitsspeicher des Modells (Kontext, ${budget.window.toLocaleString('de-DE')} Token) ist voll, bevor ein Ergebnis geschrieben wurde. Teile den Auftrag auf (z. B. einen Unterordner oder Zeitraum nach dem anderen) oder wähle ein Modell mit größerem Kontext.`)
     }
+    // Schluss in Sicht, aber noch kein Ergebnis: erst ankündigen, im letzten Schritt nur noch
+    // Schreibwerkzeuge anbieten. Vorher endete der Lauf wortlos am Limit — auch bei leerem
+    // Kontext und starkem Modell (real, 11.11.2026: 12 Aufrufe gelesen, nichts geschrieben).
+    // Platz knapp: ältere Leseergebnisse verdichten, bevor das Lesen gesperrt wird (compaction.ts).
+    // Nicht im Recherche-Lauf — dort hängen Quellenbelege am Wortlaut der abgerufenen Seiten.
+    if (!hasResult() && resultTools.length > 0) {
+      if (rejectedReads >= 2 && !writeOnly) {
+        writeOnly = true
+        pushMessage({ role: 'user', content: 'Der Kontext ist voll — weiteres Lesen ist nicht mehr möglich. Schreibe JETZT das Ergebnis aus dem, was du schon gelesen hast, und nenne im Ergebnis offen, was ungelesen blieb.' })
+      } else if (iteration === maxIterations && !writeOnly) {
+        writeOnly = true
+        pushMessage({ role: 'user', content: 'Das ist dein letzter Arbeitsschritt. Schreibe JETZT das Ergebnis aus dem, was du schon gelesen hast, und nenne im Ergebnis offen, was ungelesen blieb.' })
+      } else if (iteration === maxIterations - 2 && !warnedLastTurns && !writeOnly) {
+        warnedLastTurns = true
+        pushMessage({ role: 'user', content: 'Du hast noch drei Arbeitsschritte. Lies nur noch, was unbedingt fehlt, und schreibe dann das Ergebnis — spätestens im letzten Schritt.' })
+      }
+    }
+    currentTurn = iteration
+    reportContext()
     const sentChars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0)
-    const result = await chatWithTools(messages, tools, { ...chatOptions, telemetryModule: 'note-agent', telemetryRunId: run.runId })
+    const result = await chatWithTools(messages, writeOnly && !hasResult() ? resultTools : tools, { ...chatOptions, telemetryModule: 'note-agent', telemetryRunId: run.runId })
     callUsages.push(result.usage ?? null)
     if (run.abort.signal.aborted) throw new Error('Abgebrochen')
 
@@ -425,6 +559,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     lastText = result.text
     messages.push(result.assistantMessage)
     addToBudget(budget, (result.assistantMessage.content ?? '') + JSON.stringify(result.toolCalls))
+    reportContext()
 
     // Ausgabegrenze erreicht (siehe outputCut.ts): abgeschnittene Aufrufe nie ausführen,
     // dem Modell den wahren Grund nennen, nach MAX_OUTPUT_CUTS Abbrüchen in Folge aufhören.
@@ -439,7 +574,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         // Im Web-Lauf zählt nur das geschriebene Ergebnis — ein Bild allein erfüllt den Vertrag nicht.
         const resultDone = run.web ? run.web.wrote : run.results.size > 0
         if (resultDone) {
-          run.transcript = messages.slice()
+          run.transcript = messages.slice(); run.transcriptTokens = usedTokens(budget)
           return { text: withFormatHint(CUT_AFTER_RESULT_NOTE), hitMaxIterations: false, cost: await costOfCalls(callUsages, chatOptions) }
         }
         throw failWithHint(repeatedCutMessage(outputCuts))
@@ -500,7 +635,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         })
         continue
       }
-      run.transcript = messages.slice()
+      run.transcript = messages.slice(); run.transcriptTokens = usedTokens(budget)
       return { text: withFormatHint(result.text), hitMaxIterations: false, cost: await costOfCalls(callUsages, chatOptions) }
     }
 
@@ -517,12 +652,15 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         continue
       }
       onStep(nextSeq(run), call.name, summarizeArgs(call.name, call.arguments))
+      // Viele Leseaufrufe in EINER Runde: vor dem nächsten erst Platz schaffen, statt ihn abzulehnen.
+      if (BUDGETED_READ_TOOLS.has(call.name)) await compactIfTight(true)
       // Nur noch Platz für die Antwort: Lesen sperren, bevor das Werkzeug läuft (auch
       // collect_table — dort VOR der Registrierung eines Datensatzes, F37).
       if ((BUDGETED_READ_TOOLS.has(call.name) || LOCK_ONLY_TOOLS.has(call.name)) && isReadLocked(budget)) {
         const msg = 'Fehler: Kontext fast voll — es ist nur noch Platz für das Ergebnis. Lies nichts mehr nach, sondern schreibe JETZT das Ergebnis aus dem, was du schon gelesen hast, und nenne im Ergebnis, was du nicht mehr lesen konntest.'
         onStep(nextSeq(run), call.name, shortToolError(msg))
         pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: msg })
+        rejectedReads++
         continue
       }
       try {
@@ -541,8 +679,11 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
           const size = estimateTokens(content)
           const limit = maxToolResultTokens(budget)
           if (size > limit) {
-            content = `Fehler: Das Ergebnis wäre zu groß für den verbleibenden Kontext (etwa ${size.toLocaleString('de-DE')} Token, Platz für ${limit.toLocaleString('de-DE')}). Hole kleinere Stücke: list_context_folder mit subfolder bzw. offset, read_context_file mit offset/max_rows — oder schreibe das Ergebnis aus dem, was du schon hast.`
+            content = `Fehler: Das Ergebnis wäre zu groß für den verbleibenden Kontext (etwa ${size.toLocaleString('de-DE')} Token, Platz für ${limit.toLocaleString('de-DE')}). ${smallerPiecesHint(call.name)} — oder schreibe das Ergebnis aus dem, was du schon hast.`
             onStep(nextSeq(run), call.name, shortToolError(content))
+            rejectedReads++
+          } else if (toolResult.ok) {
+            rejectedReads = 0
           }
         } else if (LOCK_ONLY_TOOLS.has(call.name)) {
           // Diese Werkzeuge verdichten sich selbst und dürfen nicht abgelehnt werden (der
@@ -581,11 +722,32 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     throw failWithHint('Iterations-Limit erreicht, ohne dass die Recherche ein Ergebnis geschrieben hat. Der Auftrag war möglicherweise zu umfangreich für das Modell.')
   }
   // Auch nach dem Iterations-Limit fortsetzbar: der Nutzer kann „mach weiter“ sagen.
-  run.transcript = messages.slice()
+  run.transcript = messages.slice(); run.transcriptTokens = usedTokens(budget)
   return {
-    text: withFormatHint(lastText || 'Iterations-Limit erreicht ohne abschließende Antwort.'),
+    text: withFormatHint(lastText),
     hitMaxIterations: true,
     cost: await costOfCalls(callUsages, chatOptions)
+  }
+}
+
+// Folgeauftrag nach einem Lauf mit verdichteten Leseergebnissen: Die Kurzfassungen wurden für
+// den FRÜHEREN Auftrag gemacht. Ohne diesen Hinweis schrieb ein Modell bei einer Nachfrage
+// „keins“, wo die Kurzfassung nur schwieg (gemessen 12.11.2026, Szenario „nachfrage“).
+function compactedPriorHint(prior: ChatMessage[]): string {
+  const n = prior.filter(m => m.role === 'tool' && (m.content ?? '').startsWith(COMPACTED_PREFIX)).length
+  if (n === 0) return ''
+  return ` Ausnahme: ${n} frühere Leseergebnisse liegen nur als Kurzfassung vor. Braucht der Nachtrag eine Angabe, die in einer Kurzfassung nicht steht, lies diese Quelle erneut. Schreibe nie „keins“, „nicht vorhanden“ oder einen Wert, nur weil die Kurzfassung dazu schweigt.`
+}
+
+// Ausweg bei zu großem Leseergebnis — nur Parameter nennen, die das abgelehnte Werkzeug
+// wirklich hat. Vorher stand überall der Hinweis für angehängte Ordner, auch bei Notizen.
+function smallerPiecesHint(tool: string): string {
+  switch (tool) {
+    case 'note_read': return 'Lies die Notiz in Stücken: note_read mit kleinerem max_chars und offset'
+    case 'list_context_folder': return 'Hole kleinere Stücke: list_context_folder mit subfolder bzw. offset'
+    case 'read_context_file': return 'Hole kleinere Stücke: read_context_file mit offset/max_rows'
+    case 'note_search': case 'vault_search': return 'Suche enger (genauere Begriffe)'
+    default: return 'Hole ein kleineres Stück, falls das Werkzeug das erlaubt'
   }
 }
 

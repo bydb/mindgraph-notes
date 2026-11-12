@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, linesFittingTokens,
   maxToolResultTokens, recordServerPromptTokens, remainingForInput, resolveContextWindow, usedTokens,
-  ASSUMED_CONTEXT_WINDOW, CATALOG_WINDOW_MAX
+  ASSUMED_CONTEXT_WINDOW, CATALOG_WINDOW_MAX, contextGauge, snapshotBudget
 } from './contextBudget'
 
 // Messwerte vom 05.10.2026 (Ollama prompt_eval_count, qwen3.6/qwen3.8/gemma4) — die Schätzung
@@ -113,5 +113,49 @@ describe('linesFittingTokens', () => {
     expect(linesFittingTokens(lines, 33)).toBe(3)
     expect(linesFittingTokens(lines, 1_000)).toBe(10)
     expect(linesFittingTokens(lines, 0)).toBe(0)
+  })
+})
+
+describe('contextGauge (Anzeige)', () => {
+  const snap = (used: number) => ({ window: 32_000, used, outputReserve: 8_000, source: 'num_ctx' as const, measured: true })
+
+  it('ok, solange ein Leseergebnis in voller Größe (ein Viertel des Fensters) noch passt', () => {
+    const g = contextGauge(snap(16_000))
+    expect(g.level).toBe('ok')
+    expect(g.usedShare).toBe(0.5)
+    expect(g.reserveShare).toBe(0.25)
+    expect(g.readable).toBe(8_000)
+  })
+
+  it('eng, sobald Leseergebnisse nur noch verkleinert passen', () => {
+    expect(contextGauge(snap(16_001)).level).toBe('tight')
+  })
+
+  it('voll genau dort, wo der Lauf das Lesen sperrt', () => {
+    const budget = createContextBudget(32_000, 8_000)
+    recordServerPromptTokens(budget, 24_000)
+    expect(isReadLocked(budget)).toBe(true)
+    const g = contextGauge(snapshotBudget(budget, 'num_ctx'))
+    expect(g.level).toBe('full')
+    expect(g.readable).toBe(0)
+    recordServerPromptTokens(budget, 23_999)
+    expect(isReadLocked(budget)).toBe(false)
+    expect(contextGauge(snapshotBudget(budget, 'num_ctx')).level).toBe('tight')
+  })
+
+  it('Balken läuft nie über: belegt + Reserve höchstens das ganze Fenster', () => {
+    const g = contextGauge(snap(40_000))
+    expect(g.usedShare).toBe(1)
+    expect(g.reserveShare).toBe(0)
+    const h = contextGauge(snap(30_000))
+    expect(h.usedShare + h.reserveShare).toBeLessThanOrEqual(1)
+  })
+
+  it('snapshotBudget: vor der ersten Server-Meldung als Schätzung gekennzeichnet', () => {
+    const budget = createContextBudget(32_000, 8_000)
+    addToBudget(budget, 'Ein kurzer Auftrag.')
+    expect(snapshotBudget(budget, 'assumed')).toMatchObject({ measured: false, source: 'assumed', window: 32_000 })
+    recordServerPromptTokens(budget, 500)
+    expect(snapshotBudget(budget, 'assumed')).toMatchObject({ measured: true, used: 500 })
   })
 })

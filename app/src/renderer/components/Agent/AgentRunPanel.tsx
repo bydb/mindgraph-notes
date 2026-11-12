@@ -13,6 +13,7 @@ import { useTranslation } from '../../utils/translations'
 import { ModelLogo } from '../Shared/ModelLogo'
 import { SkillReferencePrompt } from './SkillReferencePrompt'
 import type { AcceptOpenTarget, AgentRunUiState } from '../../stores/noteAgentStore'
+import { contextGauge, type ContextSnapshot } from '../../../shared/contextBudget'
 
 export interface AgentPreviewResponse {
   success: boolean
@@ -101,6 +102,63 @@ function usePluginEditorClaims(needed: boolean): PluginEditorClaim[] {
     }
   }, [needed])
   return claims
+}
+
+/**
+ * Kontext-Balken: wie voll der Arbeitsspeicher des Modells in diesem Lauf ist und was das
+ * für den Lauf bedeutet. Die drei Stufen sind die Punkte, an denen der Lauf sich wirklich
+ * anders verhält (shared/contextBudget.ts) — keine geschätzte „Qualität“.
+ */
+function ContextMeter({ context, running, turns, hitTurnLimit }: { context: ContextSnapshot; running: boolean; turns?: { used: number; max: number }; hitTurnLimit: boolean }) {
+  const { t } = useTranslation()
+  const locale = useUIStore(st => st.language) === 'en' ? 'en-US' : 'de-DE'
+  const g = contextGauge(context)
+  const percent = Math.round(g.usedShare * 100)
+  const fmt = (n: number): string => Math.round(n).toLocaleString(locale)
+  // Was an der Zahl unsicher ist, steht dabei — sonst täuscht der Balken Genauigkeit vor.
+  const caveats = [
+    !context.measured ? t('aiBar.agent.context.estimated') : '',
+    context.source === 'assumed' ? t('aiBar.agent.context.windowAssumed') : '',
+    context.source === 'catalog' ? t('aiBar.agent.context.windowCatalog') : ''
+  ].filter(Boolean).join(' · ')
+  const label = `${t('aiBar.agent.context.label')}: ${fmt(context.used)} / ${fmt(context.window)} Token (${percent} %)`
+  return (
+    <div className={`ai-bar-agent-context ai-bar-agent-context-${g.level}`}>
+      <div className="ai-bar-agent-context-head">
+        <span>{label}</span>
+        {caveats && <span className="ai-bar-agent-context-caveat">{caveats}</span>}
+      </div>
+      <div
+        className="ai-bar-agent-context-track"
+        role="progressbar"
+        aria-label={t('aiBar.agent.context.label')}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+        title={t('aiBar.agent.context.reserveTitle')}
+      >
+        <div className="ai-bar-agent-context-used" style={{ width: `${g.usedShare * 100}%` }} />
+        <div className="ai-bar-agent-context-reserve" style={{ width: `${g.reserveShare * 100}%` }} />
+      </div>
+      {/* Zweite Grenze neben dem Platz: die Zahl der Modellaufrufe. Ohne sie endete ein Lauf
+          bei grünem Balken scheinbar grundlos (real, 11.11.2026). */}
+      {turns && (
+        <div className="ai-bar-agent-context-turns" title={t('aiBar.agent.context.turnsHint')}>
+          <span>{t('aiBar.agent.context.turns')} {turns.used} {t('aiBar.agent.context.turnsOf')} {turns.max}</span>
+          <div className="ai-bar-agent-context-dots" aria-hidden="true">
+            {Array.from({ length: turns.max }, (_, i) => (
+              <span key={i} className={i < turns.used ? 'ai-bar-agent-context-dot ai-bar-agent-context-dot-used' : 'ai-bar-agent-context-dot'} />
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={hitTurnLimit ? 'ai-bar-agent-context-note ai-bar-agent-context-note-limit' : 'ai-bar-agent-context-note'}>
+        {hitTurnLimit
+          ? t('aiBar.agent.context.ended.turnLimit')
+          : t(`aiBar.agent.context.${running ? 'running' : 'ended'}.${g.level}`)}
+      </div>
+    </div>
+  )
 }
 
 export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, onDismiss, onRemember, onContinue }: Props) {
@@ -212,6 +270,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
       {run.followUp && (
         <div className="ai-bar-agent-followup">{t('aiBar.agent.followUpLabel')}: {run.followUp}</div>
       )}
+      {run.context && <ContextMeter context={run.context} running={run.phase === 'running'} turns={run.turns} hitTurnLimit={run.phase !== 'running' && run.hitMaxIterations} />}
       {run.steps.length > 0 && (
         <div className="ai-bar-agent-steps">
           {run.steps.map(s => (
