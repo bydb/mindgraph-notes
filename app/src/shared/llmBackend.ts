@@ -190,3 +190,39 @@ export function cloudRoutesForFeature(
   }
   return routes
 }
+
+/**
+ * Welcher Cloud-Weg gilt, solange der Nutzer in einem Tab noch nichts gewählt hat?
+ *
+ * Bis 13.11.2026 gab es darauf keine Antwort: Chat, Agent und Macher-Leiste starteten immer
+ * lokal. Wer keinen Rechner für lokale Modelle hat und einen Anbieter eingerichtet hatte,
+ * sah trotzdem in jedem neuen Tab „kein Modell“ und musste den Anbieter jedes Mal von Hand
+ * wählen.
+ *
+ * Reihenfolge:
+ *   1. Hat der Nutzer im Tab ein lokales Modell gewählt (`localChosen`), bleibt es lokal.
+ *   2. Der in den Einstellungen gesetzte Standardweg (`preferred`), sofern die Funktion
+ *      bei diesem Anbieter freigegeben ist.
+ *   3. Gibt es gar kein lokales Modell, der erste freigegebene Anbieter — sonst wäre die
+ *      Funktion ohne Not tot.
+ *
+ * Die Freigabe je Funktion bleibt die Grenze: `routes` enthält nur, was freigegeben ist.
+ */
+export function defaultCloudRoute(
+  routes: CloudFeatureRoute[],
+  opts: { preferred?: CloudProviderId | null; localChosen: boolean; hasLocalModel: boolean }
+): CloudFeatureRoute | null {
+  if (opts.localChosen) return null
+  const preferred = opts.preferred ? routes.find(r => r.provider === opts.preferred) : undefined
+  if (preferred) return preferred
+  return opts.hasLocalModel ? null : (routes[0] ?? null)
+}
+
+/** Ist `feature` überhaupt nutzbar — lokal über das Standardmodell oder über einen freigegebenen Anbieter? */
+export function hasAiRouteFor(
+  feature: CloudFeatureId,
+  llm: { enabled?: boolean; selectedModel?: string; openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings }
+): boolean {
+  if (!llm.enabled) return false
+  return !!llm.selectedModel?.trim() || cloudRoutesForFeature(feature, llm).length > 0
+}

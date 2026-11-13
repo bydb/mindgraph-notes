@@ -17,6 +17,7 @@ import {
   type CloudProviderSettings
 } from '../../../shared/llmBackend'
 import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
+import { isFreeCloudModel } from '../../../shared/cloudOnboarding'
 import { useTranslation } from '../../utils/translations'
 import openrouterLogo from '../../assets/model-vendors/openrouter.svg'
 import llmbaseLogo from '../../assets/model-vendors/llmbase.svg'
@@ -41,7 +42,8 @@ const FEATURE_LABELS: Record<CloudFeatureId, { de: string; en: string }> = {
 type ProviderId = 'openrouter' | 'llmbase'
 type ModelEntry = { id: string; name: string; promptPrice?: string; pricing?: ModelPricing }
 
-const PROVIDERS: Record<ProviderId, {
+// Auch von der geführten Einrichtung genutzt (Onboarding/CloudSetup.tsx) — eine Quelle für IPC und Logos.
+export const PROVIDERS: Record<ProviderId, {
   name: string
   logo: string
   keysUrl: string
@@ -110,8 +112,7 @@ export function CloudProviderSection({ provider }: { provider: ProviderId }) {
 
   const patch = (next: Partial<CloudProviderSettings>) => setOllama({ [provider]: { ...settings, ...next } })
 
-  const isFreeModel = (m: ModelEntry) =>
-    /:free$/i.test(m.id) || m.promptPrice === '0' || (m.promptPrice != null && parseFloat(m.promptPrice) === 0)
+  const isFreeModel = isFreeCloudModel
   const freeModels = meta.freeTier ? models.filter(isFreeModel) : []
   const paidModels = meta.freeTier ? models.filter(m => !isFreeModel(m)) : models
   const priceLabels = en ? EN_PRICE_LABELS : DE_PRICE_LABELS
@@ -244,6 +245,14 @@ export function CloudProviderSection({ provider }: { provider: ProviderId }) {
             </Button>
           </Row>
           {testResult && <Note tone={testResult.ok ? 'ok' : 'danger'}>{testResult.msg}</Note>}
+          <Row label={t('cloudSetup.defaultRoute')} hint={t('cloudSetup.defaultRouteHint', { provider: meta.name })} htmlFor={`${provider}-default-route`} disabled={featuresLocked}>
+            <Toggle
+              id={`${provider}-default-route`}
+              checked={ollama.defaultCloudProvider === provider}
+              disabled={featuresLocked}
+              onChange={v => setOllama({ defaultCloudProvider: v ? provider : null })}
+            />
+          </Row>
           <Row label={t('settings.cloud.features')} hint={t('settings.cloud.featuresHint')} />
           {CLOUD_CAPABLE_FEATURES.map(f => (
             <Row key={f} label={en ? FEATURE_LABELS[f].en : FEATURE_LABELS[f].de} htmlFor={`${provider}-feature-${f}`} disabled={featuresLocked}>

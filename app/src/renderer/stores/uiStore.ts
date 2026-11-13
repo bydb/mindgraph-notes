@@ -277,6 +277,10 @@ interface LLMSettings {
   openrouter: CloudProviderSettings
   // LLMBase (llmbase.ai) — europäischer Anbieter, DSGVO-Positionierung. Verarbeitungsregion modellabhängig.
   llmbase: CloudProviderSettings
+  // Standardweg für neue Chats, Aufträge und die Macher-Leiste, solange im Tab nichts gewählt
+  // ist (shared/llmBackend.ts → defaultCloudRoute). null/fehlend = dieser Rechner. Gesetzt vom
+  // Anbieter-Weg im Onboarding und vom Schalter auf der Anbieter-Karte.
+  defaultCloudProvider?: 'openrouter' | 'llmbase' | null
 }
 
 // Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
@@ -853,6 +857,9 @@ interface UIState {
   // Onboarding
   onboardingCompleted: boolean
   onboardingOpen: boolean
+  /** Geführte Anbieter-Einrichtung außerhalb des Onboardings (Chat/Agent ohne Modell). */
+  cloudSetupOpen: boolean
+  setCloudSetupOpen: (open: boolean) => void
   /** Transient (nicht persistiert): direkt nach Onboarding-Abschluss die Willkommen-Notiz öffnen */
   welcomeNotePending: boolean
   brainLensActive: boolean
@@ -1278,6 +1285,7 @@ const defaultState = {
   // Onboarding
   onboardingCompleted: false,
   onboardingOpen: false,
+  cloudSetupOpen: false,
   welcomeNotePending: false,
   brainLensActive: false,
   systemTotalRamGb: null,
@@ -1561,6 +1569,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   removeCustomLogo: () => set({ customLogo: null }),
   setOnboardingCompleted: (completed) => set({ onboardingCompleted: completed }),
   setOnboardingOpen: (open) => set({ onboardingOpen: open }),
+  setCloudSetupOpen: (open) => set({ cloudSetupOpen: open }),
   setWelcomeNotePending: (pending) => set({ welcomeNotePending: pending }),
   setBrainLensActive: (active) => set({ brainLensActive: active }),
   setSystemTotalRamGb: (gb) => set({ systemTotalRamGb: gb }),

@@ -1157,3 +1157,264 @@
   color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 8%, transparent);
 }
+
+/* ============ ANBIETER-EINRICHTUNG (KI-Schritt + Fenster „KI einrichten“) ============ */
+.cloud-setup {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 4px;
+}
+
+.cloud-setup-block {
+  padding: 12px 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.cloud-setup-block .onboarding-guide-label {
+  margin-bottom: 8px;
+}
+
+.cloud-setup-providers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.cloud-setup-provider {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.cloud-setup-provider:hover:not(:disabled) {
+  border-color: var(--accent-color);
+}
+
+.cloud-setup-provider.selected {
+  border-color: var(--accent-color);
+  background: var(--accent-subtle);
+}
+
+.cloud-setup-provider img {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.cloud-setup-provider-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.cloud-setup-provider-text strong {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.cloud-setup-help,
+.cloud-setup-note {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.cloud-setup-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cloud-setup-help.is-error,
+.cloud-setup-note.is-error {
+  color: var(--color-danger);
+}
+
+.cloud-setup-note.is-warn {
+  color: var(--warning, #d97706);
+}
+
+.cloud-setup-key-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.cloud-setup-key-row .onboarding-btn-secondary {
+  white-space: nowrap;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.cloud-setup-input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.cloud-setup-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.cloud-setup-link {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.cloud-setup-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.cloud-setup-check input {
+  margin-top: 2px;
+  accent-color: var(--accent-color);
+}
+
+.cloud-setup-consent {
+  margin-top: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+
+.cloud-setup-consent-sub {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.cloud-setup-error-detail {
+  margin: 4px 0;
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.cloud-setup .onboarding-error {
+  margin-bottom: 0;
+}
+
+.cloud-setup-submit {
+  align-self: flex-start;
+}
+
+.cloud-setup-done {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--accent-color);
+  border-radius: var(--radius-md);
+  background: var(--accent-subtle);
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.cloud-setup-done svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-color);
+}
+
+.cloud-setup-done div {
+  flex: 1;
+}
+
+.cloud-setup-done p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.cloud-setup-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg-primary) 35%, rgba(0, 0, 0, 0.55));
+}
+
+.cloud-setup-dialog {
+  width: 100%;
+  max-width: 540px;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 28px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.cloud-setup-dialog .onboarding-step-desc {
+  margin-bottom: 16px;
+}
+
+/* Der KI-Schritt wird mit der Anbieter-Einrichtung höher als das Fenster — dann scrollt er. */
+.onboarding-overlay:has(.onboarding-ai-step) {
+  align-items: flex-start;
+  overflow-y: auto;
+}
+
+.onboarding-ai-step .onboarding-intent-grid {
+  margin-bottom: 16px;
+}
+
+.onboarding-ai-step .onboarding-step-desc {
+  margin-bottom: 16px;
+}
+
+/* Einrichtung direkt im Agent-Tab, solange es keinen Weg zur KI gibt. */
+.agent-view-setup {
+  width: 100%;
+  max-width: 540px;
+  margin: 32px auto;
+}
+
+.agent-view-setup .onboarding-step-desc {
+  margin-bottom: 16px;
+}
+
+.agent-view-setup-alt {
+  margin: 16px 0 0;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}

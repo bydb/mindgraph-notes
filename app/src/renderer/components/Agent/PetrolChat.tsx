@@ -25,7 +25,7 @@ import { sanitizeHtml } from '../../utils/sanitize'
 import { writeClipboardText } from '../../utils/clipboard'
 import { reserveFreeNoteName } from '../../utils/noteFileName'
 import { ModelPicker } from '../Shared/ModelPicker'
-import { cloudRoutesForFeature, cloudProviderForSentinel } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature, cloudProviderForSentinel, defaultCloudRoute } from '../../../shared/llmBackend'
 import { setAiProvenanceInContent } from '../../../shared/aiProvenance'
 import { VAULT_CHAT_ANSWER_TYPE } from '../../../shared/rag/indexPolicy'
 import type { AgentRoute } from '../../../shared/agentRoute'
@@ -252,8 +252,12 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   }, [ollama.enabled, ollama.backend, ollama.lmStudioPort])
 
   const cloudRoutes = useMemo(() => cloudRoutesForFeature('notes-chat', ollama), [ollama])
-  const activeCloudRoute = scope?.cloudProvider ? (cloudRoutes.find(r => r.provider === scope.cloudProvider) ?? null) : null
   const model = localModel || ollama.selectedModel || ''
+  // Im Tab gewählter Anbieter gewinnt; sonst der Standardweg (Einstellung, oder der einzige
+  // Weg, wenn es kein lokales Modell gibt). Eine lokale Wahl im Tab bleibt lokal.
+  const chosenCloudRoute = scope?.cloudProvider ? (cloudRoutes.find(r => r.provider === scope.cloudProvider) ?? null) : null
+  const activeCloudRoute = chosenCloudRoute
+    ?? defaultCloudRoute(cloudRoutes, { preferred: ollama.defaultCloudProvider, localChosen: !!localModel, hasLocalModel: !!model })
   const pickerValue = activeCloudRoute ? activeCloudRoute.sentinel : model
   const hasModel = !!activeCloudRoute || !!model
 
@@ -1191,7 +1195,14 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           </div>
         )}
         {saveError && <div className="petrol-chat-note is-error">{saveError}</div>}
-        {!hasModel && <div className="petrol-chat-note">{t('petrolChat.noModel')}</div>}
+        {!hasModel && (
+          <div className="petrol-chat-note">
+            {t('petrolChat.noModel')}{' '}
+            <button type="button" className="agent-card-link-btn is-strong" onClick={() => useUIStore.getState().setCloudSetupOpen(true)}>
+              {t('cloudSetup.entry')}
+            </button>
+          </div>
+        )}
         {busyElsewhere && <div className="petrol-chat-note">{t('petrolChat.busyElsewhere')}</div>}
       </div>
 

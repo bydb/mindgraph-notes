@@ -11,6 +11,7 @@ import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge } from './ModelCompatibilitySection'
 import { OpenRouterSection } from './OpenRouterSection'
+import { hasAiRouteFor } from '../../../shared/llmBackend'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
 import { WebFetchStatsSection } from './WebFetchStatsSection'
@@ -1877,7 +1878,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                     </Card>
                   )}
 
-                  {flashcardsEnabled && (!ollama.enabled || !ollama.selectedModel) && (
+                  {flashcardsEnabled && !hasAiRouteFor('quiz', ollama) && (
                     <Card>
                       <Note tone="warn">{t('settings.integrations.flashcardsOllamaWarning')}</Note>
                     </Card>

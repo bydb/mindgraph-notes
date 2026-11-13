@@ -4,6 +4,7 @@ import * as helpGuideI18n from './i18n/helpGuide'
 import * as agentCardI18n from './i18n/agentCard'
 import * as petrolChatI18n from './i18n/petrolChat'
 import * as workFocusI18n from './i18n/workFocus'
+import * as cloudSetupI18n from './i18n/cloudSetup'
 
 type TranslationKey = keyof typeof translations.de
 
@@ -14,6 +15,7 @@ const translations = {
     ...agentCardI18n.de,
     ...petrolChatI18n.de,
     ...workFocusI18n.de,
+    ...cloudSetupI18n.de,
     // ── Einstellungen · Redesign 09/2026: geteilte Bausteine, Integrationen, KI-Tab, Modul-Tab ──
     'settings.ui.saved': 'Gespeichert',
     'settings.ui.remove': 'Entfernen',
@@ -1733,7 +1735,7 @@ const translations = {
     'settings.integrations.notesChatHint': 'Stelle Fragen an deine Notizen',
     'settings.integrations.flashcards': 'Karteikarten aktivieren',
     'settings.integrations.flashcardsHint': 'Quiz & Spaced Repetition System',
-    'settings.integrations.flashcardsOllamaWarning': 'Für die Quiz-Generierung muss Ollama aktiviert und ein Modell ausgewählt sein (siehe KI-Einstellungen oben).',
+    'settings.integrations.flashcardsOllamaWarning': 'Für die Quiz-Generierung muss die KI eingeschaltet sein und entweder ein lokales Modell gewählt oder ein Anbieter für Karteikarten freigegeben sein (siehe KI-Einstellungen oben).',
     'settings.integrations.zotero': 'Zotero / Better BibTeX',
     'settings.integrations.zoteroDesc': 'Um Zotero zu nutzen, muss Zotero mit dem Better BibTeX Plugin laufen.',
     'settings.integrations.zoteroShortcut': 'Öffne die Zotero-Suche mit',
@@ -3481,6 +3483,7 @@ const translations = {
     ...agentCardI18n.en,
     ...petrolChatI18n.en,
     ...workFocusI18n.en,
+    ...cloudSetupI18n.en,
     // ── Settings · Redesign 09/2026: shared building blocks, integrations, AI tab, modules tab ──
     'settings.ui.saved': 'Saved',
     'settings.ui.remove': 'Remove',
@@ -5201,7 +5204,7 @@ const translations = {
     'settings.integrations.notesChatHint': 'Ask questions about your notes',
     'settings.integrations.flashcards': 'Enable Flashcards',
     'settings.integrations.flashcardsHint': 'Quiz & Spaced Repetition System',
-    'settings.integrations.flashcardsOllamaWarning': 'For quiz generation, Ollama must be enabled and a model selected (see AI settings above).',
+    'settings.integrations.flashcardsOllamaWarning': 'Quiz generation needs AI turned on and either a local model selected or a provider enabled for flashcards (see AI settings above).',
     'settings.integrations.zotero': 'Zotero / Better BibTeX',
     'settings.integrations.zoteroDesc': 'To use Zotero, Zotero must be running with the Better BibTeX plugin.',
     'settings.integrations.zoteroShortcut': 'Open Zotero search with',

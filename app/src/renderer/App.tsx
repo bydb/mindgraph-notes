@@ -31,6 +31,7 @@ import { TemplateSettings } from './components/TemplatePicker/TemplateSettings'
 import { Settings } from './components/Settings/Settings'
 import { WhatsNew } from './components/WhatsNew/WhatsNew'
 import { Onboarding } from './components/Onboarding/Onboarding'
+import { CloudSetupModal } from './components/Onboarding/CloudSetupModal'
 import { HelpGuide } from './components/Onboarding/HelpGuide'
 import { UpdateNotification } from './components/UpdateNotification/UpdateNotification'
 import { VoiceStatusToast } from './components/Voice/VoiceStatusToast'
@@ -1928,6 +1929,7 @@ const App: React.FC = () => {
 
       {/* Onboarding (Fullscreen Overlay beim ersten Start) */}
       <Onboarding />
+      <CloudSetupModal />
       {/* Help Guide (jederzeit aufrufbar) */}
       <HelpGuide />
 

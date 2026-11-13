@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import type { FileEntry } from '../../../shared/types'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
+import { hasAiRouteFor } from '../../../shared/llmBackend'
 import { useGraphStore } from '../../stores/graphStore'
 import { useTabStore } from '../../stores/tabStore'
 import { useNoteAgentStore } from '../../stores/noteAgentStore'
@@ -1568,7 +1569,7 @@ const FileItem: React.FC<FileItemProps> = ({
                 {t('fileTree.stripWikilinks')}
               </button>
               {/* Quiz für Ordner - nur wenn Flashcards und Ollama aktiviert */}
-              {flashcardsEnabled && ollama.enabled && ollama.selectedModel && (
+              {flashcardsEnabled && hasAiRouteFor('quiz', ollama) && (
                 <>
                   <div className="context-menu-divider" />
                   <div className="context-menu-item with-submenu">
@@ -1629,7 +1630,7 @@ const FileItem: React.FC<FileItemProps> = ({
                     </div>
                   </div>
                   {/* Quiz für Datei - nur wenn Flashcards und Ollama aktiviert */}
-                  {flashcardsEnabled && ollama.enabled && ollama.selectedModel && (
+                  {flashcardsEnabled && hasAiRouteFor('quiz', ollama) && (
                     <div className="context-menu-item with-submenu">
                       <span>{t('quiz.startQuiz')}</span>
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1073,6 +1073,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     [noteEditRoutes, agentRoutes]
   )
   const defaultAiCloudProvider = cloudPickerRoutes[0]?.provider ?? null
+  // KI nutzbar: lokales Standardmodell ODER ein freigegebener Anbieter. Vorher zählte nur das
+  // lokale Modell — wer allein über einen Anbieter arbeitet, bekam weder Leiste noch Menü.
+  const aiUsable = ollama.enabled && (!!ollama.selectedModel || cloudPickerRoutes.length > 0)
   const [aiCloudProvider, setAiCloudProvider] = useState<CloudProviderId | null>(null)
   useEffect(() => { setAiCloudProvider(defaultAiCloudProvider) }, [defaultAiCloudProvider])
   const activeAiCloudRoute = aiCloudProvider
@@ -4737,7 +4740,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const selectedText = view.state.doc.sliceString(from, to)
 
     // Alt+Rechtsklick mit Text selektiert und Ollama verfügbar: direkt AI-Menü
-    if (e.altKey && selectedText.length > 0 && ollama.enabled && ollama.selectedModel) {
+    if (e.altKey && selectedText.length > 0 && aiUsable) {
       setAiMenu({
         x: e.clientX,
         y: e.clientY,
@@ -4750,12 +4753,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
 
     // Normaler Rechtsklick: Format-Menü (mit optionalem KI-Eintrag, wenn Text selektiert + Ollama aktiv)
-    const aiInfo = selectedText.length > 0 && ollama.enabled && ollama.selectedModel
+    const aiInfo = selectedText.length > 0 && aiUsable
       ? { selectedText, selectionStart: from, selectionEnd: to }
       : undefined
     setFormatMenu({ x: e.clientX, y: e.clientY, ai: aiInfo })
     setAiMenu(null)
-  }, [viewMode, ollama.enabled, ollama.selectedModel])
+  }, [viewMode, ollama.enabled, ollama.selectedModel, aiUsable])
 
   // Tastenkombinationen: Cmd+Shift+F = Format-Menü, Cmd+Shift+A = KI-Leiste, Cmd+Shift+I = Bild
   useEffect(() => {
@@ -4782,7 +4785,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       if (key === 'a') {
         // Ohne verfügbare KI gibt es nichts zu öffnen — dann das Kürzel NICHT schlucken,
         // sonst verschwindet es wirkungslos (z.B. Select-all in einem fremden Kontext).
-        if (!ollama.enabled || !ollama.selectedModel) return
+        if (!aiUsable) return
         e.preventDefault()
         setAiBarOpen(true)
         setFormatMenu(null)
@@ -4815,7 +4818,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [viewMode, ollama.enabled, ollama.selectedModel])
+  }, [viewMode, ollama.enabled, ollama.selectedModel, aiUsable])
 
   // Refresh editor when switching to edit or live-preview mode
   useEffect(() => {

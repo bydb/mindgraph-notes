@@ -30,7 +30,9 @@ import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
 import { measurePlacement, type PickerLayout } from '../../utils/pickerPlacement'
 import { useIsModuleEnabled, isModuleAvailable } from '../../utils/modules'
 import { useNoteAgentStore, EMPTY_AGENT_SCOPE, type AgentExampleNeed } from '../../stores/noteAgentStore'
-import { cloudRoutesForFeature, cloudProviderForSentinel, CLOUD_PROVIDER_META, type CloudProviderId } from '../../../shared/llmBackend'
+import { cloudRoutesForFeature, cloudProviderForSentinel, defaultCloudRoute, hasAiRouteFor, CLOUD_PROVIDER_META, type CloudProviderId } from '../../../shared/llmBackend'
+import { CloudSetup } from '../Onboarding/CloudSetup'
+import '../Onboarding/Onboarding.css'
 import { isCloudModel } from '../../../shared/modelCompatibility'
 import { WEB_SEARCH_PROVIDER_META, isWebResearchConfigComplete } from '../../../shared/webResearch'
 import { DEFAULT_COMPUTER_CONTROL, activeComputerVerbs, computerVerbLabel } from '../../../shared/computerControl'
@@ -202,11 +204,18 @@ export function AgentView({ tabId }: Props) {
   const agentRoutes = useMemo(() => cloudRoutesForFeature('note-agent', ollama), [ollama])
   const cloudProvider = prefs.cloudProvider ?? null
   const setCloudProvider = (v: CloudProviderId | null) => setPrefs({ cloudProvider: v })
-  const activeCloudRoute = cloudProvider ? (agentRoutes.find(r => r.provider === cloudProvider) ?? null) : null
-
   // Modell-Präzedenz wie in der Macher-Leiste (CLAUDE.md): Auswahl im Tab →
   // Modul-Override → globales Modell.
   const effectiveModel = localModel || ollama.moduleModelOverrides?.['note-agent'] || ollama.selectedModel
+  // Im Tab gewählter Anbieter gewinnt; sonst der Standardweg. `cloudProvider === null` heißt
+  // „im Tab ausdrücklich lokal gewählt“ (Picker, „Lokales Modell wählen“), `undefined` heißt
+  // „noch nichts gewählt“ — nur dann greift der Standardweg (Codex F04 bleibt gewahrt).
+  const chosenCloudRoute = cloudProvider ? (agentRoutes.find(r => r.provider === cloudProvider) ?? null) : null
+  const activeCloudRoute = chosenCloudRoute ?? defaultCloudRoute(agentRoutes, {
+    preferred: ollama.defaultCloudProvider,
+    localChosen: prefs.cloudProvider === null || !!localModel,
+    hasLocalModel: !!effectiveModel?.trim()
+  })
   const pickerValue = activeCloudRoute ? activeCloudRoute.sentinel : effectiveModel
   // Ollama-Modelle mit Cloud-Anteil (`…:cloud`) erkennt die App nur am Namen — sie
   // bekommen das Cloud-Etikett, nicht das Rechner-Etikett.
@@ -557,17 +566,27 @@ export function AgentView({ tabId }: Props) {
     if (!currentUsable && firstLocal) setLocalModel(firstLocal.name)
   }
 
-  if (!ollama.enabled) {
+  // Noch gar kein Weg zur KI: ausgeschaltet, oder eingeschaltet ohne lokales Modell und ohne
+  // freigegebenen Anbieter. Dann steht die Einrichtung direkt hier, wo der Nutzer arbeiten
+  // wollte — nicht hinter einem Knopf (Nutzerwunsch 13.11.2026). Nach bestandener Einrichtung
+  // ändert sich der Store, und der Tab zeigt von selbst Chat und Auftrag.
+  // Bei eingeschalteter KI erst urteilen, wenn die lokale Modellliste da ist (kein Aufblitzen).
+  const noAiRoute = !hasAiRouteFor('note-agent', ollama) && !hasAiRouteFor('notes-chat', ollama)
+  const needsAiSetup = !ollama.enabled || (noAiRoute && (modelsLoaded || modelsFailed) && models.length === 0)
+  if (needsAiSetup) {
     return (
       <div className="agent-view">
         <div className="agent-view-inner">
-          <div className="agent-view-empty">
-            {t('agentTab.aiDisabled')}
-            <div>
-              <button type="button" className="agent-card-btn" onClick={() => openSettingsAt('ai', 'ai-backend')}>
-                {t('agentCard.setupAi')}
+          <div className="agent-view-setup">
+            <h2 className="onboarding-step-title">{t('cloudSetup.inlineTitle')}</h2>
+            <p className="onboarding-step-desc">{t('cloudSetup.inlineIntro')}</p>
+            <CloudSetup />
+            <p className="agent-view-setup-alt">
+              {t('cloudSetup.localInstead')}{' '}
+              <button type="button" className="cloud-setup-link" onClick={() => openSettingsAt('ai', 'ai-backend')}>
+                {t('cloudSetup.localInsteadLink')}
               </button>
-            </div>
+            </p>
           </div>
         </div>
       </div>
@@ -919,6 +938,9 @@ export function AgentView({ tabId }: Props) {
                   <span className="agent-card-missing-title">{t('agentCard.modelMissing')}</span>
                   <button type="button" className="agent-card-link-btn is-strong" onClick={() => openSettingsAt('ai', 'ai-default-model')}>
                     {t('agentCard.setupAi')}
+                  </button>
+                  <button type="button" className="agent-card-link-btn is-strong" onClick={() => useUIStore.getState().setCloudSetupOpen(true)}>
+                    {t('cloudSetup.entry')}
                   </button>
                 </span>
               )}

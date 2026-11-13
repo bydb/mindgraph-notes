@@ -1,10 +1,28 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from '../../../utils/translations'
 import { useUIStore } from '../../../stores/uiStore'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../../shared/modelCompatibility'
 import { StepIndicator } from './StepIndicator'
 import { AgentFocusHint } from './AgentFocusHint'
 import { chatModelsOnly } from '../../../../shared/chatModels'
+import { isCloudProviderReady } from '../../../../shared/llmBackend'
+import { shouldSuggestCloud } from '../../../../shared/cloudOnboarding'
+import { CloudSetup } from '../CloudSetup'
+
+type AIPath = 'local' | 'cloud'
+
+const PATH_ICONS: Record<AIPath, React.ReactNode> = {
+  local: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="12" rx="2" /><path d="M2 20h20" /><path d="M9 16v4" /><path d="M15 16v4" />
+    </svg>
+  ),
+  cloud: (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+    </svg>
+  )
+}
 
 interface AIStepProps {
   onBack: () => void
@@ -50,6 +68,15 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
   const [ollamaModels, setOllamaModels] = useState<string[]>([])
   const [checking, setChecking] = useState(true)
 
+  // Weiche: dieser Rechner oder ein Anbieter im Netz. Vorauswahl erst, wenn die Prüfung der
+  // lokalen Programme durch ist; eine Wahl des Nutzers wird danach nie überschrieben.
+  const ramGb = useUIStore(s => s.systemTotalRamGb)
+  const [path, setPath] = useState<AIPath>('local')
+  const pathTouched = useRef(false)
+  const cloudReady = isCloudProviderReady(ollama.openrouter) || isCloudProviderReady(ollama.llmbase)
+  const [cloudDone, setCloudDone] = useState(false)
+  const [suggestedByRam, setSuggestedByRam] = useState(false)
+
   const [pullModelName, setPullModelName] = useState('qwen3.5:4b')
   const [isPulling, setIsPulling] = useState(false)
   const [pullProgress, setPullProgress] = useState<{ status: string; completed?: number; total?: number } | null>(null)
@@ -61,6 +88,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
 
   const checkConnections = async () => {
     setChecking(true)
+    let hasLocalModel = false
     try {
       try {
         const result = await window.electronAPI.ollamaCheck()
@@ -70,6 +98,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
           // Embedding-Modell sein, das beim ersten Chat mit „400“ scheitert.
           const models = chatModelsOnly(await window.electronAPI.ollamaModels())
           if (models.length > 0) {
+            hasLocalModel = true
             setOllamaModels(models.map(m => m.name))
             if (!ollama.selectedModel) {
               setOllama({ selectedModel: models[0].name, enabled: true, backend: 'ollama' })
@@ -88,11 +117,23 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
       }
     } finally {
       setChecking(false)
+      if (!pathTouched.current) {
+        const byRam = shouldSuggestCloud(useUIStore.getState().systemTotalRamGb, hasLocalModel)
+        setSuggestedByRam(byRam)
+        // Schon eingerichteter Anbieter ohne lokales Modell: dort weitermachen.
+        if (byRam || (cloudReady && !hasLocalModel)) setPath('cloud')
+      }
     }
   }
 
+  const choosePath = (next: AIPath) => {
+    pathTouched.current = true
+    setPath(next)
+  }
+
   const handleSkip = () => {
-    setOllama({ enabled: false })
+    // Eine eben abgeschlossene Anbieter-Einrichtung wird durch „Später“ nicht wieder abgeschaltet.
+    if (!cloudDone) setOllama({ enabled: false })
     onNext()
   }
 
@@ -132,12 +173,38 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
   }
 
   return (
-    <div className="onboarding-step">
+    <div className="onboarding-step onboarding-ai-step">
       <StepIndicator current={stepNumber} total={totalSteps} />
 
       <h2 className="onboarding-step-title">{t('onboarding.aiFeatures.title')}</h2>
-      <p className="onboarding-step-desc">{t('onboarding.aiFeatures.subtitle')}</p>
+      <p className="onboarding-step-desc">{t('onboarding.aiPath.subtitle')}</p>
 
+      <div className="onboarding-guide-label">{t('onboarding.aiPath.label')}</div>
+      <div className="onboarding-intent-grid" role="radiogroup" aria-label={t('onboarding.aiPath.label')}>
+        {(['local', 'cloud'] as AIPath[]).map(id => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={path === id}
+            className={`onboarding-intent-card ${path === id ? 'selected' : ''}`}
+            onClick={() => choosePath(id)}
+          >
+            <div className="onboarding-intent-icon">{PATH_ICONS[id]}</div>
+            <div className="onboarding-intent-text">
+              <span className="onboarding-intent-title">{t(`onboarding.aiPath.${id}.title` as const)}</span>
+              <span className="onboarding-intent-badges">{t(`onboarding.aiPath.${id}.desc` as const)}</span>
+            </div>
+          </button>
+        ))}
+      </div>
+      {suggestedByRam && ramGb !== null && (
+        <div className="onboarding-ai-hint" role="note">{t('onboarding.aiPath.lowRam', { gb: Math.round(ramGb) })}</div>
+      )}
+
+      {path === 'cloud' && <CloudSetup onDone={() => setCloudDone(true)} />}
+
+      {path === 'local' && <>
       {/* Capability cards */}
       <div className="onboarding-capability-cards">
         {capabilities.map(({ id, icon }) => (
@@ -274,7 +341,9 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
         </div>
       )}
 
-      {showAgentHint && <AgentFocusHint />}
+      </>}
+
+      {showAgentHint && path === 'local' && <AgentFocusHint />}
 
       <div className="onboarding-nav">
         <button className="onboarding-btn-secondary" onClick={onBack}>
@@ -284,7 +353,8 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
           <button className="onboarding-btn-text" onClick={handleSkip}>
             {t('onboarding.aiFeatures.later')}
           </button>
-          <button className="onboarding-btn-primary" onClick={onNext}>
+          {/* Anbieter-Weg: weiter erst nach bestandener Einrichtung — „Später einrichten“ bleibt der Ausweg. */}
+          <button className="onboarding-btn-primary" onClick={onNext} disabled={path === 'cloud' && !cloudDone && !cloudReady}>
             {t('onboarding.next')}
           </button>
         </div>
