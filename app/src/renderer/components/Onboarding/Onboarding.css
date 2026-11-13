@@ -1479,3 +1479,17 @@
 .onboarding-ai-step > .web-setup {
   margin-bottom: 16px;
 }
+
+.web-setup-head.is-static {
+  cursor: default;
+}
+
+.web-setup-why {
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.web-setup.is-done .onboarding-guide-label {
+  margin: 1px 4px 0 0;
+  white-space: nowrap;
+}

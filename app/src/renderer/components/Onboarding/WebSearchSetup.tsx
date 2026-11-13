@@ -16,7 +16,12 @@ type Loaded = { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; h
 const isConfigured = (c: Loaded) =>
   c.provider === 'tavily' ? c.hasTavilyKey : c.provider === 'linkup' ? c.hasLinkupKey : !!c.searxngUrl.trim()
 
-export const WebSearchSetup: React.FC = () => {
+export const WebSearchSetup: React.FC<{
+  /** Aufgeklappt zeigen — dort, wo der Block der nächste Schritt ist. */
+  defaultOpen?: boolean
+  /** Als „4 · Websuche“ in der Anbieter-Einrichtung: immer offen, mit Begründung (Nutzerwunsch 13.11.2026). */
+  numbered?: boolean
+}> = ({ defaultOpen = false, numbered = false }) => {
   const { t, language } = useTranslation()
   const lang: 'de' | 'en' = language === 'en' ? 'en' : 'de'
   const moduleOn = useUIStore(s => s.webResearchEnabled)
@@ -25,7 +30,7 @@ export const WebSearchSetup: React.FC = () => {
   const meta = WEB_SEARCH_PROVIDER_META.tavily
 
   const [loaded, setLoaded] = useState<Loaded | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen || numbered)
   const [keyInput, setKeyInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -45,6 +50,7 @@ export const WebSearchSetup: React.FC = () => {
   if (ready && moduleOn) {
     return (
       <div className="cloud-setup-block web-setup is-done" role="status">
+        {numbered && <span className="onboarding-guide-label">{t('cloudSetup.step4')}</span>}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
         <span>{t('webSetup.done', { provider: WEB_SEARCH_PROVIDER_META[loaded.provider].label })}</span>
       </div>
@@ -55,7 +61,7 @@ export const WebSearchSetup: React.FC = () => {
   if (ready) {
     return (
       <div className="cloud-setup-block web-setup">
-        <div className="onboarding-guide-label">{t('webSetup.title')}</div>
+        <div className="onboarding-guide-label">{numbered ? t('cloudSetup.step4') : t('webSetup.title')}</div>
         <p className="cloud-setup-help">{t('webSetup.existing', { provider: WEB_SEARCH_PROVIDER_META[loaded.provider].label })}</p>
         <button type="button" className="onboarding-btn-secondary web-setup-btn" onClick={() => setModuleOn(true)}>{t('webSetup.turnOn')}</button>
       </div>
@@ -94,14 +100,22 @@ export const WebSearchSetup: React.FC = () => {
 
   return (
     <div className="cloud-setup-block web-setup">
-      <button type="button" className="web-setup-head" aria-expanded={open} onClick={() => setOpen(o => !o)}>
-        <span className="onboarding-guide-label">{t('webSetup.title')}</span>
-        <span className="web-setup-optional">{t('webSetup.optional')}</span>
-        <svg className={open ? 'is-open' : ''} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
-      </button>
+      {numbered ? (
+        <div className="web-setup-head is-static">
+          <span className="onboarding-guide-label">{t('cloudSetup.step4')}</span>
+          <span className="web-setup-optional">{t('webSetup.optional')}</span>
+        </div>
+      ) : (
+        <button type="button" className="web-setup-head" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+          <span className="onboarding-guide-label">{t('webSetup.title')}</span>
+          <span className="web-setup-optional">{t('webSetup.optional')}</span>
+          <svg className={open ? 'is-open' : ''} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9" /></svg>
+        </button>
+      )}
       {!open && <p className="cloud-setup-help">{t('webSetup.teaser')}</p>}
       {open && (
         <>
+          {numbered && <p className="cloud-setup-help web-setup-why">{t('webSetup.why')}</p>}
           <p className="cloud-setup-help">{t('webSetup.intro')}</p>
           <div className="cloud-setup-key-row">
             <button type="button" className="onboarding-btn-secondary" onClick={() => window.electronAPI.openExternal(meta.keysUrl)}>

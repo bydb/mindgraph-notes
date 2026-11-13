@@ -146,7 +146,8 @@ export const CloudSetup: React.FC<{
           </div>
           <button type="button" className="onboarding-btn-text" onClick={() => { setDone(null); setConsent(false) }}>{t('cloudSetup.change')}</button>
         </div>
-        <WebSearchSetup />
+        {/* Aufgeklappt: zugeklappt wurde der Block nach der Bestätigung übersehen (Nutzertest 13.11.2026). */}
+        <WebSearchSetup numbered />
       </div>
     )
   }
@@ -248,6 +249,9 @@ export const CloudSetup: React.FC<{
           </>
         )}
       </section>
+
+      {/* Vierter Schritt, freiwillig und unabhängig vom Knopf unten: eigene Prüfung, eigener Anbieter. */}
+      <WebSearchSetup numbered />
 
       <label className="cloud-setup-check cloud-setup-consent">
         <input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} disabled={busy} />
