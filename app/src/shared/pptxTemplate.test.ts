@@ -610,6 +610,7 @@ describe('MindGraph-Hausstil-Vorlage', () => {
     const info = await inspectPptxTemplate(tpl)
     expect(info.layouts.map(l => [l.name, l.kind])).toEqual([
       ['Titelfolie', 'title'],
+      ['Titelfolie mit Bild', 'title'],
       ['Titel und Inhalt', 'content'],
       ['Zwei Inhalte', 'two-content'],
       ['Abschnitt', 'section'],
@@ -619,10 +620,20 @@ describe('MindGraph-Hausstil-Vorlage', () => {
       ['Drei Karten', 'cards'],
       ['Vier Karten', 'cards'],
       ['Karten mit Kernaussage', 'cards'],
+      ['Vier Karten mit Kernaussage', 'cards'],
       ['Text mit Kernaussage', 'content'], // Kernaussage zählt nicht als Inhaltsfläche
       ['Drei Schritte', 'cards'],
       ['Vier Schritte', 'cards'],
-      ['Kennzahlen', 'cards']
+      ['Kennzahlen', 'cards'],
+      ['Drei Punkte', 'cards'],
+      ['Vier Punkte', 'cards'],
+      ['Fünf Punkte', 'cards'],
+      ['Vier Punkte mit Kernaussage', 'cards'],
+      ['Dokument und Erläuterung', 'two-content'],
+      ['Zeitleiste', 'title-only'],
+      ['Ablauf mit Schleife', 'title-only'],
+      ['Balkendiagramm', 'title-only'],
+      ['Balkendiagramm mit Text', 'content']
     ])
     expect(info.fields).toEqual(['ANLASS'])
     expect(describePptxTemplate(info)).toContain('Dachzeile, Titel, Inhalt')
@@ -651,7 +662,7 @@ describe('MindGraph-Hausstil-Vorlage', () => {
 
   it('Fußzeile ohne Anlass endet nicht auf einem Trennpunkt', async () => {
     const res = await buildPptxFromTemplate(await load(), { slides: [{ layout: 'Titel und Inhalt', title: 'T', body: '- x' }] })
-    const layout = await text(await open(res.bytes), 'ppt/slideLayouts/slideLayout2.xml')
+    const layout = await text(await open(res.bytes), 'ppt/slideLayouts/slideLayout3.xml')
     expect(layout).toContain('<a:t>MindGraph Notes</a:t>')
     expect(res.unfilled).toEqual(['ANLASS'])
   })
@@ -676,9 +687,9 @@ describe('MindGraph-Hausstil-Vorlage', () => {
   it('wählt ohne Layoutangabe das Karten-Layout mit passender Platzzahl', async () => {
     const tpl = await load()
     const four = await buildPptxFromTemplate(tpl, { slides: [{ title: 'Start' }, { title: 'T', items: [1, 2, 3, 4].map(n => ({ title: `K${n}` })) }] })
-    expect(await text(await open(four.bytes), 'ppt/slides/_rels/slide2.xml.rels')).toContain('slideLayout9.xml') // Vier Karten
+    expect(await text(await open(four.bytes), 'ppt/slides/_rels/slide2.xml.rels')).toContain('slideLayout10.xml') // Vier Karten
     const three = await buildPptxFromTemplate(tpl, { slides: [{ title: 'Start' }, { title: 'T', items: [1, 2, 3].map(n => ({ title: `K${n}` })), takeaway: 'Satz' }] })
-    expect(await text(await open(three.bytes), 'ppt/slides/_rels/slide2.xml.rels')).toContain('slideLayout10.xml') // Karten mit Kernaussage
+    expect(await text(await open(three.bytes), 'ppt/slides/_rels/slide2.xml.rels')).toContain('slideLayout11.xml') // Karten mit Kernaussage
   })
 
   it('lehnt Karten ohne Plätze, zu viele Karten und Kernaussage ohne Balken ab', async () => {
@@ -713,8 +724,9 @@ describe('MindGraph-Hausstil-Vorlage', () => {
     const tpl = await load()
     const pick = async (slide: Record<string, unknown>) =>
       (await text(await open((await buildPptxFromTemplate(tpl, { slides: [slide as never] })).bytes), 'ppt/slides/_rels/slide1.xml.rels')).match(/slideLayout(\d+)\.xml/)![1]
-    expect(await pick({ layout: 'cards', title: 'T', items: [1, 2, 3, 4].map(n => ({ title: `K${n}` })) })).toBe('9') // Vier Karten, nicht Vier Schritte
-    expect(await pick({ layout: 'cards', title: 'T', items: [1, 2, 3].map(n => ({ title: `K${n}` })), takeaway: 'Satz' })).toBe('10') // Karten mit Kernaussage
+    expect(await pick({ layout: 'cards', title: 'T', items: [1, 2, 3, 4].map(n => ({ title: `K${n}` })) })).toBe('10') // Vier Karten, nicht Vier Schritte oder Vier Punkte
+    expect(await pick({ layout: 'cards', title: 'T', items: [1, 2, 3].map(n => ({ title: `K${n}` })), takeaway: 'Satz' })).toBe('11') // Karten mit Kernaussage, nicht Kennzahlen oder Drei Schritte
+    expect(await pick({ layout: 'cards', title: 'T', items: [1, 2, 3, 4].map(n => ({ title: `K${n}` })), takeaway: 'Satz' })).toBe('12') // Vier Karten mit Kernaussage
   })
 
   it('highlight nur als true/false und höchstens einmal je Folie; Links in Karten werden geprüft', async () => {
@@ -726,5 +738,217 @@ describe('MindGraph-Hausstil-Vorlage', () => {
       sources: [{ title: 'Q', url: 'https://beispiel.de/q', fetchedAt: '2026-10-01' }]
     })
     expect(res.notes.join(' ')).toContain('https://fremd.example/karte')
+  })
+  it('Symbole: Kreis in der Akzentfarbe und Linienzeichnung je Karte; unbekannter Name wird gemeldet, nie leer', async () => {
+    const res = await buildPptxFromTemplate(await load(), {
+      slides: [{ layout: 'Drei Karten', title: 'T', items: [{ title: 'A', icon: 'lupe' }, { title: 'B', icon: 'Chat' }, { title: 'C', icon: 'einhorn' }] }]
+    })
+    expect(await checkPptxConsistency(res.bytes)).toEqual([])
+    const slide = await text(await open(res.bytes), 'ppt/slides/slide1.xml')
+    expect(slide.match(/name="Symbolkreis \d"/g)).toHaveLength(3)
+    expect(slide).toMatch(/name="Symbolkreis 1"[^]*?<a:prstGeom prst="ellipse">[^]*?<a:schemeClr val="accent1"\/>/)
+    expect(slide).toMatch(/name="Symbol lupe"[^]*?<a:custGeom>[^]*?<a:path w="2400" h="2400" fill="none">/)
+    expect(slide).toContain('name="Symbol sprechblase"') // „Chat" ist ein anderes Wort dafür
+    expect(slide).toContain('name="Symbolpunkt 3"')
+    expect(res.notes.join(' ')).toContain('Symbol "einhorn" gibt es nicht')
+    // Der Kreis liegt dort, wo das Layout „Symbol 1" hinlegt — die Form selbst bleibt im Layout unsichtbar.
+    const layout = await text(await open(res.bytes), 'ppt/slideLayouts/slideLayout9.xml')
+    const anchor = /name="Symbol 1"[^]*?<a:off x="(\d+)" y="(\d+)"\/>/.exec(layout)!
+    expect(slide).toContain(`<a:off x="${anchor[1]}" y="${anchor[2]}"/>`)
+    expect(layout).toMatch(/name="Symbol 1"[^]*?<a:noFill\/><a:ln><a:noFill\/><\/a:ln>/)
+  })
+
+  it('Symbole ohne Angabe: Punkt im Kreis; Layout ohne Symbolplätze lässt icon weg und sagt es', async () => {
+    const tpl = await load()
+    const plain = await buildPptxFromTemplate(tpl, { slides: [{ layout: 'Drei Karten', title: 'T', items: [{ title: 'A' }, { title: 'B' }, { title: 'C' }] }] })
+    expect((await text(await open(plain.bytes), 'ppt/slides/slide1.xml')).match(/name="Symbolpunkt \d"/g)).toHaveLength(3)
+    expect(plain.notes.join(' ')).not.toContain('Symbol')
+    const rows = await buildPptxFromTemplate(tpl, { slides: [{ layout: 'Drei Punkte', title: 'T', items: [{ title: 'A', icon: 'lupe' }, { title: 'B' }, { title: 'C' }] }] })
+    expect(await text(await open(rows.bytes), 'ppt/slides/slide1.xml')).not.toContain('custGeom')
+    expect(rows.notes.join(' ')).toContain('zeigt keine Symbole')
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ layout: 'Drei Karten', title: 'T', items: [{ title: 'A', icon: 7 as never }] }] })).rejects.toThrow(/"icon" muss Text sein/)
+  })
+
+  it('Abschnittsfolie trägt das Symbol der Folie im großen Kreis', async () => {
+    const tpl = await load()
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ layout: 'Abschnitt', kicker: 'Teil 1 · 20 Min.', title: 'Grundlagen', subtitle: 'Worum es geht', icon: 'Glühbirne' }, { layout: 'Titel und Inhalt', title: 'T', body: '- x', icon: 'lupe' }] })
+    expect(await checkPptxConsistency(res.bytes)).toEqual([])
+    const zip = await open(res.bytes)
+    expect(await text(zip, 'ppt/slides/slide1.xml')).toMatch(/name="Symbol gluehbirne"[^]*?<a:schemeClr val="bg1"\/>/)
+    expect(await text(zip, 'ppt/slides/slide2.xml')).not.toContain('custGeom')
+    expect(res.notes.join(' ')).toContain('keinen Platz für ein Symbol')
+    expect(describePptxTemplate(await inspectPptxTemplate(tpl))).toMatch(/"Abschnitt" — section — .*Symbol der Folie \(icon\)[^]*Symbole \(nur diese Namen\): .*lupe/)
+  })
+
+  it('Hinweisbalken: takeaway landet bei Schritten im hellen „Merksatz"', async () => {
+    const tpl = await load()
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ layout: 'Drei Schritte', title: 'T', items: [{ title: 'A' }, { title: 'B' }, { title: 'C' }], takeaway: 'Achtung: nur im Testvault.' }] })
+    expect(await text(await open(res.bytes), 'ppt/slides/slide1.xml')).toMatch(/name="Merksatz"[\s\S]*?<a:t>Achtung: nur im Testvault\.<\/a:t>/)
+    expect(describePptxTemplate(await inspectPptxTemplate(tpl))).toContain('Hinweisbalken (takeaway)')
+  })
+
+  it('Punktelisten verlangen die genaue Anzahl; die Tafel links nimmt die Kernaussage', async () => {
+    const tpl = await load()
+    const pts = (n: number) => Array.from({ length: n }, (_, k) => ({ title: `P${k + 1}`, text: 'kurz' }))
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ layout: 'Fünf Punkte', title: 'T', items: pts(4) }] })).rejects.toThrow(/fest 5 nummerierte Schritte/)
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ layout: 'Vier Punkte mit Kernaussage', title: 'T', items: pts(4), takeaway: 'Ein Satz.' }] })
+    expect(await checkPptxConsistency(res.bytes)).toEqual([])
+    expect(await text(await open(res.bytes), 'ppt/slides/slide1.xml')).toMatch(/name="Kernaussage"[\s\S]*?<a:t>Ein Satz\.<\/a:t>/)
+  })
+
+  it('erste Folie mit Bild nimmt von selbst die Titelfolie mit Bildhälfte, ohne Bild die schlichte', async () => {
+    const tpl = await load()
+    const layoutOf = async (bytes: Uint8Array) => (await text(await open(bytes), 'ppt/slides/_rels/slide1.xml.rels')).match(/slideLayout(\d+)\.xml/)![1]
+    const withImage = await buildPptxFromTemplate(tpl, { slides: [{ title: 'Start', subtitle: 'Anlass', image: 'foto.png' }], images: { 'foto.png': makePng(400, 300) } })
+    expect(await layoutOf(withImage.bytes)).toBe('2')
+    expect(await text(await open(withImage.bytes), 'ppt/slides/slide1.xml')).toMatch(/<p:pic>[^]*?<p:ph type="pic" idx="2"\/>/)
+    expect(await layoutOf((await buildPptxFromTemplate(tpl, { slides: [{ title: 'Start', subtitle: 'Anlass' }] })).bytes)).toBe('1')
+  })
+
+  it('Dokument und Erläuterung: body links im Blatt, body2 rechts', async () => {
+    const res = await buildPptxFromTemplate(await load(), { slides: [{ layout: 'Dokument und Erläuterung', title: 'T', body: 'name: Protokoll', body2: '- Erklärung' }] })
+    const slide = await text(await open(res.bytes), 'ppt/slides/slide1.xml')
+    expect(slide).toMatch(/name="Dokument"[\s\S]*?<a:t>name: Protokoll<\/a:t>/)
+    expect(slide).toMatch(/name="Erläuterung"[\s\S]*?<a:t>Erklärung<\/a:t>/)
+  })
+
+  it('Zeitleiste und Balkendiagramm: Layout findet sich von selbst, gezeichnet wird in die Fläche des Layouts', async () => {
+    const tpl = await load()
+    const blocks = [{ label: 'Einstieg', value: 10 }, { label: 'Werkstatt', value: 35, highlight: true }]
+    const bars = [{ label: 'klein', value: 3.4 }, { label: 'groß', value: 19, highlight: true }]
+    const res = await buildPptxFromTemplate(tpl, {
+      slides: [
+        { title: 'Ablauf', timeline: { blocks } },
+        { title: 'Zahlen', chart: { bars } },
+        { title: 'Zahlen mit Text', chart: { bars }, body: '- Erklärung' },
+        { title: 'Zahlen mit Satz', chart: { bars }, takeaway: 'Ein Satz.' }
+      ]
+    })
+    expect(await checkPptxConsistency(res.bytes)).toEqual([])
+    const zip = await open(res.bytes)
+    const layoutOf = async (n: number) => (await text(zip, `ppt/slides/_rels/slide${n}.xml.rels`)).match(/slideLayout(\d+)\.xml/)![1]
+    expect([await layoutOf(1), await layoutOf(2), await layoutOf(3), await layoutOf(4)]).toEqual(['22', '24', '25', '24'])
+    const s1 = await text(zip, 'ppt/slides/slide1.xml')
+    expect(s1).toContain('name="Zeitleiste Werkstatt"')
+    const ids = [...s1.matchAll(/<p:cNvPr id="(\d+)"/g)].map(m => m[1])
+    expect(new Set(ids).size).toBe(ids.length) // auch mit Fußzeile dahinter keine doppelte ID
+    expect(await text(zip, 'ppt/slides/slide3.xml')).toMatch(/name="Diagramm Balken 2"[^]*<a:t>Erklärung<\/a:t>|<a:t>Erklärung<\/a:t>[^]*name="Diagramm Balken 2"/)
+    expect(await text(zip, 'ppt/slides/slide4.xml')).toMatch(/name="Kernaussage"[\s\S]*?<a:t>Ein Satz\.<\/a:t>/)
+    expect(describePptxTemplate(await inspectPptxTemplate(tpl))).toMatch(/"Zeitleiste" — title-only — .*Zeitleiste \(timeline\)[^]*"Balkendiagramm" — title-only — .*Balkendiagramm \(chart\)/)
+  })
+
+  it('Grafik ohne passende Fläche wird abgelehnt, Grafik-Layouts werden ohne Grafik nie von selbst gewählt', async () => {
+    const tpl = await load()
+    const blocks = [{ label: 'A', value: 10 }]
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ layout: 'Titel und Inhalt', title: 'T', timeline: { blocks } }] })).rejects.toThrow(/keine Fläche für eine Zeitleiste/)
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ layout: 'Zeitleiste', title: 'T', chart: { bars: [{ label: 'a', value: 1 }, { label: 'b', value: 2 }] } }] })).rejects.toThrow(/keine Fläche für ein Balkendiagramm/)
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ title: 'T', timeline: { blocks: [{ label: 'A', value: 'lang' as never }] } }] })).rejects.toThrow(/Folie 1, Abschnitt 1: "value"/)
+    // Nur Titel bzw. Titel + Kernaussage: nie ein Layout mit leerer Grafikfläche.
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ title: 'Start' }, { title: 'Nur ein Titel', kicker: 'X' }, { title: 'Satz', takeaway: 'Ein Satz.' }] })
+    const zip = await open(res.bytes)
+    for (const n of [2, 3]) expect(Number((await text(zip, `ppt/slides/_rels/slide${n}.xml.rels`)).match(/slideLayout(\d+)\.xml/)![1])).toBeLessThan(22)
+  })
+
+  it('Schritte: Symbol nur, wenn eines genannt ist — dunkler Kreis neben der Ziffer, kein Ersatzpunkt', async () => {
+    const tpl = await load()
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ layout: 'Drei Schritte', title: 'T', items: [{ title: 'A', icon: 'auge' }, { title: 'B' }, { title: 'C', icon: 'einhorn' }] }] })
+    expect(await checkPptxConsistency(res.bytes)).toEqual([])
+    const slide = await text(await open(res.bytes), 'ppt/slides/slide1.xml')
+    expect(slide.match(/name="Symbolkreis \d"/g)).toEqual(['name="Symbolkreis 1"'])
+    expect(slide).toMatch(/name="Symbolkreis 1"[^]*?<a:schemeClr val="tx2"\/>/)
+    expect(slide).toContain('name="Symbol auge"')
+    expect(slide).not.toContain('Symbolpunkt')
+    expect(res.notes.join(' ')).toContain('Schritt 3: Symbol "einhorn" gibt es nicht — weggelassen')
+    expect(describePptxTemplate(await inspectPptxTemplate(tpl))).toMatch(/"Drei Schritte" — cards — .*Symbol je Schritt möglich/)
+  })
+
+  it('Ablauf mit Schleife: Layout findet sich von selbst, Hinweisbalken darunter, falsche Schleife wird abgelehnt', async () => {
+    const tpl = await load()
+    const steps = [{ label: 'Auftrag' }, { label: 'Überlegen', loop: true }, { label: 'Handeln', loop: true }, { label: 'Entwurf', text: 'liegt bereit' }]
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ title: 'Schleife', flow: { steps, loopLabel: 'wiederholt sich' }, takeaway: 'Die App führt aus.' }] })
+    expect(await checkPptxConsistency(res.bytes)).toEqual([])
+    const zip = await open(res.bytes)
+    expect((await text(zip, 'ppt/slides/_rels/slide1.xml.rels')).match(/slideLayout(\d+)\.xml/)![1]).toBe('23')
+    const slide = await text(zip, 'ppt/slides/slide1.xml')
+    expect(slide).toContain('name="Ablauf Rückpfeil Spitze"')
+    expect(slide).toMatch(/name="Ablauf Handeln"[^]*?<a:solidFill><a:schemeClr val="accent1"\/>/)
+    expect(slide).toMatch(/name="Merksatz"[\s\S]*?<a:t>Die App führt aus\.<\/a:t>/)
+    const ids = [...slide.matchAll(/<p:cNvPr id="(\d+)"/g)].map(m => m[1])
+    expect(new Set(ids).size).toBe(ids.length)
+    const broken = [{ label: 'A', loop: true }, { label: 'B' }, { label: 'C', loop: true }]
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ title: 'T', flow: { steps: broken } }] })).rejects.toThrow(/nebeneinander/)
+    await expect(buildPptxFromTemplate(tpl, { slides: [{ layout: 'Zeitleiste', title: 'T', flow: { steps } }] })).rejects.toThrow(/keine Fläche für einen Ablauf/)
+  })
+
+  it('F02: sichtbare oder beschriftete Formen namens „Diagramm"/„Symbol" sind Gestaltung, keine Plätze', async () => {
+    const zip = await open(await load())
+    const deco = (name: string, fill: string, textXml: string) =>
+      `<p:sp><p:nvSpPr><p:cNvPr id="90" name="${name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="6000000" y="2000000"/><a:ext cx="3000000" cy="2000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>${fill}</p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p>${textXml}</a:p></p:txBody></p:sp>`
+    const red = '<a:solidFill><a:srgbClr val="FF0000"/></a:solidFill><a:ln><a:noFill/></a:ln>'
+    const none = '<a:noFill/><a:ln><a:noFill/></a:ln>'
+    const add = async (n: number, xml: string) => zip.file(`ppt/slideLayouts/slideLayout${n}.xml`, (await text(zip, `ppt/slideLayouts/slideLayout${n}.xml`)).replace('</p:spTree>', `${xml}</p:spTree>`))
+    await add(3, deco('Diagramm', red, '')) // gefüllt
+    await add(4, deco('Zeitleiste', none, '<a:r><a:rPr lang="de-DE"/><a:t>Beschriftung</a:t></a:r>')) // unsichtbar, aber mit Text
+    await add(6, deco('Symbol', '<a:noFill/>', '')) // Linie nicht ausdrücklich aus → kann aus dem Stil kommen
+    const tpl = await zip.generateAsync({ type: 'uint8array' })
+    const info = await inspectPptxTemplate(tpl)
+    expect(info.layouts[2].areas).toBeUndefined()
+    expect(info.layouts[3].areas).toBeUndefined()
+    expect(info.layouts[5].iconAnchors).toBeUndefined()
+    // Das Layout bleibt in der Automatik: eine gewöhnliche Textfolie nimmt weiter „Titel und Inhalt".
+    const res = await buildPptxFromTemplate(tpl, { slides: [{ title: 'Start' }, { title: 'Text', body: '- Punkt' }] })
+    expect(await text(await open(res.bytes), 'ppt/slides/_rels/slide2.xml.rels')).toContain('slideLayout3.xml')
+  })
+
+  it('F03: eine zu kleine Fläche lehnt ab, statt über den Rand zu zeichnen', async () => {
+    const zip = await open(await load())
+    const p = 'ppt/slideLayouts/slideLayout22.xml'
+    zip.file(p, (await text(zip, p)).replace(/(<p:cNvPr id="\d+" name="Zeitleiste"\/>[^]*?<a:ext cx=")\d+(")/, `$1${4 * 914400}$2`))
+    const blocks = Array.from({ length: 8 }, (_, i) => ({ label: `B${i}`, value: 10 }))
+    await expect(buildPptxFromTemplate(await zip.generateAsync({ type: 'uint8array' }), { slides: [{ title: 'T', timeline: { blocks } }] })).rejects.toThrow(/Zeitleiste braucht mindestens 8,2 Zoll Breite, die Fläche hat 4,0/)
+  })
+
+  it('F06: fehlt nur einzelnen Karten der Symbolplatz, wird jedes verlorene Symbol gemeldet', async () => {
+    const zip = await open(await load())
+    const p = 'ppt/slideLayouts/slideLayout9.xml'
+    zip.file(p, (await text(zip, p)).replace('name="Symbol 2"', 'name="Zier 2"').replace('name="Symbol 3"', 'name="Zier 3"'))
+    const res = await buildPptxFromTemplate(await zip.generateAsync({ type: 'uint8array' }), { slides: [{ layout: 'Drei Karten', title: 'T', items: [{ title: 'A', icon: 'lupe' }, { title: 'B', icon: 'auge' }, { title: 'C', icon: 'buch' }] }] })
+    const lost = res.notes.filter(n => n.includes('keinen Symbolplatz'))
+    expect(lost).toHaveLength(2)
+    expect(lost[0]).toContain('Karte 2')
+    // Ohne jeden Symbolplatz bleibt es bei EINEM Hinweis je Folie — auch wenn erst die zweite Karte ein Symbol nennt.
+    const rows = await buildPptxFromTemplate(await load(), { slides: [{ layout: 'Drei Punkte', title: 'T', items: [{ title: 'A' }, { title: 'B', icon: 'lupe' }, { title: 'C', icon: 'auge' }] }] })
+    expect(rows.notes.filter(n => n.includes('zeigt keine Symbole'))).toHaveLength(1)
+  })
+
+  it('F01: überlaufender Zahlentext erreicht die Folie nicht', async () => {
+    await expect(buildPptxFromTemplate(await load(), { slides: [{ title: 'T', timeline: { blocks: [{ label: 'A', value: '9'.repeat(400) as never }] } }] })).rejects.toThrow(/Abschnitt 1: "value"/)
+  })
+
+  it('F08: eine Steuerform in einer Gruppe ist kein Platz — ihre Koordinaten gelten nur in der Gruppe', async () => {
+    const zip = await open(await load())
+    const sp = (name: string) => `<p:sp><p:nvSpPr><p:cNvPr id="91" name="${name}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3000000" cy="2000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr></p:sp>`
+    const grp = (inner: string) => `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="90" name="Gruppe"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="7315200" y="1828800"/><a:ext cx="3000000" cy="2000000"/><a:chOff x="0" y="0"/><a:chExt cx="3000000" cy="2000000"/></a:xfrm></p:grpSpPr>${inner}</p:grpSp>`
+    const add = async (n: number, xml: string) => zip.file(`ppt/slideLayouts/slideLayout${n}.xml`, (await text(zip, `ppt/slideLayouts/slideLayout${n}.xml`)).replace('</p:spTree>', `${xml}</p:spTree>`))
+    await add(3, grp(sp('Diagramm')))
+    await add(6, grp(grp(sp('Symbol')))) // auch verschachtelt
+    const info = await inspectPptxTemplate(await zip.generateAsync({ type: 'uint8array' }))
+    expect(info.layouts[2].areas).toBeUndefined()
+    expect(info.layouts[5].iconAnchors).toBeUndefined()
+    // Freie Steuerformen der mitgelieferten Vorlage bleiben erkannt.
+    expect(info.layouts[21].areas?.timeline).toBeDefined()
+    expect(info.layouts[8].iconAnchors).toHaveLength(3)
+    expect(info.layouts[4].iconAnchors?.[0].index).toBe(0)
+  })
+
+  it('F15: mehr Gruppen als die Sicherheitsgrenze — dann gibt es auf dem Layout keine Plätze statt falscher', async () => {
+    const zip = await open(await load())
+    const grp = (id: number, inner: string) => `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="${id}" name="G${id}"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/>${inner}</p:grpSp>`
+    const hidden = '<p:sp><p:nvSpPr><p:cNvPr id="9999" name="Diagramm"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="3000000" cy="2000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></p:spPr></p:sp>'
+    const many = Array.from({ length: 600 }, (_, i) => grp(1000 + i, '')).join('') + grp(2000, hidden)
+    const p = 'ppt/slideLayouts/slideLayout3.xml'
+    zip.file(p, (await text(zip, p)).replace('</p:spTree>', `${many}</p:spTree>`))
+    const info = await inspectPptxTemplate(await zip.generateAsync({ type: 'uint8array' }))
+    expect(info.layouts[2].areas).toBeUndefined()
   })
 })

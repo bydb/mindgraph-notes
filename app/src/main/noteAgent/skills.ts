@@ -1557,7 +1557,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'write_pptx',
     description:
-      `Erzeugt eine PowerPoint-Präsentation aus einer Vorlage des Nutzers: Master, Logo, Hintergründe, Schriften und Fußzeile kommen aus der Vorlage, du lieferst nur die Folien. Parameter: file_name (Endung .pptx), template (vault-relativer Pfad zur .pptx/.potx), slides (Liste, eine Folie je Eintrag: layout = Layoutname der Vorlage, "#n" (Nummer aus inspect_pptx_template) oder Art ${LAYOUT_KINDS.join('/')}, leer = automatisch; kicker = Dachzeile über dem Titel, 1–4 Wörter, nur wenn das Layout eine Dachzeile hat; title; subtitle; body = Text mit "- " für Aufzählung, zwei Leerzeichen Einzug je Unterebene, "1. " für Nummerierung, **fett**; body2 = zweite Spalte bei Layouts mit zwei Inhalten; image = Dateiname eines in DIESEM Lauf erzeugten Bildes oder vault-relativer Pfad zu PNG/JPEG; notes = Sprechernotizen; items = Karten, Schritte oder Kennzahlen für Layouts mit Plätzen „Karte n"/„Schritt n"/„Kennzahl n" — Liste mit title (bei Kennzahlen die Zahl, z. B. "78 %"), optional label (kleine Rubrik), text (1–2 kurze Sätze), highlight (true = eine Karte hervorheben); takeaway = ein Merksatz für Layouts mit „Kernaussage"). Optional fields ({NAME: "Text"} für {{NAME}} in der Vorlage, z. B. in der Fußzeile). Die Musterfolien der Vorlage werden ersetzt. Eine Kernaussage je Folie, höchstens etwa 6 kurze Punkte — zu volle Folien werden abgelehnt. Grenzen: ${PPTX_LIMITS.maxSlides} Folien, Titel ${PPTX_LIMITS.maxTitleChars} Zeichen, Notizen ${PPTX_LIMITS.maxNotesChars} Zeichen je Folie.`,
+      `Erzeugt eine PowerPoint-Präsentation aus einer Vorlage des Nutzers: Master, Logo, Hintergründe, Schriften und Fußzeile kommen aus der Vorlage, du lieferst nur die Folien. Parameter: file_name (Endung .pptx), template (vault-relativer Pfad zur .pptx/.potx), slides (Liste, eine Folie je Eintrag: layout = Layoutname der Vorlage, "#n" (Nummer aus inspect_pptx_template) oder Art ${LAYOUT_KINDS.join('/')}, leer = automatisch; kicker = Dachzeile über dem Titel, 1–4 Wörter, nur wenn das Layout eine Dachzeile hat; title; subtitle; body = Text mit "- " für Aufzählung, zwei Leerzeichen Einzug je Unterebene, "1. " für Nummerierung, **fett**; body2 = zweite Spalte bei Layouts mit zwei Inhalten; image = Dateiname eines in DIESEM Lauf erzeugten Bildes oder vault-relativer Pfad zu PNG/JPEG; notes = Sprechernotizen; items = Karten, Schritte oder Kennzahlen für Layouts mit Plätzen „Karte n"/„Schritt n"/„Kennzahl n" — Liste mit title (bei Kennzahlen die Zahl, z. B. "78 %"), optional label (kleine Rubrik), text (1–2 kurze Sätze), highlight (true = eine Karte hervorheben), icon (Symbolname aus inspect_pptx_template, nur bei Layouts mit „Symbol je Eintrag"); takeaway = ein Merksatz für Layouts mit „Kernaussage" oder „Hinweisbalken"; icon = Symbol der Folie, nur bei Layouts mit „Symbol der Folie"; timeline = Zeitleiste für Layouts mit „Zeitleiste": {unit: "Min.", blocks: [{label, value (Dauer als Zahl), row ("Teil 1", für mehrere Zeilen), highlight (true = Akzentfarbe), pause (true = gestrichelt)}], legend: {normal, highlight}}; chart = Balkendiagramm für Layouts mit „Balkendiagramm": {caption (was gemessen wird, mit Einheit), bars: [{label, value (Zahl), highlight}], note (Quelle)} — nur Zahlen aus Quelle oder Auftrag; flow = Ablauf mit Pfeilen für Layouts mit „Ablauf": {steps: [{label, text (eine kurze Zeile darunter), loop (true = Station gehört zur Schleife, die Schleifen-Stationen stehen nebeneinander und bekommen einen Rückpfeil)}], loopLabel (Beschriftung der Schleife)}). Optional fields ({NAME: "Text"} für {{NAME}} in der Vorlage, z. B. in der Fußzeile). Die Musterfolien der Vorlage werden ersetzt. Eine Kernaussage je Folie, höchstens etwa 6 kurze Punkte — zu volle Folien werden abgelehnt. Grenzen: ${PPTX_LIMITS.maxSlides} Folien, Titel ${PPTX_LIMITS.maxTitleChars} Zeichen, Notizen ${PPTX_LIMITS.maxNotesChars} Zeichen je Folie.`,
     parameters: {
       type: 'object',
       properties: {
@@ -1586,12 +1586,70 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
                     label: { type: 'string' },
                     title: { type: 'string' },
                     text: { type: 'string' },
-                    highlight: { type: 'boolean' }
+                    highlight: { type: 'boolean' },
+                    icon: { type: 'string', description: 'Symbolname (Liste aus inspect_pptx_template)' }
                   },
                   required: ['title']
                 }
               },
-              takeaway: { type: 'string', description: 'Merksatz im Kernaussage-Balken (nur Layouts mit Kernaussage)' }
+              takeaway: { type: 'string', description: 'Merksatz im Kernaussage- oder Hinweisbalken (nur Layouts mit einem solchen Balken)' },
+              icon: { type: 'string', description: 'Symbol der Folie (nur Layouts mit „Symbol der Folie", z. B. Abschnitt)' },
+              timeline: {
+                type: 'object',
+                description: 'Zeitleiste (nur Layouts mit „Zeitleiste"): Blöcke, deren Breite der Dauer entspricht',
+                properties: {
+                  unit: { type: 'string', description: 'Einheit hinter der Zahl, Standard "Min."' },
+                  blocks: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        label: { type: 'string' },
+                        value: { type: 'number', description: 'Dauer als Zahl' },
+                        row: { type: 'string', description: 'Zeile, z. B. "Teil 1" — gleiche Namen stehen in einer Zeile' },
+                        highlight: { type: 'boolean' },
+                        pause: { type: 'boolean' }
+                      },
+                      required: ['label', 'value']
+                    }
+                  },
+                  legend: { type: 'object', properties: { normal: { type: 'string' }, highlight: { type: 'string' } } }
+                },
+                required: ['blocks']
+              },
+              flow: {
+                type: 'object',
+                description: 'Ablauf mit Pfeilen und optionaler Schleife (nur Layouts mit „Ablauf")',
+                properties: {
+                  steps: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: { label: { type: 'string' }, text: { type: 'string' }, loop: { type: 'boolean', description: 'Station gehört zur Schleife (Rückpfeil)' } },
+                      required: ['label']
+                    }
+                  },
+                  loopLabel: { type: 'string', description: 'Beschriftung der Schleife' }
+                },
+                required: ['steps']
+              },
+              chart: {
+                type: 'object',
+                description: 'Balkendiagramm (nur Layouts mit „Balkendiagramm"); nur Zahlen aus Quelle oder Auftrag',
+                properties: {
+                  caption: { type: 'string', description: 'Was gemessen wird, mit Einheit' },
+                  bars: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: { label: { type: 'string' }, value: { type: 'number', description: 'Reine Zahl; sie bestimmt Balkenlänge und Beschriftung' }, highlight: { type: 'boolean' } },
+                      required: ['label', 'value']
+                    }
+                  },
+                  note: { type: 'string', description: 'Quelle und Lesehilfe unter dem Diagramm' }
+                },
+                required: ['bars']
+              }
             }
           }
         },
@@ -1619,11 +1677,13 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       // Auch verschachtelte items können als JSON-String ankommen.
       if (Array.isArray(slides)) {
         for (const sl of slides as Array<Record<string, unknown>>) {
-          if (sl && typeof sl.items === 'string') {
-            try {
-              sl.items = JSON.parse(sl.items)
-            } catch {
-              /* bleibt String → verständliche Ablehnung in validateInput */
+          for (const key of ['items', 'timeline', 'chart', 'flow'] as const) {
+            if (sl && typeof sl[key] === 'string') {
+              try {
+                sl[key] = JSON.parse(sl[key] as string)
+              } catch {
+                /* bleibt String → verständliche Ablehnung in validateInput */
+              }
             }
           }
         }

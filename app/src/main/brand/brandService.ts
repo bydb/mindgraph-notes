@@ -182,7 +182,7 @@ function skillMarkdown(p: BrandProfile, folderRel: string): string {
     '',
     '## Was automatisch passiert',
     '',
-    `- **Präsentationen:** Vorlage \`${folderRel}/${p.deckFile}\` (alle Layouts der MindGraph-Vorlage: Karten, Schritte, Kennzahlen, Abschnitt, Abschluss). Wer die mitgelieferte Vorlage nennt, bekommt diese.`,
+    `- **Präsentationen:** Vorlage \`${folderRel}/${p.deckFile}\` (alle Layouts der MindGraph-Vorlage: Karten mit Symbolen, Schritte, Punktelisten, Kennzahlen, Abschnitt, Abschluss). Wer die mitgelieferte Vorlage nennt, bekommt diese.`,
     '- **Mindmaps:** Mitte, Linien und Äste in der Hausfarbe; die Kategorie-Farben (Problem, Lösung, Info) bleiben.',
     '- **HTML-Seiten:** Logo im Seitenkopf, Links und Hervorhebungen in der Hausfarbe (auch im Dunkelmodus lesbar).',
     '- **Infografiken:** Der Bildauftrag bekommt die Farbcodes mit (kein Logo im Bild).',

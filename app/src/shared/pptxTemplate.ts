@@ -18,6 +18,8 @@
 // nicht ausdrücklich geändert wird, bleibt Byte für Byte erhalten.
 
 import JSZip from 'jszip'
+import { chartShapesXml, flowShapesXml, graphicFitIssue, graphicTexts, timelineShapesXml, validateChart, validateFlow, validateTimeline, type GraphicContext, type PptxChart, type PptxFlow, type PptxTimeline } from './pptxGraphics'
+import { PPTX_ICON_NAMES, iconDiscXml, iconGlyphXml, insetBox, resolvePptxIcon } from './pptxIcons'
 
 // ── Grenzen ────────────────────────────────────────────────────────────────
 
@@ -90,8 +92,16 @@ export interface PptxSlideInput {
   notes?: string
   /** Karten, Schritte oder Kennzahlen — für Layouts mit Plätzen „Karte 1", „Schritt 1", „Kennzahl 1" … */
   items?: PptxItem[]
-  /** Merksatz für einen Platz „Kernaussage" (dunkler Balken). */
+  /** Merksatz für einen Platz „Kernaussage" (dunkler Balken) oder „Merksatz" (heller Hinweisbalken). */
   takeaway?: string
+  /** Symbol der Folie — nur bei Layouts mit einem Platz „Symbol" (z. B. der Kreis der Abschnittsfolie). */
+  icon?: string
+  /** Zeitleiste (Blöcke mit Dauer) — nur bei Layouts mit einer Fläche „Zeitleiste". */
+  timeline?: PptxTimeline
+  /** Balkendiagramm — nur bei Layouts mit einer Fläche „Diagramm". */
+  chart?: PptxChart
+  /** Ablauf mit Stationen, Pfeilen und optionaler Schleife (Rückpfeil) — nur bei Layouts mit einer Fläche „Ablauf". */
+  flow?: PptxFlow
 }
 
 export interface PptxItem {
@@ -103,6 +113,8 @@ export interface PptxItem {
   text?: string
   /** Karte farbig hervorheben (Akzentfarbe hell). */
   highlight?: boolean
+  /** Symbol im Kreis der Karte — nur bei Layouts mit Plätzen „Symbol 1", „Symbol 2" …; Namen: PPTX_ICON_NAMES. */
+  icon?: string
 }
 
 export interface PptxBuildInput {
@@ -170,6 +182,24 @@ export interface LayoutInfo {
   partPath: string
   masterIndex: number
   placeholders: PlaceholderInfo[]
+  /**
+   * Symbolplätze: unsichtbare Formen des Layouts mit dem Namen „Symbol n" (je Eintrag)
+   * oder „Symbol" (index 0, für die ganze Folie). Sie geben nur die Lage vor.
+   */
+  iconAnchors?: IconAnchor[]
+  /** Flächen für gezeichnete Grafiken: unsichtbare Formen des Layouts namens „Zeitleiste", „Diagramm" bzw. „Ablauf". */
+  areas?: GraphicAreas
+}
+
+export interface GraphicAreas {
+  timeline?: Box
+  chart?: Box
+  flow?: Box
+}
+
+export interface IconAnchor {
+  index: number
+  box: Box
 }
 
 export interface SampleDecoration {
@@ -600,6 +630,74 @@ function parsePlaceholders(xml: string): PlaceholderInfo[] {
   return out
 }
 
+/**
+ * Steuerform: eine Form, die nur eine Lage vorgibt — ohne Füllung, ohne Linie, ohne Text.
+ * Nur solche Formen gelten als Symbolplatz oder Grafikfläche. Eine sichtbare Form, die in einer
+ * fremden Vorlage zufällig „Diagramm" oder „Symbol" heißt, ist Gestaltung und bleibt es (Codex F02):
+ * sonst würde sie überzeichnet, und ihr Layout fiele aus der Automatik.
+ */
+function isControlShape(spXml: string): boolean {
+  const spPr = firstElement(spXml, 'p:spPr') ?? ''
+  const ln = firstElement(spPr, 'a:ln') ?? ''
+  const fill = spPr.replace(/<a:ln[\s>][\s\S]*?<\/a:ln>|<a:ln\s*\/>/g, '')
+  return /<a:noFill\/>/.test(fill) && /<a:noFill\/>/.test(ln) && !drawingText(firstElement(spXml, 'p:txBody') ?? '').trim()
+}
+
+/**
+ * Formenbaum ohne Gruppen. Eine Form in einer Gruppe trägt Koordinaten im Raum der Gruppe, nicht
+ * der Folie — als Platz gelesen läge sie an der falschen Stelle (Codex F08). Steuerformen gelten
+ * deshalb nur, wenn sie frei auf dem Layout liegen.
+ */
+function withoutGroups(tree: string): string {
+  for (let guard = 0; guard < 500; guard++) {
+    const g = findElements(tree, 'p:grpSp')[0]
+    if (!g) return tree
+    tree = tree.slice(0, g.start) + tree.slice(g.end)
+  }
+  // Mehr Gruppen als die Sicherheitsgrenze: nichts als gruppenfrei ausgeben, was es nicht ist —
+  // dann gibt es auf diesem Layout eben keine Plätze (Codex F15).
+  return ''
+}
+
+const ICON_ANCHOR_RE = /^\s*(symbol|icon)(?:\s+(\d+))?\s*$/i
+
+/** Symbolplätze eines Layouts: Formen OHNE Platzhalter, die „Symbol" oder „Symbol n" heißen. */
+function parseIconAnchors(xml: string): IconAnchor[] {
+  const tree = withoutGroups(firstElement(xml, 'p:spTree') ?? '')
+  const out: IconAnchor[] = []
+  for (const el of findElements(tree, 'p:sp')) {
+    if (/<p:ph[\s/>]/.test(el.xml) || !isControlShape(el.xml)) continue
+    const name = attr(/<p:cNvPr\s[^>]*>/.exec(el.xml)?.[0] ?? '', 'name') ?? ''
+    const m = ICON_ANCHOR_RE.exec(unescapeXml(name))
+    const box = m ? parseBox(el.xml) : undefined
+    if (m && box && box.cx > 0 && box.cy > 0) out.push({ index: m[2] ? Number(m[2]) : 0, box })
+  }
+  return out
+}
+
+const AREA_RE = { timeline: /^\s*(zeitleiste|timeline)\s*$/i, chart: /^\s*(diagramm|balkendiagramm|chart)\s*$/i, flow: /^\s*(ablauf|ablaufgrafik|flow)\s*$/i }
+
+/** Grafikflächen eines Layouts: Formen OHNE Platzhalter, die „Zeitleiste", „Diagramm" oder „Ablauf" heißen. */
+function parseAreas(xml: string): GraphicAreas | undefined {
+  const tree = withoutGroups(firstElement(xml, 'p:spTree') ?? '')
+  const out: GraphicAreas = {}
+  for (const el of findElements(tree, 'p:sp')) {
+    if (/<p:ph[\s/>]/.test(el.xml) || !isControlShape(el.xml)) continue
+    const name = unescapeXml(attr(/<p:cNvPr\s[^>]*>/.exec(el.xml)?.[0] ?? '', 'name') ?? '')
+    const box = parseBox(el.xml)
+    if (!box || box.cx <= 0 || box.cy <= 0) continue
+    if (AREA_RE.timeline.test(name)) out.timeline ??= box
+    else if (AREA_RE.chart.test(name)) out.chart ??= box
+    else if (AREA_RE.flow.test(name)) out.flow ??= box
+  }
+  return out.timeline || out.chart || out.flow ? out : undefined
+}
+
+/** Passt das Layout zu dem, was die Folie an Grafik mitbringt? (Automatik: weder leere Fläche noch verlorene Grafik.) */
+function fitsGraphics(l: LayoutInfo, slide: PptxSlideInput): boolean {
+  return !!l.areas?.timeline === !!slide.timeline && !!l.areas?.chart === !!slide.chart && !!l.areas?.flow === !!slide.flow
+}
+
 /** Master-Platzhalter, von dem ein Layout-Platzhalter erbt (Zuordnung über den Typ). */
 function masterCounterpart(master: MasterInfo, type: string): PlaceholderInfo | undefined {
   const wanted = type === 'ctrTitle' ? 'title' : ['subTitle', 'obj', 'body', 'tx', 'pic', 'tbl', 'chart', 'media', 'clipArt', 'dgm'].includes(type) ? 'body' : type
@@ -740,7 +838,9 @@ async function readTemplate(pkg: Package): Promise<TemplateModel> {
         const mp = masterCounterpart(master, p.type)
         return { ...p, box: p.box ?? mp?.box, fontPt: p.fontPt ?? mp?.fontPt ?? masterFontPt(master, p.type) }
       })
-      layouts.push({ name, kind: classifyLayout(type, phs), type, partPath: lpath, masterIndex: masters.length - 1, placeholders: phs })
+      const iconAnchors = parseIconAnchors(lxml)
+      const areas = parseAreas(lxml)
+      layouts.push({ name, kind: classifyLayout(type, phs), type, partPath: lpath, masterIndex: masters.length - 1, placeholders: phs, ...(iconAnchors.length ? { iconAnchors } : {}), ...(areas ? { areas } : {}) })
     }
   }
   if (layouts.length === 0) throw new PptxInputError(['Die Vorlage enthält keine Folienlayouts'])
@@ -860,14 +960,18 @@ export function describePptxTemplate(info: PptxTemplateInfo): string {
       .map(p => {
         const cap = CONTENT_TYPES_PH.has(p.type) ? capacityLines(p) : undefined
         if (isKicker(p)) return 'Dachzeile'
-        if (isTakeaway(p)) return 'Kernaussage'
+        if (isTakeaway(p)) return /merksatz/i.test(p.name) ? 'Hinweisbalken (takeaway)' : 'Kernaussage'
         if (isItemSlot(p)) return `${p.name}`
         return `${ROLE_LABEL[p.type] ?? p.type}${cap ? ` (~${cap} ${cap === 1 ? 'Zeile' : 'Zeilen'})` : ''}`
       })
     const footer = l.placeholders.filter(p => (FOOTER_TYPES as readonly string[]).includes(p.type)).length > 0 ? ', Fußzeile' : ''
     const dup = (seen.get(l.name.toLowerCase()) ?? 0) > 1 ? ` [Master ${l.masterIndex + 1}]` : ''
-    lines.push(`- #${li + 1} "${l.name}"${dup} — ${l.kind} — ${parts.join(', ') || 'leer'}${footer}`)
+    const anchors = l.iconAnchors ?? []
+    const icons = (l.areas?.timeline ? ', Zeitleiste (timeline)' : '') + (l.areas?.chart ? ', Balkendiagramm (chart)' : '') + (l.areas?.flow ? ', Ablauf (flow)' : '') +
+      (anchors.some(a => a.index > 0) ? (needsExactCount(l) ? ', Symbol je Schritt möglich (items[].icon)' : ', Symbol je Eintrag (items[].icon)') : '') + (anchors.some(a => a.index === 0) ? ', Symbol der Folie (icon)' : '')
+    lines.push(`- #${li + 1} "${l.name}"${dup} — ${l.kind} — ${parts.join(', ') || 'leer'}${icons}${footer}`)
   })
+  if (info.layouts.some(l => l.iconAnchors?.length)) lines.push(`Symbole (nur diese Namen): ${PPTX_ICON_NAMES.join(', ')}`)
   if (info.fields.length) lines.push(`Felder der Vorlage (über fields füllen): ${info.fields.join(', ')}`)
   if (info.sampleDecorations.length) {
     lines.push('Achtung — diese Gestaltung fehlt auf neuen Folien, weil sie nicht im Master/Layout liegt:')
@@ -1255,6 +1359,7 @@ function bestItemLayout(layouts: LayoutInfo[], slide: PptxSlideInput): LayoutInf
   const wantsBanner = !!(slide.takeaway ?? '').trim()
   // Ohne ausdrückliche Wahl nur Karten-Layouts — keine Schritte (die nimmt man beim Namen) — außer die Anzahl passt genau.
   return layouts
+    .filter(l => fitsGraphics(l, slide))
     .filter(l => itemSlots(l).length >= nItems && (nItems > 0 ? itemSlots(l).length > 0 : contentSlots(l).length > 0 || !slide.body))
     .filter(l => !needsExactCount(l) || itemSlots(l).length === nItems)
     .filter(l => l.placeholders.some(isTakeaway) === wantsBanner)
@@ -1282,6 +1387,15 @@ function resolveLayout(model: TemplateModel, slide: PptxSlideInput, index: numbe
     }
     return `Folie ${index + 1}: Layout "${wanted}" gibt es in der Vorlage nicht`
   }
+  // Automatik für Zeitleiste/Diagramm/Ablauf: das Layout mit der passenden Fläche; mit Text das mit Textbereich.
+  if (slide.timeline || slide.chart || slide.flow) {
+    const fits = model.layouts.filter(l => fitsGraphics(l, slide))
+    const wantsText = !!(slide.body ?? '').trim()
+    const wantsBar = !!(slide.takeaway ?? '').trim()
+    const g = fits.find(l => (contentSlots(l).length > 0) === wantsText && l.placeholders.some(isTakeaway) === wantsBar)
+      ?? fits.find(l => (contentSlots(l).length > 0) === wantsText) ?? fits[0]
+    if (g) return g
+  }
   // Automatik für Karten/Kernaussage: genug Plätze, am liebsten genau passend.
   const nItems = Array.isArray(slide.items) ? slide.items.length : 0
   if (nItems > 0 || (slide.takeaway ?? '').trim()) {
@@ -1297,8 +1411,12 @@ function resolveLayout(model: TemplateModel, slide: PptxSlideInput, index: numbe
   if (slide.body) kinds.push('content')
   if (!slide.body && !slide.image) kinds.push(slide.subtitle ? 'section' : 'title-only', 'title')
   kinds.push('content')
+  // Unter mehreren Layouts einer Art: mit Bild das mit Bildplatz, ohne Bild das ohne
+  // (sonst bliebe bei „Titelfolie mit Bild" die Bildhälfte leer).
+  const hasPic = (l: LayoutInfo): boolean => l.placeholders.some(p => p.type === 'pic')
   for (const k of kinds) {
-    const l = model.layouts.find(x => x.kind === k)
+    const ofKind = model.layouts.filter(x => x.kind === k && fitsGraphics(x, slide))
+    const l = ofKind.find(x => hasPic(x) === !!slide.image) ?? ofKind[0]
     if (l) return l
   }
   return model.layouts[0]
@@ -1435,7 +1553,7 @@ function validateInput(input: PptxBuildInput): string[] {
       return
     }
     if ((s.kicker ?? '').length > PPTX_LIMITS.maxKickerChars) issues.push(`Folie ${n}: Dachzeile zu lang (höchstens ${PPTX_LIMITS.maxKickerChars} Zeichen)`)
-    for (const key of ['layout', 'kicker', 'title', 'subtitle', 'body', 'body2', 'image', 'notes'] as const) {
+    for (const key of ['layout', 'kicker', 'title', 'subtitle', 'body', 'body2', 'image', 'notes', 'icon'] as const) {
       const v = (s as unknown as Record<string, unknown>)[key]
       if (v !== undefined && v !== null && typeof v !== 'string') issues.push(`Folie ${n}: "${key}" muss Text sein`)
     }
@@ -1455,7 +1573,7 @@ function validateInput(input: PptxBuildInput): string[] {
           const m = `Folie ${n}, Karte ${k + 1}`
           if (!it || typeof it !== 'object') return void issues.push(`${m}: kein Objekt`)
           if (typeof it.title !== 'string' || !it.title.trim()) issues.push(`${m}: "title" fehlt`)
-          for (const key of ['label', 'text'] as const) if (it[key] !== undefined && it[key] !== null && typeof it[key] !== 'string') issues.push(`${m}: "${key}" muss Text sein`)
+          for (const key of ['label', 'text', 'icon'] as const) if (it[key] !== undefined && it[key] !== null && typeof it[key] !== 'string') issues.push(`${m}: "${key}" muss Text sein`)
           if ((it.label ?? '').length > PPTX_LIMITS.maxItemLabelChars) issues.push(`${m}: Rubrik zu lang (höchstens ${PPTX_LIMITS.maxItemLabelChars} Zeichen)`)
           if ((it.title ?? '').length > PPTX_LIMITS.maxItemTitleChars) issues.push(`${m}: Titel zu lang (höchstens ${PPTX_LIMITS.maxItemTitleChars} Zeichen)`)
           if ((it.text ?? '').length > PPTX_LIMITS.maxItemTextChars) issues.push(`${m}: Text zu lang (höchstens ${PPTX_LIMITS.maxItemTextChars} Zeichen)`)
@@ -1464,6 +1582,9 @@ function validateInput(input: PptxBuildInput): string[] {
         if (s.items.filter(it => it && it.highlight === true).length > 1) issues.push(`Folie ${n}: höchstens eine Karte hervorheben`)
       }
     }
+    if (s.timeline !== undefined && s.timeline !== null) issues.push(...validateTimeline(s.timeline, `Folie ${n}`))
+    if (s.chart !== undefined && s.chart !== null) issues.push(...validateChart(s.chart, `Folie ${n}`))
+    if (s.flow !== undefined && s.flow !== null) issues.push(...validateFlow(s.flow, `Folie ${n}`))
     if (s.image && !(input.images && input.images[s.image])) issues.push(`Folie ${n}: Bild "${s.image}" liegt nicht vor`)
   })
   const fields = input.fields ?? {}
@@ -1599,6 +1720,7 @@ export async function buildPptxFromTemplate(templateBytes: Uint8Array, input: Pp
       ...input.slides.flatMap(sl => [sl.kicker, sl.title, sl.subtitle, sl.body, sl.body2, sl.notes, sl.takeaway]),
       // Auch Karten tragen sichtbaren Text (Codex F37).
       ...input.slides.flatMap(sl => (Array.isArray(sl.items) ? sl.items : []).flatMap(it => [it?.label, it?.title, it?.text])),
+      ...input.slides.flatMap(sl => graphicTexts(sl.timeline, sl.chart, sl.flow)),
       ...Object.values(input.fields ?? {})
     ]
     for (const t of texts) {
@@ -1788,6 +1910,7 @@ export async function buildPptxFromTemplate(templateBytes: Uint8Array, input: Pp
       }
       else {
         if (items.length < slotsI.length) notes.push(`Folie ${n}: ${items.length} von ${slotsI.length} Plätzen belegt`)
+        let iconNoteDone = false
         items.forEach((it, k) => {
           const ph = slotsI[k]
           used.add(ph)
@@ -1820,8 +1943,80 @@ export async function buildPptxFromTemplate(templateBytes: Uint8Array, input: Pp
               : '<p:spPr><a:solidFill><a:schemeClr val="accent1"><a:lumMod val="13000"/><a:lumOff val="87000"/><a:satMod val="55000"/></a:schemeClr></a:solidFill></p:spPr>'
             : '<p:spPr/>'
           shapes.push(phSpXml(shapeId++, ph, bodyPrXml(fit), paras, spPr))
+          // Symbol im Kreis: Lage gibt das Layout vor („Symbol n"), Kreisfarbe ist die Akzentfarbe
+          // der Vorlage. Ohne (oder mit unbekanntem) Namen steht ein Punkt — der Kreis bleibt nie leer.
+          const anchor = layout.iconAnchors?.find(a => a.index === k + 1)
+          const wanted = (it.icon ?? '').trim()
+          // Schritte tragen schon eine Ziffer in der Akzentfarbe: das Symbol ist dort Zugabe —
+          // dunkler Kreis, und nur, wenn eines genannt ist (kein Ersatzpunkt neben der Ziffer).
+          const isStep = /^\s*(schritt|step)\b/i.test(ph.name)
+          if (anchor && isStep) {
+            const icon = resolvePptxIcon(wanted)
+            if (wanted && !icon) notes.push(`Folie ${n}, Schritt ${k + 1}: Symbol "${wanted}" gibt es nicht — weggelassen`)
+            if (icon) {
+              shapes.push(iconDiscXml(shapeId++, `Symbolkreis ${k + 1}`, anchor.box, '<a:schemeClr val="tx2"/>'))
+              shapes.push(iconGlyphXml(shapeId++, icon, insetBox(anchor.box, 0.54), '<a:schemeClr val="bg1"/>'))
+            }
+          } else if (anchor) {
+            const icon = resolvePptxIcon(wanted)
+            if (wanted && !icon) notes.push(`Folie ${n}, Karte ${k + 1}: Symbol "${wanted}" gibt es nicht — Punkt gesetzt`)
+            shapes.push(iconDiscXml(shapeId++, `Symbolkreis ${k + 1}`, anchor.box, '<a:schemeClr val="accent1"/>'))
+            shapes.push(icon
+              ? iconGlyphXml(shapeId++, icon, insetBox(anchor.box, 0.54), '<a:schemeClr val="bg1"/>')
+              : iconDiscXml(shapeId++, `Symbolpunkt ${k + 1}`, insetBox(anchor.box, 0.24), '<a:schemeClr val="bg1"/>'))
+          } else if (wanted) {
+            // Kein Symbol geht ohne Hinweis verloren (Codex F06): hat das Layout gar keine Plätze, EIN
+            // Hinweis je Folie; hat es welche, aber nicht für diesen Eintrag, einer je Eintrag.
+            const anyAnchor = (layout.iconAnchors ?? []).some(a => a.index > 0)
+            if (anyAnchor) notes.push(`Folie ${n}, Karte ${k + 1}: Layout "${layout.name}" hat dort keinen Symbolplatz — icon wurde weggelassen`)
+            else if (!iconNoteDone) {
+              iconNoteDone = true
+              notes.push(`Folie ${n}: Layout "${layout.name}" zeigt keine Symbole — icon wurde weggelassen`)
+            }
+          }
         })
       }
+    }
+
+    // Zeitleiste / Balkendiagramm: gezeichnete Formen in der Fläche, die das Layout vorgibt.
+    // Ohne Fläche wird abgelehnt — die Grafik ginge sonst still verloren.
+    if (s.timeline || s.chart || s.flow) {
+      const ctx: GraphicContext = { nextId: shapeId, lang: escapeXml(lang), text: t => escapeXml(cleanText(t)) }
+      if (s.timeline) {
+        if (!layout.areas?.timeline) issues.push(`Folie ${n}: Layout "${layout.name}" hat keine Fläche für eine Zeitleiste — ein Layout mit „Zeitleiste" wählen oder layout weglassen`)
+        else {
+          const tooSmall = graphicFitIssue(layout.areas.timeline, { timeline: s.timeline })
+          if (tooSmall) issues.push(`Folie ${n}: Layout "${layout.name}" — ${tooSmall}`)
+          else shapes.push(timelineShapesXml(ctx, layout.areas.timeline, s.timeline))
+        }
+      }
+      if (s.chart) {
+        if (!layout.areas?.chart) issues.push(`Folie ${n}: Layout "${layout.name}" hat keine Fläche für ein Balkendiagramm — ein Layout mit „Balkendiagramm" wählen oder layout weglassen`)
+        else {
+          const tooSmall = graphicFitIssue(layout.areas.chart, { chart: s.chart }, lang)
+          if (tooSmall) issues.push(`Folie ${n}: Layout "${layout.name}" — ${tooSmall}`)
+          else shapes.push(chartShapesXml(ctx, layout.areas.chart, s.chart))
+        }
+      }
+      if (s.flow) {
+        if (!layout.areas?.flow) issues.push(`Folie ${n}: Layout "${layout.name}" hat keine Fläche für einen Ablauf — ein Layout mit „Ablauf" wählen oder layout weglassen`)
+        else {
+          const tooSmall = graphicFitIssue(layout.areas.flow, { flow: s.flow })
+          if (tooSmall) issues.push(`Folie ${n}: Layout "${layout.name}" — ${tooSmall}`)
+          else shapes.push(flowShapesXml(ctx, layout.areas.flow, s.flow))
+        }
+      }
+      shapeId = ctx.nextId
+    }
+
+    // Symbol der Folie (z. B. im Kreis der Abschnittsfolie)
+    const slideIcon = (s.icon ?? '').trim()
+    if (slideIcon) {
+      const anchor = layout.iconAnchors?.find(a => a.index === 0)
+      const icon = resolvePptxIcon(slideIcon)
+      if (!anchor) notes.push(`Folie ${n}: Layout "${layout.name}" hat keinen Platz für ein Symbol — icon wurde weggelassen`)
+      else if (!icon) notes.push(`Folie ${n}: Symbol "${slideIcon}" gibt es nicht — weggelassen`)
+      else shapes.push(iconGlyphXml(shapeId++, icon, anchor.box, '<a:schemeClr val="bg1"/>'))
     }
 
     // Kernaussage (Balken)
