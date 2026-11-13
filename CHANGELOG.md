@@ -2,6 +2,24 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.6] - 2026-11-13
+
+**Der Agent erstellt Präsentationen jetzt in einem abwechslungsreichen Hausstil, mit Symbolen, Abläufen, Zeitleisten und Diagrammen.** Statt Folie für Folie Aufzählungen wählt er für jeden Inhalt die passende Form, in den Farben und mit dem Logo Ihrer Einrichtung, wenn Sie ein Hausdesign eingerichtet haben. Außerdem nennt die App bei Störungen eines Cloud-Anbieters jetzt den wirklichen Grund.
+
+### Hintergrund
+
+- **Auslöser:** Präsentationen des Agenten sahen einheitlich aus: Titel, Aufzählung, gelegentlich Karten. Eine von Hand gestaltete Fortbildungspräsentation zeigte, was fehlte: jede Folie eine eigene Form.
+- **Neue Folienformen:** Karten mit Symbol, Schritte mit Ziffern und Pfeilen, nummerierte Punktelisten, eine Tafel mit Kernaussage und vier Punkten, ein Blatt für Beispiele im Wortlaut, Titelfolie mit Bild und Abschnittsfolien mit großem Symbol. Unter Schritten kann ein heller Hinweisbalken stehen, etwa für einen Arbeitsauftrag.
+- **Symbole:** 73 Linien-Symbole, die der Agent passend zum Inhalt wählt. Es sind gewöhnliche PowerPoint-Formen, die Sie umfärben und verschieben können. Nennt das Modell ein Symbol, das es nicht gibt, steht dort ein Punkt, und die Ergebnis-Karte sagt es.
+- **Zeitleiste:** Für den Ablauf einer Veranstaltung. Die Breite der Blöcke folgt der Dauer; Phasen, in denen das Publikum selbst arbeitet, stehen in der Hausfarbe, Pausen gestrichelt.
+- **Ablauf mit Schleife:** Stationen mit Pfeilen. Wiederholt sich ein Teil, liegt er auf einer getönten Fläche mit einem Rückpfeil darüber.
+- **Balkendiagramm:** Waagerechte Balken mit Wert, Überschrift und Quellenzeile. Der Agent ist angewiesen, nur Zahlen aus Ihren Unterlagen oder gelesenen Quellen zu verwenden.
+- **Wie der Agent auswählt:** Die Arbeitsanleitung „PowerPoint nach Vorlage“ beschreibt jetzt, welche Form zu welchem Inhalt passt, dass sich Formen abwechseln und dass der Titel eine Aussage ist. Die Hausfarbe steht nur dort, wo etwas zu tun oder zu merken ist.
+- **Bestehende Vaults:** Die Anleitung und die Vorlage in Ihrem Vault werden nicht automatisch ersetzt, damit eigene Änderungen erhalten bleiben. Die neue Fassung bekommen Sie, wenn Sie den Ordner dieser Anleitung im Vault löschen oder umbenennen und in den Einstellungen unter „Skills“ die Starter-Skills installieren; das ergänzt, was fehlt. Haben Sie ein Hausdesign angelegt, speichern Sie es danach einmal neu; dann entsteht auch Ihre Präsentationsvorlage neu.
+- **Störungen beim Cloud-Anbieter:** Drosselte ein Anbieter ein Modell, meldete die App bisher „ohne Ergebnis beendet – stärkeres Modell wählen“. Jetzt steht dort, dass das Modell gerade gedrosselt ist. Das gilt auch für den Chat mit laufender Textausgabe.
+- **Voller Arbeitsspeicher nach dem Schreiben:** Hatte der Agent sein Ergebnis schon geschrieben und war danach der Platz des Modells erschöpft, erschien eine Fehlermeldung neben dem fertigen Ergebnis. Jetzt nennt der Lauf die geschriebenen Dateien und bittet Sie zu prüfen, ob der Auftrag damit vollständig ist.
+- **Grenzen:** Das Diagramm besteht aus gezeichneten Formen und lässt sich in PowerPoint nicht über „Daten bearbeiten“ ändern. Wie gut ein Modell die neuen Formen nutzt, hängt vom Modell ab: In unseren Versuchen wählte ein großes Cloud-Modell deutlich abwechslungsreicher als ein lokales. Zahlen und Beschriftungen prüft die App nicht gegen die Quelle. Geprüft wurde mit PowerPoint für Mac und LibreOffice.
+
 ## [1.3.5] - 2026-11-12
 
 **Wenn Sie Text mit beschrifteten Links in eine E-Mail einfügen, behalten die Links jetzt ihr Ziel und kommen beim Empfänger anklickbar an.** Das gilt für Text aus Webseiten, aus Notizen und aus dem Chat. Auch der Eintrag „Kopieren“ im Rechtsklick-Menü einer Notiz nimmt die Links jetzt mit.
