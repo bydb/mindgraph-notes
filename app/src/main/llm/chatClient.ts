@@ -460,6 +460,29 @@ function friendlyCloudError(backend: CloudChatBackend, status: number, body: str
   return `${label} API ${status}: ${body}`
 }
 
+/**
+ * Fehler im Körper einer formal erfolgreichen Antwort. OpenRouter meldet Störungen beim
+ * Modellanbieter (Drosselung, Ausfall) teils als HTTP 200 mit `{ "error": { code, message } }`
+ * und OHNE `choices`. Ohne diese Prüfung sah das aus wie eine leere Modellantwort: der Agent
+ * schob einmal nach und endete mit „ohne Ergebnis — stärkeres Modell wählen", obwohl das Modell
+ * nie geantwortet hatte (real, 12.11.2026, „temporarily rate-limited upstream", Code 429).
+ * Liefert Status und Körper für die übliche Fehlermeldung, sonst null.
+ */
+export function errorInOkBody(json: unknown): { status: number; body: string } | null {
+  if (!json || typeof json !== 'object') return null
+  const j = json as { error?: unknown; choices?: unknown }
+  if (j.error === undefined || j.error === null) return null
+  if (Array.isArray(j.choices) && j.choices.length > 0) return null
+  const code = typeof j.error === 'object' ? Number((j.error as { code?: unknown }).code) : NaN
+  return { status: Number.isInteger(code) && code >= 400 && code <= 599 ? code : 502, body: JSON.stringify(json) }
+}
+
+/** Fehler-Ereignis eines Stroms: wie `errorInOkBody`, aber auch neben schon gelieferten Textstücken. */
+function streamErrorOf(json: { error?: unknown }): { status: number; body: string } {
+  const code = json.error && typeof json.error === 'object' ? Number((json.error as { code?: unknown }).code) : NaN
+  return { status: Number.isInteger(code) && code >= 400 && code <= 599 ? code : 502, body: JSON.stringify(json) }
+}
+
 function assertCloudConfig(backend: CloudChatBackend, opts: ChatOptions): { apiKey: string; model: string } {
   const label = CLOUD_PROVIDERS[backend].label
   const apiKey = (backend === 'llmbase' ? opts.llmbaseApiKey : opts.openrouterApiKey)?.trim()
@@ -598,6 +621,16 @@ async function chatViaOpenAiCompatible(
     throw new Error(target.friendlyError(res.status, await res.text()))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: unknown }
+  const bodyError = errorInOkBody(json)
+  if (bodyError) {
+    // Meldet der Anbieter trotz Fehler einen Verbrauch, gehört er in die Kostenbilanz (Codex F16).
+    if ((json as { usage?: unknown }).usage) {
+      trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(target, (json as { usage?: unknown }).usage, {
+        module: opts.telemetryModule, runId: opts.telemetryRunId, wallMs: Date.now() - startedAt, at: startedAt
+      }))
+    }
+    throw new Error(target.friendlyError(bodyError.status, bodyError.body))
+  }
   trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(target, json.usage, {
     module: opts.telemetryModule,
     runId: opts.telemetryRunId,
@@ -825,6 +858,16 @@ async function chatWithToolsViaOpenAiCompatible(
     throw new Error(target.friendlyError(res.status, await res.text()))
   }
   const json = await res.json() as { choices?: OpenAIChatChoice[]; usage?: { prompt_tokens?: number } }
+  const bodyError = errorInOkBody(json)
+  if (bodyError) {
+    // Meldet der Anbieter trotz Fehler einen Verbrauch, gehört er in die Kostenbilanz (Codex F16).
+    if ((json as { usage?: unknown }).usage) {
+      trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(target, (json as { usage?: unknown }).usage, {
+        module: opts.telemetryModule, runId: opts.telemetryRunId, wallMs: Date.now() - startedAt, at: startedAt
+      }))
+    }
+    throw new Error(target.friendlyError(bodyError.status, bodyError.body))
+  }
   // Jede Iteration des Agenten-Loops ist ein eigener bezahlter Aufruf — hier wird
   // sie einzeln erfasst, aggregiert wird erst im Loop (shared/llmCost.ts sumCalls).
   trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(target, json.usage, {
@@ -926,6 +969,7 @@ export async function streamCloudChat(
   // nicht eigens an (stream_options ist nicht bei jedem Anbieter erlaubt) — kommt er,
   // wird er genommen; kommt er nicht, zählt der Aufruf als „ohne Preis", nie als 0.
   let usage: unknown = undefined
+  let streamError: { status: number; body: string } | null = null
   const res = await fetch(`${CLOUD_PROVIDERS[opts.backend].baseUrl}/chat/completions`, {
     method: 'POST',
     headers: cloudHeaders(opts.backend, opts.apiKey),
@@ -947,10 +991,26 @@ export async function streamCloudChat(
   const decoder = new TextDecoder()
   let full = ''
   let buffer = ''
+  // Anfang der Rohantwort: manche Fehler kommen als gewöhnliches JSON statt als Ereignisstrom.
+  let head = ''
+  // Fehler mitten im Strom (Codex F12): OpenRouter schickt eine Drosselung oder einen Ausfall beim
+  // Modellanbieter als Ereignis `data: {"error": …}`. Vorher wurde das übergangen und eine leere
+  // oder halbe Antwort als fertig zurückgegeben. Der Verbrauch bis dahin wird noch erfasst.
+  const failStream = (err: { status: number; body: string }): never => {
+    trackPendingTelemetry(opts.telemetryRunId, recordCloudCall(
+      { model: opts.model, pricingLookup: { backend: opts.backend, baseUrl: CLOUD_PROVIDERS[opts.backend].baseUrl, apiKey: opts.apiKey } },
+      usage,
+      { module: opts.telemetryModule, runId: opts.telemetryRunId, wallMs: Date.now() - startedAt, at: startedAt, firstTokenMs }
+    ))
+    const msg = friendlyCloudError(opts.backend, err.status, err.body, opts.model)
+    throw new Error(full.trim() ? `${msg} Die Antwort brach danach ab und ist unvollständig.` : msg)
+  }
   while (true) {
     const { done, value } = await reader.read()
     if (done) break
-    buffer += decoder.decode(value, { stream: true })
+    const chunk = decoder.decode(value, { stream: true })
+    if (head.length < 4000) head += chunk
+    buffer += chunk
     const lines = buffer.split('\n')
     buffer = lines.pop() || ''
     for (const line of lines) {
@@ -959,8 +1019,9 @@ export async function streamCloudChat(
       const data = trimmed.slice(5).trim()
       if (data === '[DONE]') continue
       try {
-        const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }>; usage?: unknown }
+        const json = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }>; usage?: unknown; error?: unknown }
         if (json.usage) usage = json.usage
+        if (json.error !== undefined && json.error !== null) streamError = streamErrorOf(json)
         const delta = json.choices?.[0]?.delta?.content
         if (delta) {
           if (firstTokenMs === undefined) firstTokenMs = Date.now() - startedAt
@@ -970,6 +1031,16 @@ export async function streamCloudChat(
       } catch {
         // unvollständige/Kommentar-Zeile (OpenRouter sendet gelegentlich ": OPENROUTER PROCESSING")
       }
+      if (streamError) failStream(streamError)
+    }
+  }
+  // Gar kein Ereignisstrom, sondern ein JSON-Körper mit Fehler (HTTP 200).
+  if (!full) {
+    try {
+      const whole = errorInOkBody(JSON.parse(head))
+      if (whole) failStream(whole)
+    } catch (e) {
+      if (e instanceof Error && !(e instanceof SyntaxError)) throw e
     }
   }
   // Bis 09/2026 wurde Cloud-Streaming gar nicht erfasst — weder Dauer noch Kosten.

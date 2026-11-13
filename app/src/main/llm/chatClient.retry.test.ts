@@ -17,7 +17,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 const netFetch = vi.fn()
 vi.mock('electron', () => ({ net: { fetch: (...args: unknown[]) => netFetch(...args) } }))
 
-import { chatWithTools, CHAT_RETRY_DELAY_MS, errorChainText } from './chatClient'
+import { chat, chatWithTools, streamCloudChat, CHAT_RETRY_DELAY_MS, errorChainText, errorInOkBody } from './chatClient'
 
 const OPTS = { telemetryModule: 'chat' as const, backend: 'openrouter' as const, openrouterApiKey: 'k', openrouterModel: 'moonshotai/kimi-k3' }
 const MSGS = [{ role: 'user' as const, content: 'hi' }]
@@ -172,6 +172,27 @@ describe('chatFetch — was NICHT wiederholt wird', () => {
     expect(net.attempts()).toBe(1)
   })
 
+  it('ein Rate-Limit im KÖRPER einer 200-Antwort ist ein Fehler, keine leere Modellantwort', async () => {
+    // So meldet OpenRouter eine Drosselung beim Modellanbieter (real, 12.11.2026).
+    const body = JSON.stringify({ id: 'gen-1', error: { message: 'temporarily rate-limited upstream', code: 429, metadata: { error_type: 'rate_limit_exceeded' } } })
+    const net = arm(() => errorResponse(200, body))
+    await expect(call()).rejects.toThrow(/rate-limitiert \(429\)/)
+    expect(net.attempts()).toBe(1)
+    arm(() => errorResponse(200, body))
+    await expect(chat(MSGS, OPTS)).rejects.toThrow(/rate-limitiert \(429\)/)
+  })
+
+  it('andere Fehler im Körper nennen die Meldung des Anbieters; eine Antwort mit Inhalt bleibt eine Antwort', async () => {
+    arm(() => errorResponse(200, JSON.stringify({ error: { message: 'Provider returned error', code: 503 } })))
+    await expect(call()).rejects.toThrow(/503: Provider returned error/)
+    arm(() => errorResponse(200, JSON.stringify({ error: 'kaputt' })))
+    await expect(call()).rejects.toThrow(/502/)
+    expect(errorInOkBody({ choices: [{ message: { content: 'x' } }] })).toBeNull()
+    expect(errorInOkBody({ error: { code: 429 }, choices: [{ message: { content: 'x' } }] })).toBeNull()
+    expect(errorInOkBody({ error: null, choices: [] })).toBeNull()
+    expect(errorInOkBody({ error: { code: 'abc' } })?.status).toBe(502)
+  })
+
   it('erschöpftes Guthaben (402) wird nicht wiederholt', async () => {
     const net = arm(() => errorResponse(402, '{}'))
     await expect(call()).rejects.toThrow(/402/)
@@ -208,3 +229,37 @@ describe('chatFetch — was NICHT wiederholt wird', () => {
     expect(net.attempts()).toBe(1)
   })
 })
+
+describe('Cloud-Streaming — Fehler im Strom (Codex F12)', () => {
+  const sse = (...events: string[]): Response =>
+    new Response(events.map(e => `data: ${e}\n\n`).join(''), { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+  const piece = (t: string) => JSON.stringify({ choices: [{ delta: { content: t } }] })
+  const limited = JSON.stringify({ error: { code: 429, message: 'temporarily rate-limited upstream' } })
+  const stream = (res: Response) => {
+    vi.stubGlobal('fetch', vi.fn(async () => res))
+    const tokens: string[] = []
+    const p = streamCloudChat([{ role: 'user', content: 'hi' }], { backend: 'openrouter', apiKey: 'k', model: 'm/x', telemetryModule: 'chat' }, t => tokens.push(t))
+    return { p, tokens }
+  }
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('ein Fehler-Ereignis ohne Text ist ein Fehler, keine leere Antwort', async () => {
+    await expect(stream(sse(limited)).p).rejects.toThrow(/rate-limitiert \(429\)/)
+  })
+
+  it('ein Fehler NACH Textstücken meldet die Antwort als unvollständig', async () => {
+    const { p, tokens } = stream(sse(piece('Hallo '), piece('Welt'), limited))
+    await expect(p).rejects.toThrow(/rate-limitiert \(429\).*unvollständig/)
+    expect(tokens.join('')).toBe('Hallo Welt') // was schon kam, wurde gezeigt — aber nicht als fertig gemeldet
+  })
+
+  it('ein JSON-Körper mit Fehler statt eines Stroms wird erkannt', async () => {
+    const res = new Response(JSON.stringify({ id: 'gen', error: { code: 503, message: 'Provider returned error' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    await expect(stream(res).p).rejects.toThrow(/503: Provider returned error/)
+  })
+
+  it('ein gewöhnlicher Strom bleibt eine Antwort', async () => {
+    await expect(stream(sse(piece('Hallo '), piece('Welt'), '[DONE]')).p).resolves.toBe('Hallo Welt')
+  })
+})
+

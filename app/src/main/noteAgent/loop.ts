@@ -514,6 +514,25 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     // Reihenfolge scheiterte er an „Kontext voll“, bevor das Verdichten eine Chance hatte.
     await compactIfTight(false)
     if (!hasRoomForNextCall(budget)) {
+      // Liegt schon ein Ergebnis vor, ist „bevor ein Ergebnis geschrieben wurde" schlicht falsch
+      // (real, 12.11.2026: 20 Folien geschrieben, danach diese Meldung neben der Ergebnis-Karte).
+      // Der Lauf endet deshalb ohne Fehler — aber OHNE Erfolg zu behaupten: ob der Auftrag mit
+      // dem Geschriebenen vollständig ist (etwa Notiz UND Tabelle verlangt, nur die Notiz
+      // entstanden), weiß hier niemand (Codex F11). Der Text sagt, was vorliegt, und wie es
+      // weitergeht; der Verlauf bleibt für „mach weiter" erhalten. Kein weiterer Modellaufruf.
+      if (run.results.size > 0 && (!run.web || run.web.wrote)) {
+        run.transcript = messages.slice(); run.transcriptTokens = usedTokens(budget)
+        const names = [...run.results.values()].map(r => `„${r.suggestedName}“`).join(', ')
+        return {
+          text: withFormatHint(
+            `Der Arbeitsspeicher des Modells ist voll — der Lauf endet hier. Geschrieben ist: ${names}. ` +
+            'Ob der Auftrag damit vollständig ist, konnte das Modell nicht mehr prüfen: sieh dir das Ergebnis an. ' +
+            'Fehlt noch etwas, übernimm oder verwirf zuerst das Vorhandene und antworte dann mit dem, was noch fehlt.'
+          ),
+          hitMaxIterations: false,
+          cost: await costOfCalls(callUsages, chatOptions)
+        }
+      }
       throw failWithHint(`Der Arbeitsspeicher des Modells (Kontext, ${budget.window.toLocaleString('de-DE')} Token) ist voll, bevor ein Ergebnis geschrieben wurde. Teile den Auftrag auf (z. B. einen Unterordner oder Zeitraum nach dem anderen) oder wähle ein Modell mit größerem Kontext.`)
     }
     // Schluss in Sicht, aber noch kein Ergebnis: erst ankündigen, im letzten Schritt nur noch
@@ -605,6 +624,9 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
           })
           continue
         }
+        // Nur ins lokale Protokoll: was das Modell stattdessen gesagt hat. Ohne das ist von außen nicht
+        // zu sehen, ob es eine Rückfrage gestellt, einen Plan beschrieben oder aufgegeben hat.
+        console.warn('[note-agent] Web-Lauf ohne Ergebnis — letzte Antwort des Modells:', JSON.stringify(result.text.slice(0, 1200)))
         throw failWithHint('Der Recherche-Lauf wurde ohne Ergebnis beendet — es wurde weder eine Notiz noch eine Seite oder Präsentation geschrieben. Bitte den Auftrag konkreter formulieren oder ein stärkeres Modell wählen.')
       }
       // Stiller Leerlauf auch außerhalb der Webrecherche: kein Tool gerufen, nichts

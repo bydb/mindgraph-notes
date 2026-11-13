@@ -98,6 +98,25 @@ describe('Kontextbudget im Loop', () => {
     expect(mockChat).toHaveBeenCalledTimes(1)
   })
 
+  it('voller Kontext NACH einem geschriebenen Ergebnis ist kein Fehler — der Lauf endet mit dem Ergebnis', async () => {
+    mockChat.mockResolvedValueOnce(toolCall('write_note', { file_name: 'Ergebnis.md', markdown: '# Ergebnis\n\nText.' }, 31_500))
+    const agentRun = makeRun()
+    const res = await run(agentRun)
+    expect(agentRun.results.size).toBe(1)
+    expect(res.hitMaxIterations).toBe(false)
+    // Kein Fehler, aber auch keine Erfolgsbehauptung (Codex F11): sagen, was vorliegt und wie es weitergeht.
+    expect(res.text).toContain('Geschrieben ist: „Ergebnis.md“')
+    expect(res.text).toContain('Ob der Auftrag damit vollständig ist')
+    expect(res.text).not.toMatch(/Das Ergebnis ist geschrieben|erledigt|fertig/)
+    expect(agentRun.transcript?.length).toBeGreaterThan(0) // für „mach weiter“ erhalten
+    expect(mockChat).toHaveBeenCalledTimes(1) // kein weiterer Modellaufruf in den vollen Kontext
+  })
+
+  it('voller Kontext OHNE Ergebnis bleibt ein Fehler; im Web-Lauf zählt nur ein geschriebenes Ergebnis', async () => {
+    mockChat.mockResolvedValueOnce(toolCall('list_target_folder', {}, 31_500))
+    await expect(run(makeRun())).rejects.toThrow(/bevor ein Ergebnis geschrieben wurde/)
+  })
+
   it('nennt bei unbekannter Kontextgröße die vorsichtige Annahme im Protokoll', async () => {
     mockChat.mockResolvedValueOnce(done())
     const onStep = vi.fn()
