@@ -573,7 +573,12 @@ export function AgentView({ tabId }: Props) {
   // Bei eingeschalteter KI erst urteilen, wenn die lokale Modellliste da ist (kein Aufblitzen).
   const noAiRoute = !hasAiRouteFor('note-agent', ollama) && !hasAiRouteFor('notes-chat', ollama)
   const needsAiSetup = !ollama.enabled || (noAiRoute && (modelsLoaded || modelsFailed) && models.length === 0)
-  if (needsAiSetup) {
+  // Die Ansicht bleibt nach bestandener Einrichtung stehen, bis der Nutzer „Loslegen“ wählt:
+  // sonst verschwände die Bestätigung im selben Augenblick, und die Websuche ließe sich hier
+  // nicht mehr dazunehmen.
+  const [inAiSetup, setInAiSetup] = useState(false)
+  useEffect(() => { if (needsAiSetup) setInAiSetup(true) }, [needsAiSetup])
+  if (needsAiSetup || inAiSetup) {
     return (
       <div className="agent-view">
         <div className="agent-view-inner">
@@ -581,6 +586,12 @@ export function AgentView({ tabId }: Props) {
             <h2 className="onboarding-step-title">{t('cloudSetup.inlineTitle')}</h2>
             <p className="onboarding-step-desc">{t('cloudSetup.inlineIntro')}</p>
             <CloudSetup />
+            {!needsAiSetup && (
+              <div className="onboarding-nav">
+                <span />
+                <button type="button" className="onboarding-btn-primary" onClick={() => setInAiSetup(false)}>{t('cloudSetup.start')}</button>
+              </div>
+            )}
             <p className="agent-view-setup-alt">
               {t('cloudSetup.localInstead')}{' '}
               <button type="button" className="cloud-setup-link" onClick={() => openSettingsAt('ai', 'ai-backend')}>

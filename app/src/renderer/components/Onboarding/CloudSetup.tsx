@@ -7,6 +7,7 @@ import {
 } from '../../../shared/cloudOnboarding'
 import { formatPricing, type ModelPricing } from '../../../shared/llmCost'
 import { PROVIDERS } from '../Settings/CloudProviderSection'
+import { WebSearchSetup } from './WebSearchSetup'
 
 // Geführte Einrichtung eines Cloud-Anbieters: Anbieter → Schlüssel → Modell → eine Freigabe.
 // Genutzt im KI-Schritt des Onboardings und im Fenster „KI einrichten“ (CloudSetupModal).
@@ -145,6 +146,7 @@ export const CloudSetup: React.FC<{
           </div>
           <button type="button" className="onboarding-btn-text" onClick={() => { setDone(null); setConsent(false) }}>{t('cloudSetup.change')}</button>
         </div>
+        <WebSearchSetup />
       </div>
     )
   }

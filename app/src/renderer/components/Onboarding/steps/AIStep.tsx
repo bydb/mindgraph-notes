@@ -8,6 +8,7 @@ import { chatModelsOnly } from '../../../../shared/chatModels'
 import { isCloudProviderReady } from '../../../../shared/llmBackend'
 import { shouldSuggestCloud } from '../../../../shared/cloudOnboarding'
 import { CloudSetup } from '../CloudSetup'
+import { WebSearchSetup } from '../WebSearchSetup'
 
 type AIPath = 'local' | 'cloud'
 
@@ -341,6 +342,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
         </div>
       )}
 
+      {ollamaConnected && ollamaModels.length > 0 && <WebSearchSetup />}
       </>}
 
       {showAgentHint && path === 'local' && <AgentFocusHint />}

@@ -1418,3 +1418,64 @@
   font-size: 12.5px;
   color: var(--text-secondary);
 }
+
+/* Optionale Websuche unter der KI-Einrichtung. */
+.web-setup {
+  margin-top: 0;
+}
+
+.web-setup.is-done {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.web-setup.is-done svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--accent-color);
+}
+
+.web-setup-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.web-setup-head .onboarding-guide-label {
+  margin-bottom: 0;
+}
+
+.web-setup-optional {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.web-setup-head svg {
+  transition: transform var(--transition-fast);
+}
+
+.web-setup-head svg.is-open {
+  transform: rotate(180deg);
+}
+
+.web-setup-btn {
+  margin-top: 10px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.onboarding-ai-step > .web-setup {
+  margin-bottom: 16px;
+}
