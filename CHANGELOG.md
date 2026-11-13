@@ -2,6 +2,23 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.7] - 2026-11-13
+
+**MindGraph Notes lässt sich jetzt auch ohne starken Rechner mit KI nutzen: Die Einrichtung führt Sie in drei Schritten zu einem Anbieter im Netz.** Sie wählen LLMBase oder OpenRouter, fügen Ihren Schlüssel ein und bestätigen, was der Anbieter sehen darf. Danach antworten Chat, Agent, Notizbearbeitung und Karteikarten sofort, ohne dass Sie ein Modell auf Ihrem Rechner installieren.
+
+### Hintergrund
+
+- **Auslöser:** Lokale KI braucht viel Arbeitsspeicher. Auf Rechnern mit weniger als 16 GB lief sie langsam oder gar nicht, und die Einrichtung kannte bisher nur den lokalen Weg. Die Anbieter lagen in den Einstellungen und brauchten sieben Handgriffe.
+- **Weiche in der Einrichtung:** Der KI-Schritt fragt jetzt „Auf diesem Rechner“ oder „Über einen Anbieter im Netz“. Hat Ihr Rechner weniger als 16 GB Arbeitsspeicher und noch kein lokales Modell, ist der Anbieter-Weg vorausgewählt. Die Wahl bleibt bei Ihnen.
+- **Drei Schritte:** Anbieter wählen, Schlüssel einfügen, Modell bestätigen. Ein günstiges Modell ist vorgeschlagen. Der Schlüssel wird verschlüsselt auf Ihrem Rechner gespeichert und nicht wieder angezeigt.
+- **Eine Freigabe:** Mit einem Haken erlauben Sie Chat, Notizbearbeitung, Karteikarten und Agent, den Anbieter zu nutzen. Ihre Fragen und die Notizen, mit denen Sie dabei arbeiten, verlassen dann den Rechner. E-Mails sind ausgenommen und behalten ihre eigene Freigabe in den Einstellungen. Der Agent fragt vor seinem ersten Lauf mit Zugriff auf Ihre Notizen noch einmal eigens nach.
+- **Geprüft vor dem Speichern:** Die App schickt eine kurze Testanfrage. Erst wenn sie gelingt, gilt die Einrichtung. Scheitert sie, nennt die App den Grund und die häufigsten Ursachen.
+- **Auch später erreichbar:** Wer die Einrichtung übersprungen hat, findet sie direkt im Agent-Tab, solange noch keine KI eingerichtet ist, und über „Über einen Anbieter einrichten“ in Chat und Auftragskarte.
+- **Standardweg:** Neue Chats und Aufträge wählen den eingerichteten Anbieter jetzt von selbst. Bisher musste man ihn in jedem neuen Tab von Hand auswählen. Auf der Karte des Anbieters in den Einstellungen gibt es dazu den Schalter „Standardweg für neue Chats und Aufträge“; im Tab lässt sich der Weg weiterhin umstellen.
+- **Menüs ohne lokales Modell:** Das Quiz im Dateibaum sowie KI-Leiste und Rechtsklick-Menü im Editor waren ohne lokales Modell gesperrt, auch wenn ein Anbieter eingerichtet war. Sie funktionieren jetzt mit beiden Wegen.
+- **Für Kurse und Schulungen:** Der Schlüssel muss nicht aus einem eigenen Konto stammen. Wer einen Schlüssel von der Kursleitung bekommt, fügt ihn ein und braucht kein Konto beim Anbieter.
+- **Grenzen:** Der Tagesrückblick arbeitet weiterhin nur mit einem lokalen Modell. Der Modellvorschlag beruht auf unseren Erfahrungen mit diesen Modellen, nicht auf einer Messreihe. Kostenlose Modelle bei OpenRouter sind in der Menge begrenzt, und ihre Betreiber dürfen Eingaben teils zum Training verwenden; sie eignen sich nicht für vertrauliche Inhalte. Bei beiden Anbietern verlassen Inhalte Ihren Rechner.
+
 ## [1.3.6] - 2026-11-13
 
 **Der Agent erstellt Präsentationen jetzt in einem abwechslungsreichen Hausstil, mit Symbolen, Abläufen, Zeitleisten und Diagrammen.** Statt Folie für Folie Aufzählungen wählt er für jeden Inhalt die passende Form, in den Farben und mit dem Logo Ihrer Einrichtung, wenn Sie ein Hausdesign eingerichtet haben. Außerdem nennt die App bei Störungen eines Cloud-Anbieters jetzt den wirklichen Grund.
