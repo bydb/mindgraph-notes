@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.8] - 2026-11-13
+
+**Die Einrichtung der KI bietet jetzt als vierten Schritt die Websuche an, und im Agent-Tab erscheint die Einrichtung direkt dort, wo Sie arbeiten wollen.** Mit der Websuche beantwortet die KI auch aktuelle Fragen und nennt Quellen, die Sie nachlesen können. Der Schritt ist freiwillig; alles andere funktioniert auch ohne ihn.
+
+### Hintergrund
+
+- **Auslöser:** Die Websuche lag bisher nur in den Einstellungen. Wer die KI frisch eingerichtet hatte, bekam auf aktuelle Fragen Antworten aus altem Modellwissen und wusste nicht, dass es eine Websuche gibt.
+- **Vierter Schritt:** In der Einrichtung über einen Anbieter steht jetzt „4 · Websuche“ mit einem Satz, wozu man sie braucht. Sie öffnen die Seite des Suchanbieters Tavily, kopieren dort Ihren Schlüssel und fügen ihn ein.
+- **Geprüft vor dem Einschalten:** Die App macht eine Testsuche. Erst wenn sie gelingt, ist die Websuche eingeschaltet. Scheitert sie, bleibt sie aus, und der Schlüssel wird wieder entfernt.
+- **Auch bei lokaler KI:** Wer die KI auf dem eigenen Rechner nutzt, findet die Websuche im selben Einrichtungsschritt als aufklappbaren Block.
+- **Einrichtung im Agent-Tab:** Ist noch keine KI eingerichtet, zeigt der Agent-Tab die Einrichtung direkt an, statt auf die Einstellungen zu verweisen. Nach der Bestätigung bleibt sie stehen, bis Sie „Loslegen“ wählen.
+- **Bestehende Einrichtung:** Haben Sie schon einen Suchanbieter eingerichtet, auch eine eigene Suchmaschine, wird nichts überschrieben.
+- **Grenzen:** Bei der Websuche gehen Ihre Suchanfragen an Tavily, ein Unternehmen in den USA; sie verlassen Ihren Rechner und die EU. Die gefundenen Seiten liest die App auf Ihrem Rechner. Nutzen Sie ein Modell bei einem Anbieter, sieht dieser auch den gelesenen Seiteninhalt. Wer das nicht möchte, richtet in den Einstellungen eine eigene Suchmaschine ein.
+
 ## [1.3.7] - 2026-11-13
 
 **MindGraph Notes lässt sich jetzt auch ohne starken Rechner mit KI nutzen: Die Einrichtung führt Sie in drei Schritten zu einem Anbieter im Netz.** Sie wählen LLMBase oder OpenRouter, fügen Ihren Schlüssel ein und bestätigen, was der Anbieter sehen darf. Danach antworten Chat, Agent, Notizbearbeitung und Karteikarten sofort, ohne dass Sie ein Modell auf Ihrem Rechner installieren.
