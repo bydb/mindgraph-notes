@@ -25,7 +25,7 @@ import { isCloudModel } from '../../shared/modelCompatibility'
 import { recordLlmRun, trackPendingTelemetry } from './telemetry'
 import { getModelContextLength, getModelImageInput, getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
-import { friendlyOllamaError } from '../../shared/ollamaError'
+import { friendlyOllamaError, isOllamaToolCallParseError } from '../../shared/ollamaError'
 
 export type ChatBackend = 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase'
 // Die OpenAI-kompatiblen CLOUD-Backends. LM Studio spricht dasselbe Protokoll,
@@ -730,7 +730,7 @@ async function chatWithToolsViaOllama(
   }))
 
   const startedAt = Date.now()
-  const res = await chatFetch(`${url}/api/chat`, {
+  const send = () => chatFetch(`${url}/api/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -745,8 +745,17 @@ async function chatWithToolsViaOllama(
       ...(Object.keys(ollamaOptions).length > 0 ? { options: ollamaOptions } : {})
     }),
   }, { timeoutMs: opts.timeoutMs ?? 180000, userSignal: opts.signal })
+  let res = await send()
   if (!res.ok) {
-    throw new Error(friendlyOllamaError(res.status, await res.text(), model))
+    const body = await res.text()
+    // Nur der Lesefehler für Werkzeugaufrufe wird EINMAL wiederholt (siehe isOllamaToolCallParseError).
+    if (isOllamaToolCallParseError(res.status, body) && !opts.signal?.aborted) {
+      console.warn(`[chatClient] Ollama konnte einen Werkzeugaufruf nicht lesen (${body.slice(0, 120)}) — einmal neu angefragt`)
+      res = await send()
+      if (!res.ok) throw new Error(friendlyOllamaError(res.status, await res.text(), model))
+    } else {
+      throw new Error(friendlyOllamaError(res.status, body, model))
+    }
   }
   const json = await res.json() as {
     message?: {

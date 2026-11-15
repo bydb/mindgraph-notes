@@ -19,7 +19,7 @@ const get = (id: string): CollectedTable | null => (id === 'tabelle2' ? vendors 
 describe('parseListPage', () => {
   it('OData mit nextLink und skip', () => {
     const p = parseListPage(JSON.stringify({ value: [{ a: 1 }], '@odata.nextLink': 'skip=50' }))
-    expect(p).toEqual({ rows: [{ a: 1 }], nextSkip: 50, hasNextLink: true })
+    expect(p).toEqual({ rows: [{ a: 1 }], nextSkip: 50, hasNextLink: true, cursorOnly: false })
     expect(parseListPage(JSON.stringify({ value: [], '@odata.nextLink': 'https://x/api?$skip=100&$top=50' }))?.nextSkip).toBe(100)
   })
   it('nextLink ohne lesbaren Versatz: Verweis erkannt, Versatz unbekannt', () => {
@@ -128,3 +128,70 @@ describe('fillDatasetPlaceholders', () => {
     expect(res.tooLarge).toEqual(['gross'])
   })
 })
+
+describe('Tabellen-Weg: Nachträge Codex F48/F52/F53', () => {
+  it('mehrdeutige Zahlen mit einem Trennzeichen werden nicht still gerechnet (F53)', async () => {
+    const { parseNumber } = await import('./datasetQuery')
+    expect(parseNumber('12.345')).toBeNull()
+    expect(parseNumber('1,234')).toBeNull()
+    expect(parseNumber('12.345', 'json')).toBe(12.345)
+    expect(parseNumber('1,234', 'json')).toBeNull()
+    expect(parseNumber('12.345,67')).toBe(12345.67)
+    expect(parseNumber('1,5')).toBe(1.5)
+    expect(parseNumber('12.34')).toBe(12.34)
+    expect(parseNumber('1.234.567')).toBe(1234567)
+  })
+  it('Summe über einen Textdatensatz meldet mehrdeutige Werte statt sie zu zählen (F53)', async () => {
+    const { queryDataset } = await import('./datasetQuery')
+    const t = { columns: ['a'], rows: [['12.345'], ['10']], files: [{ file: 'x.csv', status: 'ok' as const, rows: 2 }] }
+    const r = queryDataset(t, { aggregates: [{ op: 'sum', column: 'a' }] }, () => null)
+    expect(r.table.rows[0][0]).toBe('10')
+    expect(r.nonNumeric[0]).toMatchObject({ column: 'a', count: 1, example: '12.345' })
+  })
+  it('Datensatz aus JSON rechnet 1.125 als Dezimalzahl (F53)', async () => {
+    const { tableFromObjects, queryDataset } = await import('./datasetQuery')
+    const t = tableFromObjects([{ q: 1.125 }, { q: 2 }], { file: 'erp', complete: true })
+    expect(t.jsonNumberColumns).toEqual([true])
+    const r = queryDataset(t, { aggregates: [{ op: 'sum', column: 'q' }] }, () => null)
+    expect(r.table.rows[0][0]).toBe('3.125')
+  })
+  it('Cursor-Verweis wird erkannt (F48)', async () => {
+    const { parseListPage } = await import('./datasetQuery')
+    expect(parseListPage(JSON.stringify({ value: [{ a: 1 }], '@odata.nextLink': 'x?$skiptoken=abc' }))?.cursorOnly).toBe(true)
+    expect(parseListPage(JSON.stringify({ value: [{ a: 1 }], '@odata.nextLink': 'x?$skip=50' }))?.cursorOnly).toBe(false)
+  })
+  it('fremde Zellen werden im Platzhalter entschärft und mit Herkunft versehen (F52)', async () => {
+    const { fillDatasetPlaceholders } = await import('./datasetQuery')
+    const t = { columns: ['Name'], rows: [['[Bericht](https://fremd.example)'], ['![[andere-notiz]]'], ['<img src=x onerror=alert(1)>'], ['a | b']], files: [{ file: 'ERP', status: 'ok' as const, rows: 4 }], foreign: { label: 'ERP' } }
+    const out = fillDatasetPlaceholders('{{datensatz:t1}}', id => (id === 't1' ? t : null)).markdown
+    expect(out).toMatch(/^_Daten aus „ERP“ \(externes System\), wörtlich übernommen\._/)
+    expect(out).not.toMatch(/\[Bericht\]\(|\[\[|<img/)
+    expect(out).toContain('&#91;&#91;andere-notiz&#93;&#93;')
+    expect(out).toContain('a \\| b')
+    // Eigene (nicht fremde) Tabellen bleiben unverändert.
+    const own = fillDatasetPlaceholders('{{datensatz:t2}}', () => ({ ...t, foreign: undefined })).markdown
+    expect(own).toContain('[Bericht](https://fremd.example)')
+  })
+})
+
+describe('Tabellen-Weg: Nachträge Codex F54/F58', () => {
+  it('JSON-Text "12.345" neben echten JSON-Zahlen bleibt mehrdeutig, auch nach Join (F54)', async () => {
+    const { tableFromObjects, queryDataset } = await import('./datasetQuery')
+    const a = tableFromObjects([{ id: 'A', betrag: '12.345' }, { id: 'B', betrag: '10' }, { id: 'C', menge: 1.125 }], { file: 'erp', complete: true })
+    expect(a.jsonNumberColumns).toEqual([false, false, true])
+    const sum = queryDataset(a, { aggregates: [{ op: 'sum', column: 'betrag' }, { op: 'sum', column: 'menge' }] }, () => null)
+    expect(sum.table.rows[0]).toEqual(['10', '1.125'])
+    expect(sum.nonNumeric[0]).toMatchObject({ column: 'betrag', example: '12.345' })
+    const b = tableFromObjects([{ id: 'A', preis: 2.5 }], { file: 'erp2', complete: true })
+    const joined = queryDataset(a, { join: { dataset: 'b', left: 'id', right: 'id' } }, () => b)
+    expect(joined.table.jsonNumberColumns).toEqual([false, false, true, false, true])
+  })
+  it('leere fremde Tabelle behält Herkunft und UNVOLLSTÄNDIG (F58)', async () => {
+    const { fillDatasetPlaceholders } = await import('./datasetQuery')
+    const t = { columns: ['a'], rows: [], files: [{ file: 'ERP', status: 'teilweise' as const, rows: 0, message: 'Obergrenze' }], foreign: { label: 'ERP' } }
+    const out = fillDatasetPlaceholders('{{datensatz:t}}', () => t).markdown
+    expect(out).toMatch(/Daten aus „ERP“.*UNVOLLSTÄNDIG: Obergrenze/)
+    expect(out).toMatch(/keine Zeilen/)
+  })
+})
+

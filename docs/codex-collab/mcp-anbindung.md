@@ -498,6 +498,30 @@ Zählen/Summieren deterministisch (z.B. ein App-Werkzeug, das über die Seiten e
 List-Werkzeugs zählt/summiert, ohne Zeilen durch den Kontext), und ein Hinweis im Systemtext, bei
 ERP-Listen immer `select` zu setzen. Vorrang hat aber der Test am echten Business Central.
 
+## Messbericht Tabellen-Weg lokal (15.11.2026)
+
+Gleicher Harness und gleiche Fragen wie „ERP in realistischer Größe“, jetzt mit Tabellen-Weg (`mcp_collect` +
+`query_dataset`, Commit `4adae23c`), qwen3.8:27b-mlx, 6 × 3, Code-Stand `22e8b11f`.
+
+| Frage | vorher richtig / Dauer | mit Tabellen-Weg richtig / Dauer | Kontext max. |
+|---|---|---|---|
+| q1 Lieferant | 3/3 · 30–37 s | 3/3 · 37–132 s | 15 % |
+| q2 Schwelle | 3/3 · 39–89 s | 3/3 · 62–83 s | 16 % |
+| q3 Summe | 3/3 · 50–110 s | 3/3 · 62–96 s | 16 % |
+| q4 Rangliste | 3/3 · **492–618 s** | 2/3 · **37–77 s** | 18 % |
+| q5 Zählen | **2/3** · 209–256 s | **3/3** · 59–69 s | 19 % |
+| q6 Verknüpfung | 3/3 · 286–305 s | 3/3 · 64–91 s | 16 % |
+
+**17/18, aber anders verteilt:** Alle 17 abgeschlossenen Läufe sind richtig; der eine Fehlschlag (q4 Lauf 2)
+ist kein falsches Ergebnis, sondern ein Abbruch in Ollama: „Ollama-Fehler 500: XML syntax error on line 9:
+unexpected EOF“ — Ollamas Parser für die Werkzeugaufrufe des Modells scheiterte, nach 21 s. Das Zählen
+stimmt jetzt immer (vorher einmal 137 statt 136). Die ganze Reihe dauerte 20 statt 62 Minuten; Ranglisten
+und Zählen sind 3–8-mal schneller, weil die Zeilen nicht mehr Seite für Seite durch das Modell laufen.
+Jeder Lauf nutzte `mcp_collect` und (bis auf den Abbruch) `query_dataset`.
+
+**Offen daraus:** Der Ollama-500 bei Werkzeugaufrufen ist nicht vom Tabellen-Weg verursacht, beendet aber
+den Lauf; ob ein einmaliges Wiederholen dieses Fehlers sinnvoll ist, wäre eigens zu messen.
+
 ## Codex-Findings
 
 ### F01 — Dynamisches BC-Werkzeug umgeht die Lesefreigabe
@@ -782,6 +806,72 @@ ADR-Stelle: F45, Tokengrenze Runde 8
 Status: [OFFEN]
 `tokens` ist bei bestehenden Werkzeugfreigaben optional (`app/src/shared/mcp.ts:52–56`); der Store liest alte Einträge ohne Migration (`app/src/main/mcp/store.ts:200–205`). `publicServer` gibt dann `approvedTokens: null` zurück (`app/src/main/mcp/ipc.ts:101–103`). Der Picker rechnet `null` als **null Token** und warnt nur, wenn seine Summe über 8.000 liegt (`app/src/renderer/components/Agent/McpServerPicker.tsx:56–61`, `app/src/renderer/components/Agent/McpServerPicker.tsx:94–99`). Auch vorhandene Zahlen können falsch werden: Die Schätzung hängt vom Serverlabel ab (`app/src/main/mcp/agentTools.ts:169–171`), eine reine Umbenennung lässt wegen unveränderter Bindung aber Freigaben und ihre gespeicherten `tokens` stehen (`app/src/shared/mcp.ts:190–207`, `app/src/main/mcp/store.ts:276–279`, `app/src/main/mcp/store.ts:297–305`). Der Main berechnet beim Laufstart dagegen aktuelle Kosten und kann den zuvor unauffälligen Lauf ablehnen (`app/src/main/mcp/agentTools.ts:129–145`). Vorschlag: Fehlende Werte im Picker als „Größe unbekannt“ anzeigen und dafür keine Entwarnung geben; gespeicherte Kosten bei Umbenennung und nach Schema-/Schätzalgorithmusänderungen neu berechnen oder die Picker-Summe unmittelbar aus aktuellen Main-seitigen Werkzeugdefinitionen beziehen. Tests für alte Freigaben ohne `tokens` und Labeländerung ergänzen.
 
+### F48 — mcp_collect kann eine Teilliste als vollständig melden
+Schwere: hoch
+ADR-Stelle: Tabellen-Weg, Vollständigkeit
+Status: [OFFEN]
+`arguments` darf die Blätter-Parameter des fremden Werkzeugs weiterhin enthalten; `mcp_collect` übernimmt einen vom Modell gesetzten `skip`/`offset` als Startwert (`app/src/main/mcp/agentTools.ts:294–300`, `app/src/main/mcp/agentTools.ts:312–328`). Bei einem gültigen Start mit `skip: 50` sammelt es nur den Rest und meldet ohne weitere Kennzeichnung „Vollständig: alle Seiten abgerufen“ (`app/src/main/mcp/agentTools.ts:339`, `app/src/main/mcp/agentTools.ts:380–402`). Außerdem erkennt `parseListPage` einen `@odata.nextLink` mit `$skiptoken`, kann dessen Cursor aber nicht lesen (`app/src/shared/datasetQuery.ts:39–49`); `mcp_collect` ersetzt ihn still durch einen errechneten Zahlenversatz (`app/src/main/mcp/agentTools.ts:387–388`). Ein Cursor ist nicht gleich einem Offset: Zeilen können fehlen oder doppelt vorkommen, obwohl der Datensatz am Ende als vollständig gilt. Vorschlag: Beim vollständigen Sammeln vorgegebene Startversätze ablehnen oder ausdrücklich als Teilliste kennzeichnen. Einen unbekannten Cursor nicht in einen Offset umdeuten; nur einen nachweislich unterstützten Seitenweg verwenden, sonst mit klarer Unvollständigkeit stoppen. Tests für Startversatz und Cursor-Verweis ergänzen.
+
+### F49 — Sammelaufruf hat keine Gesamtgrenze für Zeit und Datenmenge
+Schwere: hoch
+ADR-Stelle: Tabellen-Weg, Mengen- und Zeitgrenzen
+Status: [OFFEN]
+Die Grenzen betreffen Zeilen und Seiten, nicht die Größe der Zeilen oder die Gesamtdauer (`app/src/main/mcp/agentTools.ts:257–260`, `app/src/main/mcp/agentTools.ts:335–389`). Pro Seite darf ein HTTP-Server bis zu 4 MiB liefern, und jeder einzelne Werkzeugaufruf hat 60 Sekunden Zeit (`app/src/shared/mcp.ts:125–127`, `app/src/main/mcp/httpFetch.ts:60–61`, `app/src/main/mcp/client.ts:182–184`). 400 Seiten mit 50 großen Zeilen können so grob 1,6 GiB Rohdaten und deutlich mehr Speicher nach JSON-Parsing, `rows.push` und `tableFromObjects` belegen (`app/src/main/mcp/agentTools.ts:344–345`, `app/src/main/mcp/agentTools.ts:373–394`, `app/src/shared/datasetQuery.ts:60–69`); die Zeitgrenze ist pro Seite statt für den Sammelauftrag. Der direkte MCP-Weg kürzt Resultate auf 40.000 Zeichen, `rawResultText` umgeht diese Grenze absichtlich (`app/src/main/mcp/agentTools.ts:225`, `app/src/main/mcp/agentTools.ts:270–274`). Vorschlag: Zusätzlich kumulative Byte-/Zeichengrenze, Speichergrenze für Zellen/Spalten und Gesamtdauer je `mcp_collect` erzwingen; bei Erreichen den Datensatz sichtbar als unvollständig markieren. Große echte Seiten und einen langsamen Server als Gegenprobe verwenden.
+
+### F50 — Kontextkürzung kann die Kennung eines schon angelegten Datensatzes entfernen
+Schwere: mittel
+ADR-Stelle: Tabellen-Weg, Ergebnisbudget
+Status: [OFFEN]
+`mcp_collect` legt den Datensatz vor seiner Antwort an; `query_dataset` tut dasselbe (`app/src/main/mcp/agentTools.ts:391–410`, `app/src/main/noteAgent/skills.ts:775–793`). Beide Antworten mit fremden Daten beginnen durch `wrapForeignResult` jedoch mit einer Herkunftszeile; erst die zweite Zeile enthält die neue Datensatz-ID (`app/src/shared/mcp.ts:392–395`, `app/src/main/noteAgent/skills.ts:2115–2118`). Für `LOCK_ONLY_TOOLS` entfernt der Loop bei knappem Restbudget Zeilen **vom Ende**, bis im Grenzfall nur die erste Herkunftszeile und der Kürzungsvermerk stehen (`app/src/main/noteAgent/loop.ts:736–746`). Das Modell erfährt dann weder die bereits registrierte ID noch gegebenenfalls „UNVOLLSTÄNDIG“, obwohl der Datensatz fortlebt. Vorschlag: Einen kurzen, nicht entfernbaren Vorspann mit ID, Zeilenzahl, Herkunft und Vollständigkeitsstatus vor das Kürzen setzen; Beispielzeilen nur bis `ctx.maxResultTokens()` anhängen. Grenztest mit knapp positivem Kontextrest und großer Zelle.
+
+### F51 — mcp_collect zählt nicht zur Werkzeug-Tokengrenze
+Schwere: mittel
+ADR-Stelle: E10, Tabellen-Weg
+Status: [OFFEN]
+Die 8.000-Token-Prüfung summiert ausschließlich die fremden Werkzeuge und läuft **vor** dem Anlegen von `mcp_collect` (`app/src/main/mcp/agentTools.ts:139–167`). Dessen Modelldefinition enthält einen Beschreibungstext und ein `enum` mit allen freigegebenen Werkzeugnamen (`app/src/main/mcp/agentTools.ts:286–303`); der Loop hängt auch diese Definition an die tatsächlich gesendete Werkzeugliste (`app/src/main/noteAgent/loop.ts:310–321`). Ein Lauf knapp unter 8.000 kann daher mit dem Tabellen-Weg oberhalb der beabsichtigten Grenze starten. Vorschlag: Den festen App-Helfer samt dynamischem `enum` vor der Grenzprüfung aufbauen und seine geschätzten Token zur Summe rechnen oder eine entsprechend belegte Reserve in der Grenze abziehen.
+
+### F52 — Platzhalter übernimmt fremde Zellen als aktive Markdown-Syntax
+Schwere: mittel
+ADR-Stelle: Tabellen-Weg, write_note und Herkunft
+Status: [OFFEN]
+`markdownTable` maskiert in Spalten und Zellen nur Pipe und Zeilenumbruch; Markdown-Links, Bild-/Wikilink-Syntax und HTML bleiben unverändert (`app/src/shared/datasetQuery.ts:313–319`). `fillDatasetPlaceholders` setzt diesen Text ohne Herkunftszeile in den Notiztext ein, und `write_note` schreibt ihn danach als Markdown (`app/src/shared/datasetQuery.ts:321–333`, `app/src/main/noteAgent/skills.ts:1969–1977`, `app/src/main/noteAgent/skills.ts:1989–1991`). Eine präparierte fremde Zelle wie `[Bericht](https://fremd.example)` oder `![[andere-notiz]]` wird dadurch als Link bzw. Einbettung statt als wörtlicher Zellwert gespeichert; die vorhandene Kennzeichnung `foreign` wirkt nur auf Werkzeugantworten an das Modell (`app/src/main/noteAgent/skills.ts:2115–2118`). Vorschlag: Zelltext für die Markdown-Tabelle als Text kodieren und vor eingesetzten Fremdtabellen eine feste Herkunfts- und Datenkennzeichnung erzeugen; Tests mit Link, Wikilink, HTML und Pipe im Zellwert.
+
+### F53 — Zahlen mit genau einem Tausendertrennzeichen werden still falsch gerechnet
+Schwere: mittel
+ADR-Stelle: Tabellen-Weg, query_dataset
+Status: [OFFEN]
+`parseNumber` versucht die Schreibweise mit Punkt zuerst als Dezimalzahl; `12.345` wird deshalb als 12,345 statt als mögliche deutsche Tausenderzahl 12.345 gelesen. Entsprechend trifft `1,234` die allgemeine Komma-Dezimalregel und kann als 1,234 statt als englische Tausenderzahl 1.234 gelten (`app/src/shared/datasetQuery.ts:74–85`). Diese Werte gehen ohne Warnung in Vergleiche, Summen und Ranglisten ein; `nonNumeric` meldet nur Werte, die `parseNumber` als `null` zurückgibt (`app/src/shared/datasetQuery.ts:139–153`, `app/src/shared/datasetQuery.ts:258–270`). Der Test deckt nur eindeutige Schreibweisen mit beiden Trennzeichen ab (`app/src/shared/datasetQuery.test.ts:48–60`). Vorschlag: Mehrdeutige Einzeltrennzeichen ohne festes Quellformat ablehnen und als nicht lesbare Zahl melden oder das Zahlenformat je Spalte/Server ausdrücklich festlegen; beide Schreibweisen als Gegenprobe für Summe und Sortierung testen.
+
+### F54 — JSON-Zahlenmodus gilt irrtümlich auch für String-Zellen
+Schwere: hoch
+ADR-Stelle: F53, query_dataset
+Status: [OFFEN]
+`tableFromObjects` setzt `numberFormat: 'json'` für den **ganzen** Datensatz, obwohl `cellText` auch JSON-Strings unverändert übernimmt (`app/src/shared/datasetQuery.ts:53–75`). `queryDataset` nutzt diesen Modus für alle Zellen, bei einem Join sogar für beide ganzen Datensätze, sobald beide so markiert sind (`app/src/shared/datasetQuery.ts:211–217`). Dadurch wird etwa `{"Betrag":"12.345"}` als Dezimalzahl 12,345 statt als mehrdeutiger Textwert gelesen; `parseNumber` unterdrückt im JSON-Modus genau diese Warnung (`app/src/shared/datasetQuery.ts:90–98`, `app/src/shared/datasetQuery.ts:275–285`). Auch ein Ergebnisdatensatz übernimmt den Modus pauschal (`app/src/shared/datasetQuery.ts:323–325`). Vorschlag: Die Herkunft der Zahl pro Zelle oder mindestens pro Spalte erhalten; nur echte JSON-Zahlen im Dezimalmodus rechnen, JSON-Strings und gemischte Join-Spalten nach der vorsichtigen Textregel behandeln. Test mit einem JSON-String `12.345` neben einer echten JSON-Zahl und einem Join ergänzen.
+
+### F55 — Geschützter Ergebnis-Kopf kann selbst das Kontextbudget sprengen
+Schwere: mittel
+ADR-Stelle: F50, Ergebnisbudget
+Status: [OFFEN]
+Die neue Loop-Kürzung behält alle Zeilen bis zur ersten Leerzeile zwingend und sendet den Rest auch dann, wenn dieser Kopf **allein** größer als `maxToolResultTokens` ist (`app/src/main/noteAgent/loop.ts:740–749`). Bei `mcp_collect` liegt die unbeschränkte Liste aller Spaltennamen vor der Leerzeile (`app/src/main/mcp/agentTools.ts:424–429`); bei `query_dataset` stehen dort auch ungekürzte Beispiele nicht lesbarer Zellwerte und Meldungen unvollständiger Quellen (`app/src/main/noteAgent/skills.ts:782–786`). Ein Server kann diese Kopfzeilen groß machen, oder der Restplatz ist knapp positiv: Die Datensatz-ID bleibt dann zwar sichtbar, die behauptete Kontextgrenze greift aber nicht mehr. Vorschlag: Einen kurzen festen Kopf mit ID, Herkunft und Vollständigkeit erzeugen; variable Spalten, Argumente und Beispiele separat und begrenzt anhängen. Ist selbst der feste Kopf zu groß für den Restplatz, vor dem Aufruf sperren oder eine kurze sichere Meldung senden. Grenztest mit vielen langen Spalten und kleinem Restbudget.
+
+### F56 — Leere Seite mit Fortsetzungsverweis wird als vollständiges Ende gewertet
+Schwere: mittel
+ADR-Stelle: F48, Pagination
+Status: [OFFEN]
+`parseListPage` bewahrt `hasNextLink` und erkennt nun auch Cursor-Verweise (`app/src/shared/datasetQuery.ts:30–55`). `mcp_collect` bricht aber bei `page.rows.length === 0` **vor** der Prüfung des Verweises ab (`app/src/main/mcp/agentTools.ts:399–413`). Antwortet ein Listenwerkzeug mit `value: []` und `@odata.nextLink` auf eine noch ausstehende Seite, wird `incomplete` nicht gesetzt; Datensatz und Modellantwort behaupten anschließend „Vollständig: alle Seiten abgerufen“ (`app/src/main/mcp/agentTools.ts:416–427`). Vorschlag: Einen Fortsetzungsverweis auch bei leerer Seite beachten; wenn sein Cursor nicht weitergereicht werden kann, sichtbar „unvollständig“ melden. Test mit leerer Seite plus `nextLink`.
+
+### F57 — Neue Sammelgrenzen werden erst nach der letzten Antwort geprüft
+Schwere: mittel
+ADR-Stelle: F49, Gesamtgrenzen
+Status: [OFFEN]
+Die 20-Mio.-Zeichen- und Fünf-Minuten-Prüfung steht nur **vor** dem nächsten Seitenaufruf (`app/src/main/mcp/agentTools.ts:350–356`). Danach wird die komplette Antwort zu `totalChars` addiert, geparst und in `rows` übernommen, ohne das Überschreiten erneut zu prüfen (`app/src/main/mcp/agentTools.ts:362–364`, `app/src/main/mcp/agentTools.ts:385–417`). Endet die Liste mit dieser Seite, meldet der Datensatz sogar „vollständig“, obwohl Größen- oder Zeitgrenze überschritten ist. Bei HTTP sind pro Seite bis 4 MiB zusätzlich möglich (`app/src/main/mcp/httpFetch.ts:60–61`); für lokale stdio-Antworten ist hier keine Seitengröße belegt. Vorschlag: Nach jedem Empfang und vor dem Parsen/Übernehmen die kumulativen Grenzen prüfen und überschießende Daten verwerfen oder gezielt kürzen; die Gesamtdauer per Deadline/AbortSignal auch während eines laufenden Seitenaufrufs erzwingen. Tests mit überschießender **letzter** Seite und letzter langsamer Antwort.
+
+### F58 — Leere fremde Platzhalter-Tabelle verliert Herkunft und Unvollständigkeit
+Schwere: mittel
+ADR-Stelle: F52, write_note und Herkunft
+Status: [OFFEN]
+`fillDatasetPlaceholders` gibt bei null Zeilen sofort `_(keine Zeilen)_` zurück, **bevor** es `foreign` oder den Status der Quelldateien prüft (`app/src/shared/datasetQuery.ts:352–364`). Ein `query_dataset`-Ergebnis aus einer unvollständigen fremden Liste kann nach einem Filter null Zeilen haben und behält dennoch `foreign` und den Status `teilweise` (`app/src/main/noteAgent/skills.ts:775–779`); der Platzhalter fügt es in `write_note` dann ohne Anbieter oder „UNVOLLSTÄNDIG“ ein (`app/src/main/noteAgent/skills.ts:1969–1975`). Der Modellbericht kann vorher gewarnt haben; die deterministisch eingesetzte Notiz enthält diese Warnung nicht. Vorschlag: Die feste Herkunfts- und Vollständigkeitszeile auch bei leerem fremdem Datensatz erzeugen und erst darunter „keine Zeilen“ ausgeben. Test für `foreign` + `teilweise` + null Zeilen.
+
 ## Claude-Antwort
 
 Runde 1, 14.11.2026. Code-Belege von F02, F03, F05–F09 am Code nachgelesen; F01, F04 und F10
@@ -914,6 +1004,48 @@ Runde 8 (Nachprüfung, 15.11.2026): F44–F46 tragen laut Codex bis auf die Anze
   ‚Werkzeuge anzeigen‘“ und gibt keine Entwarnung; Umbenennen behält Freigaben, verwirft aber gespeicherte
   Größen; „Werkzeuge anzeigen“ frischt die Größe bestehender Freigaben auf. Die Laufgrenze im Main rechnet
   weiterhin frisch. Test in `client.test.ts`. Nicht mehr von Codex nachgeprüft.
+
+Runde 9 (Tabellen-Weg, 15.11.2026). Alle sechs am Code nachgelesen (F52/F53 direkt nachgeprüft) und umgesetzt
+(Nutzer: „ja, einverstanden“). Belege: typecheck grün (auch die zwei vorher roten Typfehler in
+`collectTool.test.ts` aus `4adae23c` behoben), Tests `shared`, `main/mcp`, `main/noteAgent` grün bis auf die
+bekannte Shell-Probe.
+
+- **F48 [ADRESSIERT]** — `mcp_collect` lehnt einen vom Modell gesetzten Startversatz (`skip`/`$skip`/`offset` ≠ 0)
+  ab; `parseListPage` meldet `cursorOnly`, wenn ein `nextLink` keinen Zahlenversatz trägt (z.B. `$skiptoken`) —
+  dann hält `mcp_collect` mit „UNVOLLSTÄNDIG … nur die ersten n Zeilen“ an statt umzudeuten. Tests.
+- **F49 [ADRESSIERT]** — Gesamtgrenzen je Sammelaufruf: 20 Mio. Zeichen Rohtext und 5 Minuten
+  (`MCP_COLLECT_MAX_CHARS`, `MCP_COLLECT_MAX_MS`), sonst „unvollständig“. Test mit großen Zeilen.
+- **F50 [ADRESSIERT]** — die Notkürzung im Loop behält den Kopf bis zur ersten Leerzeile (Herkunft, Datensatz-ID,
+  „UNVOLLSTÄNDIG“) immer und kürzt nur danach.
+- **F51 [ADRESSIERT]** — `mcp_collect` wird vor der Tokenprüfung gebaut und zählt mit (mit Aufschlag).
+- **F52 [ADRESSIERT]** — `fillDatasetPlaceholders` setzt bei fremden Tabellen eine feste Herkunftszeile davor
+  und entschärft Zellen und Spaltennamen (`inertCell`: `& < > [ ] \``` als HTML-Entitäten); eigene Tabellen
+  unverändert. Grenze: Wird die Notiz später im Lesen-Modus bearbeitet, macht turndown aus den Entitäten
+  wieder Zeichen. Test mit Link, Wikilink, HTML, Pipe.
+- **F53 [ADRESSIERT]** — `parseNumber(s, mode)`: genau ein Trennzeichen mit drei Ziffern danach („12.345“,
+  „1,234“) gilt als mehrdeutig → nicht gerechnet, als „keine eindeutige Zahl“ gemeldet; Datensätze aus JSON
+  (`numberFormat: 'json'`, gesetzt von `tableFromObjects`) lesen „1.125“ als Dezimalzahl. Tests.
+
+Zusätzlich (aus den Messungen): Ollama brach 2 von 21 Tabellen-Weg-Läufen mit „500 XML syntax error …
+unexpected EOF“ ab, beide Male beim `query_dataset`-Aufruf direkt nach `mcp_collect`. `chatWithToolsViaOllama`
+wiederholt genau diesen Lesefehler einmal (`isOllamaToolCallParseError`, getestet); andere Fehler nicht.
+
+Messung nach Runde 9 (15.11.2026, qwen3.8:27b-mlx, 6 × 3): **18/18**, Kontext max. 20 %, Reihe 19 min. Der
+Ollama-Lesefehler trat in dieser Reihe nicht auf — dass die Wiederholung greift, ist damit nicht belegt.
+
+Runde 10 (Nachprüfung, 15.11.2026). Alle fünf am Code nachgelesen und umgesetzt.
+- **F54 [ADRESSIERT]** — Zahlenmodus je Spalte statt je Datensatz: `jsonNumberColumns` (nur Spalten, in denen
+  alle Werte echte JSON-Zahlen sind), durch join, Gruppierung (Aggregate = JS-Zahlen), select mitgeführt;
+  JSON-Text „12.345“ bleibt mehrdeutig. Test mit Text neben Zahl und Join.
+- **F55 [ADRESSIERT]** — Ist der geschützte Kopf selbst zu groß, bleiben nur die ersten drei Zeilen, je auf
+  300 Zeichen gekappt (Herkunft, ID, Vollständigkeit).
+- **F56 [ADRESSIERT]** — Leere Seite mit Verweis: weiter nur über einen lesbaren Zahlenversatz, sonst
+  „UNVOLLSTÄNDIG … leere Seite mit Verweis“. Test.
+- **F57 [ADRESSIERT]** — Zeichengrenze nach jedem Empfang (überschießende Seite wird verworfen und gemeldet);
+  Zeitgrenze als Abbruchsignal auch während eines Seitenaufrufs. Test mit überschießender letzter Seite.
+- **F58 [ADRESSIERT]** — Leere fremde Tabelle im Platzhalter behält Herkunftszeile und „UNVOLLSTÄNDIG“. Test.
+Belege: typecheck grün, Tests `shared`, `main/mcp`, `main/noteAgent`, `main/llm` grün bis auf die bekannte
+Shell-Probe; Live-Gegenprobe 6 Fragen × 1: 6/6. Nicht mehr von Codex nachgeprüft.
 
 ## Status
 

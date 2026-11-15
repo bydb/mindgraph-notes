@@ -14,7 +14,7 @@ const SCHEMA = { type: 'object', properties: { filter: { type: 'string' }, top: 
 
 function setup(opts: { schema?: Record<string, unknown>; respond?: (args: Record<string, unknown>, n: number) => { text: string; isError?: boolean } } = {}) {
   const calls: Array<Record<string, unknown>> = []
-  const respond = opts.respond ?? ((args: Record<string, unknown>) => {
+  const respond: (args: Record<string, unknown>, n: number) => { text: string; isError?: boolean } = opts.respond ?? ((args: Record<string, unknown>) => {
     const skip = Number(args.skip ?? 0)
     const top = Number(args.top ?? 50)
     const page = ROWS.slice(skip, skip + top)
@@ -90,7 +90,7 @@ describe('mcp_collect', () => {
 
   it('Fehler auf Seite 2: Datensatz mit dem Bisherigen, als unvollständig', async () => {
     const { tool, ctx, run } = setup({
-      respond: (args, n) => (n === 2 ? { text: 'Zeitüberschreitung', isError: true } : { text: JSON.stringify({ value: ROWS.slice(0, 50), '@odata.nextLink': 'skip=50' }) })
+      respond: (_args, n) => (n === 2 ? { text: 'Zeitüberschreitung', isError: true } : { text: JSON.stringify({ value: ROWS.slice(0, 50), '@odata.nextLink': 'skip=50' }) })
     })
     const res = await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066' }, ctx)
     expect(run.datasets.get('tabelle1').rows).toHaveLength(50)
@@ -123,4 +123,50 @@ describe('mcp_collect', () => {
     await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066' }, ctx)
     expect(calls.map(c => c.skip)).toEqual([undefined, 50, 100])
   })
+
+  it('lehnt einen vom Modell gesetzten Startversatz ab (F48)', async () => {
+    const { tool, ctx, calls } = setup()
+    const res = await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066', arguments: { skip: 50 } }, ctx)
+    expect(res.ok).toBe(false)
+    expect(res.content).toMatch(/Lass „skip“ weg/)
+    expect(calls).toHaveLength(0)
+  })
+
+  it('deutet einen Cursor-Verweis nicht in einen Zahlenversatz um (F48)', async () => {
+    const { tool, ctx, run, calls } = setup({
+      respond: () => ({ text: JSON.stringify({ value: ROWS.slice(0, 50), '@odata.nextLink': 'https://bc.example/api?$skiptoken=abc' }) })
+    })
+    const res = await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066' }, ctx)
+    expect(calls).toHaveLength(1)
+    expect(run.datasets.get('tabelle1').files[0].status).toBe('teilweise')
+    expect(res.content).toMatch(/UNVOLLSTÄNDIG: .*skiptoken/)
+  })
+
+  it('bricht bei der Gesamtgrenze für Zeichen ab und meldet es (F49)', async () => {
+    const big = 'x'.repeat(5_100_000)
+    const { tool, ctx, run } = setup({
+      respond: (args) => ({ text: JSON.stringify({ value: [{ number: `PO-${args.skip ?? 0}`, note: big }], '@odata.nextLink': `skip=${Number(args.skip ?? 0) + 1}` }) })
+    })
+    const res = await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066' }, ctx)
+    expect(run.datasets.get('tabelle1').rows.length).toBeLessThanOrEqual(4)
+    expect(res.content).toMatch(/UNVOLLSTÄNDIG: Obergrenze von 20 Mio. Zeichen/)
+  })
+
+  it('leere Seite mit nicht weiterverfolgbarem Verweis gilt als unvollständig (F56)', async () => {
+    const { tool, ctx, run } = setup({
+      respond: (_a, n) => ({ text: JSON.stringify(n === 1 ? { value: ROWS.slice(0, 50), '@odata.nextLink': 'skip=50' } : { value: [], '@odata.nextLink': 'x?$skiptoken=b' }) })
+    })
+    const res = await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066' }, ctx)
+    expect(run.datasets.get('tabelle1').files[0].status).toBe('teilweise')
+    expect(res.content).toMatch(/UNVOLLSTÄNDIG: .*leere Seite/)
+  })
+
+  it('überschießende letzte Seite wird verworfen und gemeldet (F57)', async () => {
+    const big = 'y'.repeat(21_000_000)
+    const { tool, ctx, run } = setup({ respond: () => ({ text: JSON.stringify({ value: [{ number: 'PO-1', note: big }] }) }) })
+    const res = await tool.run({ tool: 'mcp__erp__List_PurchaseOrders_PAG30066' }, ctx)
+    expect(run.datasets.get('tabelle1').rows).toHaveLength(0)
+    expect(res.content).toMatch(/UNVOLLSTÄNDIG: Obergrenze von 20 Mio\. Zeichen erreicht \(Seite 1 verworfen\)/)
+  })
 })
+

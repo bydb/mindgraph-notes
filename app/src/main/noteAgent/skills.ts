@@ -782,7 +782,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const lines = [
         `Ergebnis als Datensatz "${resultId}": ${res.table.rows.length.toLocaleString('de-DE')} Zeilen${q.limit !== undefined && res.totalBeforeLimit > res.table.rows.length ? ` (die ersten ${res.table.rows.length} von ${res.totalBeforeLimit.toLocaleString('de-DE')})` : ''}.`,
         ...(incomplete.length ? [`ACHTUNG: Grunddaten unvollständig (${incomplete.map(f => `${f.file}: ${f.message ?? f.status}`).join('; ')}) — das Ergebnis gilt nur für die abgerufenen Zeilen. Sage das im Ergebnis.`] : []),
-        ...res.nonNumeric.map(n => `ACHTUNG: In Spalte „${n.column}“ waren ${n.count} Werte keine Zahl (z. B. „${n.example}“) und zählen in Summe/Mittel/Min/Max NICHT mit.`),
+        ...res.nonNumeric.map(n => `ACHTUNG: In Spalte „${n.column}“ waren ${n.count} Werte keine eindeutige Zahl (z. B. „${n.example}“ — leer, Text oder mehrdeutig wie 12.345) und zählen in Summe/Mittel/Min/Max NICHT mit.`),
         '',
         res.table.rows.length ? markdownTable(res.table, SHOW) : '(keine Zeilen)',
         ...(res.table.rows.length > SHOW ? [`[${shown} von ${res.table.rows.length} Zeilen gezeigt — die übrigen stehen im Datensatz. Für die ganze Tabelle {{datensatz:${resultId}}} in write_note einsetzen oder write_xlsx mit dataset="${resultId}".]`] : [])

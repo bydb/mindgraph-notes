@@ -741,7 +741,17 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
           if (estimateTokens(content) > limit) {
             const marker = '\n[gekürzt: Kontext fast voll — schreibe jetzt das Ergebnis aus dem, was du hast]'
             const lines = content.split('\n')
-            while (lines.length > 1 && estimateTokens(lines.join('\n') + marker) > limit) lines.pop()
+            // Der Kopf bis zur ersten Leerzeile trägt Herkunft, Datensatz-ID und „UNVOLLSTÄNDIG“ —
+            // der bleibt immer stehen; gekürzt wird nur danach (Codex F50).
+            const blank = lines.indexOf('')
+            const keep = Math.max(1, blank > 0 ? blank : 1)
+            while (lines.length > keep && estimateTokens(lines.join('\n') + marker) > limit) lines.pop()
+            // Ist der Kopf selbst zu groß (viele/lange Spalten, lange Meldungen), jede Kopfzeile kappen
+            // und notfalls nur die ersten drei behalten — Herkunft, ID, Vollständigkeit (Codex F55).
+            if (estimateTokens(lines.join('\n') + marker) > limit) {
+              const capped = lines.slice(0, 3).map((l: string) => (l.length > 300 ? `${l.slice(0, 300)} …` : l))
+              lines.splice(0, lines.length, ...capped)
+            }
             content = lines.join('\n') + marker
           }
         }

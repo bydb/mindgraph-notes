@@ -18,6 +18,12 @@ export interface ParsedListPage {
   nextSkip: number | null
   /** Hat die Antwort überhaupt einen Verweis auf eine nächste Seite? */
   hasNextLink: boolean
+  /**
+   * Verweis mit einem Cursor statt Zahlenversatz (z.B. `$skiptoken`, `cursor=`, `page_token=`):
+   * Über ein Werkzeug lässt sich so ein Cursor nicht weiterreichen, also auch nicht in einen
+   * Zahlenversatz umdeuten — sonst fehlen oder doppeln sich Zeilen (Codex F48).
+   */
+  cursorOnly: boolean
 }
 
 const LIST_KEYS = ['value', 'items', 'data', 'results', 'records', 'rows']
@@ -46,7 +52,7 @@ export function parseListPage(text: string): ParsedListPage | null {
     const m = /(?:^|[?&$])\$?skip=(\d+)/i.exec(nextLink as string)
     if (m) nextSkip = Number(m[1])
   }
-  return { rows: list as Array<Record<string, unknown>>, nextSkip, hasNextLink }
+  return { rows: list as Array<Record<string, unknown>>, nextSkip, hasNextLink, cursorOnly: hasNextLink && nextSkip === null }
 }
 
 /** Zellwert als Text: Zahlen und Wahrheitswerte unverändert lesbar, null leer, Objekte als JSON. */
@@ -62,8 +68,20 @@ export function tableFromObjects(rows: Array<Record<string, unknown>>, source: {
   const columns: string[] = []
   const seen = new Set<string>()
   for (const r of rows) for (const k of Object.keys(r)) if (!seen.has(k)) { seen.add(k); columns.push(k) }
+  // Je Spalte: nur echte JSON-Zahlen (kein JSON-Text) zählen als eindeutig (F54).
+  const jsonNumberColumns = columns.map(c => {
+    let seenNumber = false
+    for (const r of rows) {
+      const v = r[c]
+      if (v === null || v === undefined) continue
+      if (typeof v !== 'number') return false
+      seenNumber = true
+    }
+    return seenNumber
+  })
   return {
     columns,
+    ...(jsonNumberColumns.some(Boolean) ? { jsonNumberColumns } : {}),
     rows: rows.map(r => columns.map(c => cellText(r[c]))),
     files: [{ file: source.file, status: source.complete ? 'ok' : 'teilweise', rows: rows.length, ...(source.message ? { message: source.message } : {}) }]
   }
@@ -74,10 +92,17 @@ export function tableFromObjects(rows: Array<Record<string, unknown>>, source: {
 /**
  * Zahl aus einer Zelle: JSON-Schreibweise („12345.67“), deutsch („12.345,67“) oder mit
  * Tausender-Komma („12,345.67“). Leer oder nicht eindeutig → null, nie 0.
+ *
+ * Mehrdeutig ist genau ein Trennzeichen mit drei Ziffern danach: „12.345“ (deutsch zwölftausend
+ * oder JSON zwölf Komma drei) und „1,234“ (englisch tausend oder deutsch eins Komma zwei). Im
+ * Modus `json` (Datensatz aus JSON-Zahlen) gilt der Punkt als Dezimalzeichen; sonst → null, damit
+ * die Abfrage den Wert als „keine eindeutige Zahl“ meldet statt still falsch zu rechnen (Codex F53).
  */
-export function parseNumber(s: string): number | null {
+export function parseNumber(s: string, mode: 'json' | 'text' = 'text'): number | null {
   const t = s.trim().replace(/[\s ']/g, '').replace(/(EUR|€|%)$/i, '')
   if (!t) return null
+  if (/^[+-]?\d{1,3},\d{3}$/.test(t)) return null
+  if (/^[+-]?\d{1,3}\.\d{3}$/.test(t) && mode !== 'json') return null
   if (/^[+-]?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(t)) return Number(t)
   if (/^[+-]?\d{1,3}(\.\d{3})+(,\d+)?$/.test(t) || /^[+-]?\d+,\d+$/.test(t)) return Number(t.replace(/\./g, '').replace(',', '.'))
   if (/^[+-]?\d{1,3}(,\d{3})+(\.\d+)?$/.test(t)) return Number(t.replace(/,/g, ''))
@@ -136,9 +161,9 @@ function colIndex(columns: string[], name: string, where: string): number {
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ][\d:.]+(Z|[+-]\d{2}:?\d{2})?)?$/
 
 /** Vergleich: Zahl mit Zahl, ISO-Datum mit ISO-Datum (Text), sonst Text ohne Groß/Klein. */
-function compare(a: string, b: string): number {
-  const na = parseNumber(a)
-  const nb = parseNumber(b)
+function compare(a: string, b: string, mode: 'json' | 'text'): number {
+  const na = parseNumber(a, mode)
+  const nb = parseNumber(b, mode)
   if (na !== null && nb !== null && !(ISO_DATE.test(a.trim()) || ISO_DATE.test(b.trim()))) return na - nb
   const x = a.trim()
   const y = b.trim()
@@ -146,34 +171,35 @@ function compare(a: string, b: string): number {
   return x.localeCompare(y, 'de', { sensitivity: 'base', numeric: true })
 }
 
-function equalCell(cell: string, value: string): boolean {
-  const nc = parseNumber(cell)
-  const nv = parseNumber(value)
+function equalCell(cell: string, value: string, mode: 'json' | 'text'): boolean {
+  const nc = parseNumber(cell, mode)
+  const nv = parseNumber(value, mode)
   if (nc !== null && nv !== null && !ISO_DATE.test(cell.trim())) return nc === nv
   return cell.trim().toLowerCase() === value.trim().toLowerCase()
 }
 
-function whereTest(columns: string[], w: WhereClause): (row: string[]) => boolean {
+function whereTest(columns: string[], w: WhereClause, modeOf: (i: number) => 'json' | 'text'): (row: string[]) => boolean {
   if (!WHERE_OPS.includes(w.op)) throw new DatasetQueryError(`where: Operator „${String(w.op)}“ unbekannt. Erlaubt: ${WHERE_OPS.join(', ')}`)
   const i = colIndex(columns, w.column, 'where')
+  const mode = modeOf(i)
   if (w.op === 'empty') return r => r[i].trim() === ''
   if (w.op === 'not_empty') return r => r[i].trim() !== ''
   if (w.op === 'in') {
     if (!Array.isArray(w.value) || w.value.length === 0) throw new DatasetQueryError(`where „${w.column} in“: value muss eine nicht-leere Liste sein`)
     const vals = w.value.map(v => String(v))
-    return r => vals.some(v => equalCell(r[i], v))
+    return r => vals.some(v => equalCell(r[i], v, mode))
   }
   if (w.value === undefined || w.value === null || Array.isArray(w.value)) throw new DatasetQueryError(`where „${w.column} ${w.op}“: value fehlt`)
   const v = String(w.value)
   switch (w.op) {
-    case 'eq': return r => equalCell(r[i], v)
-    case 'ne': return r => !equalCell(r[i], v)
+    case 'eq': return r => equalCell(r[i], v, mode)
+    case 'ne': return r => !equalCell(r[i], v, mode)
     case 'contains': return r => r[i].toLowerCase().includes(v.toLowerCase())
     // Leere Zellen erfüllen nie eine Größer/Kleiner-Bedingung.
-    case 'gt': return r => r[i].trim() !== '' && compare(r[i], v) > 0
-    case 'ge': return r => r[i].trim() !== '' && compare(r[i], v) >= 0
-    case 'lt': return r => r[i].trim() !== '' && compare(r[i], v) < 0
-    case 'le': return r => r[i].trim() !== '' && compare(r[i], v) <= 0
+    case 'gt': return r => r[i].trim() !== '' && compare(r[i], v, mode) > 0
+    case 'ge': return r => r[i].trim() !== '' && compare(r[i], v, mode) >= 0
+    case 'lt': return r => r[i].trim() !== '' && compare(r[i], v, mode) < 0
+    case 'le': return r => r[i].trim() !== '' && compare(r[i], v, mode) <= 0
   }
   throw new DatasetQueryError(`where: Operator „${w.op}“ unbekannt`)
 }
@@ -198,6 +224,9 @@ export function queryDataset(base: CollectedTable, q: DatasetQuery, getDataset: 
   let columns = [...base.columns]
   let rows = base.rows
   const nonNumeric = new Map<string, { count: number; example: string }>()
+  // Zahlenmodus je Spalte (F53/F54): nur Spalten aus echten JSON-Zahlen lesen „1.125“ als Dezimalzahl.
+  let jsonCol: boolean[] = columns.map((_, i) => !!base.jsonNumberColumns?.[i])
+  const modeOf = (i: number): 'json' | 'text' => (jsonCol[i] ? 'json' : 'text')
 
   if (q.join) {
     const other = getDataset(q.join.dataset)
@@ -221,11 +250,12 @@ export function queryDataset(base: CollectedTable, q: DatasetQuery, getDataset: 
       }
     }
     columns = [...columns, ...names]
+    jsonCol = [...jsonCol, ...wanted.map(j => !!other.jsonNumberColumns?.[j])]
     rows = out
   }
 
   for (const w of q.where ?? []) {
-    const test = whereTest(columns, w)
+    const test = whereTest(columns, w, modeOf)
     rows = rows.filter(test)
   }
 
@@ -258,7 +288,7 @@ export function queryDataset(base: CollectedTable, q: DatasetQuery, getDataset: 
         const nums: number[] = []
         for (const r of g.rows) {
           if (r[i].trim() === '') continue
-          const v = parseNumber(r[i])
+          const v = parseNumber(r[i], modeOf(i))
           if (v === null) {
             const prev = nonNumeric.get(columns[i])
             nonNumeric.set(columns[i], { count: (prev?.count ?? 0) + 1, example: prev?.example ?? r[i] })
@@ -272,6 +302,8 @@ export function queryDataset(base: CollectedTable, q: DatasetQuery, getDataset: 
       })
       outRows.push(cells)
     }
+    // Gruppenschlüssel behalten ihren Modus; Ergebnisse von count/sum/avg/min/max sind JS-Zahlen.
+    jsonCol = [...gIdx.map(i => jsonCol[i]), ...aggs.map(() => true)]
     columns = outCols
     rows = outRows
   }
@@ -284,7 +316,7 @@ export function queryDataset(base: CollectedTable, q: DatasetQuery, getDataset: 
         const ea = a[k.i].trim() === ''
         const eb = b[k.i].trim() === ''
         if (ea !== eb) return ea ? 1 : -1
-        const c = compare(a[k.i], b[k.i])
+        const c = compare(a[k.i], b[k.i], modeOf(k.i))
         if (c !== 0) return k.desc ? -c : c
       }
       return 0
@@ -300,11 +332,12 @@ export function queryDataset(base: CollectedTable, q: DatasetQuery, getDataset: 
   if (q.select && q.select.length) {
     const idx = q.select.map(s => colIndex(columns, s, 'select'))
     columns = idx.map(i => columns[i])
+    jsonCol = idx.map(i => jsonCol[i])
     rows = rows.map(r => idx.map(i => r[i]))
   }
 
   return {
-    table: { columns, rows, files: base.files },
+    table: { columns, rows, files: base.files, ...(jsonCol.some(Boolean) ? { jsonNumberColumns: jsonCol } : {}) },
     totalBeforeLimit,
     nonNumeric: [...nonNumeric].map(([column, v]) => ({ column, ...v }))
   }
@@ -321,6 +354,16 @@ export function markdownTable(table: Pick<CollectedTable, 'columns' | 'rows'>, m
 /** Platzhalter `{{datensatz:tabelle3}}` in einer Notiz durch die Tabelle ersetzen. */
 export const DATASET_PLACEHOLDER = /\{\{\s*datensatz\s*:\s*([A-Za-z0-9_-]+)\s*\}\}/g
 
+/**
+ * Zellwert aus einem fremden System als reiner Text für Markdown (Codex F52): Links, Bilder,
+ * Wikilinks und HTML werden über HTML-Entitäten neutralisiert, damit ein präparierter Feldwert
+ * nicht als Verweis oder Einbettung in die Notiz gelangt. Angezeigt wird derselbe Text.
+ */
+export function inertCell(c: string): string {
+  return c.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\[/g, '&#91;').replace(/\]/g, '&#93;').replace(/`/g, '&#96;')
+}
+
 export function fillDatasetPlaceholders(markdown: string, getDataset: (id: string) => CollectedTable | null, maxRows = 2_000): { markdown: string; missing: string[]; tooLarge: string[] } {
   const missing: string[] = []
   const tooLarge: string[] = []
@@ -328,7 +371,13 @@ export function fillDatasetPlaceholders(markdown: string, getDataset: (id: strin
     const t = getDataset(id)
     if (!t) { missing.push(id); return all }
     if (t.rows.length > maxRows) { tooLarge.push(id); return all }
-    return t.rows.length ? markdownTable(t) : '_(keine Zeilen)_'
+    if (!t.foreign) return t.rows.length ? markdownTable(t) : '_(keine Zeilen)_'
+    // Fremde Tabelle: feste Herkunftszeile + entschärfte Zellen (F52), Unvollständiges sichtbar —
+    // auch, wenn keine Zeile übrig ist (F58).
+    const partial = t.files.filter(f => f.status !== 'ok')
+    const head = `_Daten aus „${inertCell(t.foreign.label)}“ (externes System), wörtlich übernommen${partial.length ? ` — UNVOLLSTÄNDIG: ${inertCell(partial.map(f => f.message ?? f.status).join('; '))}` : ''}._`
+    if (!t.rows.length) return `${head}\n\n_(keine Zeilen)_`
+    return `${head}\n\n${markdownTable({ columns: t.columns.map(inertCell), rows: t.rows.map(r => r.map(inertCell)) })}`
   })
   return { markdown: out, missing, tooLarge }
 }

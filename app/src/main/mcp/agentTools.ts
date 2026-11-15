@@ -158,13 +158,17 @@ export async function prepareMcpForRun(opts: {
     }
     // Platz VOR dem Start prüfen (GUI-Test 15.11.2026): 14 Notion-Werkzeuge belegten ~21 000 Token,
     // der Lauf scheiterte mit 32 768 Token Kontext vor dem ersten Schritt an „Kontext voll“.
+    // Der App-Helfer mcp_collect geht mit seiner Beschreibung und der Liste aller Werkzeugnamen
+    // ebenfalls an das Modell — er zählt mit (Codex F51).
+    const collectTool = makeCollectTool(state)
+    toolCosts.push({ label: MCP_COLLECT_TOOL, tokens: Math.ceil(estimateTokens(JSON.stringify({ name: collectTool.name, description: collectTool.description, parameters: collectTool.parameters })) * MCP_TOOL_TOKEN_RESERVE) })
     const totalTokens = toolCosts.reduce((a, c) => a + c.tokens, 0)
     if (totalTokens > MCP_MAX_TOOL_TOKENS_PER_RUN) {
       const biggest = [...toolCosts].sort((a, b) => b.tokens - a.tokens).slice(0, 3).map(c => `${c.label} (~${c.tokens.toLocaleString('de-DE')})`).join(', ')
       throw new Error(`Die freigegebenen externen Werkzeuge aller gewählten Dienste belegen zusammen ~${totalTokens.toLocaleString('de-DE')} Token — mehr als ${MCP_MAX_TOOL_TOKENS_PER_RUN.toLocaleString('de-DE')}, sonst bleibt dem Agenten kein Platz zum Lesen. Größte: ${biggest}. Geben Sie in den Einstellungen weniger Werkzeuge frei (die Liste zeigt die Größe je Werkzeug).`)
     }
     assertNotRevoked()
-    state.helperTools.set(MCP_COLLECT_TOOL, makeCollectTool(state))
+    state.helperTools.set(MCP_COLLECT_TOOL, collectTool)
     state.startAbort = undefined
     return state
   } catch (e) {
@@ -258,6 +262,13 @@ export const MCP_COLLECT_TOOL = 'mcp_collect'
 export const MCP_COLLECT_MAX_ROWS = 20_000
 /** Obergrenze an Seiten je Sammelaufruf (20 000 / 50). */
 export const MCP_COLLECT_MAX_PAGES = 400
+/**
+ * Gesamtgrenzen je Sammelaufruf (Codex F49): Zeilen und Seiten begrenzen nicht, wie groß eine
+ * Zeile ist oder wie langsam ein Server antwortet. 20 Mio. Zeichen Rohtext (~20 MB) und 5 Minuten
+ * je Aufruf; darüber wird mit „unvollständig“ abgebrochen, nie still.
+ */
+export const MCP_COLLECT_MAX_CHARS = 20_000_000
+export const MCP_COLLECT_MAX_MS = 5 * 60_000
 
 const SKIP_PARAMS = ['skip', '$skip', 'offset']
 const TOP_PARAMS = ['top', '$top', 'limit', 'pagesize', 'page_size', 'pageSize', 'per_page']
@@ -325,24 +336,34 @@ export function makeCollectTool(state: McpRunState): AppTool<NoteAgentContext> {
         return { ok: false, content: `Fehler: ${e instanceof Error ? e.message : String(e)}` }
       }
       const pageSize = topName && typeof base[topName] === 'number' ? base[topName] as number : null
-      let skip = skipName && typeof base[skipName] === 'number' ? base[skipName] as number : 0
+      // Blättern macht die App: Ein vom Modell gesetzter Startversatz ergäbe eine Teilliste, die am
+      // Ende als „vollständig“ gälte (Codex F48).
+      const givenSkip = SKIP_PARAMS.find(n => rawArgs[n] !== undefined && rawArgs[n] !== null && Number(rawArgs[n]) !== 0)
+      if (givenSkip) return { ok: false, content: `Fehler: Lass „${givenSkip}“ weg — mcp_collect blättert selbst ab dem ersten Eintrag. Für einen Ausschnitt rufe das Werkzeug direkt auf.` }
+      let skip = 0
 
       markForeign(ctx, cfg)
       const rows: Array<Record<string, unknown>> = []
       let pages = 0
+      let totalChars = 0
       let incomplete = ''
       const t0 = Date.now()
       for (;;) {
         if (ctx.run.abort.signal.aborted) throw new Error('Abgebrochen')
         if (state.blocked.get(cfg.id)) { incomplete = `Server während des Sammelns gesperrt: ${state.blocked.get(cfg.id)}`; break }
         if (pages >= MCP_COLLECT_MAX_PAGES) { incomplete = `Obergrenze von ${MCP_COLLECT_MAX_PAGES} Seiten erreicht`; break }
+        if (totalChars >= MCP_COLLECT_MAX_CHARS) { incomplete = `Obergrenze von ${(MCP_COLLECT_MAX_CHARS / 1_000_000).toLocaleString('de-DE')} Mio. Zeichen erreicht`; break }
+        if (Date.now() - t0 >= MCP_COLLECT_MAX_MS) { incomplete = `Zeitgrenze von ${MCP_COLLECT_MAX_MS / 60_000} Minuten erreicht`; break }
         const callArgs = skipName && (pages > 0 || skip > 0) ? { ...base, [skipName]: skip } : base
         const ts = Date.now()
         const record: McpCallRecord = { serverId: cfg.id, serverLabel: cfg.label, tool: def.name, ok: false, ms: 0, chars: 0, truncated: false, capped: pages === 0 ? capped : [] }
         let text: string
         try {
-          const res = await session.call(def.name, callArgs, ctx.run.abort.signal)
+          // Gesamtdauer auch WÄHREND eines Seitenaufrufs (Codex F57): Restzeit als eigenes Abbruchsignal.
+          const remaining = Math.max(1, MCP_COLLECT_MAX_MS - (Date.now() - t0))
+          const res = await session.call(def.name, callArgs, AbortSignal.any([ctx.run.abort.signal, AbortSignal.timeout(remaining)]))
           text = rawResultText(res)
+          totalChars += text.length
           record.ok = !res.isError
           record.chars = text.length
           record.ms = Date.now() - ts
@@ -358,9 +379,19 @@ export function makeCollectTool(state: McpRunState): AppTool<NoteAgentContext> {
           record.error = e instanceof Error ? e.message : String(e)
           state.calls.push(record)
           if (ctx.run.abort.signal.aborted) throw new Error('Abgebrochen')
+          if (Date.now() - t0 >= MCP_COLLECT_MAX_MS) {
+            if (pages === 0) return { ok: false, content: `Fehler: ${def.name} hat innerhalb von ${MCP_COLLECT_MAX_MS / 60_000} Minuten nicht geantwortet.` }
+            incomplete = `Zeitgrenze von ${MCP_COLLECT_MAX_MS / 60_000} Minuten erreicht (Seite ${pages + 1} nicht mehr abgewartet)`
+            break
+          }
           const msg = wrapForeignResult(cfg.label, def.name, record.error.slice(0, 300))
           if (pages === 0) return { ok: false, content: `Fehler beim Aufruf von ${def.name}: ${msg}` }
           incomplete = `Abbruch auf Seite ${pages + 1}: ${msg}`
+          break
+        }
+        // Zeichengrenze NACH dem Empfang (Codex F57): Die überschießende Seite wird nicht übernommen.
+        if (totalChars > MCP_COLLECT_MAX_CHARS) {
+          incomplete = `Obergrenze von ${(MCP_COLLECT_MAX_CHARS / 1_000_000).toLocaleString('de-DE')} Mio. Zeichen erreicht (Seite ${pages + 1} verworfen)`
           break
         }
         pages++
@@ -377,9 +408,22 @@ export function makeCollectTool(state: McpRunState): AppTool<NoteAgentContext> {
           rows.length = Math.min(rows.length, maxRows)
           break
         }
-        if (page.rows.length === 0) break
+        if (page.rows.length === 0) {
+          // Leere Seite MIT Verweis (Codex F56): weiter nur über einen lesbaren Zahlenversatz, sonst ehrlich anhalten.
+          if (page.hasNextLink) {
+            if (skipName && !page.cursorOnly && page.nextSkip !== null && page.nextSkip > skip) { skip = page.nextSkip; continue }
+            incomplete = `${def.name} lieferte eine leere Seite mit Verweis auf weitere Einträge, der sich nicht weiterverfolgen lässt — nur die ersten ${rows.length.toLocaleString('de-DE')} Zeilen`
+          }
+          break
+        }
         const fullPage = pageSize !== null && page.rows.length >= pageSize
         if (!page.hasNextLink && !fullPage) break
+        // Cursor statt Zahlenversatz: nicht umdeuten, sondern ehrlich anhalten (Codex F48).
+        // Ohne Blätter-Parameter greift zuerst die genauere Meldung darunter.
+        if (page.cursorOnly && skipName) {
+          incomplete = `${def.name} blättert mit einem Verweis (z. B. $skiptoken), den MindGraph nicht weiterreichen kann — nur die ersten ${rows.length.toLocaleString('de-DE')} Zeilen`
+          break
+        }
         if (!skipName) {
           incomplete = `Die Liste hat weitere Seiten, aber ${def.name} hat keinen Parameter zum Blättern (skip/offset)`
           break

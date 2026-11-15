@@ -414,6 +414,12 @@ export interface CollectedTable {
   headerCandidates?: Array<{ file: string; rows: string[] }>
   /** Daten aus einem fremden System (MCP): Ausgaben daraus werden als DATEN gekennzeichnet. */
   foreign?: { label: string }
+  /**
+   * Je Spalte (gleiche Reihenfolge wie `columns`): Stammen ALLE Werte aus JSON-Zahlen? Dann ist
+   * „1.125“ eindeutig eine Dezimalzahl. Sonst — auch bei JSON-Text wie "12.345" — gelten Zahlen mit
+   * genau einem Trennzeichen und drei Ziffern danach als mehrdeutig (Codex F53/F54).
+   */
+  jsonNumberColumns?: boolean[]
 }
 
 /**

@@ -39,3 +39,13 @@ describe('ollamaErrorDetail', () => {
     expect(ollamaErrorDetail('x'.repeat(400))).toHaveLength(301)
   })
 })
+
+describe('isOllamaToolCallParseError', () => {
+  it('erkennt nur den Lesefehler für Werkzeugaufrufe', async () => {
+    const { isOllamaToolCallParseError } = await import('./ollamaError')
+    expect(isOllamaToolCallParseError(500, '{"error":"XML syntax error on line 9: unexpected EOF"}')).toBe(true)
+    expect(isOllamaToolCallParseError(500, '{"error":"llama runner process has terminated"}')).toBe(false)
+    expect(isOllamaToolCallParseError(400, 'XML syntax error')).toBe(false)
+  })
+})
+

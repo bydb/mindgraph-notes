@@ -43,3 +43,15 @@ export function friendlyOllamaError(status: number, body: string, model: string)
   }
   return detail ? `Ollama-Fehler ${status}: ${detail}` : `Ollama-Fehler ${status}`
 }
+
+/**
+ * Ollama konnte einen Werkzeugaufruf des Modells nicht lesen (qwen3.x schreibt Aufrufe als XML;
+ * bei verschachtelten Argumenten bricht Ollamas Leser gelegentlich mit „XML syntax error … unexpected
+ * EOF“ ab). Gemessen 15.11.2026: 2 von 21 Läufen mit query_dataset, immer direkt nach mcp_collect.
+ * Das ist ein Lesefehler des Servers, kein Fehler des Auftrags — ein einmaliges Wiederholen ist
+ * vertretbar; alle anderen 500er nicht.
+ */
+export function isOllamaToolCallParseError(status: number, body: string): boolean {
+  return status === 500 && /XML syntax error/i.test(body)
+}
+
