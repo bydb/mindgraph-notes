@@ -103,7 +103,8 @@ export const MCP_CATALOG: readonly McpCatalogEntry[] = [
   {
     id: 'business-central',
     name: 'Business Central',
-    summary: { de: 'ERP-Daten lesend abfragen (Microsoft-Anmeldung, nur freigegebene Listen).', en: 'Read ERP data (Microsoft sign-in, approved lists only).' },
+    // Nie gegen ein echtes Business Central gelaufen (kein Testzugang) — das steht sichtbar dabei.
+    summary: { de: 'ERP-Daten lesend abfragen (Microsoft-Anmeldung, nur freigegebene Listen). Vorschau: noch nicht an einem echten System getestet.', en: 'Read ERP data (Microsoft sign-in, approved lists only). Preview: not yet tested against a real system.' },
     color: '#3f6f6a',
     kind: 'business-central',
     url: 'https://mcp.businesscentral.dynamics.com',
