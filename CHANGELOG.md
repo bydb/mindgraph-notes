@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.3.9] - 2026-11-15
+
+**Erweiterungen können jetzt einen eigenen Arbeitsbereich als Tab öffnen, ein fertiges Dokument in einen Mail-Entwurf legen und PDFs im eingebauten Betrachter zeigen.** Damit werden Erweiterungen wie eine kleine Rechnungsverwaltung möglich, die Kunden, Leistungen und Rechnungen in Ihrem Vault führt. Abgeschickt wird nichts ohne Sie: Die Mail öffnet sich als Entwurf, den Sie prüfen und selbst senden.
+
+### Hintergrund
+
+- **Auslöser:** Erweiterungen konnten bisher nur kleine Bausteine beisteuern, etwa ein Feld in einer Notiz. Für eine Anwendung mit eigenen Listen und Formularen fehlte ein ganzer Arbeitsbereich.
+- **Eigener Tab:** Eine Erweiterung meldet ihren Arbeitsbereich an, und er erscheint im Werkzeuge-Menü. Er öffnet sich wie jeder andere Tab und wird beim Vault-Wechsel neu geladen, damit er nie Daten des vorherigen Vaults zeigt.
+- **Mail-Entwurf mit Anhang:** Eine Erweiterung kann einen Entwurf mit Empfänger, Betreff, Text und Anhängen vorbereiten. Sie kann ihn nicht selbst senden. Ohne eingerichtetes Mailkonto erscheint ein Hinweis statt eines leeren Entwurfs.
+- **PDFs im Vault:** Verweist eine Erweiterung auf ein PDF in Ihrem Vault, öffnet es sich im eingebauten Betrachter statt in einem anderen Programm.
+- **Grenzen:** Eine Erweiterung kann nur ihre eigenen Aktionen aufrufen, nicht die anderer Erweiterungen. Bereits installierte Erweiterungen funktionieren unverändert weiter.
+
 ## [1.3.8] - 2026-11-13
 
 **Die Einrichtung der KI bietet jetzt als vierten Schritt die Websuche an, und im Agent-Tab erscheint die Einrichtung direkt dort, wo Sie arbeiten wollen.** Mit der Websuche beantwortet die KI auch aktuelle Fragen und nennt Quellen, die Sie nachlesen können. Der Schritt ist freiwillig; alles andere funktioniert auch ohne ihn.
