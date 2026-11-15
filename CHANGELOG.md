@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.0] - 2026-11-15
+
+**Der Agent kann jetzt Ihre Dienste abfragen: Aufnahmen aus Plaud, Seiten aus Notion, Vorgänge aus Linear oder Jira.** Sie verbinden einen Dienst mit einem Klick und melden sich im Browser an; Ihr Passwort bleibt beim Dienst. Jedes Werkzeug geben Sie einzeln frei, und bevor Personendaten an einen KI-Anbieter im Netz gehen, fragt die App nach. Lange Listen, etwa aus einem ERP, zählt und summiert die App selbst, statt das Modell rechnen zu lassen.
+
+### Hintergrund
+
+- **Auslöser:** Viele Arbeitsdaten liegen nicht in Notizen, sondern in anderen Programmen. Der offene Standard MCP (Model Context Protocol) erlaubt es, deren Abfragen dem Agenten als Werkzeuge anzubieten. Bisher ging das nur mit Technikwissen: Programmpfade, Kopfzeilen, Schlüssel.
+- **Dienste verbinden:** Unter Einstellungen → KI & Modelle → „Externe Dienste und Werkzeuge (MCP)“ stehen Plaud, Notion, Linear und Atlassian (Jira, Confluence) als Kacheln. Ein Klick zeigt Adresse und Datenweg, danach melden Sie sich im Browser an. Die Einstellungssuche findet die Seite auch unter „Plaud“ oder „Notion“. Das Modul ist anfangs aus und lässt sich dort direkt einschalten.
+- **Freigabe je Werkzeug:** Die App zeigt alle Werkzeuge eines Dienstes mit ihrer Größe; empfohlene und laut Dienst nur lesende stehen oben. Freigegebene Werkzeuge belegen Platz im Arbeitsspeicher des Modells, deshalb startet ein Lauf nicht, wenn sie zusammen zu groß werden, und sagt, welche zu groß sind.
+- **Schutz:** Angemeldet wird nur, wenn die Anmeldeseite auf derselben Adresse liegt wie der Dienst. Ein Lauf mit Daten aus einem Dienst hat keine Shell, keine Websuche und keine Rechner-Steuerung, auch nicht in Folgeaufträgen. Was ein Dienst liefert, gilt als Daten, nicht als Anweisung.
+- **Lange Listen:** Der Agent holt eine ganze Liste in einen Datensatz der App und lässt Zählen, Summieren, Ranglisten und Abgleiche im Code rechnen. In einer Probe mit einem erfundenen ERP (500 Bestellungen) waren damit alle Antworten eines lokalen Modells richtig, und Ranglisten dauerten etwa eine Minute statt zehn.
+- **Übernahme:** Wer Dienste schon in Claude Desktop oder Cursor eingerichtet hat, kann deren Konfiguration einlesen; erkannte Dienste werden markiert und mit einem Klick verbunden.
+- **Mehr Platz:** Läufe mit Diensten bekommen bei lokalen Modellen ein doppelt so großes Arbeitsfenster. Beim Anbieter LLMBase nutzt der Agent jetzt das große Fenster des Modells statt einer festen Annahme.
+- **Grenzen:** Business Central (Microsoft-Anmeldung) ist als Vorschau dabei und noch nicht an einem echten System getestet. Asana, HubSpot und GitHub fehlen, weil sie eine vorher registrierte App verlangen. Lokale Programme laufen nur unter macOS in einer Sandbox; unter Windows und Linux nur mit ausdrücklich vollen Rechten. Ob ein Werkzeug nur liest, legt der jeweilige Dienst fest, nicht MindGraph.
+
 ## [1.3.9] - 2026-11-15
 
 **Erweiterungen können jetzt einen eigenen Arbeitsbereich als Tab öffnen, ein fertiges Dokument in einen Mail-Entwurf legen und PDFs im eingebauten Betrachter zeigen.** Damit werden Erweiterungen wie eine kleine Rechnungsverwaltung möglich, die Kunden, Leistungen und Rechnungen in Ihrem Vault führt. Abgeschickt wird nichts ohne Sie: Die Mail öffnet sich als Entwurf, den Sie prüfen und selbst senden.
