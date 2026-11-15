@@ -462,6 +462,42 @@ Auffindbarkeit (E24′, E31′, E33′) · **6.4** Übernahme (E32′) · **6.5*
 4. E30-Fallback: Ist es vertretbar, dass MindGraph eine URL aus der Antwort eines fremden Servers im
    Browser öffnet (mit sichtbarer Adresse und Rückfrage)?
 
+## Messbericht ERP in realistischer Größe (15.11.2026)
+
+Frage: Trägt der heutige Weg (Zeilen laufen als Werkzeugergebnis durch den Modellkontext) bei typischen
+ERP-Fragen, oder braucht es vorher einen „Tabellen-Weg“ wie `collect_table`? Harness
+`app/src/main/mcp/eval/mcpErpScale.live.test.ts` (nur mit `MINDGRAPH_MCP_EVAL=1`): erfundenes ERP mit
+300 Lieferanten, 500 Bestellungen à 30 Feldern (Ø 839 Zeichen JSON je Bestellung, 287 offen), deterministisch
+erzeugt; Werkzeuge im Business-Central-Muster (`List_…_PAG…`, Parameter `filter`/`select`/`top`/`skip`,
+Seiten mit `@odata.nextLink`). Echte Ablage, Freigaben, Verbindung, Loop; Kontext 65 536 (MCP-Lauf).
+Richtige Antworten rechnet der Test aus den Daten, gewertet ohne Modell als Richter. Modell
+qwen3.8:27b-mlx (Nutzer: qwen3.5:4b nicht), 6 Fragen × 3 Läufe, Code-Stand `41fc1a2a`.
+
+| Frage | richtig | Dauer | Kontext max. | ERP-Aufrufe | Auffällig |
+|---|---|---|---|---|---|
+| q1 offene Bestellungen eines Lieferanten (4) | 3/3 | 30–37 s | 12 % | 1 | filtert + wählt Spalten selbst |
+| q2 alle über Schwelle, alle Lieferanten (13) | 3/3 | 39–89 s | 12 % | 1 | eine gefilterte Abfrage |
+| q3 Summe eines Lieferanten | 3/3 | 50–110 s | 12–13 % | 2 | Summe auf den Cent |
+| q4 Top 5 nach offenem Volumen (287 Bestellungen) | 3/3 | 492–618 s | 28–35 % | 6 | blättert alle Seiten, summiert selbst |
+| q5 Anzahl überfälliger Bestellungen (136) | 2/3 | 209–256 s | 23–32 % | 3 | 1× „137“ — selbst gezählt, um eins daneben |
+| q6 Verknüpfung Lieferant (Kassel) ↔ Bestellung (11) | 3/3 | 286–305 s | 24–29 % | 4–6 | 1× ohne `select` → 40 000 Zeichen gekürzt, danach selbst korrigiert; 1× `in (…)` → Fehler des Servers, selbst korrigiert |
+
+**17/18 bestanden.** Kein Lauf ging an den Kontext (max. 35 %). Der Deckel `top ≤ 50` griff oft, das
+Modell folgte dann dem `nextLink`. **Schwächen:** (1) Zählen und Summieren macht das Modell selbst —
+einmal falsch gezählt; (2) Auswertungen über alle Zeilen sind langsam (8–10 min für die Rangliste), weil
+jede Seite eine Modellrunde kostet; (3) ohne `select` ist eine Seite mit vollen Datensätzen über der
+Kürzungsgrenze.
+
+**Grenzen der Aussage:** ein Modell, ein erfundenes ERP mit kooperativem Filter und klaren Feldnamen in
+der Beschreibung, keine Netzlatenz. Echte Business-Central-Werkzeuge (Namen, Parameter, Filtersyntax,
+Antwortform) sind ungemessen. Während der Reihe wurden unter `app/src` Dateien geändert (`contextBudget.ts`,
+paralleler LLMBase-Test des Nutzers); vitest hatte den Code beim Start geladen.
+
+**Folgerung:** Ein „Tabellen-Weg“ ist für diese Größenordnung nicht nötig. Kleiner und gezielter wären:
+Zählen/Summieren deterministisch (z.B. ein App-Werkzeug, das über die Seiten eines freigegebenen
+List-Werkzeugs zählt/summiert, ohne Zeilen durch den Kontext), und ein Hinweis im Systemtext, bei
+ERP-Listen immer `select` zu setzen. Vorrang hat aber der Test am echten Business Central.
+
 ## Codex-Findings
 
 ### F01 — Dynamisches BC-Werkzeug umgeht die Lesefreigabe
