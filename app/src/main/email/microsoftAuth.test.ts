@@ -131,7 +131,9 @@ beforeEach(async () => {
   opened = []
   dirRequests = 0
 })
-afterEach(async () => { await fs.rm(dir, { recursive: true, force: true }) })
+// Ein nachlaufendes Speichern kann beim Aufräumen noch eine Datei anlegen → ENOTEMPTY (CI, 15.11.2026).
+// maxRetries wiederholt das Löschen genau bei ENOTEMPTY/EBUSY.
+afterEach(async () => { await fs.rm(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }) })
 
 describe('deriveMicrosoftAccountId', () => {
   it('ist für dieselbe Anmeldung auf jedem Gerät gleich und hat die reservierte Form', () => {
