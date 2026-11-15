@@ -5,7 +5,7 @@
 // Bewusst byte-arm getrennt: der `RendererDescriptor` (Liste/Push) trägt KEINE Bytes; nur `RendererServe`
 // (Antwort auf `plugin:rendererEntry`) liefert den verifizierten Code als utf8-String für den Blob-Import.
 
-import type { FileEditorDecl } from '@mindgraph/plugin-api'
+import type { FileEditorDecl, WorkspaceTabDecl } from '@mindgraph/plugin-api'
 
 /** Byte-freie Beschreibung eines aktiven Renderer-Plugins (für Liste + `plugin:renderers-changed`-Push). */
 export interface RendererDescriptor {
@@ -15,6 +15,8 @@ export interface RendererDescriptor {
   /** Routing-/Lifecycle-Mechanik (I-S1), KEINE Trust-Grenze. Wechselt bei jeder (Re-)Aktivierung. */
   rendererInstanceId: string
   fileEditors: FileEditorDecl[]
+  /** Arbeitsbereich-Tabs aus dem signierten Manifest (API ≥0.2.3); fehlt bei älteren Erzeugern. */
+  workspaceTabs?: WorkspaceTabDecl[]
 }
 
 /** Antwort auf `plugin:rendererEntry`: die VERIFIZIERTEN Bytes (utf8) + Routing-Metadaten (I-L5). */
@@ -26,6 +28,7 @@ export interface RendererServe {
   code: string
   styles?: string
   fileEditors: FileEditorDecl[]
+  workspaceTabs?: WorkspaceTabDecl[]
 }
 
 /** Ergebnis von `plugin:renderers` (byte-frei). */

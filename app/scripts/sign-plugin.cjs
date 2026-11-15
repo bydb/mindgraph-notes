@@ -11272,7 +11272,7 @@ var import_ajv = __toESM(require_ajv(), 1);
 var import_semver = __toESM(require_semver2(), 1);
 
 // packages/plugin-api/src/version.ts
-var API_VERSION = "0.2.2";
+var API_VERSION = "0.2.3";
 
 // packages/plugin-api/src/validation.ts
 var ajv = new import_ajv.default({ allErrors: true, removeAdditional: false });
@@ -11331,6 +11331,17 @@ var PLUGIN_MANIFEST_SCHEMA = {
     },
     // Datei-Editor-Beanspruchung (ADR plugin-renderer-host §8). Endungs-Form wird zusätzlich in
     // validateManifestSemantics + dem FileEditorResolver normalisiert/geprüft.
+    workspaceTabDecl: {
+      type: "object",
+      required: ["tabId", "label"],
+      properties: {
+        tabId: { type: "string", minLength: 1, maxLength: 64, pattern: "^[a-z0-9][a-z0-9-]*$" },
+        label: { type: "string", minLength: 1, maxLength: 40 },
+        // Nur SVG-Pfadbefehle und Zahlen — kein Markup, kein url().
+        icon: { type: "string", maxLength: 2e3, pattern: "^[MmLlHhVvCcSsQqTtAaZz0-9 ,.\\-]*$" }
+      },
+      additionalProperties: false
+    },
     fileEditorDecl: {
       type: "object",
       required: ["editorId", "extensions"],
@@ -11497,7 +11508,8 @@ var PLUGIN_MANIFEST_SCHEMA = {
         // SlotDecl strikt: nur die zwei Slot-Kategorien; KEIN `view`-Template (fromAction liefert die WidgetView).
         dashboardWidget: { $ref: "#/definitions/slotDecl" },
         sidebarPanel: { $ref: "#/definitions/slotDecl" },
-        fileEditors: { type: "array", items: { $ref: "#/definitions/fileEditorDecl" } }
+        fileEditors: { type: "array", items: { $ref: "#/definitions/fileEditorDecl" } },
+        workspaceTabs: { type: "array", items: { $ref: "#/definitions/workspaceTabDecl" } }
       },
       additionalProperties: false
     },
@@ -11582,6 +11594,14 @@ function validateManifestSemantics(manifest) {
       errors.push(`Doppelte ui.fileEditors.editorId '${fe2.editorId}'.`);
     }
     seenEditorIds.add(fe2.editorId);
+  }
+  const seenTabIds = /* @__PURE__ */ new Set();
+  for (const wt2 of manifest.ui?.workspaceTabs ?? []) {
+    if (seenTabIds.has(wt2.tabId)) errors.push(`Doppelte ui.workspaceTabs.tabId '${wt2.tabId}'.`);
+    seenTabIds.add(wt2.tabId);
+  }
+  if (manifest.ui?.workspaceTabs?.length && !manifest.entrypoints?.renderer) {
+    errors.push("ui.workspaceTabs braucht entrypoints.renderer \u2014 ohne Renderer-Bundle mountet niemand den Tab.");
   }
   if (!manifest.entrypoints?.main) {
     if (manifest.actions?.length) {

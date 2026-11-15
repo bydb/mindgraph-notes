@@ -13,6 +13,38 @@ import { useNotesStore } from '../../stores/notesStore'
 import { useTabStore } from '../../stores/tabStore'
 import { findNoteForWikilink, resolvePluginFileLink } from '../../utils/linkExtractor'
 import { classifyPluginLink } from '../../../shared/pluginLink'
+import { useEmailStore } from '../../stores/emailStore'
+import type { ComposeMailDraft } from '@mindgraph/plugin-api'
+
+/**
+ * Mail-Schreibfenster aus einem Renderer-Plugin vorbelegen (API ≥0.2.3). Anhänge kommen als Bytes und
+ * werden über denselben Ablageweg wie gezogene Dateien abgelegt (`email-stage-compose-files`: nur
+ * Basisname, Größengrenzen). Es wird NICHTS verschickt — Senden bleibt beim Nutzer.
+ */
+async function composeMailFromPlugin(pluginId: string, draft: ComposeMailDraft): Promise<void> {
+  const accounts = useUIStore.getState().email.accounts
+  if (!accounts.length) throw new Error('Kein Mailkonto eingerichtet (Einstellungen → E-Mail).')
+  const files = (draft.attachments ?? []).map((a) => ({ name: String(a.name ?? ''), data: a.bytes }))
+  let attachments: Awaited<ReturnType<typeof window.electronAPI.emailStageComposeFiles>>['attachments'] = []
+  if (files.length) {
+    const res = await window.electronAPI.emailStageComposeFiles(files)
+    if (!res.success || (res.skipped?.length ?? 0) > 0) {
+      throw new Error(res.error || `Anhang konnte nicht übernommen werden: ${(res.skipped ?? []).join(', ')}`)
+    }
+    attachments = res.attachments
+  }
+  const to = (draft.to ?? [])
+    .filter((r) => typeof r?.address === 'string' && r.address.includes('@'))
+    .map((r) => ({ name: String(r.name ?? ''), address: r.address.trim() }))
+  console.log(`[plugin:${pluginId}] Schreibfenster vorbelegt (${to.length} Empfänger, ${attachments?.length ?? 0} Anhänge)`)
+  useEmailStore.getState().setComposeState({
+    to,
+    subject: String(draft.subject ?? ''),
+    body: String(draft.body ?? ''),
+    accountId: accounts[0].id,
+    attachments: attachments ?? [],
+  })
+}
 
 /**
  * Link aus einem Renderer-Plugin öffnen (Excalidraw-Element-Links, Codex F07). Nur während einer Nutzeraktion:
@@ -42,7 +74,24 @@ async function openPluginLink(link: string): Promise<'opened' | 'not-found' | 'r
     )
     return 'opened'
   }
+  // PDF im Vault (API ≥0.2.3, z. B. eine Rechnung aus Faktura) → eingebauter PDF-Betrachter. Nur exakte
+  // Pfade, die im Dateibaum stehen — kein Namensraten über Ordner hinweg.
+  if (/\.pdf$/i.test(target.target) && vaultFileExists(target.target, fileTree)) {
+    useNotesStore.getState().selectPdf(target.target)
+    return 'opened'
+  }
   return 'not-found'
+}
+
+function vaultFileExists(relPath: string, tree: Array<{ path: string; isDirectory?: boolean; children?: unknown[] }>): boolean {
+  const want = relPath.replace(/\\/g, '/').toLowerCase()
+  const stack = [...tree]
+  while (stack.length) {
+    const e = stack.pop()!
+    if (e.isDirectory) { stack.push(...((e.children ?? []) as typeof tree)); continue }
+    if (e.path.replace(/\\/g, '/').toLowerCase() === want) return true
+  }
+  return false
 }
 
 function effectiveTheme(): 'light' | 'dark' {
@@ -77,6 +126,12 @@ const prodEnv: RendererLoaderEnv = {
   },
   getTheme: effectiveTheme,
   openLink: openPluginLink,
+  invokeAction: async (pluginId, actionId, payload) => {
+    const res = await window.electronAPI.pluginInvoke(pluginId, actionId, payload)
+    if (!res.ok) throw new Error(res.error ?? `Plugin-Aufruf '${actionId}' fehlgeschlagen`)
+    return res.data
+  },
+  composeMail: composeMailFromPlugin,
   onThemeChange: (cb) => {
     let last = effectiveTheme()
     const fire = (): void => {

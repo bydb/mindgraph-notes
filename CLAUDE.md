@@ -205,6 +205,7 @@ Diese Datei hält nur, was überall gilt. Feature-Wissen liegt in pfadgebundenen
 | `email.md` | Mail-Empfang, Versand, KI-Assistent, Kontakte |
 | `sync.md` · `release-signing.md` | E2E-Sync · Apple/Windows-Signierung, Snap |
 | `telegram.md` · `remarkable.md` · `integrations.md` | Telegram-Agent · reMarkable · Antares, edoobox, Terminal |
+| `plugin-workspace-tabs.md` | Externe Plugins: Arbeitsbereich-Tabs, `invoke`, `composeMail`, PDF über `openLink` (API 0.2.3, Faktura) |
 
 ## Sicherheit
 

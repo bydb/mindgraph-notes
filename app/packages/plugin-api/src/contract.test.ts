@@ -304,3 +304,29 @@ describe('validateManifestSemantics — Widget-Provider-Vertrag (Renderer-Spike 
     expect(validateManifestSemantics(validManifest).valid).toBe(true)
   })
 })
+
+describe('validateManifest — ui.workspaceTabs (API 0.2.3)', () => {
+  const withTabs = (tabs: unknown, entrypoints: PluginManifest['entrypoints'] = { main: 'main.js', renderer: 'renderer.js' }) => {
+    const m = { ...validManifest, entrypoints, ui: { workspaceTabs: tabs } } as unknown as PluginManifest
+    const schema = validateManifest(m)
+    return schema.valid ? validateManifestSemantics(m) : schema
+  }
+
+  it('nimmt einen gültigen Tab an', () => {
+    expect(withTabs([{ tabId: 'main', label: 'Faktura', icon: 'M6 2h9l5 5v15H6z' }]).valid).toBe(true)
+  })
+  it('lehnt doppelte tabId ab', () => {
+    const r = withTabs([{ tabId: 'main', label: 'A' }, { tabId: 'main', label: 'B' }])
+    expect(r.errors.join()).toMatch(/Doppelte ui.workspaceTabs.tabId/)
+  })
+  it('verlangt einen Renderer-Entry', () => {
+    expect(withTabs([{ tabId: 'main', label: 'A' }], { main: 'main.js' }).errors.join()).toMatch(/entrypoints.renderer/)
+  })
+  it('Icon nur aus SVG-Pfadbefehlen — kein Markup', () => {
+    expect(withTabs([{ tabId: 'main', label: 'A', icon: '<script>' }]).valid).toBe(false)
+    expect(withTabs([{ tabId: 'main', label: 'A', icon: 'url(x)' }]).valid).toBe(false)
+  })
+  it('tabId nur Kleinbuchstaben, Ziffern, Bindestrich', () => {
+    expect(withTabs([{ tabId: 'Main Tab', label: 'A' }]).valid).toBe(false)
+  })
+})

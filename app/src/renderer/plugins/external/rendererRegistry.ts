@@ -18,10 +18,13 @@
 //    Blob-URL revoken. Zombie-Freiheit wird unter Option A NICHT versprochen.
 
 import type {
+  ComposeMailDraft,
   FileEditorMount,
   FileEmbedMount,
   PluginRendererHost,
   PluginRendererModule,
+  WorkspaceTabDecl,
+  WorkspaceTabMount,
 } from '@mindgraph/plugin-api'
 import type {
   RendererActivateAck,
@@ -48,6 +51,15 @@ export interface RendererLoaderEnv {
   onThemeChange(cb: (theme: 'light' | 'dark') => void): () => void
   /** Link aus einem Plugin öffnen (API ≥0.2.2). Optional, damit Test-Envs ohne Navigation auskommen. */
   openLink?(link: string): Promise<'opened' | 'not-found' | 'refused'>
+  /** Eigene Main-Action aufrufen (API ≥0.2.3). Wirft mit der Fehlermeldung der Action. */
+  invokeAction?(pluginId: string, actionId: string, payload: unknown): Promise<unknown>
+  /** Mail-Schreibfenster vorbelegt öffnen (API ≥0.2.3). Verschickt nichts. */
+  composeMail?(pluginId: string, draft: ComposeMailDraft): Promise<void>
+}
+
+/** Ein veröffentlichter Arbeitsbereich-Tab (für Werkzeuge-Menü und plugin-view-Tab). */
+export interface ExternalWorkspaceTab extends WorkspaceTabDecl {
+  pluginId: string
 }
 
 /** Registrierungsfehler während `activate` (unbekannte/doppelte editorId) — vom generischen activate-Wurf
@@ -86,6 +98,9 @@ interface LoadedRenderer {
   mounts: Map<string, FileEditorMount>
   /** OPT-IN Read-only-Embed-Mounts je editorId (R2, API ≥0.2.1) — leer, wenn das Plugin keine registriert. */
   embedMounts: Map<string, FileEmbedMount>
+  /** Arbeitsbereich-Tabs (API ≥0.2.3): Deklaration aus dem Manifest + registrierter Mount je tabId. */
+  tabDecls: WorkspaceTabDecl[]
+  tabMounts: Map<string, WorkspaceTabMount>
   /** Host-Theme-Subscriptions — beim Teardown abräumen, falls das Plugin es vergisst. */
   themeUnsubs: Set<() => void>
   /** Teardown läuft/lief (hängendes deactivate) — sperrt neue Mounts + verhindert Doppel-Teardown. */
@@ -278,8 +293,12 @@ export class ExternalRendererRegistry {
     const declared = new Set(desc.fileEditors.map((f) => f.editorId))
     const staged = new Map<string, FileEditorMount>()
     const stagedEmbeds = new Map<string, FileEmbedMount>()
+    // Tab-Deklarationen kommen aus dem SERVE (verifiziertes Manifest), nicht aus dem Push.
+    const tabDecls = serve.data.workspaceTabs ?? []
+    const declaredTabs = new Set(tabDecls.map((t) => t.tabId))
+    const stagedTabs = new Map<string, WorkspaceTabMount>()
     const themeUnsubs = new Set<() => void>()
-    const { host, closeStaging } = this.buildHost(desc.pluginId, instanceId, declared, staged, stagedEmbeds, themeUnsubs)
+    const { host, closeStaging } = this.buildHost(desc.pluginId, instanceId, declared, staged, stagedEmbeds, themeUnsubs, declaredTabs, stagedTabs)
 
     try {
       await def.activate(host)
@@ -296,7 +315,10 @@ export class ExternalRendererRegistry {
 
     // Jeder deklarierte Beitrag muss GENAU EINMAL registriert sein (unbekannt/doppelt warf bereits in
     // registerFileEditor; hier bleibt nur „fehlend" — terminal, kein halb-aktiver Editor).
-    const missing = [...declared].filter((id) => !staged.has(id))
+    const missing = [
+      ...[...declared].filter((id) => !staged.has(id)),
+      ...[...declaredTabs].filter((id) => !stagedTabs.has(id)).map((id) => `Tab ${id}`),
+    ]
     if (missing.length) {
       await this.cleanupAfterActivateFailure(instanceId, desc.pluginId, url, def, themeUnsubs)
       return fail(`Nicht registrierte Editor-Beiträge: ${missing.join(', ')}`, 'register')
@@ -312,6 +334,8 @@ export class ExternalRendererRegistry {
       host,
       mounts: staged,
       embedMounts: stagedEmbeds,
+      tabDecls: tabDecls.map((t) => ({ ...t })),
+      tabMounts: stagedTabs,
       themeUnsubs,
       tearingDown: false,
     })
@@ -367,6 +391,8 @@ export class ExternalRendererRegistry {
     staged: Map<string, FileEditorMount>,
     stagedEmbeds: Map<string, FileEmbedMount>,
     themeUnsubs: Set<() => void>,
+    declaredTabs: ReadonlySet<string> = new Set(),
+    stagedTabs: Map<string, WorkspaceTabMount> = new Map(),
   ): { host: PluginRendererHost; closeStaging: () => void } {
     const env = this.env
     let stagingOpen = true
@@ -426,6 +452,28 @@ export class ExternalRendererRegistry {
       },
       log: (...args) => console.log(`[plugin:${pluginId}]`, ...args),
       openLink: (link) => (env.openLink ? env.openLink(link) : Promise.resolve('refused' as const)),
+      registerWorkspaceTab: ({ tabId, mount }) => {
+        if (!stagingOpen) throw new RegisterError('registerWorkspaceTab ist nur während activate() erlaubt')
+        if (typeof tabId !== 'string' || typeof mount !== 'function') {
+          throw new RegisterError('registerWorkspaceTab erwartet { tabId:string, mount:function }')
+        }
+        if (!declaredTabs.has(tabId)) throw new RegisterError(`tabId '${tabId}' ist im Manifest nicht deklariert`)
+        if (stagedTabs.has(tabId)) throw new RegisterError(`tabId '${tabId}' doppelt registriert`)
+        stagedTabs.set(tabId, mount)
+      },
+      // Nur EIGENE Actions: der Präfix bindet den Aufruf an dieses Plugin. Die Main-Registry prüft
+      // Schema + Capability wie bei jedem Aufruf; das ist Komfort, keine Grenze (Option A, §4).
+      invoke: async <T,>(actionId: string, payload?: unknown): Promise<T> => {
+        if (typeof actionId !== 'string' || !actionId.startsWith(`${pluginId}.`)) {
+          throw new Error(`invoke: nur eigene Actions ('${pluginId}.…')`)
+        }
+        if (!env.invokeAction) throw new Error('invoke wird von diesem Host nicht unterstützt')
+        return (await env.invokeAction(pluginId, actionId, payload)) as T
+      },
+      composeMail: async (draft) => {
+        if (!env.composeMail) throw new Error('composeMail wird von diesem Host nicht unterstützt')
+        await env.composeMail(pluginId, draft)
+      },
     }
     return { host, closeStaging: () => { stagingOpen = false } }
   }
@@ -446,6 +494,25 @@ export class ExternalRendererRegistry {
     const mount = lr.mounts.get(editorId)
     if (!mount) return null
     return this.runMount(lr, mount, editorId, container, filePath)
+  }
+
+  /** Alle veröffentlichten Arbeitsbereich-Tabs geladener Plugins (Werkzeuge-Menü). */
+  listWorkspaceTabs(): ExternalWorkspaceTab[] {
+    const out: ExternalWorkspaceTab[] = []
+    for (const lr of this.loaded.values()) {
+      if (lr.tearingDown) continue
+      for (const t of lr.tabDecls) if (lr.tabMounts.has(t.tabId)) out.push({ ...t, pluginId: lr.pluginId })
+    }
+    return out
+  }
+
+  /** Mountet einen Arbeitsbereich-Tab (LAZY, beim Öffnen). `null` wenn nicht geladen/registriert. */
+  mountWorkspaceTab(pluginId: string, tabId: string, container: HTMLElement): (() => void) | null {
+    const lr = this.loaded.get(pluginId)
+    if (!lr || lr.tearingDown) return null
+    const mount = lr.tabMounts.get(tabId)
+    if (!mount) return null
+    return this.runMount(lr, (c, ctx) => mount(c, { host: ctx.host }), `tab:${tabId}`, container, '')
   }
 
   /** Hat das Plugin für diese editorId einen Read-only-Embed registriert? (Für den Fallback-Chip.) */

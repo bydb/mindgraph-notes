@@ -21,6 +21,8 @@ interface FakePlugin {
   instanceId: string
   editorIds: string[] // im Manifest deklariert
   styles?: string
+  /** Im Manifest deklarierte Arbeitsbereich-Tabs (API ≥0.2.3). */
+  tabIds?: string[]
   /** Test-Hook: was das Modul beim activate tut (Default: alle deklarierten editorIds 1× registrieren). */
   module?: unknown
 }
@@ -74,6 +76,7 @@ function makeEnv(plugins: FakePlugin[]) {
           code: codeFor(pluginId),
           styles: p.styles,
           fileEditors: p.editorIds.map((editorId) => ({ editorId, extensions: [`.${editorId}`] })),
+          workspaceTabs: (p.tabIds ?? []).map((tabId) => ({ tabId, label: `Tab ${tabId}` })),
         },
       }
     },
@@ -594,5 +597,85 @@ describe('ExternalRendererRegistry — Read-only-Embeds (R2)', () => {
     expect(await reg.teardownInstance('i1')).toBe('success')
     expect(el.dataset.mounted).toBe('')
     expect(reg.hasEmbed('demo', 'draw')).toBe(false)
+  })
+})
+
+describe('ExternalRendererRegistry — Arbeitsbereich-Tabs, invoke, composeMail (API 0.2.3)', () => {
+  const tabModule = (opts: { register?: string[]; onActivate?: (h: PluginRendererHost) => void } = {}): unknown => ({
+    id: 'faktura',
+    activate: (h: PluginRendererHost) => {
+      for (const tabId of opts.register ?? ['main']) {
+        h.registerWorkspaceTab!({ tabId, mount: (el) => { el.dataset.tab = tabId; return () => { el.dataset.tab = '' } } })
+      }
+      opts.onActivate?.(h)
+    },
+  })
+
+  it('registrierter Tab erscheint in der Liste und lässt sich mounten/disposen', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'faktura', instanceId: 'i1', editorIds: [], tabIds: ['main'], module: tabModule() }]
+    const { env, acks } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+    expect(acks).toEqual([{ ok: true, rendererInstanceId: 'i1' }])
+    expect(reg.listWorkspaceTabs()).toEqual([{ pluginId: 'faktura', tabId: 'main', label: 'Tab main' }])
+    const el = fakeEl()
+    const dispose = reg.mountWorkspaceTab('faktura', 'main', el)
+    expect(el.dataset.tab).toBe('main')
+    dispose!()
+    expect(el.dataset.tab).toBe('')
+    expect(reg.mountWorkspaceTab('faktura', 'fremd', fakeEl())).toBeNull()
+  })
+
+  it('deklarierter, aber nicht registrierter Tab → ack register, nicht geladen', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'faktura', instanceId: 'i1', editorIds: [], tabIds: ['main'], module: tabModule({ register: [] }) }]
+    const { env, acks } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+    expect(acks[0]).toMatchObject({ ok: false, phase: 'register' })
+    expect(reg.listWorkspaceTabs()).toEqual([])
+  })
+
+  it('nicht deklarierter Tab → ack register', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'faktura', instanceId: 'i1', editorIds: [], tabIds: ['main'], module: tabModule({ register: ['main', 'heimlich'] }) }]
+    const { env, acks } = makeEnv(plugins)
+    await new ExternalRendererRegistry(env).sync()
+    expect(acks[0]).toMatchObject({ ok: false, phase: 'register' })
+  })
+
+  it('invoke: nur eigene Actions, Ergebnis der Env wird durchgereicht', async () => {
+    let host: PluginRendererHost | null = null
+    const plugins: FakePlugin[] = [{ pluginId: 'faktura', instanceId: 'i1', editorIds: [], tabIds: ['main'], module: tabModule({ onActivate: (h) => { host = h } }) }]
+    const { env } = makeEnv(plugins)
+    const calls: string[] = []
+    env.invokeAction = async (pluginId, actionId) => { calls.push(`${pluginId}:${actionId}`); return { ok: 1 } }
+    await new ExternalRendererRegistry(env).sync()
+    await expect(host!.invoke!('faktura.load', {})).resolves.toEqual({ ok: 1 })
+    await expect(host!.invoke!('antares.listEntleiher', {})).rejects.toThrow(/eigene Actions/)
+    await expect(host!.invoke!('fakturaX.load', {})).rejects.toThrow(/eigene Actions/)
+    expect(calls).toEqual(['faktura:faktura.load'])
+  })
+
+  it('composeMail geht mit der eigenen pluginId an die Env; ohne Env wirft es', async () => {
+    let host: PluginRendererHost | null = null
+    const plugins: FakePlugin[] = [{ pluginId: 'faktura', instanceId: 'i1', editorIds: [], tabIds: ['main'], module: tabModule({ onActivate: (h) => { host = h } }) }]
+    const { env } = makeEnv(plugins)
+    await new ExternalRendererRegistry(env).sync()
+    await expect(host!.composeMail!({ subject: 'x' })).rejects.toThrow(/nicht unterstützt/)
+    const seen: string[] = []
+    env.composeMail = async (pluginId, draft) => { seen.push(`${pluginId}:${draft.subject}`) }
+    await host!.composeMail!({ subject: 'Rechnung' })
+    expect(seen).toEqual(['faktura:Rechnung'])
+  })
+
+  it('Teardown disposed einen offenen Tab', async () => {
+    const plugins: FakePlugin[] = [{ pluginId: 'faktura', instanceId: 'i1', editorIds: [], tabIds: ['main'], module: tabModule() }]
+    const { env } = makeEnv(plugins)
+    const reg = new ExternalRendererRegistry(env)
+    await reg.sync()
+    const el = fakeEl()
+    reg.mountWorkspaceTab('faktura', 'main', el)
+    expect(await reg.teardownInstance('i1')).toBe('success')
+    expect(el.dataset.tab).toBe('')
+    expect(reg.listWorkspaceTabs()).toEqual([])
   })
 })

@@ -10,7 +10,7 @@
 // Komfort, keine Sicherheits-Seam (die harte Grenze bleibt writeFileSafe/assertApprovedVault).
 
 import { randomUUID } from 'node:crypto'
-import type { FileEditorDecl, PluginManifest } from '@mindgraph/plugin-api'
+import type { FileEditorDecl, PluginManifest, WorkspaceTabDecl } from '@mindgraph/plugin-api'
 import type {
   RendererDescriptor,
   RendererServe,
@@ -57,6 +57,10 @@ export interface RendererActivation {
   fileEditors: FileEditorDecl[]
   manifest: PluginManifest
 }
+
+/** Arbeitsbereich-Tabs direkt aus dem verifizierten Manifest (API ≥0.2.3) — geklont, nie das Original. */
+const cloneWorkspaceTabs = (m: PluginManifest): WorkspaceTabDecl[] =>
+  (m.ui?.workspaceTabs ?? []).map((t) => ({ tabId: t.tabId, label: t.label, ...(t.icon ? { icon: t.icon } : {}) }))
 
 const cloneFileEditors = (fe: FileEditorDecl[]): FileEditorDecl[] =>
   fe.map((f) => ({ editorId: f.editorId, extensions: [...f.extensions], ...(f.label ? { label: f.label } : {}) }))
@@ -151,6 +155,7 @@ export class RendererRuntime {
       code: e.payload.code.toString('utf8'),
       styles: e.payload.styles?.toString('utf8'),
       fileEditors: cloneFileEditors(e.fileEditors),
+      workspaceTabs: cloneWorkspaceTabs(e.manifest),
     }
   }
 
@@ -240,5 +245,6 @@ function describe(e: RendererRuntimeEntry): RendererDescriptor {
     version: e.version,
     rendererInstanceId: e.rendererInstanceId,
     fileEditors: cloneFileEditors(e.fileEditors),
+    workspaceTabs: cloneWorkspaceTabs(e.manifest),
   }
 }

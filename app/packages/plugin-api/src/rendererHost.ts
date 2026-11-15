@@ -49,6 +49,29 @@ export interface PluginRendererVault {
   writeBytes(relPath: string, bytes: Uint8Array): Promise<void>
 }
 
+/**
+ * Mount eines Arbeitsbereich-Tabs (API ≥0.2.3) — gleiche Form wie `FileEditorMount`, ohne Datei.
+ * Höchstens ein Tab je `tabId` ist gleichzeitig offen; der Host mountet beim Öffnen und disposed beim Schließen.
+ */
+export type WorkspaceTabMount = (
+  container: HTMLElement,
+  ctx: { host: PluginRendererHost },
+) => () => void
+
+/** Ein Anhang für `composeMail` — Bytes, keine Pfade (der Host legt sie selbst ab). */
+export interface ComposeMailAttachment {
+  name: string
+  bytes: Uint8Array
+}
+
+/** Vorbelegung des Schreibfensters (API ≥0.2.3). Abgeschickt wird immer von Hand. */
+export interface ComposeMailDraft {
+  to?: Array<{ name?: string; address: string }>
+  subject?: string
+  body?: string
+  attachments?: ComposeMailAttachment[]
+}
+
 /** Das Host-Objekt, das ein externes Renderer-Plugin in `activate(host)` erhält (ADR §6). */
 export interface PluginRendererHost {
   /** Eigene Plugin-ID — muss zum geladenen Descriptor passen (der Host prüft das beim Laden). */
@@ -77,6 +100,23 @@ export interface PluginRendererHost {
    * Regeln: `shared/pluginLink.ts`.
    */
   openLink?(link: string): Promise<'opened' | 'not-found' | 'refused'>
+  /**
+   * Arbeitsbereich-Tab (API ≥0.2.3, optional — feature-detected aufrufen). Bindet eine Mount-Funktion an
+   * eine im Manifest deklarierte `ui.workspaceTabs[].tabId`. Nur während `activate()`; jede deklarierte
+   * tabId GENAU EINMAL, unbekannt/doppelt/fehlend lässt die Aktivierung terminal scheitern.
+   */
+  registerWorkspaceTab?(opts: { tabId: string; mount: WorkspaceTabMount }): void
+  /**
+   * Eine EIGENE Main-Action aufrufen (API ≥0.2.3, optional). `actionId` muss mit `<pluginId>.` beginnen;
+   * Schema- und Capability-Prüfung macht die Main-Registry wie bei jedem Plugin-Aufruf. Wirft mit der
+   * Fehlermeldung der Action.
+   */
+  invoke?<T = unknown>(actionId: string, payload?: unknown): Promise<T>
+  /**
+   * Öffnet das Mail-Schreibfenster der App vorbelegt (API ≥0.2.3, optional). Verschickt NICHTS — der
+   * Nutzer prüft und sendet selbst. Ohne eingerichtetes Mailkonto wirft der Aufruf.
+   */
+  composeMail?(draft: ComposeMailDraft): Promise<void>
   /** Komfort-Vault-Bridge (siehe `PluginRendererVault`). */
   readonly vault: PluginRendererVault
   /** Aktuelles Host-Theme (live — spiegelt spätere Wechsel wider). */

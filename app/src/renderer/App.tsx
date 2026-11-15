@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react'
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { Sidebar } from './components/Sidebar/Sidebar'
 import { QuickEventModal } from './components/Sidebar/QuickEventModal'
@@ -48,6 +48,8 @@ import { SemanticScholarPanel } from './components/SemanticScholarPanel/Semantic
 import { useEmailStore } from './stores/emailStore'
 import { isTaskPathExcluded } from '../shared/taskFolderFilter'
 import { PluginSlot } from './plugins/slots'
+import { ExternalWorkspaceTab } from './plugins/external/WorkspaceTab'
+import { externalRendererRegistry, useRendererRevision } from './plugins/external/rendererHostClient'
 import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
 import { NotesChat } from './components/NotesChat/NotesChat'
@@ -201,6 +203,14 @@ const App: React.FC = () => {
   const { unreadRelevantCount } = useEmailStore()
   const emailEnabled = useUIStore(state => state.email.enabled)
   const edooboxEnabled = usePluginEnabled('edoobox')
+  // Arbeitsbereich-Tabs externer Plugins (ui.workspaceTabs, API ≥0.2.3) — Kern nennt kein Plugin namentlich.
+  const openPluginViewTab = useTabStore(state => state.openPluginViewTab)
+  // Geladen heißt aktiv; rendererRevision → neu berechnen, sobald ein externes Plugin lädt/entlädt.
+  const rendererRevision = useRendererRevision()
+  const workspaceTabs = useMemo(
+    () => externalRendererRegistry.listWorkspaceTabs().map(t => ({ pluginId: t.pluginId, viewId: t.tabId, label: t.label, icon: t.icon })),
+    [rendererRevision]
+  )
   const workflowCanvasEnabled = useUIStore(state => state.workflowCanvasEnabled)
   const brainLensActive = useUIStore(state => state.brainLensActive)
   const editorShowBacklinks = useUIStore(state => state.editorShowBacklinks)
@@ -869,7 +879,7 @@ const App: React.FC = () => {
     const activeTab = currentTabs.find(t => t.id === currentActiveTabId)
     const shadowsViewer = !!activeTab && (
       activeTab.type === 'dashboard' || activeTab.type === 'workflow-canvas' || activeTab.type === 'code' ||
-      activeTab.type === 'plugin-editor' || activeTab.type === 'agent' || activeTab.type === 'llm-performance' ||
+      activeTab.type === 'plugin-editor' || activeTab.type === 'plugin-view' || activeTab.type === 'agent' || activeTab.type === 'llm-performance' ||
       activeTab.type === 'comparison'
     )
     if (!shadowsViewer) return // Viewer ist bereits sichtbar — nichts tun
@@ -1558,6 +1568,12 @@ const App: React.FC = () => {
                         <span>{t('titlebar.zotero')}</span>
                       </button>
                     )}
+                    {workspaceTabs.map(c => (
+                      <button key={`ws-${c.pluginId}-${c.viewId ?? ''}`} className={`titlebar-tools-item ${activeTab?.type === 'plugin-view' && activeTab.pluginId === c.pluginId && activeTab.editorId === c.viewId ? 'active' : ''}`} role="menuitem" onClick={() => { openPluginViewTab(c.pluginId, c.label, c.viewId); setToolsMenuOpen(false) }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={c.icon ?? 'M4 4h16v16H4z'} /></svg>
+                        <span>{c.label}</span>
+                      </button>
+                    ))}
                     <button className={`titlebar-tools-item ${terminalVisible ? 'active' : ''}`} role="menuitem" onClick={() => { setTerminalVisible(!terminalVisible); setToolsMenuOpen(false) }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
                       <span>{t('titlebar.terminal')}</span>
@@ -1646,6 +1662,8 @@ const App: React.FC = () => {
                     filePath={activeTab.filePath}
                     editorId={activeTab.editorId}
                   />
+                ) : activeTab?.type === 'plugin-view' && activeTab.pluginId && activeTab.editorId ? (
+                  <ExternalWorkspaceTab key={`${activeTab.id}:${vaultPath ?? ""}`} pluginId={activeTab.pluginId} tabId={activeTab.editorId} />
                 ) : selectedPdfPath && vaultPath ? (
                   <PDFViewer filePath={`${vaultPath}/${selectedPdfPath}`} fileName={selectedPdfPath.split('/').pop() || selectedPdfPath} relativePath={selectedPdfPath} revision={pdfRevision} />
                 ) : selectedImagePath && vaultPath ? (

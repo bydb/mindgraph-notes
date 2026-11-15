@@ -121,6 +121,18 @@ export interface FileEditorDecl {
   label?: string
 }
 
+/** Arbeitsbereich-Tab eines externen Renderer-Plugins (API ≥0.2.3). Signiert + code-frei lesbar: der Kern
+ *  listet den Tab im Werkzeuge-Menü, bevor Plugin-Code läuft; `registerWorkspaceTab` bindet zur Laufzeit nur
+ *  die Mount-Funktion an die `tabId`. */
+export interface WorkspaceTabDecl {
+  /** Stabile ID innerhalb des Plugins — verbindet den Manifest-Eintrag mit `registerWorkspaceTab`. */
+  tabId: string
+  /** Name im Werkzeuge-Menü und auf dem Tab. */
+  label: string
+  /** Optionale SVG-Pfaddaten (24er-Raster, Strichgrafik) für den Menüeintrag. */
+  icon?: string
+}
+
 /** Autor eines Plugins. Bewusst Objekt (nicht String) — eine spätere Erweiterung um url/email
  *  bliebe additiv, eine String→Objekt-Umstellung wäre es nicht. */
 export interface PluginAuthor {
@@ -202,6 +214,8 @@ export interface PluginManifest {
     /** Datei-Editor-Beanspruchungen (ADR plugin-renderer-host §8). Signiert + code-frei lesbar,
      *  damit der Host Endung→Plugin VOR dem Laden kennt. */
     fileEditors?: FileEditorDecl[]
+    /** Arbeitsbereich-Tabs (API ≥0.2.3), nur mit `entrypoints.renderer`. */
+    workspaceTabs?: WorkspaceTabDecl[]
   }
   privacy?: { containsPersonalData?: boolean; localOnly?: boolean }
 }

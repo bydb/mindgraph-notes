@@ -101,6 +101,17 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
     },
     // Datei-Editor-Beanspruchung (ADR plugin-renderer-host §8). Endungs-Form wird zusätzlich in
     // validateManifestSemantics + dem FileEditorResolver normalisiert/geprüft.
+    workspaceTabDecl: {
+      type: 'object',
+      required: ['tabId', 'label'],
+      properties: {
+        tabId: { type: 'string', minLength: 1, maxLength: 64, pattern: '^[a-z0-9][a-z0-9-]*$' },
+        label: { type: 'string', minLength: 1, maxLength: 40 },
+        // Nur SVG-Pfadbefehle und Zahlen — kein Markup, kein url().
+        icon: { type: 'string', maxLength: 2000, pattern: '^[MmLlHhVvCcSsQqTtAaZz0-9 ,.\\-]*$' },
+      },
+      additionalProperties: false,
+    },
     fileEditorDecl: {
       type: 'object',
       required: ['editorId', 'extensions'],
@@ -259,6 +270,7 @@ export const PLUGIN_MANIFEST_SCHEMA: JsonSchema = {
         dashboardWidget: { $ref: '#/definitions/slotDecl' },
         sidebarPanel: { $ref: '#/definitions/slotDecl' },
         fileEditors: { type: 'array', items: { $ref: '#/definitions/fileEditorDecl' } },
+        workspaceTabs: { type: 'array', items: { $ref: '#/definitions/workspaceTabDecl' } },
       },
       additionalProperties: false,
     },
@@ -368,6 +380,16 @@ export function validateManifestSemantics(manifest: PluginManifest): ValidationR
       errors.push(`Doppelte ui.fileEditors.editorId '${fe.editorId}'.`)
     }
     seenEditorIds.add(fe.editorId)
+  }
+
+  // Arbeitsbereich-Tabs (API ≥0.2.3): tabId eindeutig, nur mit Renderer-Entry (sonst mountet niemand).
+  const seenTabIds = new Set<string>()
+  for (const wt of manifest.ui?.workspaceTabs ?? []) {
+    if (seenTabIds.has(wt.tabId)) errors.push(`Doppelte ui.workspaceTabs.tabId '${wt.tabId}'.`)
+    seenTabIds.add(wt.tabId)
+  }
+  if (manifest.ui?.workspaceTabs?.length && !manifest.entrypoints?.renderer) {
+    errors.push('ui.workspaceTabs braucht entrypoints.renderer — ohne Renderer-Bundle mountet niemand den Tab.')
   }
 
   // Main-gebundene Beiträge brauchen einen main-Entrypoint (ADR plugin-renderer-host §5.1, R1-impl-F05):

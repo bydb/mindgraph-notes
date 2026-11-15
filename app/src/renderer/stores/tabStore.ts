@@ -11,6 +11,7 @@ export type TabType =
   | 'workflow-canvas'
   | 'agent'
   | 'plugin-editor'
+  | 'plugin-view'
   | 'llm-performance'
   | 'comparison'
 
@@ -67,6 +68,9 @@ interface TabState {
   openLlmPerformanceTab: () => void
   openCodeTab: (relativePath: string, title: string) => void
   openPluginEditorTab: (pluginId: string, filePath: string, editorId: string, title: string) => void
+  /** Arbeitsbereich-Tab eines externen Plugins (`ui.workspaceTabs`, API ≥0.2.3) — genau einer je
+   *  (Plugin, tabId). Die tabId liegt in `editorId`. */
+  openPluginViewTab: (pluginId: string, title: string, viewId: string) => void
   closeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
 
@@ -283,6 +287,17 @@ export const useTabStore = create<TabState>()((set, get) => ({
       tabs: [...state.tabs, newTab],
       activeTabId: newTab.id
     })
+  },
+
+  openPluginViewTab: (pluginId, title, viewId) => {
+    const state = get()
+    const existingTab = state.tabs.find(t => t.type === 'plugin-view' && t.pluginId === pluginId && t.editorId === viewId)
+    if (existingTab) {
+      set({ activeTabId: existingTab.id })
+      return
+    }
+    const newTab: Tab = { id: generateTabId(), type: 'plugin-view', noteId: `plugin-view:${pluginId}:${viewId ?? ''}`, pluginId, editorId: viewId, title }
+    set({ tabs: [...state.tabs, newTab], activeTabId: newTab.id })
   },
 
   openPluginEditorTab: (pluginId, filePath, editorId, title) => {
