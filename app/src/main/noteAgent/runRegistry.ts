@@ -52,6 +52,8 @@ export interface PublicAgentResult {
 }
 
 import type { AgentOcrState } from '../ocr/agentOcr'
+import type { McpRunState } from '../mcp/agentTools'
+import type { McpForeignData } from '../../shared/mcp'
 
 export interface AgentRun {
   runId: string
@@ -148,6 +150,15 @@ export interface AgentRun {
   // damit weiter, statt den ganzen Verlauf neu zu schätzen — die Schätzung liegt bis zu 71 %
   // zu hoch und lehnte Folgeaufträge nach längeren Läufen als „Kontext voll“ ab (gemessen 12.11.2026).
   transcriptTokens?: number
+  // Externe Werkzeuge (MCP) dieses Laufs — Verbindungen und Werkzeugansicht, beim Start im Main
+  // gebaut (docs/codex-collab/mcp-anbindung.md, E7′). Nie aus Renderer-Angaben.
+  mcp?: McpRunState
+  // Gewählte Server-Kennungen dieses Laufs (für die Teilmengen-Regel bei Folgeaufträgen, E17′).
+  mcpServers?: string[]
+  // Herkunft „enthält Daten aus externen Werkzeugen" — monoton über alle Folgeaufträge vererbt
+  // (E19, Codex F15). Solange gesetzt: keine Shell, keine Webrecherche, keine Rechner-Steuerung,
+  // keine Bilderzeugung.
+  foreignData?: McpForeignData
 }
 
 // Beendete Läufe mit noch offenen Review-Karten pro Sender maximal halten —
@@ -206,6 +217,9 @@ export function startRun(params: {
   route?: AgentRoute
   vaultSearch?: AgentRun['vaultSearch']
   dayOverview?: AgentRun['dayOverview']
+  mcp?: McpRunState
+  mcpServers?: string[]
+  foreignData?: McpForeignData
 }): AgentRun | null {
   const existing = activeBySender.get(params.senderId)
   if (existing && existing.status === 'running') return null
@@ -233,6 +247,9 @@ export function startRun(params: {
     sources: new Set(),
     startedAt: Date.now(),
     toolsUsed: new Set(),
+    ...(params.mcp ? { mcp: params.mcp } : {}),
+    ...(params.mcpServers?.length ? { mcpServers: params.mcpServers } : {}),
+    ...(params.foreignData ? { foreignData: params.foreignData } : {}),
     skillsUsed: [],
     instructionMs: params.instructionMs,
     comparisonCaseId: params.comparisonCaseId,
@@ -285,7 +302,9 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
       transcriptTokens: run.transcriptTokens,
       datasets: new Map(run.datasets),
       folderReads: new Map(run.folderReads),
-      collectedFolders: new Set(run.collectedFolders)
+      collectedFolders: new Set(run.collectedFolders),
+      ...(run.foreignData ? { foreignData: run.foreignData } : {}),
+      ...(run.mcpServers?.length ? { mcpServers: run.mcpServers } : {})
     })
   } else {
     continuations.delete(run.senderId)
@@ -303,6 +322,10 @@ export interface RunContinuation {
   datasets: Map<string, CollectedTable>
   folderReads: Map<string, number>
   collectedFolders: Set<string>
+  /** Herkunft aus externen Werkzeugen, über die ganze Kette vererbt (E19). */
+  foreignData?: McpForeignData
+  /** Im Vorgänger gewählte externe Server (E17′: Folgeauftrag nur dieselben oder weniger). */
+  mcpServers?: string[]
 }
 
 const continuations = new Map<number, RunContinuation>()

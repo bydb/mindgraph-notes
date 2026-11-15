@@ -24,6 +24,7 @@ import { ContextAttachmentRow, FolderGlyph } from '../Shared/ContextAttachmentRo
 import { ModelPicker } from '../Shared/ModelPicker'
 import { MindGraphLogo } from '../Shared/MindGraphLogo'
 import { AgentRunPanel } from './AgentRunPanel'
+import { McpServerPicker } from './McpServerPicker'
 import { PetrolChat } from './PetrolChat'
 import { usePetrolChatStore } from '../../stores/petrolChatStore'
 import { useContextVaultFiles } from '../../utils/useContextVaultFiles'
@@ -156,6 +157,7 @@ export function AgentView({ tabId }: Props) {
   const webResearchModule = useIsModuleEnabled('web-research')
   const shellModule = useIsModuleEnabled('agent-shell')
   const computerModule = useIsModuleEnabled('agent-computer')
+  const mcpModule = useIsModuleEnabled('agent-mcp')
   const imageModule = useIsModuleEnabled('image-generation')
   const computerSettings = useUIStore(s => s.agentComputer) ?? DEFAULT_COMPUTER_CONTROL
   const shellNetwork = useUIStore(s => s.agentShell?.network === true)
@@ -444,11 +446,20 @@ export function AgentView({ tabId }: Props) {
   const webOn = webArmed && webResearchModule && webConfigured
   const shellOn = shellArmed && shellModule && HAS_MAC_TOOLS
   const computerOn = computerArmed && computerModule && computerVerbs.length > 0 && HAS_MAC_TOOLS
+  // Externe Werkzeuge (MCP) schließen Web, Shell und Rechner-Steuerung im selben Lauf aus —
+  // der Main sperrt die Kombination (docs/codex-collab/mcp-anbindung.md, E9′); die Karte zeigt
+  // es vorher, statt den Start scheitern zu lassen.
+  const mcpSelected = scope.prefs?.mcpServers ?? []
+  const mcpOn = mcpModule && mcpSelected.length > 0
+  const setMcpSelected = (ids: string[]) => {
+    store().setPrefs(tabId, { mcpServers: ids })
+    if (ids.length > 0) { setWebArmed(false); setShellArmed(false); setComputerArmed(false) }
+  }
   const webState: PermState = !webResearchModule ? 'modOff' : !webConfigured ? 'setup'
-    : webOn ? 'on' : (shellOn || computerOn) ? 'locked' : 'off'
-  const shellState: PermState = !shellModule ? 'modOff' : shellOn ? 'on' : webOn ? 'locked' : 'off'
+    : webOn && !mcpOn ? 'on' : (shellOn || computerOn || mcpOn) ? 'locked' : 'off'
+  const shellState: PermState = !shellModule ? 'modOff' : shellOn && !mcpOn ? 'on' : (webOn || mcpOn) ? 'locked' : 'off'
   const computerState: PermState = !computerModule ? 'modOff' : computerVerbs.length === 0 ? 'setup'
-    : computerOn ? 'on' : webOn ? 'locked' : 'off'
+    : computerOn && !mcpOn ? 'on' : (webOn || mcpOn) ? 'locked' : 'off'
   const webLockedBy = [shellOn ? t('aiBar.shell.label') : '', computerOn ? t('aiBar.computer.label') : ''].filter(Boolean).join(' / ')
   // Während ein Lauf arbeitet, zeigt die Karte SEINE Einstellungen — nicht die für den
   // nächsten Lauf. Sonst steht neben „Agent arbeitet“ ein anderes Modell und Web aus.
@@ -458,7 +469,10 @@ export function AgentView({ tabId }: Props) {
   const shownShellState: PermState = running ? (runShell ? 'on' : 'off') : shellState
   const shownComputerState: PermState = running ? (runComputer ? 'on' : 'off') : computerState
   const actsNow = running ? runShell || runComputer : shellOn || computerOn
-  const lockedReason = webState === 'locked'
+  const mcpLockReason = mcpOn && !running
+    ? (en ? 'External tools exclude web, shell and computer control in the same run — data from another system must not trigger anything else.' : 'Externe Werkzeuge schließen Web, Shell und Rechner-Steuerung im selben Lauf aus — Daten aus einem fremden System sollen nichts anderes auslösen können.')
+    : ''
+  const lockedReason = mcpLockReason ? mcpLockReason : webState === 'locked'
     ? t('agentCard.permLocked', { a: webLockedBy, b: t('aiBar.web.label') })
     : (shellState === 'locked' || computerState === 'locked')
       ? t('agentCard.permLocked', { a: t('aiBar.web.label'), b: [shellState === 'locked' ? t('aiBar.shell.label') : '', computerState === 'locked' ? t('aiBar.computer.label') : ''].filter(Boolean).join(' / ') })
@@ -521,8 +535,9 @@ export function AgentView({ tabId }: Props) {
       cloudLabel = activeCloudRoute.label
     }
     setStarting(true)
-    const shellAccess = shellOn
-    const computerAccess = computerOn
+    // Mit externen Werkzeugen nie zusammen (siehe mcpOn) — auch nicht aus einem gemerkten Schalter.
+    const shellAccess = shellOn && !mcpOn
+    const computerAccess = computerOn && !mcpOn
     setShellArmed(false)
     setComputerArmed(false)
     const context = chatContext ?? undefined
@@ -538,7 +553,7 @@ export function AgentView({ tabId }: Props) {
       lmStudioPort: ollama.lmStudioPort,
       cloud,
       cloudLabel,
-      webResearch: webOn,
+      webResearch: webOn && !mcpOn,
       shellAccess,
       computerAccess,
       instructionMs: compose.take(),
@@ -907,6 +922,16 @@ export function AgentView({ tabId }: Props) {
                     />
                   </>
                 )}
+                {mcpModule && (
+                  <McpServerPicker
+                    selected={mcpSelected}
+                    onChange={setMcpSelected}
+                    disabled={busy}
+                    en={en}
+                    onOpenSettings={() => openSettingsAt('ai', 'ai-mcp')}
+                    runningServers={running ? (run.mcpServers ?? []) : undefined}
+                  />
+                )}
               </div>
               {webMissing && <span className={firstGap === 'web' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(webHint)}</span>}
               {mindmapWithWeb && <span className="agent-card-help">{t('agentCard.mindmapNoWeb')}</span>}
@@ -1050,6 +1075,12 @@ export function AgentView({ tabId }: Props) {
                         {(running ? runComputer : computerOn) && computerVerbs.includes('mail_draft') && (<>
                           <dt>{t('agentCard.flowMailHead')}</dt>
                           <dd>{t('agentCard.flowMailBody')}</dd>
+                        </>)}
+                        {(running ? (run.mcpServers?.length ?? 0) > 0 : mcpOn) && (<>
+                          <dt>{en ? 'External tools (MCP)' : 'Externe Werkzeuge (MCP)'}</dt>
+                          <dd>{en
+                            ? 'Search terms and filters the agent passes to the selected tools go to those systems; their answers go to the model like everything else the agent reads. A local program runs in a sandbox (no network unless allowed); a network server receives the requests at its address.'
+                            : 'Suchbegriffe und Filter, die der Agent an die gewählten Werkzeuge gibt, gehen an diese Systeme; deren Antworten gehen wie alles Gelesene an das Modell. Ein lokales Programm läuft in einer Sandbox (ohne Netz, sofern nicht erlaubt); ein Server über das Netz bekommt die Anfragen an seiner Adresse.'}</dd>
                         </>)}
                         <dt>{t('agentCard.flowLocalHead')}</dt>
                         <dd>{t('agentCard.flowLocalBody')}</dd>

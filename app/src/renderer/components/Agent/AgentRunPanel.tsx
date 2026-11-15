@@ -14,6 +14,7 @@ import { ModelLogo } from '../Shared/ModelLogo'
 import { SkillReferencePrompt } from './SkillReferencePrompt'
 import type { AcceptOpenTarget, AgentRunUiState } from '../../stores/noteAgentStore'
 import { contextGauge, type ContextSnapshot } from '../../../shared/contextBudget'
+import type { McpRunProvenance } from '../../../shared/types'
 
 export interface AgentPreviewResponse {
   success: boolean
@@ -330,6 +331,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
               ))}
             </div>
           )}
+          {run.mcp && <McpProvenanceBlock mcp={run.mcp} />}
           {run.results.map(r => (
             <div key={r.resultId} className="ai-bar-agent-card">
               <div className="ai-bar-agent-card-head">
@@ -428,6 +430,37 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+
+/**
+ * Externe Werkzeuge (MCP): was im Lauf wirklich lief, inkl. Fehlversuchen, gekürzter und
+ * gedeckelter Aufrufe (E12). Gleiche Optik wie die Web-Herkunft — lokal, nie gesendet.
+ */
+function McpProvenanceBlock({ mcp }: { mcp: McpRunProvenance }) {
+  const en = useUIStore(st => st.language) === 'en'
+  if (mcp.calls.length === 0 && mcp.skipped.length === 0 && mcp.blocked.length === 0) return null
+  return (
+    <div className="ai-bar-agent-web">
+      <div className="ai-bar-agent-web-summary">
+        {en ? 'External tools' : 'Externe Werkzeuge'}: {mcp.calls.length} {en ? (mcp.calls.length === 1 ? 'call' : 'calls') : (mcp.calls.length === 1 ? 'Aufruf' : 'Aufrufe')}
+        {' · '}{mcp.servers.map(s => s.label).join(', ')}
+      </div>
+      {mcp.calls.map((c, i) => (
+        <div key={`c${i}`} className="ai-bar-agent-web-item" title={c.error}>
+          {c.server}: {c.tool} — {c.ok
+            ? `${c.chars.toLocaleString(en ? 'en-US' : 'de-DE')} ${en ? 'chars' : 'Zeichen'}, ${(c.ms / 1000).toFixed(1)} s${c.truncated ? (en ? ', truncated' : ', gekürzt') : ''}${c.capped?.length ? (en ? `, capped: ${c.capped.join(', ')}` : `, gedeckelt: ${c.capped.join(', ')}`) : ''}`
+            : (en ? 'failed' : 'fehlgeschlagen')}
+        </div>
+      ))}
+      {mcp.skipped.map((s, i) => (
+        <div key={`s${i}`} className="ai-bar-agent-web-item">{en ? 'Not offered' : 'Nicht angeboten'}: {s}</div>
+      ))}
+      {mcp.blocked.map((b, i) => (
+        <div key={`b${i}`} className="ai-bar-agent-web-item">{en ? 'Blocked during the run' : 'Im Lauf gesperrt'}: {b.server} — {b.reason}</div>
+      ))}
     </div>
   )
 }

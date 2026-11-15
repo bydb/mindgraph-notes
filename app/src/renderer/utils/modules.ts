@@ -89,6 +89,7 @@ export function useIsModuleEnabled(id: ModuleDescriptor['id']): boolean {
       case 'web-research':      return state.webResearchEnabled
       case 'agent-shell':       return state.agentShellEnabled
       case 'agent-computer':    return state.agentComputerEnabled
+      case 'agent-mcp':         return state.agentMcpEnabled
       case 'image-generation':  return state.imageGenerationEnabled
       case 'semantic-scholar':  return state.semanticScholarEnabled
       case 'zotero':            return state.zoteroEnabled
@@ -119,6 +120,7 @@ export function isModuleEnabled(id: ModuleDescriptor['id']): boolean {
     case 'web-research':      return s.webResearchEnabled
     case 'agent-shell':       return s.agentShellEnabled
     case 'agent-computer':    return s.agentComputerEnabled
+    case 'agent-mcp':         return s.agentMcpEnabled
     case 'image-generation':  return s.imageGenerationEnabled
     case 'semantic-scholar':  return s.semanticScholarEnabled
     case 'zotero':            return s.zoteroEnabled
@@ -154,6 +156,7 @@ function applyModuleFlags(id: ModuleDescriptor['id'], enabled: boolean): void {
     case 'web-research':      s.setWebResearchEnabled(enabled); break
     case 'agent-shell':       s.setAgentShellEnabled(enabled); break
     case 'agent-computer':    s.setAgentComputerEnabled(enabled); break
+    case 'agent-mcp':         s.setAgentMcpEnabled(enabled); break
     case 'image-generation':  s.setImageGenerationEnabled(enabled); break
     case 'semantic-scholar':  s.setSemanticScholarEnabled(enabled); break
     case 'zotero':            s.setZoteroEnabled(enabled); break

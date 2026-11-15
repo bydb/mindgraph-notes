@@ -17,6 +17,7 @@ import { WebResearchSection } from './WebResearchSection'
 import { WebFetchStatsSection } from './WebFetchStatsSection'
 import { AgentShellSection } from './AgentShellSection'
 import { ComputerControlSection } from './ComputerControlSection'
+import { McpSection } from './McpSection'
 import { ImageGenerationSection } from './ImageGenerationSection'
 import { SkillsSection } from './SkillsSection'
 import { SettingsSearch, type SettingsSearchEntry } from './SettingsSearch'
@@ -256,6 +257,7 @@ const MODULE_CONFIG_TABS: Record<string, { tab: Tab; anchor?: string }> = {
   'web-research': { tab: 'ai', anchor: 'ai-webresearch' },
   'agent-shell': { tab: 'ai', anchor: 'ai-agentshell' },
   'agent-computer': { tab: 'ai', anchor: 'ai-agentcomputer' },
+  'agent-mcp': { tab: 'ai', anchor: 'ai-mcp' },
   'image-generation': { tab: 'ai', anchor: 'ai-imagegen' },
   zotero: { tab: 'integrations', anchor: 'integration-zotero' },
   'semantic-scholar': { tab: 'integrations', anchor: 'integration-research' },
@@ -1022,6 +1024,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
   const searchImageGenEnabled = useIsModuleEnabled('image-generation')
   const agentShellModuleOn = useIsModuleEnabled('agent-shell')
   const agentComputerModuleOn = useIsModuleEnabled('agent-computer')
+  const agentMcpModuleOn = useIsModuleEnabled('agent-mcp')
   const projectRagOn = useIsModuleEnabled('project-rag')
   const searchIndex = React.useMemo<SettingsSearchEntry[]>(() => {
     const g = {
@@ -1069,6 +1072,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       { id: 'ai-default-model', tab: 'ai', label: t('settings.integrations.ollama.model'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'standard modell default model chat analyse qwen', anchor: 'ai-default-model' },
       { id: 'ai-matrix', tab: 'ai', label: t('settings.integrations.compatibility.title'), path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'modell kompatibilität matrix modul override brain aufgaben extraktion mail zusammenfassung eignung verdict', anchor: 'ai-matrix' },
       { id: 'ai-embedding', tab: 'ai', label: 'Projekt-RAG Embedding', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'embedding modell bge nomic smart connections ähnlichkeit rag', anchor: 'ai-embedding' },
+      { id: 'ai-mcp', tab: 'ai', label: language === 'en' ? 'External services (MCP)' : 'Externe Dienste (MCP)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'mcp externe dienste werkzeuge tools verbinden connector plaud diktiergerät aufnahmen notion linear atlassian jira confluence business central erp claude desktop cursor', anchor: 'ai-mcp' },
       { id: 'ai-openrouter', tab: 'ai', label: 'OpenRouter (Cloud)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'openrouter cloud api opt-in claude gpt', anchor: 'ai-openrouter' },
       { id: 'ai-llmbase', tab: 'ai', label: 'LLMBase (europäischer Anbieter)', path: `${g.modules} → ${t('settings.tab.ai')}`, keywords: 'llmbase eu dsgvo cloud europa', anchor: 'ai-llmbase' },
       { id: 'ai-chat-history', tab: 'ai', label: t('petrolChat.retentionTitle'), path: t('settings.tab.ai'), keywords: 'chat verlauf gespräche aufbewahrung löschen history retention petrol', anchor: 'ai-chat-history' },
@@ -1099,7 +1103,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       if (e.id === 'ai-imagegen') return searchImageGenEnabled
       return true
     })
-  }, [t, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled, searchImageGenEnabled])
+  }, [t, language, searchEmailEnabled, searchSpeechEnabled, searchRemarkableEnabled, searchWebResearchEnabled, searchImageGenEnabled])
 
   // App Version
   const [appVersion, setAppVersion] = useState<string>('')
@@ -1826,7 +1830,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   <div data-settings-anchor="ai-agent-cloud-consent"><AgentCloudConsentCard /></div>
 
                   {/* ── Agent-Fähigkeiten (nur bei aktivem Modul) ── */}
-                  {(searchWebResearchEnabled || agentShellModuleOn || agentComputerModuleOn) && <SectionTitle title={t('settings.aiTab.agent')} />}
+                  <SectionTitle title={t('settings.aiTab.agent')} />
                   {searchWebResearchEnabled && (
                     <Card anchor="ai-webresearch">
                       <div className="sui-embed"><WebResearchSection /></div>
@@ -1845,6 +1849,18 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   )}
                   {agentComputerModuleOn && (
                     <Card anchor="ai-agentcomputer"><div className="sui-embed"><ComputerControlSection /></div></Card>
+                  )}
+                  {/* Immer sichtbar: Wer „Plaud verbinden“ sucht, soll hier landen, auch bei ausgeschaltetem Modul
+                      (Abschnitt 6, E33′ — im GUI-Test fand die Suche nach „Plaud“ und „MCP“ nichts). */}
+                  {agentMcpModuleOn ? (
+                    <Card anchor="ai-mcp"><div className="sui-embed"><McpSection /></div></Card>
+                  ) : (
+                    <ModuleOffCard
+                      icon={<IconTile bg="#3f6f6a">{TILE_GLYPH.cpu}</IconTile>}
+                      name={language === 'en' ? 'External services and tools (MCP) — Plaud, Notion, Linear, Atlassian …' : 'Externe Dienste und Werkzeuge (MCP) — Plaud, Notion, Linear, Atlassian …'}
+                      onEnable={() => { void setModuleEnabled('agent-mcp', true).catch(err => console.error('[settings] agent-mcp:', err)) }}
+                      anchor="ai-mcp"
+                    />
                   )}
 
                   {/* ── Smart Connections ── */}

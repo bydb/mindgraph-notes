@@ -234,6 +234,9 @@ import { setupTray, hideTransportWindow, updateShortcut, showTransportWindow } f
 import { createMainRegistry, discoverMainPlugins } from './plugins/registry'
 import { isPluginGateEnabled } from '../shared/plugins/moduleGate'
 import { registerPluginTransport, isTrustedSender } from './plugins/transport'
+import { registerMcpIpc, getMcpStore, mcpMicrosoftToken, mcpOAuthToken, confirmMcpPersonalDataForRun } from './mcp/ipc'
+import { prepareMcpForRun, closeMcpForRun, mcpProvenance, revokeActiveMcpSessions, type McpRunState } from './mcp/agentTools'
+import { mcpRunGate } from '../shared/mcp'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments, readContextBlock } from './noteAgent/contextFiles'
 import { startRun, peekContinuation, dropContinuation, type RunContinuation, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState, type AgentRun } from './noteAgent/runRegistry'
 import { randomBytes } from 'crypto'
@@ -1286,6 +1289,11 @@ async function addApprovedRoot(root: string | null | undefined): Promise<void> {
   if (!root || typeof root !== 'string') return
   try {
     const resolved = path.resolve(root)
+    // Laufende externe Programme kennen einen neuen Vault nicht und sperren ihn nicht — vorher
+    // beenden (MCP, Codex F17). Nur wenn der Vault wirklich neu ist.
+    if (!approvedVaultRoots.has(resolved)) {
+      await revokeActiveMcpSessions('Ein weiterer Vault wurde geöffnet; die Verbindungen zu externen Programmen wurden zum Schutz beendet.').catch(() => undefined)
+    }
     approvedVaultRoots.add(resolved)
     try {
       const real = await fs.realpath(resolved)
@@ -4733,6 +4741,9 @@ interface NoteAgentRunParams {
   // Folgelauf: `instruction` ist dann die Antwort des Nutzers auf die letzte Nachricht
   // dieses Laufs. Verlauf und Datensätze holt der Main selbst — nie aus dem Renderer.
   continueFromRunId?: string
+  // Externe Werkzeuge (MCP) für diesen Lauf — nur Server-Kennungen. Programm, Adresse,
+  // Freigaben und Geheimnisse liest der Main aus seiner eigenen Ablage (E4).
+  mcpServers?: string[]
 }
 
 // ── Modellweg des Agenten: Einstufung + Cloud-Freigabe (Codex F15/F26–F28) ──────────
@@ -5021,6 +5032,29 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       }
     } catch { /* Modul bleibt aus */ }
 
+    // Externe Werkzeuge (MCP) — docs/codex-collab/mcp-anbindung.md E5, E9′, E17′, E19.
+    // HIER und nicht weiter oben: erst jetzt stehen Modellweg und imageGen fest (Codex F16), und
+    // der Fortsetzungsstand ist noch nicht verbraucht (startRun/dropContinuation folgen unten).
+    const mcpUi = (await loadUISettings().catch(() => ({}))) as Record<string, unknown>
+    const mcpGate = mcpRunGate({
+      requested: params.mcpServers,
+      moduleEnabled: mcpUi.agentMcpEnabled === true,
+      inherited: continuation?.prev.foreignData,
+      prevServers: continuation?.prev.mcpServers,
+      shell: params.shellAccess === true,
+      web: !!params.webResearch?.enabled,
+      computer: params.computerAccess === true
+    })
+    if (!mcpGate.ok) return { success: false, error: mcpGate.error }
+    // Bilderzeugung ist kein Lauf-Parameter, sondern hängt am Modul — mit Fremddaten fest aus
+    // (E9′, Codex F03): ein präpariertes Ergebnis könnte sonst Daten als Bild-Prompt zu Google schicken.
+    if (mcpGate.hasForeign) imageGen = false
+    // Personendaten aus einem Dienst (z.B. Plaud-Mitschnitte) auf einem Cloud-Weg: eigene Rückfrage
+    // im Main, unabhängig von der allgemeinen Cloud-Zustimmung (Abschnitt 6, E31′, Codex F29).
+    // Auch geerbte Server zählen: ihre Daten stehen im übernommenen Verlauf (Codex F33).
+    const personal = await confirmMcpPersonalDataForRun(event.sender, mcpGate.serverIds, continuation?.prev.foreignData, route)
+    if (!personal.ok) return { success: false, error: personal.error }
+
     // Vault-Index als Suchwerkzeug (vault_search) — für alle Wege, auch Cloud (Nutzerentscheidung
     // 24.09.2026: Transparenz statt Sperre; die Karte nennt Suchauszüge als Datenweg). Die
     // Einbettung der Anfrage bleibt lokal und meldet sich als Vordergrund an, damit der
@@ -5047,6 +5081,23 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
     // Hausdesign: einmal beim Start laden; aus, kaputt oder Logo-Prüfsumme falsch → kein Hausdesign.
     const brand = await loadBrandForRun(params.vaultPath, skills.map(s => ({ ...s, enabled: true }))).catch(() => null)
 
+    // Externe Server verbinden und die Werkzeugansicht bauen (E7′, E16′) — vor startRun, damit
+    // ein Server, der nicht startet, den Lauf mit Klartext ablehnt statt mitten darin zu scheitern.
+    let mcp: McpRunState | undefined
+    if (mcpGate.serverIds.length > 0) {
+      try {
+        mcp = await prepareMcpForRun({ serverIds: mcpGate.serverIds, store: getMcpStore(), vaultPath: params.vaultPath, knownVaults: [...approvedVaultRoots], getMicrosoftToken: mcpMicrosoftToken, getOAuthToken: mcpOAuthToken, expectedBindings: personal.bindings })
+      } catch (e) {
+        return { success: false, error: e instanceof Error ? e.message : String(e) }
+      }
+      // Das Verbinden kann dauern. Ist das Fenster inzwischen zu, darf kein Lauf mehr entstehen,
+      // den niemand abbrechen kann (Codex F05 der Code-Prüfung).
+      if (event.sender.isDestroyed()) {
+        await closeMcpForRun(mcp)
+        return { success: false, error: 'Fenster geschlossen.' }
+      }
+    }
+
     const run = startRun({
       senderId: event.sender.id,
       noteId: params.noteId,
@@ -5069,9 +5120,16 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
       route,
       vaultSearch,
       dayOverview,
-      ...(brand ? { brand } : {})
+      ...(brand ? { brand } : {}),
+      ...(mcp ? { mcp, mcpServers: mcpGate.serverIds } : {}),
+      ...(continuation?.prev.foreignData ? { foreignData: continuation.prev.foreignData } : {})
     })
-    if (!run) return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
+    if (!run) {
+      await closeMcpForRun(mcp)
+      return { success: false, error: 'Es läuft bereits ein Agent-Lauf in diesem Fenster — erst abbrechen oder abwarten.' }
+    }
+    // Abbrechen schließt die Verbindungen sofort (ein laufender Aufruf endet damit).
+    if (mcp) run.abort.signal.addEventListener('abort', () => { void closeMcpForRun(mcp) }, { once: true })
     if (continuation) {
       // Datensätze (collect_table) und Lese-Zähler gehen mit — der Verlauf nennt ihre IDs.
       for (const [id, table] of continuation.prev.datasets) run.datasets.set(id, table)
@@ -5215,6 +5273,7 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             hitMaxIterations: res.hitMaxIterations,
             results: publicResults(run),
             web: webRunProvenance(run),
+            mcp: mcpProvenance(run.mcp),
             ...promptSkillFields(run)
           })
         }
@@ -5267,12 +5326,15 @@ ipcMain.handle('note-agent-run', async (event, params: NoteAgentRunParams) => {
             error: message,
             results: publicResults(run),
             web: webRunProvenance(run),
+            mcp: mcpProvenance(run.mcp),
             ...promptSkillFields(run)
           })
         }
       } finally {
         // MUSS hier stehen: sonst bleibt die Maschine nach einem Fehler-Lauf für immer wach.
         releaseStayAwake()
+        // Verbindungen zu externen Servern enden mit dem Lauf — kein verwaister Prozess (E13).
+        await closeMcpForRun(run.mcp)
       }
     })()
 
@@ -12138,6 +12200,10 @@ ipcMain.handle('sync-restore', async (_event, vaultPath: string, vaultId: string
 
 // E-Mail-Handler (IMAP, Analyse, Versand, Anhänge, Kontakte): main/email/ipc.ts.
 // Angemeldet an der Stelle, an der der Block bis 10.11.2026 in dieser Datei stand.
+// Externe Werkzeuge (MCP), Einstellungen: main/mcp/ipc.ts. Der Lauf-Teil steht im
+// note-agent-run-Handler (Sperren, Werkzeugansicht), die Ablage teilt sich beides.
+registerMcpIpc({ isTrustedSender, assertApprovedVault, getApprovedVaultRoots: () => [...approvedVaultRoots] })
+
 registerEmailIpc({
   getMainWindow: () => mainWindow,
   validatePath,

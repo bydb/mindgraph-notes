@@ -21636,6 +21636,7 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
 .agent-card-flag { font-size: 11.5px; white-space: nowrap; padding-top: 4px; }
 .agent-card-help { color: var(--text-secondary); font-size: 11.5px; line-height: 1.45; }
 .agent-card-muted { color: var(--text-secondary); }
+.agent-card-muted.is-warning { color: var(--color-warning, var(--text-secondary)); font-size: 12px; flex-basis: 100%; }
 .agent-card-eyebrow { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; }
 
 .agent-card-examples {

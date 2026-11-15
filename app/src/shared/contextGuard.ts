@@ -29,6 +29,7 @@ export const AGENT_NUM_CTX = 32_768
 // (WEB_PAGE_CONTEXT_MAX_CHARS) plus 8 Suchen à 8 Treffer — rund 144.000 Zeichen,
 // also grob 50.000 Token. 65.536 deckt das mit Reserve ab und kostet auf einem
 // 32-GB-Mac gemessen ~1 GB mehr als 32k (qwen3.6:latest: 24 → 25 GB).
+// Gilt seit 15.11.2026 auch für Läufe mit externen Diensten (MCP) — gleiche Lage: fremde Seiten.
 export const AGENT_NUM_CTX_WEB = 65_536
 
 // Zeichen pro Token — bewusst großzügig (deutscher Text liegt eher bei 3). Der Wert

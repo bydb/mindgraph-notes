@@ -1,0 +1,180 @@
+/* Externe Werkzeuge (MCP) — ergänzt die settings-guard-card um Serverliste und Formular. */
+.mcp-server {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 10px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mcp-server-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.mcp-server-kind {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.mcp-server-where {
+  word-break: break-all;
+}
+.mcp-server-actions,
+.mcp-add {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.mcp-danger {
+  color: var(--color-danger);
+}
+.mcp-tools {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mcp-tools li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mcp-tools li label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.mcp-tools li.is-blocked code {
+  color: var(--text-secondary);
+}
+.mcp-tool-blocked {
+  font-size: 12px;
+  color: var(--color-warning, var(--text-secondary));
+}
+.mcp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+.mcp-form > label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+.mcp-form input[type='text'],
+.mcp-form input:not([type]),
+.mcp-form input[type='password'] {
+  width: 100%;
+}
+.mcp-form .mcp-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.mcp-path {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.mcp-path input {
+  flex: 1;
+  min-width: 0;
+}
+/* Katalog „Dienst verbinden“ (Abschnitt 6, E24′/E33′). */
+.mcp-catalog-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.mcp-steps {
+  margin: 6px 0 8px;
+  padding-left: 20px;
+}
+.mcp-catalog {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.mcp-tile {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+.mcp-tile:hover:not(:disabled) {
+  border-color: var(--accent-color);
+}
+.mcp-tile:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.mcp-tile.is-found {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+.mcp-tile-mark {
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+.mcp-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.mcp-tile-state {
+  font-size: 12px;
+  color: var(--accent-color);
+  margin-top: 2px;
+}
+.mcp-suggested {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-color);
+  color: var(--accent-color);
+}
+.mcp-server.is-new {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 1px var(--accent-color);
+}
+.settings-guard-fixed + .settings-guard-warning,
+.mcp-server + .settings-guard-fixed {
+  margin-top: 12px;
+}
+.mcp-writes {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--color-warning, var(--text-secondary));
+  color: var(--color-warning, var(--text-secondary));
+}
+.mcp-tokens {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}

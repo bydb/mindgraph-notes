@@ -196,6 +196,7 @@ Diese Datei hält nur, was überall gilt. Feature-Wissen liegt in pfadgebundenen
 | `note-agent.md` | Notiz-Agent Kern: Ordner auswerten, Modellweg + Cloud-Zustimmung, Webrecherche, Bilder/OCR, Skill-Zeichengrenze (12 000) |
 | `note-agent-outputs.md` | `write_html`, `write_docx`, `write_pptx`, `write_excalidraw`, `write_edumap`, Veranstaltungsjournal, Edupool, Hausdesign-Builder |
 | `note-agent-system-access.md` | Agent-Shell (Sandbox) und Rechner-Steuerung |
+| `mcp.md` | Externe Werkzeuge (MCP): wer garantiert was, Freigabedialoge, Sandbox mit allen Vaults, Netzweg, Herkunft |
 | `vault-rag.md` | Vault-Index, Vault-Chat, Smart Connections |
 | `workflow-canvas.md` · `graph-canvas.md` | Workflow-Automationen · Graph-Ansicht |
 | `settings-ui.md` | Einstellungs-Bausteine (`SettingsUI`), Auto-Save, Modul ↔ Konfiguration |

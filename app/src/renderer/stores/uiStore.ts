@@ -598,6 +598,7 @@ export const MODULES: ModuleDescriptor[] = [
   { id: 'project-rag',      label: 'Notizen befragen (RAG)', description: 'Projektordner oder den ganzen Vault semantisch befragen — Index, Embedding & Antwort lokal; der Vault-Index braucht ein eigenes Opt-in pro Vault', category: 'ai' },
   { id: 'web-research',     label: 'Webrecherche',     description: 'Der Notiz-Agent recherchiert im Web und erstellt eine Notiz mit Quellen — opt-in, eigene Suchmaschine (SearXNG) oder EU-Anbieter (Linkup)', category: 'ai' },
   { id: 'agent-shell',      label: 'Agent-Shell',      macOnly: true,      description: 'Der Notiz-Agent darf nach Freigabe pro Lauf Befehle und Skripte ausführen — in einer Sandbox mit Schutzgrenzen (nur Anhänge lesen, nur Arbeitsordner schreiben, kein Netz); experimentell, derzeit macOS', category: 'ai' },
+  { id: 'agent-mcp',        label: 'Externe Werkzeuge', description: 'Der Notiz-Agent darf freigegebene Werkzeuge externer Systeme abfragen (MCP), z.B. ein ERP. Drei Stufen: hier einschalten, Server und einzelne Werkzeuge in den Einstellungen freigeben, Server pro Lauf wählen. Lokale Programme laufen in einer Sandbox. Ob ein Werkzeug nur liest, legt das fremde System fest — nicht MindGraph', category: 'ai' },
   { id: 'agent-computer',   label: 'Rechner-Steuerung', macOnly: true, description: 'Der Notiz-Agent darf ein Ergebnis weiterreichen — Datei öffnen, im Finder zeigen, Mail-Entwurf in Apple Mail, drucken. Drei Stufen: hier einschalten, dann pro Lauf ein Schalter, dann eine Bestätigung beim Start. Kein Skript, keine Kurzbefehle, nichts holt Daten von aussen; Mails nie gesendet. Experimentell, nur macOS', category: 'ai' },
   { id: 'image-generation', label: 'Bild-Generierung', description: 'Bilder mit Google Nano Banana erzeugen (Cloud, eigener API-Key) — nutzbar im Marketing-Tab und Notiz-Agenten', category: 'ai' }
 ]
@@ -766,6 +767,8 @@ interface UIState {
   agentShellEnabled: boolean
   /** Modul „Rechner-Steuerung": erlaubt dem Notiz-Agenten, andere Programme anzusprechen. */
   agentComputerEnabled: boolean
+  /** Modul „Externe Werkzeuge" (MCP). Erste Stufe des Opt-ins; der Main liest das Flag selbst. */
+  agentMcpEnabled: boolean
   /** Welche Vorgänge und Programme dabei freigegeben sind (siehe shared/computerControl.ts). */
   agentComputer: ComputerControlSettings
   // Schutzgrenzen der Shell (shared/shellGuardrails.ts). Der Main liest sie aus ui-settings.json.
@@ -957,6 +960,7 @@ interface UIState {
   setAgentShellEnabled: (enabled: boolean) => void
   setAgentShell: (patch: Partial<ShellGuardrails>) => void
   setAgentComputerEnabled: (enabled: boolean) => void
+  setAgentMcpEnabled: (enabled: boolean) => void
   setAgentComputer: (patch: Partial<ComputerControlSettings>) => void
   setImageGenerationEnabled: (enabled: boolean) => void
   setWebResearchConfig: (config: { provider: 'tavily' | 'searxng' | 'linkup'; searxngUrl: string; hasTavilyKey: boolean; hasLinkupKey: boolean } | null) => void
@@ -1148,6 +1152,7 @@ const defaultState = {
   agentShellEnabled: false,
   agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
   agentComputerEnabled: false,
+  agentMcpEnabled: false,
   agentComputer: { ...DEFAULT_COMPUTER_CONTROL, verbs: { ...DEFAULT_COMPUTER_CONTROL.verbs }, apps: [] },
   webResearchConfig: null,
   imageGenerationEnabled: false,
@@ -1372,7 +1377,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'agentMcpEnabled', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1492,6 +1497,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setAgentShellEnabled: (enabled) => set({ agentShellEnabled: enabled }),
   setAgentShell: (patch) => set((state) => ({ agentShell: { ...DEFAULT_SHELL_GUARDRAILS, ...state.agentShell, ...patch } })),
   setAgentComputerEnabled: (enabled) => set({ agentComputerEnabled: enabled }),
+  setAgentMcpEnabled: (enabled) => set({ agentMcpEnabled: enabled }),
   setAgentComputer: (patch) => set((state) => {
     const base = { ...DEFAULT_COMPUTER_CONTROL, ...state.agentComputer }
     return { agentComputer: { ...base, ...patch, verbs: { ...base.verbs, ...(patch.verbs ?? {}) } } }

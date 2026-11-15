@@ -14,8 +14,9 @@ import type { ContextSnapshot } from '../../shared/contextBudget'
 import { dropComposeMeasurement } from '../utils/activeTimeTracker'
 import { create } from 'zustand'
 import { useNotesStore } from './notesStore'
+import { useUIStore } from './uiStore'
 import { createActiveMeasurement, type ActiveMeasurement } from '../utils/activeTimeTracker'
-import type { NoteAgentAttachment } from '../../shared/types'
+import type { NoteAgentAttachment, McpRunProvenance } from '../../shared/types'
 import type { CloudProviderId } from '../../shared/llmBackend'
 
 /** Wohin „Übernehmen und öffnen" führt: `true` = Standardprogramm des Systems, sonst der
@@ -79,6 +80,10 @@ export interface AgentRunUiState {
   shellAccess?: boolean
   computerAccess?: boolean
   webResearch?: boolean
+  /** Für diesen Lauf gewählte externe Server (Anzeige; maßgeblich ist der Main). */
+  mcpServers?: string[]
+  /** Was die externen Werkzeuge im Lauf wirklich getan haben (aus dem done-Event). */
+  mcp?: McpRunProvenance
   /** Main-seitig beim Start festgestellter Modellweg — die Karte zeigt während des Laufs nur ihn. */
   route?: AgentRoute
   // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
@@ -149,6 +154,8 @@ export interface AgentScopePrefs {
   localModel?: string
   cloudProvider?: 'openrouter' | 'llmbase' | null
   webArmed?: boolean
+  /** Externe Server (MCP), die für den nächsten Lauf gewählt sind — nur Kennungen. */
+  mcpServers?: string[]
 }
 
 /** Voraussetzung eines Beispielauftrags, solange sein Text unverändert ist. */
@@ -197,6 +204,8 @@ export interface AgentStartParams {
   comparisonCaseId?: string
   /** Folgelauf: `instruction` ist die Antwort auf die letzte Nachricht dieses Laufs. */
   continueFromRunId?: string
+  /** Externe Server (MCP). Fehlt die Angabe, gilt die Auswahl des Bereichs (prefs.mcpServers). */
+  mcpServers?: string[]
 }
 
 interface NoteAgentStoreState {
@@ -420,6 +429,11 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
     get().setAttachError(scopeId, null)
     const attachmentIds = get().getScope(scopeId).attachments.map(a => a.id)
     const targetFolderRel = get().getScope(scopeId).targetFolder
+    // Externe Server: ausdrücklich übergeben (Folgeauftrag) oder die Auswahl des Bereichs —
+    // aber nur mit eingeschaltetem Modul, sonst würde der Main den Lauf ablehnen.
+    const mcpServers = useUIStore.getState().agentMcpEnabled
+      ? (params.mcpServers ?? get().getScope(scopeId).prefs?.mcpServers ?? [])
+      : []
     const res = await window.electronAPI.noteAgentRun({
       vaultPath: params.vaultPath,
       noteId: params.noteId,
@@ -437,7 +451,8 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
       computerAccess: params.computerAccess === true,
       instructionMs: params.instructionMs,
       comparisonCaseId: params.comparisonCaseId,
-      continueFromRunId: params.continueFromRunId
+      continueFromRunId: params.continueFromRunId,
+      ...(mcpServers.length ? { mcpServers } : {})
     })
     if (!res.success || !res.runId) {
       if (res.code === 'optin' || res.code === 'consent') {
@@ -449,7 +464,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
     set(s => withScope(s, scopeId, sc => ({
       ...sc,
       startGate: null,
-      lastStart: { ...params, continueFromRunId: undefined, instructionMs: undefined }
+      lastStart: { ...params, continueFromRunId: undefined, instructionMs: undefined, mcpServers }
     })))
     const runId = res.runId
     startWaitTimer(runId)
@@ -467,6 +482,7 @@ export const useNoteAgentStore = create<NoteAgentStoreState>((set, get) => ({
           shellAccess: params.shellAccess === true,
           computerAccess: params.computerAccess === true,
           webResearch: params.webResearch === true,
+          ...(mcpServers.length ? { mcpServers } : {}),
           route: res.route,
           followUp: params.continueFromRunId ? params.instruction : undefined
         }
@@ -615,6 +631,7 @@ export function initNoteAgentEvents(): void {
       phase: 'review',
       results: p.results.map(r => ({ ...r, state: 'pending' as const })),
       web: p.web,
+      ...(p.mcp ? { mcp: p.mcp } : {}),
       skills: p.skills ?? [],
       vaultKey: p.vaultKey,
       outcome: p.ok ? 'ok' : p.cancelled ? 'cancelled' : 'error',

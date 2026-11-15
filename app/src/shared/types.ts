@@ -646,6 +646,32 @@ export interface NoteAgentDoneEvent {
   skills?: Array<{ id: string; label: string }>;
   /** Opake Vault-Kennung, an die eine dort erfragte Skill-Referenz gebunden wird. */
   vaultKey?: string;
+  /** Externe Werkzeuge (MCP): was wirklich lief, inkl. Fehlversuchen (lokal, nie gesendet). */
+  mcp?: McpRunProvenance;
+}
+
+/** Herkunft externer Werkzeuge eines Agent-Laufs (main/mcp/agentTools.ts, mcpProvenance). */
+export interface McpRunProvenance {
+  servers: Array<{ id: string; label: string; transport: 'stdio' | 'http'; sandboxed: boolean; network: boolean }>;
+  calls: Array<{ server: string; tool: string; ok: boolean; ms: number; chars: number; truncated: boolean; capped?: string[]; error?: string }>;
+  skipped: string[];
+  blocked: Array<{ server: string; reason: string }>;
+}
+
+/** Server-Eintrag für die Oberfläche — ohne Geheimnisse und Prüfsummen (main/mcp/ipc.ts). */
+export interface McpServerSummary {
+  id: string;
+  label: string;
+  transport: 'stdio' | 'http';
+  profile: 'business-central' | null;
+  readOnlyConfirmed: boolean;
+  catalogId: string | null;
+  personalData: boolean;
+  approvedTools: string[];
+  /** Geschätzte Token aller Freigaben; null = für ältere Freigaben unbekannt. */
+  approvedTokens: number | null;
+  stdio?: { command: string; script: string | null; args: string[]; programDir: string; extraReadPaths: string[]; vaultRead: boolean; network: boolean; fullAccess: boolean };
+  http?: { url: string; headers: Record<string, string>; secretHeaderNames: string[]; privateApproved: boolean; microsoft?: { clientId: string; tenant: string; username: string | null }; oauth?: { issuer: string; signedIn: boolean } };
 }
 
 // IPC Kommunikation
@@ -919,6 +945,8 @@ export interface ElectronAPI {
     comparisonCaseId?: string;
     /** Folgelauf: `instruction` ist die Antwort auf die letzte Nachricht dieses Laufs. */
     continueFromRunId?: string;
+    /** Externe Werkzeuge (MCP): nur Server-Kennungen, alles andere liest der Main selbst. */
+    mcpServers?: string[];
   }) => Promise<{ success: boolean; runId?: string; error?: string; code?: 'optin' | 'consent'; route?: import('./agentRoute').AgentRoute }>;
   noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) => Promise<{
     success: boolean;
@@ -928,6 +956,24 @@ export interface ElectronAPI {
   }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   computerControlPickApp: () => Promise<{ success: boolean; app?: { id: string; label: string; path: string }; error?: string }>;
+  // Externe Werkzeuge (MCP) — Einstellungen. Speichern nur nach nativem Dialog im Main.
+  mcpList: () => Promise<{ success: boolean; servers?: McpServerSummary[]; blockers?: Record<string, string>; sandbox?: { ok: boolean; reason?: string }; error?: string }>;
+  mcpPickPath: (kind: 'file' | 'folder') => Promise<{ success: boolean; path?: string | null; error?: string }>;
+  mcpSaveStdio: (input: { id?: string; label: string; command: string; script?: string; args?: string[]; extraReadPaths?: string[]; vaultRead?: boolean; network?: boolean; fullAccess?: boolean }) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpSaveHttp: (input: { id?: string; label: string; url: string; headers?: Record<string, string>; secretHeaders?: Record<string, string>; profile?: 'business-central'; microsoft?: { clientId?: string; tenant?: string }; useOAuth?: boolean }) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpAddCatalog: (catalogId: string) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpOAuthLogin: (id: string) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpOAuthCancel: () => Promise<{ success: boolean }>;
+  mcpOAuthLogout: (id: string) => Promise<{ success: boolean; error?: string }>;
+  mcpImportConfig: () => Promise<{ success: boolean; canceled?: boolean; found?: string[]; already?: string[]; unmatched?: string[]; error?: string }>;
+  mcpMsLogin: (id: string) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpMsCancel: () => Promise<{ success: boolean }>;
+  mcpMsLogout: (id: string) => Promise<{ success: boolean; error?: string }>;
+  mcpRemove: (id: string) => Promise<{ success: boolean; error?: string }>;
+  mcpInspect: (id: string, vaultPath?: string) => Promise<{ success: boolean; tools?: import('./mcp').McpToolView[]; ms?: number; error?: string }>;
+  mcpSetTool: (id: string, toolName: string, approved: boolean) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpConfirmReadOnly: (id: string, confirmed: boolean) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
+  mcpReapprove: (id: string) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
   noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
   noteAgentMemoryStatus: (vaultPath: string) => Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }>;
   imageGenHasKey: () => Promise<boolean>;

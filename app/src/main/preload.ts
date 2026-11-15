@@ -228,12 +228,32 @@ contextBridge.exposeInMainWorld('electronAPI', {
     comparisonCaseId?: string
     /** Folgelauf: `instruction` ist die Antwort auf die letzte Nachricht dieses Laufs. */
     continueFromRunId?: string
+    /** Externe Werkzeuge (MCP): nur Server-Kennungen. */
+    mcpServers?: string[]
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) =>
     ipcRenderer.invoke('note-agent-route-preflight', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
   // Rechner-Steuerung: Programm über den Systemdialog freigeben (liefert Bundle-Kennung).
   computerControlPickApp: () => ipcRenderer.invoke('computer-control-pick-app'),
+  // Externe Werkzeuge (MCP) — Einstellungen. Der Main speichert nur nach eigenem Dialog.
+  mcpList: () => ipcRenderer.invoke('mcp-list'),
+  mcpPickPath: (kind: 'file' | 'folder') => ipcRenderer.invoke('mcp-pick-path', kind),
+  mcpSaveStdio: (input: { id?: string; label: string; command: string; script?: string; args?: string[]; extraReadPaths?: string[]; vaultRead?: boolean; network?: boolean; fullAccess?: boolean }) => ipcRenderer.invoke('mcp-save-stdio', input),
+  mcpSaveHttp: (input: { id?: string; label: string; url: string; headers?: Record<string, string>; secretHeaders?: Record<string, string>; profile?: 'business-central'; microsoft?: { clientId?: string; tenant?: string }; useOAuth?: boolean }) => ipcRenderer.invoke('mcp-save-http', input),
+  mcpAddCatalog: (catalogId: string) => ipcRenderer.invoke('mcp-add-catalog', catalogId),
+  mcpOAuthLogin: (id: string) => ipcRenderer.invoke('mcp-oauth-login', id),
+  mcpOAuthCancel: () => ipcRenderer.invoke('mcp-oauth-cancel'),
+  mcpOAuthLogout: (id: string) => ipcRenderer.invoke('mcp-oauth-logout', id),
+  mcpImportConfig: () => ipcRenderer.invoke('mcp-import-config'),
+  mcpMsLogin: (id: string) => ipcRenderer.invoke('mcp-ms-login', id),
+  mcpMsCancel: () => ipcRenderer.invoke('mcp-ms-cancel'),
+  mcpMsLogout: (id: string) => ipcRenderer.invoke('mcp-ms-logout', id),
+  mcpRemove: (id: string) => ipcRenderer.invoke('mcp-remove', id),
+  mcpInspect: (id: string, vaultPath?: string) => ipcRenderer.invoke('mcp-inspect', id, vaultPath),
+  mcpSetTool: (id: string, toolName: string, approved: boolean) => ipcRenderer.invoke('mcp-set-tool', id, toolName, approved),
+  mcpConfirmReadOnly: (id: string, confirmed: boolean) => ipcRenderer.invoke('mcp-confirm-readonly', id, confirmed),
+  mcpReapprove: (id: string) => ipcRenderer.invoke('mcp-reapprove', id),
 
   // Tätigkeitsprotokoll (Effizienzindex). Anhängen darf der Renderer nur
   // Sprachbefehl-Ereignisse — alles andere schreibt der Main selbst.
@@ -318,6 +338,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
     skills?: Array<{ id: string; label: string }>
     vaultKey?: string
+    mcp?: {
+      servers: Array<{ id: string; label: string; transport: 'stdio' | 'http'; sandboxed: boolean; network: boolean }>
+      calls: Array<{ server: string; tool: string; ok: boolean; ms: number; chars: number; truncated: boolean; capped?: string[]; error?: string }>
+      skipped: string[]
+      blocked: Array<{ server: string; reason: string }>
+    }
   }) => void) => {
     ipcRenderer.removeAllListeners('note-agent-done')
     ipcRenderer.on('note-agent-done', (_event, p) => callback(p))
