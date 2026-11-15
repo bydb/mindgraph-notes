@@ -58,7 +58,9 @@ export function McpServerPicker({ selected, onChange, disabled, en, onOpenSettin
   // vor dem Start sichtbar sein, nicht erst als Fehler.
   const chosen = servers.filter(s => selected.includes(s.id))
   const sum = chosen.reduce((n, s) => n + (s.approvedTokens ?? 0), 0)
-  const tooBig = !runningServers && chosen.length > 1 && sum > MCP_MAX_TOOL_TOKENS_PER_RUN
+  // Unbekannte Größe (ältere Freigaben, Umbenennung) nie als 0 zählen (Codex F47).
+  const unknown = !runningServers && chosen.length > 1 && chosen.some(s => s.approvedTokens === null)
+  const tooBig = !runningServers && chosen.length > 1 && !unknown && sum > MCP_MAX_TOOL_TOKENS_PER_RUN
   return (
     <>
       {servers.map(s => {
@@ -91,6 +93,13 @@ export function McpServerPicker({ selected, onChange, disabled, en, onOpenSettin
           </button>
         )
       })}
+      {unknown && (
+        <span className="agent-card-muted is-warning">
+          {en
+            ? 'Size of the approved tools unknown for at least one service — open “Show tools” in the settings once. The run checks the limit when it starts.'
+            : 'Größe der Freigaben bei mindestens einem Dienst unbekannt — dort einmal „Werkzeuge anzeigen“ öffnen. Der Lauf prüft die Grenze beim Start.'}
+        </span>
+      )}
       {tooBig && (
         <span className="agent-card-muted is-warning">
           {en

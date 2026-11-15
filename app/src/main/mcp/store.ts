@@ -302,7 +302,11 @@ export function createMcpStore(dir: string, box: SecretBox) {
           ...(entry.catalogId ? { catalogId: entry.catalogId } : {}),
           ...(entry.personalData ? { personalData: true } : {}),
           ...(fileHashes ? { fileHashes } : {}),
-          approvedTools: keep ? existing!.approvedTools : {},
+          // Gespeicherte Größen hängen am Anzeigenamen (er steht im Vorspann): bei Umbenennung verwerfen,
+          // „Werkzeuge anzeigen“ rechnet sie neu (Codex F47). Die Laufgrenze rechnet ohnehin frisch.
+          approvedTools: keep
+            ? (existing!.label === label ? existing!.approvedTools : Object.fromEntries(Object.entries(existing!.approvedTools).map(([k, a]) => [k, { definitionHash: a.definitionHash }])))
+            : {},
           readOnlyConfirmed: keep ? existing!.readOnlyConfirmed : false,
           // „Nicht mehr fragen“ bei Personendaten hängt an der Bindung (E31′).
           ...(keep && existing!.personalDataCloudAck?.length ? { personalDataCloudAck: existing!.personalDataCloudAck } : {}),

@@ -587,6 +587,8 @@ export function registerMcpIpc(deps: McpIpcDeps): void {
         for (const [name, a] of Object.entries(cfg.approvedTools)) {
           const now = tools.get(name)
           if (!now || now.hash !== a.definitionHash || now.blocked) await store.setToolApproval(id, cfg.bindingHash, name, null)
+          // Größe frisch halten (Codex F47): gleiche Freigabe, aktuelle Schätzung.
+          else if (a.tokens !== now.tokens) await store.setToolApproval(id, cfg.bindingHash, name, a.definitionHash, now.tokens)
         }
         return ok({ tools: views, ms: Date.now() - t0 })
       } finally {

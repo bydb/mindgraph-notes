@@ -740,6 +740,12 @@ ADR-Stelle: E17′, Kontextfenster Runde 7
 Status: [OFFEN]
 Ein Folgeauftrag darf die alten MCP-Werkzeuge abwählen und behält dennoch den fremden Verlauf (`app/src/shared/mcp.ts:460–470`, `app/src/main/index.ts:5123–5125`). Die neue `numCtx`-Bedingung erkennt nur `run.web` oder **aktuell** vorhandene MCP-Werkzeuge; bei geerbten Fremddaten ohne ausgewählten Server setzt sie wieder 32.768 statt 65.536 (`app/src/main/noteAgent/loop.ts:383–392`, `app/src/shared/contextGuard.ts:26–33`). Gleichzeitig übernimmt das Budget die Tokenzahl des Vorgängerlaufs und dessen Nachrichten (`app/src/main/noteAgent/loop.ts:373–379`, `app/src/main/noteAgent/loop.ts:408–417`). Ein nach einem langen MCP-Lauf gestellter Nachtrag kann dadurch schon vor dem ersten Modellaufruf als „Kontext voll“ scheitern oder ein kleineres Ollama-Fenster für den übernommenen Verlauf erhalten (`app/src/main/noteAgent/loop.ts:524–550`). Vorschlag: Bei `run.foreignData` ebenfalls das große Fenster wählen; einen Folgetest mit geerbtem MCP-Verlauf, abgewählten Servern und mehr als 32.768 bisherigen Token ergänzen.
 
+### F47 — Picker behandelt unbekannte und veraltete Werkzeugkosten als gültige Summe
+Schwere: mittel
+ADR-Stelle: F45, Tokengrenze Runde 8
+Status: [OFFEN]
+`tokens` ist bei bestehenden Werkzeugfreigaben optional (`app/src/shared/mcp.ts:52–56`); der Store liest alte Einträge ohne Migration (`app/src/main/mcp/store.ts:200–205`). `publicServer` gibt dann `approvedTokens: null` zurück (`app/src/main/mcp/ipc.ts:101–103`). Der Picker rechnet `null` als **null Token** und warnt nur, wenn seine Summe über 8.000 liegt (`app/src/renderer/components/Agent/McpServerPicker.tsx:56–61`, `app/src/renderer/components/Agent/McpServerPicker.tsx:94–99`). Auch vorhandene Zahlen können falsch werden: Die Schätzung hängt vom Serverlabel ab (`app/src/main/mcp/agentTools.ts:169–171`), eine reine Umbenennung lässt wegen unveränderter Bindung aber Freigaben und ihre gespeicherten `tokens` stehen (`app/src/shared/mcp.ts:190–207`, `app/src/main/mcp/store.ts:276–279`, `app/src/main/mcp/store.ts:297–305`). Der Main berechnet beim Laufstart dagegen aktuelle Kosten und kann den zuvor unauffälligen Lauf ablehnen (`app/src/main/mcp/agentTools.ts:129–145`). Vorschlag: Fehlende Werte im Picker als „Größe unbekannt“ anzeigen und dafür keine Entwarnung geben; gespeicherte Kosten bei Umbenennung und nach Schema-/Schätzalgorithmusänderungen neu berechnen oder die Picker-Summe unmittelbar aus aktuellen Main-seitigen Werkzeugdefinitionen beziehen. Tests für alte Freigaben ohne `tokens` und Labeländerung ergänzen.
+
 ## Claude-Antwort
 
 Runde 1, 14.11.2026. Code-Belege von F02, F03, F05–F09 am Code nachgelesen; F01, F04 und F10
@@ -866,6 +872,12 @@ nachgelesen und umgesetzt (Nutzer: „erst Codex-Runde, dann committen“). Bele
   Dienst … für alle in einem Lauf gewählten Dienste zusammen“.
 - **F46 [ADRESSIERT]** — `numCtx` = 65 536 auch bei `run.foreignData` (geerbte Fremddaten ohne aktuelle
   Werkzeuge). Kein eigener Folgetest mit > 32 768 geerbten Token gebaut (bräuchte den Live-Loop).
+
+Runde 8 (Nachprüfung, 15.11.2026): F44–F46 tragen laut Codex bis auf die Anzeige im Picker.
+- **F47 [ADRESSIERT]** — Picker zählt unbekannte Größen nicht als 0, sondern zeigt „Größe unbekannt … einmal
+  ‚Werkzeuge anzeigen‘“ und gibt keine Entwarnung; Umbenennen behält Freigaben, verwirft aber gespeicherte
+  Größen; „Werkzeuge anzeigen“ frischt die Größe bestehender Freigaben auf. Die Laufgrenze im Main rechnet
+  weiterhin frisch. Test in `client.test.ts`. Nicht mehr von Codex nachgeprüft.
 
 ## Status
 

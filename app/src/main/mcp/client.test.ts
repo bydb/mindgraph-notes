@@ -139,6 +139,11 @@ describe('Freigaben hängen an der Bindung (E16)', () => {
       expect(Object.keys(back?.approvedTools ?? {})).toEqual(['search'])
       // Rücknahme nur auf dem Stand, den der Aufrufer selbst geschrieben hat.
       await expect(store.restore(approved, 'anderer-stand')).rejects.toThrow(/geändert/)
+      // Umbenennen behält die Freigabe, verwirft aber die gespeicherte Größe (F47).
+      const sized = await store.setToolApproval(a.id, (await store.get(a.id))!.bindingHash, 'search', 'h1', 500)
+      expect(sized.approvedTools.search.tokens).toBe(500)
+      const renamed = await store.put({ id: a.id, label: 'Svc neu', transport: 'http', http: sized.http!, catalogId: 'notion', personalData: true })
+      expect(renamed.approvedTools.search).toEqual({ definitionHash: 'h1' })
       // Der Renderer kann `oauth` mit fremden Endpunkten nicht unterschieben.
       expect(() => normalizeHttpInput({ label: 'x', url: 'https://svc.example/mcp', oauth: { ...oauth, endpoints: { ...oauth.endpoints, tokenEndpoint: 'https://evil.example/token' } } })).toThrow(/liegt nicht/)
     } finally {
