@@ -56,7 +56,8 @@ const BUDGETED_READ_TOOLS = new Set([
   'peek_dataset', 'use_skill', 'read_skill_file', 'list_target_folder', 'inspect_pptx_template'
 ])
 // Vor dem Lauf gesperrt wie die Lesewerkzeuge, aber nie nachträglich abgelehnt.
-const LOCK_ONLY_TOOLS = new Set(['collect_table', 'folder_digest'])
+// query_dataset und mcp_collect legen Datensätze an (Nebenwirkung) — wie collect_table.
+const LOCK_ONLY_TOOLS = new Set(['collect_table', 'folder_digest', 'query_dataset', 'mcp_collect'])
 
 // Ordner-Läufe brauchen mehr Luft: Manifest, zwei bis drei Stichproben, das
 // Zusammenführen und erst danach die Ergebnisdateien — das sind schnell acht
@@ -269,6 +270,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     allowed.add('read_context_file')
     allowed.add('collect_table')
     allowed.add('peek_dataset')
+    allowed.add('query_dataset')
     allowed.add('folder_digest')
   }
   if (run.skills.length > 0) {
@@ -305,8 +307,13 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Externe Werkzeuge (MCP, E7′): eine Werkzeugansicht je Lauf, beim Start im Main gebaut und
   // danach unveränderlich. Sie leben nicht im gemeinsamen Register, gelten aber an allen drei
   // Stellen — Definitionen für das Modell, Aufruf, Neulesen beim Folgeauftrag (Codex F06).
-  const mcpTools = run.mcp?.tools ?? new Map()
+  // Tabellen-Weg: mcp_collect (App-Werkzeug, ruft fremde Werkzeuge auf) + Rechnen im Datensatz.
+  const mcpTools = new Map([...(run.mcp?.tools ?? new Map()), ...(run.mcp && run.mcp.tools.size > 0 ? run.mcp.helperTools : new Map())])
   for (const name of mcpTools.keys()) allowed.add(name)
+  if (run.mcp && run.mcp.tools.size > 0) {
+    allowed.add('query_dataset')
+    allowed.add('peek_dataset')
+  }
   const lookupTool = (name: string) => registry.get(name) ?? mcpTools.get(name)
   ctx.allowedTools = allowed
   const tools = [
@@ -839,6 +846,18 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
       return `${pick('folder')}${cols ? ` → ${cols}` : ''}`
     }
     case 'peek_dataset': return pick('dataset')
+    case 'query_dataset': {
+      const parts = [pick('dataset')]
+      if (args.join && typeof args.join === 'object') parts.push(`+ ${String((args.join as Record<string, unknown>).dataset ?? '')}`)
+      if (Array.isArray(args.where)) parts.push(`${args.where.length} Bedingung(en)`)
+      if (Array.isArray(args.group_by) && args.group_by.length) parts.push(`je ${args.group_by.join(', ')}`)
+      if (Array.isArray(args.aggregates) && args.aggregates.length) parts.push((args.aggregates as Array<Record<string, unknown>>).map(a => `${a.op}${a.column ? `(${a.column})` : ''}`).join(', '))
+      return parts.join(' · ')
+    }
+    case 'mcp_collect': {
+      const a = args.arguments && typeof args.arguments === 'object' ? JSON.stringify(args.arguments) : ''
+      return `${pick('tool')}${a && a !== '{}' ? ` ${a.length > 140 ? `${a.slice(0, 140)}…` : a}` : ''}`
+    }
     case 'write_xlsx': {
       const ds = pick('dataset')
       if (ds) return `${pick('file_name')} (Datensatz ${ds})`

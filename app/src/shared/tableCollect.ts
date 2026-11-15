@@ -412,6 +412,8 @@ export interface CollectedTable {
   alwaysMissingColumns?: string[]
   /** Beispiel-Zeilen aus den Dateien, damit das Modell die echten Überschriften sieht. */
   headerCandidates?: Array<{ file: string; rows: string[] }>
+  /** Daten aus einem fremden System (MCP): Ausgaben daraus werden als DATEN gekennzeichnet. */
+  foreign?: { label: string }
 }
 
 /**

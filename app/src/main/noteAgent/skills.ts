@@ -24,7 +24,9 @@ import {
   resolveFolderName, countFolderTables, describeIncomplete, type FolderManifest
 } from './contextFiles'
 import { registerResult, registerDataset, getDataset, type AgentRun } from './runRegistry'
-import { formatCollectReport, type RowFilter, type RowFilterOp } from '../../shared/tableCollect'
+import { formatCollectReport, type RowFilter, type RowFilterOp, type CollectedTable } from '../../shared/tableCollect'
+import { queryDataset, markdownTable, fillDatasetPlaceholders, DatasetQueryError, WHERE_OPS, AGG_OPS, type DatasetQuery } from '../../shared/datasetQuery'
+import { wrapForeignResult } from '../../shared/mcp'
 import { estimateTokens } from '../../shared/contextBudget'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
 import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
@@ -714,7 +716,82 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         ...slice.map(r => `| ${r.map(c => c.replace(/\|/g, '\\|').replace(/\n/g, ' ')).join(' | ')} |`)
       ]
       if (offset - 1 + slice.length < table.rows.length) lines.push(`[weiter mit offset=${offset + slice.length}]`)
-      return { ok: true, content: lines.join('\n'), display: `peek_dataset: ${id} (${slice.length} Zeilen)` }
+      return { ok: true, content: asDatasetOutput(table, lines.join('\n')), display: `peek_dataset: ${id} (${slice.length} Zeilen)` }
+    }
+  })
+
+
+  // Tabellen-Weg (15.11.2026): Rechnen über einem Datensatz im Code. Anlass: ERP-Messung
+  // (deepseek-v4.1-flash) — alle Fehlschläge waren Kopfrechnen über viele Zeilen (Rangliste,
+  // Zählen, Abgleich zweier Listen), nicht der Abruf. Registriert das Ergebnis als neuen
+  // Datensatz (Nebenwirkung → im Loop wie collect_table: vorher sperren, nie verwerfen).
+  registry.register({
+    name: 'query_dataset',
+    description:
+      'Rechnet über einem Datensatz (aus mcp_collect, collect_table oder einer früheren Abfrage) — exakt, im Code. Nutze das für Zählen, Summen, Mittelwerte, Ranglisten, Filtern und das Verknüpfen zweier Datensätze, statt selbst zu rechnen. ' +
+      'Reihenfolge: join → where → group_by/aggregates → order_by → limit → select. ' +
+      `Parameter: dataset; optional join {dataset, left, right, columns} (verknüpft Zeilen, deren Spalte left gleich right im anderen Datensatz ist; danach kannst du in where auf dessen Spalten filtern); where [{column, op, value}] mit op = ${WHERE_OPS.join(' | ')} (Datum als JJJJ-MM-TT, in: value als Liste); group_by [Spalten]; aggregates [{op, column, as}] mit op = ${AGG_OPS.join(' | ')} (count ohne column zählt Zeilen); order_by [{column, desc}] (auch auf einen as-Namen); limit; select [Spalten]. ` +
+      'Das Ergebnis wird ein neuer Datensatz; für eine Tabelle in der Notiz setze {{datensatz:ID}} in write_note ein.',
+    parameters: {
+      type: 'object',
+      properties: {
+        dataset: { type: 'string' },
+        join: {
+          type: 'object',
+          properties: { dataset: { type: 'string' }, left: { type: 'string' }, right: { type: 'string' }, columns: { type: 'array', items: { type: 'string' } } },
+          required: ['dataset', 'left', 'right']
+        },
+        where: {
+          type: 'array',
+          items: { type: 'object', properties: { column: { type: 'string' }, op: { type: 'string', enum: [...WHERE_OPS] }, value: {} }, required: ['column', 'op'] }
+        },
+        group_by: { type: 'array', items: { type: 'string' } },
+        aggregates: {
+          type: 'array',
+          items: { type: 'object', properties: { op: { type: 'string', enum: [...AGG_OPS] }, column: { type: 'string' }, as: { type: 'string' } }, required: ['op'] }
+        },
+        order_by: { type: 'array', items: { type: 'object', properties: { column: { type: 'string' }, desc: { type: 'boolean' } }, required: ['column'] } },
+        limit: { type: 'number' },
+        select: { type: 'array', items: { type: 'string' } }
+      },
+      required: ['dataset']
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const id = requireString(args, 'dataset')
+      if (!id) return err('Parameter "dataset" fehlt')
+      const table = getDataset(ctx.run, id)
+      if (!table) return err(`Datensatz "${id}" gibt es nicht. Vorhanden: ${Array.from(ctx.run.datasets.keys()).join(', ') || '(keiner)'}`)
+      const q = parseDatasetQuery(args)
+      if (typeof q === 'string') return err(q)
+      const partner = q.join ? getDataset(ctx.run, q.join.dataset) : null
+      let res
+      try {
+        res = queryDataset(table, q, other => getDataset(ctx.run, other))
+      } catch (e) {
+        if (e instanceof DatasetQueryError) return err(e.message)
+        throw e
+      }
+      const foreign = table.foreign ?? partner?.foreign
+      const files = [...table.files, ...(partner?.files ?? [])]
+      const resultTable: CollectedTable = { ...res.table, files, ...(foreign ? { foreign } : {}) }
+      const resultId = registerDataset(ctx.run, resultTable)
+      const incomplete = files.filter(f => f.status !== 'ok')
+      const SHOW = 100
+      const shown = Math.min(res.table.rows.length, SHOW)
+      const lines = [
+        `Ergebnis als Datensatz "${resultId}": ${res.table.rows.length.toLocaleString('de-DE')} Zeilen${q.limit !== undefined && res.totalBeforeLimit > res.table.rows.length ? ` (die ersten ${res.table.rows.length} von ${res.totalBeforeLimit.toLocaleString('de-DE')})` : ''}.`,
+        ...(incomplete.length ? [`ACHTUNG: Grunddaten unvollständig (${incomplete.map(f => `${f.file}: ${f.message ?? f.status}`).join('; ')}) — das Ergebnis gilt nur für die abgerufenen Zeilen. Sage das im Ergebnis.`] : []),
+        ...res.nonNumeric.map(n => `ACHTUNG: In Spalte „${n.column}“ waren ${n.count} Werte keine Zahl (z. B. „${n.example}“) und zählen in Summe/Mittel/Min/Max NICHT mit.`),
+        '',
+        res.table.rows.length ? markdownTable(res.table, SHOW) : '(keine Zeilen)',
+        ...(res.table.rows.length > SHOW ? [`[${shown} von ${res.table.rows.length} Zeilen gezeigt — die übrigen stehen im Datensatz. Für die ganze Tabelle {{datensatz:${resultId}}} in write_note einsetzen oder write_xlsx mit dataset="${resultId}".]`] : [])
+      ]
+      return {
+        ok: true,
+        content: asDatasetOutput(resultTable, lines.join('\n')),
+        display: `query_dataset: ${id} → ${resultId} (${res.table.rows.length} Zeilen)`
+      }
     }
   })
 
@@ -1848,7 +1925,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
 
   registry.register({
     name: 'write_note',
-    description: 'Erzeugt eine Markdown-Notiz im Staging. Parameter: file_name, markdown.',
+    description: 'Erzeugt eine Markdown-Notiz im Staging. Parameter: file_name, markdown. Eine Tabelle aus einem Datensatz setzt du mit dem Platzhalter {{datensatz:ID}} ein (eigene Zeile) — die App füllt sie, du tippst sie nicht ab.',
     parameters: {
       type: 'object',
       properties: { file_name: { type: 'string' }, markdown: { type: 'string' } },
@@ -1888,6 +1965,14 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       }
       if (/\.json$/i.test(rawName) && isToolAvailable(ctx, 'write_edumap')) {
         return err('write_note schreibt ausschließlich Markdown. Für eine Edumap das Werkzeug write_edumap benutzen (Parameter: title, columns) — die App baut daraus die importierbare JSON-Datei.')
+      }
+      // Tabellen-Weg: {{datensatz:ID}} durch die Tabelle ersetzen — das Modell tippt keine
+      // langen Listen ab (dort entstehen Zahlendreher und vergessene Zeilen).
+      if (/\{\{\s*datensatz\s*:/i.test(markdown)) {
+        const filled = fillDatasetPlaceholders(markdown, id => getDataset(ctx.run, id))
+        if (filled.missing.length) return err(`Platzhalter für unbekannte Datensätze: ${filled.missing.join(', ')}. Vorhanden: ${Array.from(ctx.run.datasets.keys()).join(', ') || '(keiner)'}`)
+        if (filled.tooLarge.length) return err(`Datensatz ${filled.tooLarge.join(', ')} ist zu groß für eine Notiz-Tabelle (über 2 000 Zeilen) — schreibe ihn mit write_xlsx (Parameter dataset) und fasse in der Notiz zusammen.`)
+        markdown = filled.markdown
       }
       const qualityIssues = validateAgentMarkdownResult(markdown, ctx.run.instruction)
       if (qualityIssues.length > 0) {
@@ -2025,4 +2110,57 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   })
 
   return registry
+}
+
+/** Ausgabe aus einem Datensatz fremder Herkunft bleibt als DATEN gekennzeichnet (wie das MCP-Ergebnis selbst). */
+function asDatasetOutput(table: CollectedTable, text: string): string {
+  return table.foreign ? wrapForeignResult(table.foreign.label, 'Datensatz', text) : text
+}
+
+const strList = (v: unknown): string[] | undefined =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim() !== '').map(x => x.trim()) : undefined
+
+/** Argumente von query_dataset prüfen — Klartext statt stiller Korrektur. */
+export function parseDatasetQuery(args: Record<string, unknown>): DatasetQuery | string {
+  const q: DatasetQuery = {}
+  if (args.join !== undefined) {
+    const j = args.join as Record<string, unknown> | null
+    if (!j || typeof j !== 'object' || typeof j.dataset !== 'string' || typeof j.left !== 'string' || typeof j.right !== 'string') return 'join braucht dataset, left und right'
+    q.join = { dataset: j.dataset.trim(), left: j.left.trim(), right: j.right.trim(), ...(strList(j.columns)?.length ? { columns: strList(j.columns) } : {}) }
+  }
+  if (args.where !== undefined) {
+    if (!Array.isArray(args.where)) return 'where muss eine Liste sein'
+    q.where = []
+    for (const w of args.where as Array<Record<string, unknown>>) {
+      if (!w || typeof w.column !== 'string' || typeof w.op !== 'string') return 'jede where-Bedingung braucht column und op'
+      q.where.push({ column: w.column.trim(), op: w.op.trim() as never, ...(w.value !== undefined ? { value: w.value as never } : {}) })
+    }
+  }
+  const groupBy = strList(args.group_by)
+  if (groupBy?.length) q.group_by = groupBy
+  if (args.aggregates !== undefined) {
+    if (!Array.isArray(args.aggregates)) return 'aggregates muss eine Liste sein'
+    q.aggregates = []
+    for (const a of args.aggregates as Array<Record<string, unknown>>) {
+      if (!a || typeof a.op !== 'string') return 'jedes Aggregat braucht op'
+      q.aggregates.push({ op: a.op.trim() as never, ...(typeof a.column === 'string' && a.column.trim() ? { column: a.column.trim() } : {}), ...(typeof a.as === 'string' && a.as.trim() ? { as: a.as.trim() } : {}) })
+    }
+  }
+  if (args.order_by !== undefined) {
+    // Auch eine einzelne Angabe als Objekt oder Spaltenname annehmen — häufige Modellform.
+    const raw = Array.isArray(args.order_by) ? args.order_by : [args.order_by]
+    q.order_by = []
+    for (const o of raw as unknown[]) {
+      if (typeof o === 'string' && o.trim()) q.order_by.push({ column: o.trim() })
+      else if (o && typeof o === 'object' && typeof (o as Record<string, unknown>).column === 'string') q.order_by.push({ column: String((o as Record<string, unknown>).column).trim(), desc: (o as Record<string, unknown>).desc === true })
+      else return 'order_by braucht je Eintrag column (und optional desc)'
+    }
+  }
+  if (args.limit !== undefined) {
+    if (typeof args.limit !== 'number' || !Number.isInteger(args.limit) || args.limit < 1) return 'limit muss eine ganze Zahl ≥ 1 sein'
+    q.limit = args.limit
+  }
+  const select = strList(args.select)
+  if (select?.length) q.select = select
+  return q
 }
