@@ -49,6 +49,12 @@ describe('resolveContextWindow', () => {
     expect(resolveContextWindow('openrouter', undefined, 1_000_000).tokens).toBe(CATALOG_WINDOW_MAX)
   })
 
+  it('LLMBase mit Katalogwert: wie OpenRouter (Überlauf am Endpunkt als lauter Fehler geprüft)', () => {
+    expect(resolveContextWindow('llmbase', undefined, 1_048_576)).toEqual({ tokens: CATALOG_WINDOW_MAX, source: 'catalog' })
+    expect(resolveContextWindow('llmbase', undefined, 131_072)).toEqual({ tokens: 98_304, source: 'catalog' })
+    expect(resolveContextWindow('llmbase', undefined, null).source).toBe('assumed')
+  })
+
   it('kleiner Katalogwert senkt das Budget nicht unter die Annahme', () => {
     expect(resolveContextWindow('openrouter', undefined, 8_192)).toEqual({ tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' })
     expect(resolveContextWindow('openrouter', undefined, 40_000)).toEqual({ tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' })
@@ -58,8 +64,6 @@ describe('resolveContextWindow', () => {
     expect(resolveContextWindow('openrouter', undefined, null).source).toBe('assumed')
     expect(resolveContextWindow('openrouter', undefined, Number.NaN).source).toBe('assumed')
     expect(resolveContextWindow('lmstudio', undefined, 200_000).source).toBe('assumed')
-    // LLMBase: Überlaufverhalten ungeprüft, kein Schutz gegen stille Kürzung (Codex F01)
-    expect(resolveContextWindow('llmbase', undefined, 200_000).source).toBe('assumed')
     expect(resolveContextWindow('ollama', 32_768, 200_000)).toEqual({ tokens: 32_768, source: 'num_ctx' })
   })
 })

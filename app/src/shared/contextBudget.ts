@@ -70,17 +70,21 @@ export const CATALOG_WINDOW_SHARE = 0.75
  */
 export const CATALOG_WINDOW_MAX = 128_000
 
-// Nur OpenRouter (Codex F01): dort schaltet die App die stille Mitten-Kompression ab
-// (`transforms: []`), ein zu großer Prompt scheitert also laut. Für LLMBase ist das
-// Überlaufverhalten nicht belegt — bis zu einer Prüfung am echten Endpunkt bleibt es bei
-// der Annahme, sonst könnte ein Lauf still mit gekürztem Auftrag weiterarbeiten.
-const CATALOG_BACKENDS = new Set(['openrouter'])
+// Nur Anbieter, bei denen ein zu großer Prompt LAUT scheitert (Codex F01):
+// - OpenRouter: die App schaltet die stille Mitten-Kompression ab (`transforms: []`).
+// - LLMBase: am echten Endpunkt geprüft (15.11.2026, deepseek/deepseek-v4.1-flash, Katalog
+//   1 048 576): drei Prüfcodes an Anfang/Mitte/Ende kamen bei 151k, 709k und 952k Token
+//   vollständig an (prompt_tokens wie gesendet); 1,1 und 1,25 Mio. Token scheiterten jedes
+//   Mal mit HTTP 503 `model_temporarily_unavailable` — laut, aber irreführend benannt
+//   (siehe friendlyCloudError). Eine kleine Anfrage direkt danach lief durch.
+// Andere Cloud-Wege bleiben bei der Annahme, bis ihr Überlauf ebenso geprüft ist.
+const CATALOG_BACKENDS = new Set(['openrouter', 'llmbase'])
 
 /**
  * Fenster bestimmen. Bei Ollama kennt die App es sicher, weil sie `num_ctx` selbst setzt.
- * Bei OpenRouter gilt der Katalogwert mit Abschlag und Deckel (`catalogTokens`, aus
- * cloudPricing.ts). LM Studio ignoriert `num_ctx` und hat keinen Katalog, LLMBase ist
- * ungeprüft (siehe CATALOG_BACKENDS) — dort und ohne Katalogwert bleibt es bei 32 768. Das Ergebnis ist nie kleiner als diese
+ * Bei OpenRouter und LLMBase gilt der Katalogwert mit Abschlag und Deckel (`catalogTokens`, aus
+ * cloudPricing.ts), ebenso bei LLMBase (siehe CATALOG_BACKENDS). LM Studio ignoriert `num_ctx`
+ * und hat keinen Katalog — dort und ohne Katalogwert bleibt es bei 32 768. Das Ergebnis ist nie kleiner als diese
  * Annahme: ein Katalog mit 8k-Modell verkleinert das Budget nicht unter den alten Stand.
  */
 export function resolveContextWindow(

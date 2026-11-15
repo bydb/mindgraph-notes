@@ -263,3 +263,20 @@ describe('Cloud-Streaming — Fehler im Strom (Codex F12)', () => {
   })
 })
 
+describe('LLMBase: 503 model_temporarily_unavailable', () => {
+  const LLMBASE = { backend: 'llmbase' as const, llmbaseApiKey: 'k', llmbaseModel: 'deepseek/deepseek-v4.1-flash' }
+  const body = JSON.stringify({ error: { message: 'The requested model is temporarily unavailable. Please retry shortly.', type: 'server_error', code: 'model_temporarily_unavailable' } })
+
+  it('nennt den möglichen Überlauf statt nur „gleich nochmal" — und wiederholt nicht still', async () => {
+    const net = arm(() => errorResponse(503, body))
+    await expect(call(LLMBASE)).rejects.toThrow(/größer als das Kontextfenster/)
+    expect(net.attempts()).toBe(1)
+  })
+
+  it('andere 503 und OpenRouter bleiben beim allgemeinen Text', async () => {
+    arm(() => errorResponse(503, body))
+    await expect(call()).rejects.toThrow(/OpenRouter API 503: The requested model is temporarily unavailable/)
+    arm(() => errorResponse(503, JSON.stringify({ error: { message: 'Wartung' } })))
+    await expect(call(LLMBASE)).rejects.toThrow(/LLMBase API 503: Wartung/)
+  })
+})

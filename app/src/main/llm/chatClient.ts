@@ -451,6 +451,16 @@ function friendlyCloudError(backend: CloudChatBackend, status: number, body: str
         ? ' Das ist das Limit des Gratis-Tiers — kurz warten, ein anderes :free-Modell wählen oder ein kleines Guthaben aufladen (openrouter.ai/credits), das die Free-Limits anhebt.'
         : ' Kurz warten und erneut versuchen, oder ein anderes Modell wählen.')
   }
+  // LLMBase meldet einen Prompt über dem Kontextfenster als 503 „model_temporarily_unavailable"
+  // mit retry-after: 1 — „gleich nochmal" würde denselben Fehler wieder auslösen. Am echten
+  // Endpunkt reproduzierbar (15.11.2026, drei von drei Überlaufversuchen, kleine Anfrage direkt
+  // danach lief). Ob es im Einzelfall Überlauf oder echte Störung ist, sieht die Antwort nicht.
+  if (backend === 'llmbase' && status === 503 && /model_temporarily_unavailable/.test(body)) {
+    const m = model ? `„${model}"` : 'Das Modell'
+    return `${label}: ${m} ist laut Anbieter vorübergehend nicht verfügbar (503). ` +
+      'LLMBase meldet so auch einen Auftrag, der größer als das Kontextfenster des Modells ist. ' +
+      'Kommt die Meldung beim erneuten Versuch wieder, den Auftrag verkleinern (weniger Dateien oder Abrufe) oder ein Modell mit größerem Fenster wählen.'
+  }
   // Versuche, eine kompakte Fehlermeldung aus dem JSON zu ziehen.
   try {
     const j = JSON.parse(body) as { error?: { message?: string; metadata?: { raw?: string } } }
