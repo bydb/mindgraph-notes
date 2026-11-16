@@ -2,6 +2,16 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.1] - 2026-11-16
+
+**Erweiterungen können jetzt die Websuche der App nutzen, etwa um die Anschrift einer Firma oder Einrichtung aus ihrem Impressum zu übernehmen.** In der Rechnungserweiterung Faktura tippen Sie einen Namen ein, und die Anschrift steht im Kundenformular, mit Link auf die Seite, von der sie stammt. Übernommen wird nur, was wörtlich auf der Seite steht; gespeichert wird erst, wenn Sie es geprüft haben.
+
+### Hintergrund
+
+- **Auslöser:** Eine Firmensuche nur über OpenStreetMap fand Medienzentren und kleinere Firmen kaum, weil viele dort gar nicht eingetragen sind. Das Impressum auf der eigenen Website hat dagegen fast jede Einrichtung.
+- **Wie es läuft:** Die Erweiterung sucht über den Suchanbieter, den Sie unter Einstellungen → KI & Modelle → Webrecherche eingerichtet haben, und ruft passende Seiten über denselben abgesicherten Weg ab wie der Chat: nur öffentliche Adressen, mit Größen- und Zeitgrenzen.
+- **Voraussetzungen und Grenzen:** Die Websuche steht Erweiterungen nur zur Verfügung, wenn das Modul Webrecherche eingeschaltet ist. Jede Erweiterung darf höchstens 30 Suchen und 60 Seitenabrufe in zehn Minuten machen. Bereits installierte Erweiterungen funktionieren unverändert weiter.
+
 ## [1.4.0] - 2026-11-15
 
 **Der Agent kann jetzt Ihre Dienste abfragen: Aufnahmen aus Plaud, Seiten aus Notion, Vorgänge aus Linear oder Jira.** Sie verbinden einen Dienst mit einem Klick und melden sich im Browser an; Ihr Passwort bleibt beim Dienst. Jedes Werkzeug geben Sie einzeln frei, und bevor Personendaten an einen KI-Anbieter im Netz gehen, fragt die App nach. Lange Listen, etwa aus einem ERP, zählt und summiert die App selbst, statt das Modell rechnen zu lassen.
