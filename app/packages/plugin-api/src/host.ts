@@ -165,6 +165,33 @@ export interface WorkflowActionService {
   emit(actionId: string, payload: unknown): Promise<void>
 }
 
+/** Ein Suchtreffer der App-Websuche. */
+export interface WebSearchHit {
+  title: string
+  url: string
+  snippet: string
+}
+
+/** Eine abgerufene Seite als Klartext (Markdown), höchstens `maxChars` Zeichen. */
+export interface WebPage {
+  /** Adresse nach Weiterleitungen (nur gleicher Host). */
+  finalUrl: string
+  title: string
+  text: string
+  truncated: boolean
+}
+
+/**
+ * Websuche der App (API ≥0.2.4). Läuft über den Anbieter, den der Nutzer in den Einstellungen
+ * eingerichtet hat (Tavily, SearXNG, Linkup), und ruft Seiten über den gehärteten Egress der App ab
+ * (nur öffentliche Adressen, Größen- und Zeitgrenzen). Wirft, solange das Modul Webrecherche aus ist
+ * oder kein Anbieter eingerichtet ist — die Meldung nennt den Einstellungsort.
+ */
+export interface WebSearchService {
+  search(query: string): Promise<WebSearchHit[]>
+  fetchPage(url: string, opts?: { maxChars?: number }): Promise<WebPage>
+}
+
 /**
  * Abbildung Capability → freigeschalteter Host-Oberfläche. Jeder Eintrag ist ein
  * Objekt mit dem Namespace-Schlüssel, sodass die Intersection (siehe unten) bei
@@ -186,6 +213,7 @@ export interface CapabilityServiceMap {
   dialog: { dialog: DialogService }
   resource: { resource: ResourceService }
   activity: { activity: ActivityService }
+  'web.search': { web: WebSearchService }
 }
 
 /** Union → Intersection. `{vault:R} | {vault:W}` ⇒ `{vault: R & W}`. */

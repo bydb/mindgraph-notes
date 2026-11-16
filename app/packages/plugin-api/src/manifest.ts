@@ -49,6 +49,9 @@ export type PluginCapability =
   // Tätigkeitsprotokoll des Kerns. Der Kern setzt Zeit und Plugin-ID selbst und prüft
   // jedes Feld — ein Plugin kann weder rückdatieren noch für ein anderes schreiben.
   | 'activity'
+  // Websuche der App (API ≥0.2.4): Suche über den vom Nutzer eingerichteten Anbieter und Seitenabruf
+  // über den gehärteten Egress (nur öffentliche Adressen). Nur bei eingeschaltetem Modul Webrecherche.
+  | 'web.search'
 
 /**
  * JSON Schema (draft-07) als reine serialisierbare Daten. Bewusst lose getypt —

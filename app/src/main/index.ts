@@ -7,6 +7,7 @@ import { existsSync, constants as fsConstants } from 'fs'
 import type { FileEntry, SecretStorageResult, SyncRestoreResult } from '../shared/types'
 import { loadWebResearchConfig, saveWebResearchConfig, loadProviderKey, saveProviderKey, clearProviderKey, keyPresence } from './webResearch/config'
 import { webSearch as webResearchSearch } from './webResearch/providers'
+import { fetchAndExtract as webResearchFetchPage } from './webResearch/fetchExtract'
 import { originNeedsPrivateApproval as webResearchNeedsApproval } from './webResearch/egress'
 import { isWebResearchConfigComplete, normalizeWebUrl, hostnameFromUrl, extractUrlsFromInstruction, KEY_PROVIDERS, normalizeQuery, isQueryTooLong, sanitizeSourceTitle, WEB_QUERY_MAX_CHARS, WEB_SEARCH_PROVIDER_META, type WebSearchProviderId } from '../shared/webResearch'
 import {
@@ -878,6 +879,29 @@ function buildPluginHostServices(): HostServices {
     collectRunTotals: (runId) => collectRunTotals(runId),
     httpFetch: (url, init) => fetch(url, init),
     httpFetchBasicAuth: nativeServices.httpFetchBasicAuth,
+    // Websuche für Plugins (Capability web.search, API 0.2.4): dieselben Voraussetzungen wie der
+    // Petrol-Chat — Modul an, Anbieter eingerichtet, Key vorhanden. Suche über den Anbieter,
+    // Abruf über den gehärteten Egress (nur öffentliche Adressen, keine private Ausnahme).
+    webSearch: async (rawQuery) => {
+      const ui = await loadUISettings()
+      if (ui.webResearchEnabled !== true) throw new Error('Die Webrecherche ist ausgeschaltet (Einstellungen → Module → Webrecherche).')
+      const config = await loadWebResearchConfig()
+      if (!isWebResearchConfigComplete(config)) throw new Error('Die Webrecherche ist nicht eingerichtet (Einstellungen → KI & Modelle → Webrecherche).')
+      const apiKey = KEY_PROVIDERS.includes(config.provider) ? await loadProviderKey(config.provider) : null
+      if (KEY_PROVIDERS.includes(config.provider) && !apiKey) throw new Error('Für die Webrecherche ist kein API-Key hinterlegt (Einstellungen → KI & Modelle → Webrecherche).')
+      const query = normalizeQuery(rawQuery).replace(/[\u0000-\u001f\u007f]/g, ' ')
+      if (!query) throw new Error('Leerer Suchbegriff.')
+      if (isQueryTooLong(query)) throw new Error(`Suchbegriff zu lang (höchstens ${WEB_QUERY_MAX_CHARS} Zeichen).`)
+      return webResearchSearch(query, { config, apiKey, signal: AbortSignal.timeout(30_000) })
+    },
+    webFetchPage: async (rawUrl, maxChars) => {
+      const ui = await loadUISettings()
+      if (ui.webResearchEnabled !== true) throw new Error('Die Webrecherche ist ausgeschaltet (Einstellungen → Module → Webrecherche).')
+      const url = normalizeWebUrl(rawUrl)
+      if (!url) throw new Error('Ungültige Adresse (nur http/https).')
+      const r = await webResearchFetchPage(url, { signal: AbortSignal.timeout(30_000), markTruncation: false, maxChars })
+      return { finalUrl: r.record.finalUrl, title: r.record.title, text: r.markdown, truncated: r.truncated || r.bodyTruncated }
+    },
     resolveExtraAllowedHosts: async (pluginId) => {
       // Plugins mit user-konfiguriertem Endpunkt (z.B. Antares-baseUrl) dürfen ihren konfigurierten
       // Host ansprechen — der ist user-getrust, anders als ein beliebiger. Die Config liegt generisch

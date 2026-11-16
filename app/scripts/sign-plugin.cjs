@@ -11272,7 +11272,7 @@ var import_ajv = __toESM(require_ajv(), 1);
 var import_semver = __toESM(require_semver2(), 1);
 
 // packages/plugin-api/src/version.ts
-var API_VERSION = "0.2.3";
+var API_VERSION = "0.2.4";
 
 // packages/plugin-api/src/validation.ts
 var ajv = new import_ajv.default({ allErrors: true, removeAdditional: false });
@@ -11291,7 +11291,8 @@ var CAPABILITY_VALUES = [
   "pdf.optimize",
   "dialog",
   "resource",
-  "activity"
+  "activity",
+  "web.search"
 ];
 var CATEGORY_VALUES = [
   "ai",

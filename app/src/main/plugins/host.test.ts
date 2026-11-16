@@ -173,3 +173,50 @@ describe('createHostFactory — activity (Arbeitsbilanz)', () => {
     expect((services.recordActivity as ReturnType<typeof vi.fn>).mock.calls[0][0]).toMatchObject({ kind: 'job-started', llm: totals })
   })
 })
+
+describe('createHostFactory — web.search (API 0.2.4)', () => {
+  type Web = { search: (q: string) => Promise<unknown>; fetchPage: (u: string, o?: { maxChars?: number }) => Promise<unknown> }
+
+  it('gibt den Dienst nur mit deklarierter Capability', () => {
+    const without = createHostFactory(fakeServices())(manifest({ capabilities: ['http.fetch'], http: { allowedHosts: ['a.example'] } })) as Record<string, unknown>
+    expect(without.web).toBeUndefined()
+    const withCap = createHostFactory(fakeServices())(manifest({ capabilities: ['web.search'] })) as Record<string, unknown>
+    expect(withCap.web).toBeDefined()
+  })
+
+  it('reicht Suche und Abruf durch und deckelt die Seitenlänge', async () => {
+    const webSearch = vi.fn(async () => [{ title: 't', url: 'https://x.example/', snippet: 's' }])
+    const webFetchPage = vi.fn(async () => ({ finalUrl: 'https://x.example/', title: 't', text: 'x', truncated: false }))
+    const web = (createHostFactory(fakeServices({ webSearch, webFetchPage }))(manifest({ capabilities: ['web.search'] })) as { web: Web }).web
+    await web.search('Firma Impressum')
+    expect(webSearch).toHaveBeenCalledWith('Firma Impressum')
+    await web.fetchPage('https://x.example/', { maxChars: 10_000_000 })
+    await web.fetchPage('https://x.example/', { maxChars: 1 })
+    await web.fetchPage('https://x.example/')
+    expect(webFetchPage.mock.calls.map((c) => (c as unknown[])[1])).toEqual([20_000, 500, 20_000])
+  })
+
+  it('bremst zu viele Suchen je Plugin', async () => {
+    const webSearch = vi.fn(async () => [])
+    const web = (createHostFactory(fakeServices({ webSearch }))(manifest({ capabilities: ['web.search'] })) as { web: Web }).web
+    for (let i = 0; i < 30; i++) await web.search('q')
+    await expect(web.search('q')).rejects.toThrow(/zu viele Webanfragen/)
+    expect(webSearch).toHaveBeenCalledTimes(30)
+  })
+
+  it('meldet eine App ohne Websuche verständlich', async () => {
+    const web = (createHostFactory(fakeServices())(manifest({ capabilities: ['web.search'] })) as { web: Web }).web
+    await expect(web.search('q')).rejects.toThrow(/keine Websuche/)
+  })
+})
+
+describe('slidingBudget', () => {
+  it('gibt Budget nach Ablauf des Fensters zurück', async () => {
+    const { slidingBudget } = await import('./host')
+    let t = 0
+    const b = slidingBudget(2, 1000, () => t)
+    expect([b.take(), b.take(), b.take()]).toEqual([true, true, false])
+    t = 1000
+    expect(b.take()).toBe(true)
+  })
+})

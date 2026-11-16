@@ -18,3 +18,9 @@ Anlass: das Rechnungs-Plugin **Faktura** (`bydb/mindgraph-faktura-plugin`, ID `m
 - **`openLink`** öffnet zusätzlich PDFs im Vault im eingebauten Betrachter (exakter Pfad im Dateibaum, nur mit Nutzergeste). Per CDP testen: `Input.dispatchMouseEvent`, ein JS-`click()` zählt nicht als Geste.
 - **Nach jeder Änderung an `packages/plugin-api`: `npm run build:signer` + Bundle committen** — der Signier-Workflow prüft Manifeste mit `scripts/sign-plugin.cjs`; ohne Neubau lehnt er `ui.workspaceTabs` ab, und der Drift-Check der CI wird rot.
 - Plugins mit `ui.workspaceTabs` brauchen `apiVersion: "^0.2.3"`; ältere Apps (API 0.2.2) lehnen sie am Kompat-Gate ab, bevor das Schema greift.
+
+## Websuche für Plugins: Capability `web.search` (Plugin-API 0.2.4, seit 16.11.2026)
+- Anlass: Firmensuche im Faktura-Plugin. OpenStreetMap allein fand Medienzentren und kleine Firmen kaum (Rheingau-Taunus, Marburg: kein Eintrag). Jetzt sucht das Plugin „Name + Impressum“ über den Anbieter der App und liest die Seite.
+- `host.web.search(query)` → Treffer `{title, url, snippet}` über den eingerichteten Anbieter (Tavily/SearXNG/Linkup); `host.web.fetchPage(url, {maxChars})` → Klartext über den gehärteten Egress (`fetchAndExtract`, nur öffentliche Adressen, keine private SearXNG-Ausnahme). Voraussetzungen wie beim Petrol-Chat: `webResearchEnabled`, Anbieter eingerichtet, Key vorhanden — sonst wirft der Main mit Einstellungsort.
+- Mengenbremse je Plugin in `createHostFactory` (`PLUGIN_WEB_LIMITS`: 30 Suchen, 60 Abrufe je 10 Minuten), Seitentext höchstens 20 000 Zeichen.
+- Plugins mit `web.search` brauchen `apiVersion: "^0.2.4"` und als `minAppVersion` die erste App mit 0.2.4 (1.4.1). Nach der Änderung `npm run build:signer`.

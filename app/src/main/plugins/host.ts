@@ -93,6 +93,13 @@ export interface HostServices {
    * Medienzentrum hat einen eigenen Server) — der konfigurierte Host ist user-getrust.
    */
   resolveExtraAllowedHosts?: (pluginId: string) => Promise<string[]>
+  /**
+   * Websuche der App über den eingerichteten Anbieter. Prüft selbst Modul-Schalter, Einrichtung
+   * und Suchbegriff; die Mengenbremse je Plugin liegt in createHostFactory.
+   */
+  webSearch?: (query: string) => Promise<{ title: string; url: string; snippet: string }[]>
+  /** Seitenabruf über den gehärteten Egress (nur öffentliche Adressen) als Klartext. */
+  webFetchPage?: (url: string, maxChars: number) => Promise<{ finalUrl: string; title: string; text: string; truncated: boolean }>
   emitWorkflow: (pluginId: string, actionId: string, payload: unknown) => Promise<void>
 }
 
@@ -106,6 +113,24 @@ export function isHostAllowed(allowedHosts: string[], hostname: string): boolean
     }
     return false
   })
+}
+
+/** Mengenbremse für web.search je Plugin: höchstens so viele Aufrufe im gleitenden Fenster. */
+export const PLUGIN_WEB_LIMITS = { windowMs: 10 * 60_000, searches: 30, fetches: 60 } as const
+export const PLUGIN_WEB_PAGE_MAX_CHARS = 20_000
+
+/** Gleitendes Fenster: `take()` gibt false, wenn das Budget im Fenster aufgebraucht ist. */
+export function slidingBudget(limit: number, windowMs: number, now: () => number = Date.now): { take: () => boolean } {
+  const stamps: number[] = []
+  return {
+    take: () => {
+      const t = now()
+      while (stamps.length && stamps[0] <= t - windowMs) stamps.shift()
+      if (stamps.length >= limit) return false
+      stamps.push(t)
+      return true
+    },
+  }
 }
 
 /**
@@ -210,6 +235,27 @@ export function createHostFactory(services: HostServices): HostFactory {
         ) => {
           await ensureHostAllowed(url)
           return services.httpFetchBasicAuth(url, opts)
+        },
+      }
+    }
+
+    if (caps.has('web.search')) {
+      const searches = slidingBudget(PLUGIN_WEB_LIMITS.searches, PLUGIN_WEB_LIMITS.windowMs)
+      const fetches = slidingBudget(PLUGIN_WEB_LIMITS.fetches, PLUGIN_WEB_LIMITS.windowMs)
+      const tooMany = (): Error => new Error(`Plugin '${id}': zu viele Webanfragen in kurzer Zeit. Bitte in einigen Minuten erneut versuchen.`)
+      host.web = {
+        search: async (query: string) => {
+          if (!services.webSearch) throw new Error('Diese MindGraph-Version bietet Plugins keine Websuche an.')
+          if (typeof query !== 'string') throw new Error(`Plugin '${id}': Suchbegriff muss Text sein`)
+          if (!searches.take()) throw tooMany()
+          return services.webSearch(query)
+        },
+        fetchPage: async (url: string, opts?: { maxChars?: number }) => {
+          if (!services.webFetchPage) throw new Error('Diese MindGraph-Version bietet Plugins keine Websuche an.')
+          if (typeof url !== 'string') throw new Error(`Plugin '${id}': Adresse muss Text sein`)
+          if (!fetches.take()) throw tooMany()
+          const max = Math.min(Math.max(Math.floor(Number(opts?.maxChars) || PLUGIN_WEB_PAGE_MAX_CHARS), 500), PLUGIN_WEB_PAGE_MAX_CHARS)
+          return services.webFetchPage(url, max)
         },
       }
     }

@@ -56,6 +56,7 @@ const CAPABILITY_VALUES = [
   'dialog',
   'resource',
   'activity',
+  'web.search',
 ] as const
 
 const CATEGORY_VALUES = [
