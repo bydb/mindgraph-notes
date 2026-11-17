@@ -30,6 +30,7 @@ import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, 
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { FileKindIcon } from './FileKindIcon'
 import { openVaultFileLink } from '../../utils/openVaultFileLink'
+import { resolveFileLink } from '../../../shared/resolveFileLink'
 import type { FileEntry } from '../../../shared/types'
 import { flattenFilePaths, planFileDrop, parseVaultFilesDrag, VAULT_FILES_DRAG_TYPE, type VaultFileKind } from '../../../shared/fileLinkTarget'
 import { suggestLinkTargets, firstSelectableIndex, stepSelectableIndex } from '../../../shared/linkSuggestions'
@@ -3690,11 +3691,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             // next
           }
         }
-        const found = await window.electronAPI.findImageInVault(vaultPath, filename)
-        if (found.success && found.path) {
-          const rel = found.path.startsWith(vaultPath + '/') ? found.path.slice(vaultPath.length + 1) : found.path
-          useNotesStore.getState().selectOffice(rel, officeType)
-        }
+        // Rückfall: Dateibaum, exakter Pfad oder eindeutiger Dateiname. Vorher fragte das
+        // find-image-in-vault, das nur Bild-/PDF-Endungen kennt — eine Office-Datei in einem
+        // anderen Ordner wurde so nie gefunden, der Klick tat nichts.
+        const res = resolveFileLink(filename, flattenFilePaths(fileTree))
+        if (res.status === 'found') useNotesStore.getState().selectOffice(res.path, officeType)
+        else if (res.status === 'ambiguous') showEditorHint(t('editor.linkAmbiguous', { count: res.count, name: filename }))
       })()
       return
     }
@@ -3843,7 +3845,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
       }
       return
     }
-  }, [notes, fileTree, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t, deleteAnnotationById])
+  }, [notes, fileTree, selectNote, selectSecondaryNote, isSecondary, vaultPath, previewContent, saveContent, t, deleteAnnotationById, showEditorHint])
 
   // Process headings to add fold toggles
   const processHeadingFolds = useCallback((html: string): string => {
