@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { suggestLinkTargets } from './linkSuggestions'
+import { firstSelectableIndex, stepSelectableIndex, suggestLinkTargets } from './linkSuggestions'
 
 const paths = [
   'Projekte/202609031500 - Marburger Forum.md',
@@ -56,5 +56,19 @@ describe('suggestLinkTargets', () => {
 
   it('begrenzt die Liste', () => {
     expect(suggestLinkTargets('', paths, notes, 3).items.length).toBe(3)
+  })
+})
+
+describe('Markierung überspringt gesperrte Einträge', () => {
+  const items = [{ disabled: true }, {}, { disabled: true }, {}]
+  it('startet auf dem ersten wählbaren Eintrag', () => {
+    expect(firstSelectableIndex(items)).toBe(1)
+    expect(firstSelectableIndex([{ disabled: true }])).toBe(0)
+  })
+  it('Pfeiltasten springen über gesperrte Einträge, am Rand bleibt sie stehen', () => {
+    expect(stepSelectableIndex(items, 1, 1)).toBe(3)
+    expect(stepSelectableIndex(items, 3, -1)).toBe(1)
+    expect(stepSelectableIndex(items, 1, -1)).toBe(1)
+    expect(stepSelectableIndex(items, 3, 1)).toBe(3)
   })
 })

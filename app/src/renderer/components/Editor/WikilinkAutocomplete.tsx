@@ -4,7 +4,7 @@ import { useNotesStore } from '../../stores/notesStore'
 import { extractParagraphs, generateBlockId, findNoteForWikilink } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
 import { flattenFilePaths, type VaultFileKind } from '../../../shared/fileLinkTarget'
-import { suggestLinkTargets } from '../../../shared/linkSuggestions'
+import { suggestLinkTargets, firstSelectableIndex, stepSelectableIndex } from '../../../shared/linkSuggestions'
 import { FileKindIcon } from './FileKindIcon'
 
 export type AutocompleteMode = 'note' | 'heading' | 'block' | 'tag'
@@ -277,8 +277,8 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
 
   // Reset selection when items change
   useEffect(() => {
-    setSelectedIndex(0)
-  }, [items.length, query])
+    setSelectedIndex(firstSelectableIndex(items))
+  }, [items, query])
 
   // Scroll selected item into view
   useEffect(() => {
@@ -327,12 +327,12 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
         case 'ArrowDown':
           e.preventDefault()
           e.stopPropagation()
-          setSelectedIndex(prev => Math.min(prev + 1, items.length - 1))
+          setSelectedIndex(prev => stepSelectableIndex(items, prev, 1))
           break
         case 'ArrowUp':
           e.preventDefault()
           e.stopPropagation()
-          setSelectedIndex(prev => Math.max(prev - 1, 0))
+          setSelectedIndex(prev => stepSelectableIndex(items, prev, -1))
           break
         case 'Enter':
           e.preventDefault()
@@ -414,7 +414,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
               className={`wikilink-autocomplete-item ${index === selectedIndex ? 'selected' : ''} ${item.needsBlockId ? 'needs-id' : ''} ${item.createNewNote ? 'create-new' : ''} ${item.disabled ? 'disabled' : ''}`}
               aria-disabled={item.disabled || undefined}
               onClick={() => handleSelect(item)}
-              onMouseEnter={() => setSelectedIndex(index)}
+              onMouseEnter={() => { if (!item.disabled) setSelectedIndex(index) }}
             >
               <span className={`wikilink-autocomplete-icon ${item.needsBlockId ? 'new-id' : ''} ${item.createNewNote ? 'create-new' : ''}`}>
                 {item.fileKind ? <FileKindIcon kind={item.fileKind} /> : item.icon}

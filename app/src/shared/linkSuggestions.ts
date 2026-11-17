@@ -101,3 +101,20 @@ export function suggestLinkTargets(
   })
   return { items, exactMatch }
 }
+
+/**
+ * Markierung in Vorschlagslisten: gesperrte Einträge (z. B. `#` im Dateinamen) werden
+ * übersprungen. Vorher stand die Markierung auf dem gesperrten ersten Eintrag und Enter
+ * tat nichts (Test, 17.11.2026). Ohne wählbaren Eintrag bleibt der Ausgangsindex.
+ */
+export function firstSelectableIndex(items: ReadonlyArray<{ disabled?: boolean }>): number {
+  const i = items.findIndex(it => !it.disabled)
+  return i === -1 ? 0 : i
+}
+
+export function stepSelectableIndex(items: ReadonlyArray<{ disabled?: boolean }>, from: number, dir: 1 | -1): number {
+  for (let i = from + dir; i >= 0 && i < items.length; i += dir) {
+    if (!items[i].disabled) return i
+  }
+  return from
+}

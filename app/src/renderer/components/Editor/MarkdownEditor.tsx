@@ -31,7 +31,7 @@ import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './Wi
 import { FileKindIcon } from './FileKindIcon'
 import { openVaultFileLink } from '../../utils/openVaultFileLink'
 import { flattenFilePaths, planFileDrop, parseVaultFilesDrag, VAULT_FILES_DRAG_TYPE, type VaultFileKind } from '../../../shared/fileLinkTarget'
-import { suggestLinkTargets } from '../../../shared/linkSuggestions'
+import { suggestLinkTargets, firstSelectableIndex, stepSelectableIndex } from '../../../shared/linkSuggestions'
 import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
@@ -3546,8 +3546,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
   // Beim Tippen den Auswahl-Index zurücksetzen, damit immer das oberste Item highlighted ist.
   useEffect(() => {
-    setPreviewWikilinkIndex(0)
-  }, [previewLinkInput?.value, previewWikilinkSuggestions.length])
+    setPreviewWikilinkIndex(firstSelectableIndex(previewWikilinkSuggestions))
+  }, [previewLinkInput?.value, previewWikilinkSuggestions])
 
   // Handle wikilink and checkbox clicks in preview
   // Annotation löschen: Block per id aus der Sidecar-Datei entfernen + Marke auspacken.
@@ -5518,12 +5518,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                     if (previewLinkInput.kind === 'wiki' && previewWikilinkSuggestions.length > 0) {
                       if (e.key === 'ArrowDown') {
                         e.preventDefault()
-                        setPreviewWikilinkIndex(i => Math.min(i + 1, previewWikilinkSuggestions.length - 1))
+                        setPreviewWikilinkIndex(i => stepSelectableIndex(previewWikilinkSuggestions, i, 1))
                         return
                       }
                       if (e.key === 'ArrowUp') {
                         e.preventDefault()
-                        setPreviewWikilinkIndex(i => Math.max(i - 1, 0))
+                        setPreviewWikilinkIndex(i => stepSelectableIndex(previewWikilinkSuggestions, i, -1))
                         return
                       }
                     }
@@ -5559,7 +5559,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                             if (item.disabled) return
                             confirmPreviewLink(item.value, item.isCreate)
                           }}
-                          onMouseEnter={() => setPreviewWikilinkIndex(idx)}
+                          onMouseEnter={() => { if (!item.disabled) setPreviewWikilinkIndex(idx) }}
                         >
                           <span className={`wikilink-autocomplete-icon ${item.isCreate ? 'create-new' : ''}`}>
                             <FileKindIcon kind={item.kind} />
