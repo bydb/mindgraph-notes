@@ -31,6 +31,7 @@ import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './Wi
 import { FileKindIcon } from './FileKindIcon'
 import { openVaultFileLink } from '../../utils/openVaultFileLink'
 import { resolveFileLink } from '../../../shared/resolveFileLink'
+import { embedCandidatePaths } from '../../../shared/embedCandidates'
 import type { FileEntry } from '../../../shared/types'
 import { flattenFilePaths, planFileDrop, parseVaultFilesDrag, VAULT_FILES_DRAG_TYPE, type VaultFileKind } from '../../../shared/fileLinkTarget'
 import { suggestLinkTargets, firstSelectableIndex, stepSelectableIndex } from '../../../shared/linkSuggestions'
@@ -579,15 +580,11 @@ wysiwygTurndown.addRule('callout', {
  * Bilder in eingebetteten Notizen (dort relativ zum Ordner der EINGEBETTETEN Notiz).
  */
 async function resolveImageDataUrl(dataSrc: string, vaultPath: string, noteDir: string, fileTree: FileEntry[]): Promise<string | null> {
+  // Absoluter Pfad zuerst (Bild außerhalb des Vaults), sonst Reihenfolge aus embedCandidatePaths
   const possiblePaths = [
-    dataSrc.startsWith('/') ? dataSrc : null,
-    noteDir ? `${vaultPath}/${noteDir}/${dataSrc}` : null,
-    `${vaultPath}/${dataSrc}`,
-    `${vaultPath}/.attachments/${dataSrc}`,
-    `${vaultPath}/attachments/${dataSrc}`,
-    `${vaultPath}/assets/${dataSrc}`,
-    `${vaultPath}/images/${dataSrc}`,
-  ].filter(Boolean) as string[]
+    ...(dataSrc.startsWith('/') ? [dataSrc] : []),
+    ...embedCandidatePaths(dataSrc, noteDir, ['.attachments', 'attachments', 'assets', 'images']).map(rel => `${vaultPath}/${rel}`),
+  ]
   for (const imagePath of possiblePaths) {
     const result = await window.electronAPI.readImageAsDataUrl(imagePath)
     if (result.success && result.dataUrl) return result.dataUrl
@@ -3677,10 +3674,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       // Suche die Datei im Vault (relative zum Notizverzeichnis, dann root, dann fuzzy)
       const noteDir = selectedNote?.path ? selectedNote.path.substring(0, selectedNote.path.lastIndexOf('/')) : ''
-      const candidates = [
-        noteDir ? `${noteDir}/${filename}` : null,
-        filename,
-      ].filter(Boolean) as string[]
+      const candidates = embedCandidatePaths(filename, noteDir)
       ;(async () => {
         for (const rel of candidates) {
           try {
@@ -4375,12 +4369,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
         try {
           // Try multiple possible locations for the PDF
-          const possiblePaths = [
-            noteDir ? `${vaultPath}/${noteDir}/${filename}` : null,
-            `${vaultPath}/${filename}`,
-            `${vaultPath}/.attachments/${filename}`,
-            `${vaultPath}/attachments/${filename}`,
-          ].filter(Boolean) as string[]
+          const possiblePaths = embedCandidatePaths(filename, noteDir, ['.attachments', 'attachments']).map(rel => `${vaultPath}/${rel}`)
 
           let pdfBase64: string | null = null
           let foundPath: string | null = null
