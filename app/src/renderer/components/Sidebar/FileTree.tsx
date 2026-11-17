@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, useLayoutEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { FileEntry } from '../../../shared/types'
+import { flattenFilePaths, VAULT_FILES_DRAG_TYPE } from '../../../shared/fileLinkTarget'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useUIStore, FOLDER_COLORS, FOLDER_ICONS, type IconSet } from '../../stores/uiStore'
 import { hasAiRouteFor } from '../../../shared/llmBackend'
@@ -17,6 +18,21 @@ import { BrainIcon } from '../BrainIcon'
 import { writeClipboardText } from '../../utils/clipboard'
 import { getFilePathsFromDataTransfer } from '../../utils/imageUtils'
 import { isTaskFolderExcluded } from '../../../shared/taskFolderFilter'
+
+/**
+ * Eigene, kompakte Zieh-Vorschau. Ohne sie macht Chromium einen Schnappschuss der ganzen
+ * Zeile — der erschien beim Ziehen größer als die Markierung und nach oben versetzt
+ * (Nutzer, 17.11.2026). Der Chip zeigt nur den Namen bzw. „N Dateien“.
+ */
+function setCompactDragImage(e: React.DragEvent, label: string): void {
+  const ghost = document.createElement('div')
+  ghost.className = 'file-drag-ghost'
+  ghost.textContent = label
+  document.body.appendChild(ghost)
+  e.dataTransfer.setDragImage(ghost, 10, 12)
+  // Erst nach dem Schnappschuss entfernen (der Browser liest das Element synchron im dragstart).
+  setTimeout(() => ghost.remove(), 0)
+}
 
 const isMac = window.electronAPI.platform === 'darwin'
 const NOTE_KIND_ORDER: NoteKindId[] = ['problem', 'solution', 'info']
@@ -1273,8 +1289,19 @@ const FileItem: React.FC<FileItemProps> = ({
 
   // Drag & Drop handlers
   const handleDragStart = (e: React.DragEvent) => {
+    // text/plain bleibt GENAU der gezogene Pfad: darüber verschiebt der Ordner-Drop (unverändert).
     e.dataTransfer.setData('text/plain', entry.path)
-    e.dataTransfer.effectAllowed = 'move'
+    if (!entry.isDirectory) {
+      // Für den Editor: Link/Einbettung. Ist die gezogene Datei Teil einer Mehrfachauswahl,
+      // gehen alle markierten Dateien mit, in Dateibaum-Reihenfolge (filetree-drag-link.md, F07/F16).
+      const paths = selectedPaths.size > 1 && selectedPaths.has(entry.path)
+        ? flattenFilePaths(fileTree).filter(p => selectedPaths.has(p))
+        : [entry.path]
+      e.dataTransfer.setData(VAULT_FILES_DRAG_TYPE, JSON.stringify(paths))
+    }
+    // copy für den Editor, move für Ordner
+    e.dataTransfer.effectAllowed = 'copyMove'
+    setCompactDragImage(e, selectedPaths.size > 1 && selectedPaths.has(entry.path) ? t('fileTree.dragCount', { count: selectedPaths.size }) : entry.name.replace(/\.md$/i, ''))
   }
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -1296,8 +1323,10 @@ const FileItem: React.FC<FileItemProps> = ({
 
     if (!entry.isDirectory || !vaultPath) return
 
-    // 1) External drop from Finder/Desktop: copy file(s) into this folder
-    const externalPaths = getFilePathsFromDataTransfer(e.dataTransfer)
+    // 1) External drop from Finder/Desktop: copy file(s) into this folder.
+    // Ein interner Zug aus dem Dateibaum wird nie als Finder-Drop behandelt (Codex F05).
+    const isInternal = e.dataTransfer.types.includes(VAULT_FILES_DRAG_TYPE)
+    const externalPaths = isInternal ? [] : getFilePathsFromDataTransfer(e.dataTransfer)
     if (externalPaths.length > 0) {
       let copied = 0
       for (const src of externalPaths) {

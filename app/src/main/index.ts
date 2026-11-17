@@ -3595,8 +3595,12 @@ ipcMain.handle('find-image-in-vault', async (_event, vaultPath: string, imageNam
     const searchName = imageName.toLowerCase()
     const justFileName = searchName.split('/').pop() || searchName
 
-    // Recursive search function
-    async function searchDir(dirPath: string): Promise<string | null> {
+    // Alle Treffer sammeln: bei mehreren gleichnamigen Dateien wird keine geraten,
+    // sonst zeigt eine Einbettung still die falsche Datei (filetree-drag-link.md, F04/F26).
+    const matches: string[] = []
+    const MAX_MATCHES = 20
+    async function searchDir(dirPath: string): Promise<void> {
+      if (matches.length >= MAX_MATCHES) return
       try {
         const entries = await fs.readdir(dirPath, { withFileTypes: true })
 
@@ -3608,27 +3612,26 @@ ipcMain.handle('find-image-in-vault', async (_event, vaultPath: string, imageNam
             if (entry.name.startsWith('.') && entry.name !== '.attachments') continue
             if (entry.name === 'node_modules') continue
 
-            const found = await searchDir(fullPath)
-            if (found) return found
+            await searchDir(fullPath)
+            if (matches.length >= MAX_MATCHES) return
           } else if (entry.isFile()) {
             const ext = path.extname(entry.name).toLowerCase()
             // Include images AND PDFs for embed support
             const isEmbeddable = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico', '.pdf'].includes(ext)
 
             if (isEmbeddable && entry.name.toLowerCase() === justFileName) {
-              // Return absolute path
-              return fullPath
+              matches.push(fullPath)
             }
           }
         }
       } catch (error) {
         // Ignore permission errors etc.
       }
-      return null
     }
 
-    const foundPath = await searchDir(vaultPath)
-    return { success: !!foundPath, path: foundPath }
+    await searchDir(vaultPath)
+    if (matches.length > 1) return { success: false, ambiguous: matches.length }
+    return { success: matches.length === 1, path: matches[0] ?? null }
   } catch (error) {
     console.error('[Image] Find in vault error:', error)
     return { success: false, error: String(error) }

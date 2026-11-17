@@ -262,8 +262,15 @@ export class ImageWidget extends WidgetType {
 
       // Fallback: Obsidian-style vault-wide search
       const searchResult = await window.electronAPI.findImageInVault(this.vaultPath, this.url)
+      if (searchResult.ambiguous && searchResult.ambiguous > 1) {
+        // Nicht cachen: nach Umbenennen soll der nächste Aufbau neu suchen.
+        if (currentLoadId === this.loadId) this.renderError(container, `Mehrdeutig: ${searchResult.ambiguous} Dateien heißen ${this.url}`)
+        return
+      }
       if (searchResult.success && searchResult.path) {
-        const fullPath = `${this.vaultPath}/${searchResult.path}`
+        // Der Main liefert einen ABSOLUTEN Pfad. Vorher wurde der Vault-Pfad noch einmal
+        // davorgesetzt — diese Ausweichsuche konnte so nie ein Bild laden.
+        const fullPath = searchResult.path.startsWith(this.vaultPath) ? searchResult.path : `${this.vaultPath}/${searchResult.path}`
         const imageResult = await window.electronAPI.readImageAsDataUrl(fullPath)
         if (imageResult.success && imageResult.dataUrl) {
           imageCache.set(this.cacheKey, imageResult.dataUrl)
@@ -366,11 +373,13 @@ export class PdfEmbedWidget extends WidgetType {
       }
     }
 
+    let ambiguousCount = 0
     if (!pdfBase64) {
       // Try vault-wide search for the PDF
       console.log('[PdfEmbed] Trying vault-wide search for:', this.filename)
       const searchResult = await window.electronAPI.findImageInVault(this.vaultPath, this.filename)
       console.log('[PdfEmbed] Search result:', searchResult)
+      ambiguousCount = searchResult.ambiguous ?? 0
       if (searchResult.success && searchResult.path) {
         try {
           pdfBase64 = await window.electronAPI.readFileBinary(searchResult.path)
@@ -443,7 +452,9 @@ export class PdfEmbedWidget extends WidgetType {
             <path d="M4 1C3.45 1 3 1.45 3 2V14C3 14.55 3.45 15 4 15H12C12.55 15 13 14.55 13 14V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#ffebee" stroke="#e53935" strokeWidth="0.8"/>
             <text x="8" y="11" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53935">PDF</text>
           </svg>
-          <span>PDF nicht gefunden: ${escapeHtml(this.filename)}</span>
+          <span>${ambiguousCount > 1
+            ? `PDF mehrdeutig: ${ambiguousCount} Dateien heißen ${escapeHtml(this.filename)}. Bitte mit Ordnerpfad verlinken.`
+            : `PDF nicht gefunden: ${escapeHtml(this.filename)}`}</span>
         </div>
       `
     }

@@ -28,6 +28,10 @@ import { extractLinks, extractTags, extractTitle, extractHeadings, extractBlocks
 import { applyHighlights, clearHighlights, matchRanges } from '../../utils/inNoteSearch'
 import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, parsePluginEmbedSize } from '../../utils/pluginEmbeds'
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
+import { FileKindIcon } from './FileKindIcon'
+import { openVaultFileLink } from '../../utils/openVaultFileLink'
+import { flattenFilePaths, planFileDrop, parseVaultFilesDrag, VAULT_FILES_DRAG_TYPE, type VaultFileKind } from '../../../shared/fileLinkTarget'
+import { suggestLinkTargets } from '../../../shared/linkSuggestions'
 import { SlashCommandMenu } from './SlashCommandMenu'
 import { livePreviewExtension } from './extensions/livePreview'
 import { imageHandlingExtension } from './extensions/imageHandling'
@@ -59,11 +63,11 @@ import {
 import { isImageFile, findImageInVault, getFilePathsFromDataTransfer, extractImageFromDataTransfer, fileToBase64 } from '../../utils/imageUtils'
 import { highlightCode } from '../../utils/highlightSetup'
 import { renderedCodeBlockRule } from '../../utils/wysiwygCodeBlockRule'
+import { noteEmbedRule, renderNoteEmbedHtml } from '../../utils/wysiwygNoteEmbedRule'
 import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { markdownToSpeakable } from '../../../shared/speakableText'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
-import { noteEmbedRule, renderNoteEmbedHtml } from '../../utils/wysiwygNoteEmbedRule'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { getNoteKind, stripNoteKindMarker, splitZettelTitle, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
 import { setAiProvenanceInContent, getAiProvenance, todayIsoDate } from '../../../shared/aiProvenance'
@@ -567,6 +571,16 @@ wysiwygTurndown.addRule('callout', {
   }
 })
 
+/** Gibt es die Datei schon? Lesen statt eigener IPC — ein Fehler heißt „nicht da“. */
+async function vaultFileExists(fullPath: string): Promise<boolean> {
+  try {
+    await window.electronAPI.readFile(fullPath)
+    return true
+  } catch {
+    return false
+  }
+}
+
 function stripFrontmatterRaw(content: string): { frontmatter: string; body: string } {
   const match = content.match(/^(---\s*\n[\s\S]*?\n---\s*\n?)/)
   if (!match) return { frontmatter: '', body: content }
@@ -1030,6 +1044,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   // Verwende die übergebene noteId oder die primary/secondary Selection
   const effectiveNoteId = noteId ?? (isSecondary ? secondarySelectedNoteId : selectedNoteId)
   const selectedNote = notes.find(n => n.id === effectiveNoteId)
+  // Pfad der Notiz DIESER Editorinstanz für Drops aus dem Dateibaum. Die CodeMirror-
+  // Extensions werden einmal gebaut, deshalb Ref statt Closure (Split: Codex F09).
+  const dropNotePathRef = useRef<string | null>(null)
+  dropNotePathRef.current = selectedNote?.path ?? null
 
   // Voice: Sprache-Modul + aktueller Status für Preview-Vorlese-Button
   const speechEnabled = useIsModuleEnabled('speech')
@@ -1098,6 +1116,18 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
   const [showPublishWpModal, setShowPublishWpModal] = useState(false)
   const [previewToolbar, setPreviewToolbar] = useState<{ x: number; y: number } | null>(null)
   const [previewLinkInput, setPreviewLinkInput] = useState<{ kind: 'url' | 'wiki'; value: string } | null>(null)
+  // Kurzer Hinweis im Editor (mehrdeutiger Dateilink, abgelehnter Drop). Verschwindet nach 5 s.
+  const [editorHint, setEditorHint] = useState<string | null>(null)
+  const editorHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const showEditorHint = useCallback((text: string) => {
+    if (editorHintTimerRef.current) clearTimeout(editorHintTimerRef.current)
+    setEditorHint(text)
+    editorHintTimerRef.current = setTimeout(() => setEditorHint(null), 5000)
+  }, [])
+  useEffect(() => () => { if (editorHintTimerRef.current) clearTimeout(editorHintTimerRef.current) }, [])
+  // Für Callbacks aus einmal gebauten Extensions (CodeMirror): immer die aktuelle Sprache.
+  const showEditorHintRef = useRef<(names: string[]) => void>(() => {})
+  showEditorHintRef.current = (names: string[]) => showEditorHint(t('editor.dropUnsupported', { names: names.join(', ') }))
   const [previewWikilinkIndex, setPreviewWikilinkIndex] = useState(0)
   const savedPreviewRangeRef = useRef<Range | null>(null)
 
@@ -1915,17 +1945,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         // Initialer Inhalt mit Titel
         const initialContent = `# ${blockInfo.newNoteName}\n\n`
 
-        // Datei erstellen
-        await window.electronAPI.writeFile(fullPath, initialContent)
-        console.log(`Neue Notiz erstellt: ${relativePath}`)
+        // Nie eine vorhandene Datei überschreiben (Codex F25): Store/Baum können
+        // veraltet sein, deshalb zusätzlich auf der Platte nachsehen.
+        if (!(await vaultFileExists(fullPath))) {
+          await window.electronAPI.writeFile(fullPath, initialContent)
+          console.log(`Neue Notiz erstellt: ${relativePath}`)
 
-        // Notiz zum Store hinzufügen
-        const newNote = await createNoteFromFile(fullPath, relativePath, initialContent)
-        addNote(newNote)
+          // Notiz zum Store hinzufügen
+          const newNote = await createNoteFromFile(fullPath, relativePath, initialContent)
+          addNote(newNote)
 
-        // FileTree aktualisieren
-        const tree = await window.electronAPI.readDirectory(vaultPath)
-        setFileTree(tree)
+          // FileTree aktualisieren
+          const tree = await window.electronAPI.readDirectory(vaultPath)
+          setFileTree(tree)
+        }
       } catch (error) {
         console.error('Fehler beim Erstellen der neuen Notiz:', error)
       }
@@ -2507,7 +2540,12 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           // Image handling for drag & drop and paste
           imageHandlingExtension({
             vaultPath: vaultPath || '',
-            getImagesFolder: () => useUIStore.getState().imagesFolder || '.attachments'
+            getImagesFolder: () => useUIStore.getState().imagesFolder || '.attachments',
+            getFileDropContext: () => {
+              const st = useNotesStore.getState()
+              return { ctx: { allPaths: flattenFilePaths(st.fileTree), notes: st.notes }, currentNotePath: dropNotePathRef.current }
+            },
+            onFileDropSkipped: (names) => showEditorHintRef.current(names)
           }),
           // Live Preview extension compartment (starts empty, can be reconfigured)
           livePreviewCompartment.of([]),
@@ -2786,7 +2824,14 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
       const linkedNote = findNoteForWikilink(linkText, notes)
       if (!linkedNote) {
-        // Kein Notiz-Treffer: Plugin-Datei (z.B. [[skizze.excalidraw]]) im Plugin-Editor öffnen
+        // Kein Notiz-Treffer: Datei (PDF, Bild, Office, Plugin) wie im Dateibaum öffnen (Codex F20)
+        const fileRes = openVaultFileLink(linkText, fileTree)
+        if (fileRes.status === 'found') return
+        if (fileRes.status === 'ambiguous') {
+          showEditorHint(t('editor.linkAmbiguous', { count: fileRes.count, name: linkText }))
+          return
+        }
+        // Rückfall: unscharfe Plugin-Dateisuche wie bisher
         const pluginFile = resolvePluginFileLink(linkText, fileTree)
         if (pluginFile) {
           useTabStore.getState().openPluginEditorTab(
@@ -2844,7 +2889,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => {
       window.removeEventListener('live-preview-wikilink-open', handleLivePreviewWikilinkOpen as EventListener)
     }
-  }, [notes, fileTree, isSecondary, selectNote, selectSecondaryNote, vaultPath])
+  }, [notes, fileTree, isSecondary, selectNote, selectSecondaryNote, vaultPath, showEditorHint, t])
 
   const updatePreviewToolbarPosition = useCallback(() => {
     const root = editablePreviewRef.current
@@ -3169,7 +3214,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const onDragOver = (e: DragEvent) => {
       const dt = e.dataTransfer
       if (!dt) return
-      const hasFiles = dt.types.includes('Files') || dt.types.includes('text/uri-list')
+      const hasVaultFiles = dt.types.includes(VAULT_FILES_DRAG_TYPE)
+      const hasFiles = hasVaultFiles || dt.types.includes('Files') || dt.types.includes('text/uri-list')
       if (!hasFiles) return
       // Nur Drops in DIESE Vorschau übernehmen: der Listener hängt dokumentweit in der
       // Capture-Phase. Ohne die Prüfung schluckte ein Lesen-Editor im Split jeden Finder-Drop,
@@ -3186,6 +3232,84 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     const onDrop = async (e: DragEvent) => {
       const dt = e.dataTransfer
       if (!dt) return
+
+      // Dateien aus dem Dateibaum → Link bzw. Einbettung als Markdown-Text. Vor dem
+      // Finder-Zweig, nur im getroffenen Editor, und auch bei Ablehnung übernehmen
+      // (Codex F06/F17). Der Text läuft über turndown, das `[`, `]` und `!` nicht escaped.
+      if (dt.types.includes(VAULT_FILES_DRAG_TYPE)) {
+        if (!isInsidePreview(e.target)) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        const st = useNotesStore.getState()
+        const plan = planFileDrop(
+          parseVaultFilesDrag(dt.getData(VAULT_FILES_DRAG_TYPE)),
+          { allPaths: flattenFilePaths(st.fileTree), notes: st.notes },
+          dropNotePathRef.current
+        )
+        if (plan.skipped.length > 0) showEditorHintRef.current(plan.skipped)
+        if (!plan.markdown) return
+        type DocCaretV = Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
+        const range: Range | null = (document as DocCaretV).caretRangeFromPoint?.(e.clientX, e.clientY) ?? null
+        // Nie IN einen vorhandenen Link, eine Einbettung oder Code einfügen: sonst entsteht
+        // `[[A|Text [[B]]]]` (real im Test, 17.11.2026). Dann direkt dahinter.
+        if (range) {
+          const startEl = range.startContainer.nodeType === Node.ELEMENT_NODE
+            ? range.startContainer as Element
+            : range.startContainer.parentElement
+          const blocker = startEl?.closest('a, .wikilink, .wikilink-embed, .pdf-embed, .office-embed, .plugin-embed, code, pre')
+          if (blocker && editable.contains(blocker)) {
+            range.setStartAfter(blocker)
+            range.collapse(true)
+          }
+        }
+        const inEditable = !!range && editable.contains(range.startContainer)
+        let lastNode: Node
+        if (plan.block) {
+          // Eigene Absätze hinter dem Block, in dem gedroppt wurde
+          let anchor: Node | null = inEditable ? range!.startContainer : null
+          while (anchor && anchor.parentNode !== editable) anchor = anchor.parentNode
+          const frag = document.createDocumentFragment()
+          for (const line of plan.markdown.split('\n')) {
+            const p = document.createElement('p')
+            p.textContent = line
+            frag.appendChild(p)
+          }
+          lastNode = frag.lastChild!
+          if (anchor) editable.insertBefore(frag, anchor.nextSibling)
+          else editable.appendChild(frag)
+        } else {
+          let text = plan.markdown
+          if (inEditable && range!.startContainer.nodeType === Node.TEXT_NODE) {
+            const data = (range!.startContainer as Text).data
+            const prev = data[range!.startOffset - 1]
+            const next = data[range!.startOffset]
+            if (prev && !/\s/.test(prev)) text = ` ${text}`
+            if (next && !/\s/.test(next)) text = `${text} `
+          }
+          const node = document.createTextNode(text)
+          if (inEditable) range!.insertNode(node)
+          else {
+            const p = document.createElement('p')
+            p.appendChild(node)
+            editable.appendChild(p)
+          }
+          lastNode = node
+        }
+        const sel = window.getSelection()
+        if (sel) {
+          const after = document.createRange()
+          after.setStartAfter(lastNode)
+          after.collapse(true)
+          sel.removeAllRanges()
+          sel.addRange(after)
+        }
+        // Ohne Dirty-Flag beendet commitEditablePreview stumm ohne Speichern (Codex F01).
+        isPreviewDomDirtyRef.current = true
+        commitEditablePreview(true)
+        return
+      }
+
       const hasFiles = dt.types.includes('Files') || dt.types.includes('text/uri-list')
       if (!hasFiles) return
       if (!isInsidePreview(e.target)) return
@@ -3334,37 +3458,29 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     setPreviewWikilinkIndex(0)
   }, [])
 
-  // Wikilink-Vorschläge analog zum CodeMirror-Autocomplete: Filter über notes,
-  // dazu ggf. eine "Neue Notiz erstellen"-Option, falls der Query keinen exakten
-  // Treffer hat. Nur aktiv wenn das Wikilink-Input offen ist.
+  // Wikilink-Vorschläge mit derselben Logik wie das CodeMirror-Popup: alle Vault-Dateien
+  // (auch PDF, Bild, Office), Notizen über H1/Dateiname/Frontmatter-Titel, Ziel nach
+  // `buildFileLinkTarget` (Codex F24). Nur aktiv, wenn das Wikilink-Eingabefeld offen ist.
+  type PreviewWikilinkSuggestion = { id: string; label: string; sublabel: string; value: string; isCreate: boolean; kind: VaultFileKind | 'create'; disabled: boolean }
   const previewWikilinkSuggestions = useMemo(() => {
-    if (previewLinkInput?.kind !== 'wiki') return [] as Array<{ id: string; label: string; sublabel: string; value: string; isCreate: boolean }>
-    const q = previewLinkInput.value.toLowerCase().trim()
-    const matching = notes
-      .filter(n => {
-        if (!q) return true
-        return n.title.toLowerCase().includes(q) || n.path.toLowerCase().includes(q)
-      })
-      .slice(0, 8)
-      .map(n => ({ id: n.id, label: n.title, sublabel: n.path, value: n.title, isCreate: false }))
-
-    const exactMatch = q.length > 0 && notes.some(n => {
-      const titleLower = n.title.toLowerCase()
-      const fileLower = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
-      return titleLower === q || fileLower === q
-    })
-
-    if (q && !exactMatch) {
-      matching.unshift({
-        id: '__create__',
-        label: previewLinkInput.value.trim(),
-        sublabel: 'Neue Notiz erstellen',
-        value: previewLinkInput.value.trim(),
-        isCreate: true
-      })
+    if (previewLinkInput?.kind !== 'wiki') return [] as PreviewWikilinkSuggestion[]
+    const typed = previewLinkInput.value.trim()
+    const { items, exactMatch } = suggestLinkTargets(typed, flattenFilePaths(fileTree), notes, 8)
+    const matching: PreviewWikilinkSuggestion[] = items.map(sg => ({
+      id: sg.path,
+      label: sg.label,
+      sublabel: sg.target === null ? t('wikilink.unsupportedChars', { chars: (sg.blockedBy ?? []).join(' ') }) : sg.path,
+      value: sg.target ?? '',
+      isCreate: false,
+      kind: sg.kind,
+      disabled: sg.target === null
+    }))
+    const hasForeignExtension = /\.[a-z0-9]{1,5}$/i.test(typed) && !/\.md$/i.test(typed)
+    if (typed && !exactMatch && !hasForeignExtension) {
+      matching.push({ id: '__create__', label: typed, sublabel: t('wikilink.createNewNote'), value: typed, isCreate: true, kind: 'create', disabled: false })
     }
     return matching
-  }, [previewLinkInput, notes])
+  }, [previewLinkInput, notes, fileTree, t])
 
   const insertPreviewWikilink = useCallback((target: string, displayFromRange: string) => {
     const safeTarget = target.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -3408,6 +3524,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             const relativePath = currentFolder ? `${currentFolder}/${fileName}` : fileName
             const fullPath = `${vaultPath}/${relativePath}`
             const initialContent = `# ${value}\n\n`
+            if (await vaultFileExists(fullPath)) return
             await window.electronAPI.writeFile(fullPath, initialContent)
             const newNote = await createNoteFromFile(fullPath, relativePath, initialContent)
             addNote(newNote)
@@ -3629,8 +3746,13 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             }, 100)
           }
         } else {
-          // Kein Notiz-Treffer: Plugin-Datei (z.B. [[skizze.excalidraw]]) im Plugin-Editor öffnen
-          const pluginFile = resolvePluginFileLink(linkText, fileTree)
+          // Kein Notiz-Treffer: Datei (PDF, Bild, Office, Plugin) wie im Dateibaum öffnen (Codex F20)
+          const fileRes = openVaultFileLink(linkText, fileTree)
+          if (fileRes.status === 'ambiguous') {
+            showEditorHint(t('editor.linkAmbiguous', { count: fileRes.count, name: linkText }))
+          }
+          // Rückfall: unscharfe Plugin-Dateisuche wie bisher
+          const pluginFile = fileRes.status === 'none' ? resolvePluginFileLink(linkText, fileTree) : null
           if (pluginFile) {
             useTabStore.getState().openPluginEditorTab(
               pluginFile.pluginEditor.pluginId,
@@ -4221,6 +4343,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
           let pdfBase64: string | null = null
           let foundPath: string | null = null
+          let ambiguousCount = 0
 
           for (const pdfPath of possiblePaths) {
             try {
@@ -4235,6 +4358,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           // Fallback: vault-wide search
           if (!pdfBase64) {
             const searchResult = await window.electronAPI.findImageInVault(vaultPath, filename)
+            ambiguousCount = searchResult.ambiguous ?? 0
             if (searchResult.success && searchResult.path) {
               try {
                 pdfBase64 = await window.electronAPI.readFileBinary(searchResult.path)
@@ -4285,7 +4409,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                   <path d="M4 1C3.45 1 3 1.45 3 2V14C3 14.55 3.45 15 4 15H12C12.55 15 13 14.55 13 14V5.41C13 5.15 12.89 4.9 12.71 4.71L10.29 2.29C10.1 2.11 9.85 2 9.59 2H4Z" fill="#ffebee" stroke="#e53935" stroke-width="0.8"/>
                   <text x="8" y="11" text-anchor="middle" font-size="5" font-weight="bold" fill="#e53935">PDF</text>
                 </svg>
-                <span>PDF nicht gefunden: ${escapeHtml(filename)}</span>
+                <span>${ambiguousCount > 1
+                  ? `PDF mehrdeutig: ${ambiguousCount} Dateien heißen ${escapeHtml(filename)}. Bitte mit Ordnerpfad verlinken.`
+                  : `PDF nicht gefunden: ${escapeHtml(filename)}`}</span>
               </div>
             `
           }
@@ -5405,6 +5531,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                       e.preventDefault()
                       if (previewLinkInput.kind === 'wiki' && previewWikilinkSuggestions[previewWikilinkIndex]) {
                         const item = previewWikilinkSuggestions[previewWikilinkIndex]
+                        if (item.disabled) return
                         confirmPreviewLink(item.value, item.isCreate)
                       } else {
                         confirmPreviewLink()
@@ -5423,17 +5550,19 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
                       {previewWikilinkSuggestions.map((item, idx) => (
                         <div
                           key={item.id}
-                          className={`wikilink-autocomplete-item ${idx === previewWikilinkIndex ? 'selected' : ''} ${item.isCreate ? 'create-new' : ''}`}
+                          className={`wikilink-autocomplete-item ${idx === previewWikilinkIndex ? 'selected' : ''} ${item.isCreate ? 'create-new' : ''} ${item.disabled ? 'disabled' : ''}`}
+                          aria-disabled={item.disabled || undefined}
                           onMouseDown={e => {
                             // mousedown statt click — sonst stiehlt der Klick den Fokus,
                             // und der Input-onBlur cancelt vor dem Confirm.
                             e.preventDefault()
+                            if (item.disabled) return
                             confirmPreviewLink(item.value, item.isCreate)
                           }}
                           onMouseEnter={() => setPreviewWikilinkIndex(idx)}
                         >
                           <span className={`wikilink-autocomplete-icon ${item.isCreate ? 'create-new' : ''}`}>
-                            {item.isCreate ? '➕' : '📄'}
+                            <FileKindIcon kind={item.kind} />
                           </span>
                           <span className="wikilink-autocomplete-label">{item.label}</span>
                           {item.sublabel && (
@@ -5625,6 +5754,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
           onClose={() => setSlashMenu(null)}
           onExecute={() => setSlashMenu(null)}
         />
+      )}
+
+      {editorHint && (
+        <div className="editor-hint" role="status" onClick={() => setEditorHint(null)}>{editorHint}</div>
       )}
 
       {/* Wikilink Autocomplete */}

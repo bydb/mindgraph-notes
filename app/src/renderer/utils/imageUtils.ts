@@ -283,31 +283,18 @@ import type { FileEntry } from '../../shared/types'
  * @returns The relative path to the image, or null if not found
  */
 export function findImageInVault(fileName: string, fileTree: FileEntry[]): string | null {
-  // Normalize the filename for comparison
-  const searchName = fileName.toLowerCase()
-
-  // Extract just the filename if a path was provided
-  const justFileName = searchName.split('/').pop() || searchName
-
-  // Recursive search function
-  function searchTree(entries: FileEntry[]): string | null {
+  // Bei mehreren gleichnamigen Bildern wird keins geraten (filetree-drag-link.md, F26).
+  const justFileName = (fileName.toLowerCase().split('/').pop() || fileName.toLowerCase())
+  const matches: string[] = []
+  function searchTree(entries: FileEntry[]): void {
     for (const entry of entries) {
-      if (entry.isDirectory && entry.children) {
-        // Recursively search directories
-        const found = searchTree(entry.children)
-        if (found) return found
-      } else if (entry.fileType === 'image') {
-        // Check if this is the image we're looking for
-        const entryFileName = entry.name.toLowerCase()
-        if (entryFileName === justFileName) {
-          return entry.path
-        }
-      }
+      if (matches.length > 1) return
+      if (entry.isDirectory && entry.children) searchTree(entry.children)
+      else if (entry.fileType === 'image' && entry.name.toLowerCase() === justFileName) matches.push(entry.path)
     }
-    return null
   }
-
-  return searchTree(fileTree)
+  searchTree(fileTree)
+  return matches.length === 1 ? matches[0] : null
 }
 
 /**

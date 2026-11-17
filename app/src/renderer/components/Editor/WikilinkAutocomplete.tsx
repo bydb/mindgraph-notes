@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react'
 import { EditorView } from '@codemirror/view'
 import { useNotesStore } from '../../stores/notesStore'
-import { extractParagraphs, generateBlockId } from '../../utils/linkExtractor'
+import { extractParagraphs, generateBlockId, findNoteForWikilink } from '../../utils/linkExtractor'
 import { useTranslation } from '../../utils/translations'
+import { flattenFilePaths, type VaultFileKind } from '../../../shared/fileLinkTarget'
+import { suggestLinkTargets } from '../../../shared/linkSuggestions'
+import { FileKindIcon } from './FileKindIcon'
 
 export type AutocompleteMode = 'note' | 'heading' | 'block' | 'tag'
 
@@ -33,6 +36,10 @@ interface AutocompleteItem {
   label: string
   sublabel?: string
   icon: string
+  /** Dateiart für das Symbol im Notiz-/Datei-Modus (ersetzt `icon`). */
+  fileKind?: VaultFileKind | 'create'
+  /** Nicht wählbar (z. B. Dateiname mit `#` oder `|`). */
+  disabled?: boolean
   value: string
   // Für Block-Items
   needsBlockId?: boolean
@@ -52,7 +59,9 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
   onSelect
 }) => {
   const { t } = useTranslation()
-  const { notes, vaultPath } = useNotesStore()
+  const { notes, vaultPath, fileTree } = useNotesStore()
+  // Alle Dateien des Vaults (nicht nur Notizen) — Grundlage für [[-Vorschläge auf PDFs, Bilder, Office.
+  const allPaths = useMemo(() => flattenFilePaths(fileTree), [fileTree])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const listRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -80,14 +89,11 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
   }, [view, isOpen, triggerPos])
 
   // Finde die Zielnotiz für heading/block Mode
+  // Gleicher Resolver wie beim Klick: voller Pfad zuerst — sonst bleiben Überschriften/Absätze
+  // leer, sobald die Vervollständigung bei Namensdopplung einen Pfad eingefügt hat (Codex F22).
   const targetNoteData = useMemo(() => {
     if (!targetNote) return null
-    const normalizedTarget = targetNote.toLowerCase()
-    return notes.find(n => {
-      const titleLower = n.title.toLowerCase()
-      const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
-      return titleLower === normalizedTarget || fileNameWithoutExt === normalizedTarget
-    }) || null
+    return findNoteForWikilink(targetNote, notes)
   }, [targetNote, notes])
 
   // Lade Content der Zieldatei für Block-Modus
@@ -116,43 +122,36 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
     const queryLower = query.toLowerCase()
 
     if (mode === 'note') {
-      const matchingNotes = notes
-        .filter(n => {
-          if (!queryLower) return true
-          return n.title.toLowerCase().includes(queryLower) ||
-                 n.path.toLowerCase().includes(queryLower)
-        })
-        .slice(0, 20)
-        .map(n => ({
-          id: n.id,
-          label: n.title,
-          sublabel: n.path,
-          icon: '📄',
-          value: n.title
-        }))
+      const { items: suggestions, exactMatch } = suggestLinkTargets(query, allPaths, notes)
+      const matching: AutocompleteItem[] = suggestions.map(sg => ({
+        id: sg.path,
+        label: sg.label,
+        sublabel: sg.target === null
+          ? t('wikilink.unsupportedChars', { chars: (sg.blockedBy ?? []).join(' ') })
+          : sg.path,
+        icon: '',
+        fileKind: sg.kind,
+        disabled: sg.target === null,
+        value: sg.target ?? ''
+      }))
 
-      // Prüfe ob es einen exakten Treffer gibt (case-insensitive)
-      const exactMatch = notes.some(n =>
-        n.title.toLowerCase() === queryLower ||
-        n.path.replace('.md', '').toLowerCase() === queryLower ||
-        n.path.split('/').pop()?.replace('.md', '').toLowerCase() === queryLower
-      )
-
-      // Wenn Query vorhanden und kein exakter Treffer, zeige "Neue Notiz erstellen" Option
-      if (query.trim() && !exactMatch) {
-        const createItem: AutocompleteItem = {
+      // Neuanlage nur, wenn kein vorhandener Name exakt passt — auch kein PDF/Bild
+      // gleichen Namens (Codex F25) — und nur hinter den Treffern, damit Enter nicht
+      // versehentlich eine Notiz anlegt, wo eine Datei gemeint war.
+      const typed = query.trim()
+      const hasForeignExtension = /\.[a-z0-9]{1,5}$/i.test(typed) && !/\.md$/i.test(typed)
+      if (typed && !exactMatch && !hasForeignExtension) {
+        matching.push({
           id: '__create_new__',
-          label: query.trim(),
+          label: typed,
           sublabel: t('wikilink.createNewNote'),
-          icon: '➕',
-          value: query.trim(),
+          icon: '',
+          fileKind: 'create',
+          value: typed,
           createNewNote: true
-        }
-        // Füge "Erstellen" Option am Anfang ein
-        return [createItem, ...matchingNotes]
+        })
       }
-
-      return matchingNotes
+      return matching
     }
 
     if (mode === 'heading' && targetNoteData) {
@@ -274,7 +273,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
     }
 
     return []
-  }, [mode, notes, targetNoteData, targetNote, query, targetContent])
+  }, [mode, notes, allPaths, targetNoteData, targetNote, query, targetContent, t])
 
   // Reset selection when items change
   useEffect(() => {
@@ -293,6 +292,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
 
   // Handle selection
   const handleSelect = (item: AutocompleteItem) => {
+    if (item.disabled) return
     if (item.createNewNote) {
       // Neue Notiz erstellen
       const blockInfo: BlockSelectionInfo = {
@@ -379,7 +379,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
 
   const getHeaderText = () => {
     switch (mode) {
-      case 'note': return t('wikilink.notes')
+      case 'note': return t('wikilink.notesAndFiles')
       case 'heading': return `${t('wikilink.headingsIn')} "${targetNote}"`
       case 'block': return `${t('wikilink.paragraphsIn')} "${targetNote}"`
       case 'tag': return t('wikilink.tags')
@@ -402,7 +402,7 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
       <div className="wikilink-autocomplete-list" ref={listRef}>
         {items.length === 0 ? (
           <div className="wikilink-autocomplete-empty">
-            {mode === 'note' && t('wikilink.noNotesFound')}
+            {mode === 'note' && t('wikilink.noFilesFound')}
             {mode === 'heading' && t('wikilink.noHeadingsFound')}
             {mode === 'block' && t('wikilink.noParagraphsFound')}
             {mode === 'tag' && t('wikilink.noTagsFound')}
@@ -411,12 +411,13 @@ export const WikilinkAutocomplete: React.FC<WikilinkAutocompleteProps> = ({
           items.map((item, index) => (
             <div
               key={item.id}
-              className={`wikilink-autocomplete-item ${index === selectedIndex ? 'selected' : ''} ${item.needsBlockId ? 'needs-id' : ''} ${item.createNewNote ? 'create-new' : ''}`}
+              className={`wikilink-autocomplete-item ${index === selectedIndex ? 'selected' : ''} ${item.needsBlockId ? 'needs-id' : ''} ${item.createNewNote ? 'create-new' : ''} ${item.disabled ? 'disabled' : ''}`}
+              aria-disabled={item.disabled || undefined}
               onClick={() => handleSelect(item)}
               onMouseEnter={() => setSelectedIndex(index)}
             >
               <span className={`wikilink-autocomplete-icon ${item.needsBlockId ? 'new-id' : ''} ${item.createNewNote ? 'create-new' : ''}`}>
-                {item.icon}
+                {item.fileKind ? <FileKindIcon kind={item.fileKind} /> : item.icon}
               </span>
               <span className="wikilink-autocomplete-label">{item.label}</span>
               {item.sublabel && (

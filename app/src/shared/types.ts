@@ -844,7 +844,9 @@ export interface ElectronAPI {
   }>;
   findImageInVault: (vaultPath: string, imageName: string) => Promise<{
     success: boolean;
-    path?: string;
+    path?: string | null;
+    /** Mehr als eine Datei trägt diesen Namen — es wurde keine gewählt. */
+    ambiguous?: number;
     error?: string;
   }>;
 

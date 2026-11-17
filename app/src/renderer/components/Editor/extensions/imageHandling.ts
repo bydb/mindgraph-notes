@@ -10,12 +10,17 @@ import {
   generateImageMarkdown,
   isImageFile
 } from '../../../utils/imageUtils'
+import { planFileDrop, parseVaultFilesDrag, VAULT_FILES_DRAG_TYPE, type LinkTargetContext } from '../../../../shared/fileLinkTarget'
 
 export interface ImageHandlingConfig {
   vaultPath: string
   /** Lazy read: getter so dass Setting-Änderungen live wirken, ohne Editor-Rebuild */
   getImagesFolder?: () => string
   onImageInserted?: (markdown: string) => void
+  /** Dateiliste + Pfad der Notiz DIESER Editorinstanz (Split: nie global, Codex F09). */
+  getFileDropContext?: () => { ctx: LinkTargetContext; currentNotePath: string | null }
+  /** Hinweis, wenn Dateien wegen `# | ^ [ ]` im Namen nicht verlinkt wurden. */
+  onFileDropSkipped?: (names: string[]) => void
 }
 
 /**
@@ -149,7 +154,8 @@ export function imageHandlingExtension(config: ImageHandlingConfig): Extension {
       if (!dt) return false
 
       // Check if there's a wikilink being dragged (from SmartConnections etc.)
-      const hasWikilink = dt.types.includes('application/x-mindgraph-wikilink')
+      // oder Dateien aus dem Dateibaum
+      const hasWikilink = dt.types.includes('application/x-mindgraph-wikilink') || dt.types.includes(VAULT_FILES_DRAG_TYPE)
 
       // Check if there's an image or file being dragged
       const hasImage = dt.types.includes('Files') ||
@@ -188,6 +194,22 @@ export function imageHandlingExtension(config: ImageHandlingConfig): Extension {
       // Remove visual feedback
       const target = event.currentTarget as HTMLElement
       target.classList.remove('drag-over')
+
+      // Dateien aus dem Dateibaum → Link bzw. Einbettung. VOR dem Finder-Zweig (sonst würde
+      // ein internes Bild kopiert) und auch bei Ablehnung vollständig übernehmen — sonst
+      // fügt CodeMirror den rohen text/plain-Pfad ein (Codex F06/F17).
+      if (dt.types.includes(VAULT_FILES_DRAG_TYPE)) {
+        event.preventDefault()
+        event.stopPropagation()
+        const paths = parseVaultFilesDrag(dt.getData(VAULT_FILES_DRAG_TYPE))
+        const dropCtx = config.getFileDropContext?.()
+        if (paths.length > 0 && dropCtx) {
+          const plan = planFileDrop(paths, dropCtx.ctx, dropCtx.currentNotePath)
+          if (plan.skipped.length > 0) config.onFileDropSkipped?.(plan.skipped)
+          if (plan.markdown) insertFileDropAtCursor(view, event, plan.markdown, plan.block)
+        }
+        return true
+      }
 
       // Check if this is a wikilink drop (from SmartConnections etc.)
       const wikilinkTitle = dt.getData('application/x-mindgraph-wikilink')
@@ -253,6 +275,45 @@ function insertWikilinkAtCursor(view: EditorView, event: DragEvent, title: strin
     selection: { anchor: insertPos + wikilink.length }
   })
 
+  view.focus()
+}
+
+/** Liegt `pos` innerhalb eines `[[…]]`/`![[…]]`, die Position direkt dahinter — nie verschachteln. */
+function posOutsideWikilink(line: { from: number; text: string }, pos: number): number {
+  const re = /!?\[\[[^\]\n]*\]\]/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(line.text)) !== null) {
+    const start = line.from + m.index
+    const end = start + m[0].length
+    if (pos > start && pos < end) return end
+  }
+  return pos
+}
+
+/**
+ * Dateilinks aus dem Dateibaum einfügen: Einbettungen und mehrere Dateien als eigener
+ * Block, ein einzelner Link im Fließtext mit Leerzeichen-Trennung.
+ */
+function insertFileDropAtCursor(view: EditorView, event: DragEvent, markdown: string, block: boolean): void {
+  const at = view.posAtCoords({ x: event.clientX, y: event.clientY })
+  const doc = view.state.doc
+  const pos = posOutsideWikilink(doc.lineAt(at !== null ? at : view.state.selection.main.head), at !== null ? at : view.state.selection.main.head)
+  let insert = markdown
+  if (block) {
+    const line = doc.lineAt(pos)
+    if (line.text.trim().length === 0) insert = markdown
+    else if (pos === line.from) insert = `${markdown}\n\n`
+    else if (pos === line.to) insert = `\n\n${markdown}`
+    else insert = `\n\n${markdown}\n\n`
+  } else {
+    const before = pos > 0 ? doc.sliceString(pos - 1, pos) : ''
+    const after = pos < doc.length ? doc.sliceString(pos, pos + 1) : ''
+    insert = `${before && !/\s/.test(before) ? ' ' : ''}${markdown}${after && !/\s/.test(after) ? ' ' : ''}`
+  }
+  view.dispatch({
+    changes: { from: pos, to: pos, insert },
+    selection: { anchor: pos + insert.length }
+  })
   view.focus()
 }
 

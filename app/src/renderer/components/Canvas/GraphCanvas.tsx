@@ -29,7 +29,8 @@ import { PdfNode } from './PdfNode'
 import { LabelNode } from './LabelNode'
 import { DotNode, dotSizeForLinks } from './DotNode'
 import type { FileEntry } from '../../../shared/types'
-import { resolveLink, extractLinks, generateNoteId, extractFirstCardCallout, extractTasks, extractExternalLinks, extractFirstImage } from '../../utils/linkExtractor'
+import { removeWikilinksTo } from '../../../shared/removeWikilinks'
+import { resolveLink, findNoteForWikilink, extractLinks, generateNoteId, extractFirstCardCallout, extractTasks, extractExternalLinks, extractFirstImage } from '../../utils/linkExtractor'
 import { applyLayout, type LayoutAlgorithm, type LayoutNode, type LayoutEdge } from '../../utils/layoutAlgorithms'
 import { useTranslation, type TranslationKey } from '../../utils/translations'
 import { getNoteKind } from '../../utils/noteKind'
@@ -2846,16 +2847,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({
             const fullPath = `${vaultPath}/${sourceNote.path}`
             const currentContent = await window.electronAPI.readFile(fullPath)
             
-            // Alle Varianten des Links entfernen
-            const linkPatterns = [
-              `[[${targetNote.title}]]`,
-              `[[${targetNote.path.replace('.md', '')}]]`
-            ]
-            
-            let newContent = currentContent
-            linkPatterns.forEach(pattern => {
-              newContent = newContent.replace(new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '')
-            })
+            // Jeden Link entfernen, der auf die Zielnotiz auflöst (H1, Dateiname, Pfad,
+            // mit #Fragment oder |Alias) — derselbe Resolver wie beim Klick (Codex F30).
+            let newContent = removeWikilinksTo(currentContent, target => findNoteForWikilink(target, notes)?.id === targetNote.id)
             
             // Leere Zeilen aufräumen
             newContent = newContent.replace(/\n{3,}/g, '\n\n').trim()

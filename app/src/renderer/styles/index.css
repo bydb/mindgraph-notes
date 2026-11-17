@@ -24039,7 +24039,55 @@ body.presentation-mode *::after {
   gap: 6px;
 }
 
+/* [[-Vorschlag, der nicht verlinkt werden kann (z. B. `#` oder `|` im Dateinamen) */
+.wikilink-autocomplete-item.disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.wikilink-autocomplete-icon svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Kurzer Hinweis im Editor (mehrdeutiger Dateilink, abgelehnter Drop) */
+.editor-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  box-shadow: 0 4px 16px color-mix(in srgb, black 18%, transparent);
+  font-size: 13px;
+  cursor: pointer;
+}
+
 /* Notiz-Einbettung im Fließtext: als <span> gerendert (Roundtrip), aber wie ein Block angezeigt */
 .wikilink-embed-inline {
   display: block;
+}
+
+/* Kompakte Zieh-Vorschau im Dateibaum (statt Schnappschuss der ganzen Zeile).
+   Außerhalb des sichtbaren Bereichs, aber gerendert, damit setDragImage ein Bild bekommt. */
+.file-drag-ghost {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  max-width: 260px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 60%, transparent);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
 }
