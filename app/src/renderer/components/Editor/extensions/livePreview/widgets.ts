@@ -336,6 +336,17 @@ export class PdfEmbedWidget extends WidgetType {
     return other.filename === this.filename && other.vaultPath === this.vaultPath
   }
 
+  // Blob-URL freigeben, wenn CodeMirror das Widget entfernt — sonst blieb jede PDF bis zum
+  // App-Neustart im Speicher (gemessen +48 MB je Öffnen mit drei 20-MB-PDFs, 17.11.2026).
+  destroy(dom: HTMLElement): void {
+    dom.dataset.destroyed = 'true'
+    const url = dom.dataset.blobUrl
+    if (url) {
+      URL.revokeObjectURL(url)
+      delete dom.dataset.blobUrl
+    }
+  }
+
   toDOM(): HTMLElement {
     const container = document.createElement('div')
     container.className = 'lp-pdf-embed'
@@ -420,6 +431,12 @@ export class PdfEmbedWidget extends WidgetType {
         console.log('[PdfEmbed] Blob created, size:', blob.size)
         const blobUrl = URL.createObjectURL(blob)
         console.log('[PdfEmbed] Blob URL:', blobUrl)
+        // Freigabe in destroy(); war das Widget schon weg, bevor das Laden fertig war, sofort.
+        if (container.dataset.destroyed === 'true') {
+          URL.revokeObjectURL(blobUrl)
+          return
+        }
+        container.dataset.blobUrl = blobUrl
 
         // KEIN sandbox-Attribut am iframe — das ist Absicht, nicht vergessen.
         // Gemessen 29.08.2026 (Electron 41.10.7 / Chromium 145): Mit sandbox

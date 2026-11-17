@@ -4336,9 +4336,31 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     return () => { cancelled = true; clearTimeout(timer) }
   }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, fileTree, contentVersion])
 
+  // Blob-URLs der PDF-Einbettungen im Lesen-Modus. Jede hält die ganze PDF im Speicher, bis
+  // sie freigegeben wird — vorher nie: gemessen +48 MB je Öffnen einer Notiz mit drei 20-MB-
+  // PDFs, ohne Rückgang (17.11.2026). Freigegeben wird, was in keinem iframe mehr steckt.
+  const pdfBlobUrlsRef = useRef<Set<string>>(new Set())
+  const releaseDetachedPdfBlobUrls = useCallback(() => {
+    const inUse = new Set(Array.from(document.querySelectorAll('iframe')).map(f => f.getAttribute('src') || ''))
+    for (const url of pdfBlobUrlsRef.current) {
+      if (!inUse.has(url)) {
+        URL.revokeObjectURL(url)
+        pdfBlobUrlsRef.current.delete(url)
+      }
+    }
+  }, [])
+  // Beim Schließen des Editors alles freigeben
+  useEffect(() => () => {
+    for (const url of pdfBlobUrlsRef.current) URL.revokeObjectURL(url)
+    pdfBlobUrlsRef.current.clear()
+  }, [])
+
   // Load PDFs in preview mode
   useEffect(() => {
-    if (viewMode !== 'preview' || !previewRef.current || !vaultPath) return
+    // Nach jedem Neuzeichnen/Moduswechsel: was nicht mehr angezeigt wird, freigeben.
+    // Im nächsten Takt, damit React das alte DOM schon ersetzt hat.
+    const sweep = setTimeout(releaseDetachedPdfBlobUrls, 0)
+    if (viewMode !== 'preview' || !previewRef.current || !vaultPath) return () => clearTimeout(sweep)
 
     const loadPdfs = async () => {
       const pdfElements = previewRef.current?.querySelectorAll('.pdf-embed[data-filename]')
@@ -4398,6 +4420,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
             const byteArray = new Uint8Array(byteNumbers)
             const blob = new Blob([byteArray], { type: 'application/pdf' })
             const blobUrl = URL.createObjectURL(blob)
+            pdfBlobUrlsRef.current.add(blobUrl)
 
             // KEIN sandbox-Attribut am iframe — das ist Absicht, nicht vergessen.
             // Gemessen 29.08.2026 (Electron 41.10.7 / Chromium 145): Mit sandbox
@@ -4441,8 +4464,8 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     }
 
     const timer = setTimeout(loadPdfs, 100)
-    return () => clearTimeout(timer)
-  }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, contentVersion])
+    return () => { clearTimeout(timer); clearTimeout(sweep) }
+  }, [renderedMarkdown, viewMode, vaultPath, selectedNote?.path, contentVersion, releaseDetachedPdfBlobUrls])
 
   useEffect(() => {
     const editable = editablePreviewRef.current
