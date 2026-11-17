@@ -30,6 +30,7 @@ import { resolvePluginEmbedTarget, buildPluginEmbedFrame, mountPluginEmbedBody, 
 import { WikilinkAutocomplete, AutocompleteMode, BlockSelectionInfo } from './WikilinkAutocomplete'
 import { FileKindIcon } from './FileKindIcon'
 import { openVaultFileLink } from '../../utils/openVaultFileLink'
+import type { FileEntry } from '../../../shared/types'
 import { flattenFilePaths, planFileDrop, parseVaultFilesDrag, VAULT_FILES_DRAG_TYPE, type VaultFileKind } from '../../../shared/fileLinkTarget'
 import { suggestLinkTargets, firstSelectableIndex, stepSelectableIndex } from '../../../shared/linkSuggestions'
 import { SlashCommandMenu } from './SlashCommandMenu'
@@ -570,6 +571,36 @@ wysiwygTurndown.addRule('callout', {
     return '\n\n' + titleLine + (bodyLines ? '\n' + bodyLines : '') + '\n\n'
   }
 })
+
+/**
+ * Bild aus `![[…]]` als Data-URL laden: Notizordner, Vault-Wurzel, übliche Anhangordner,
+ * zuletzt die eindeutige Namenssuche im Dateibaum. Gemeinsam für die eigene Notiz und für
+ * Bilder in eingebetteten Notizen (dort relativ zum Ordner der EINGEBETTETEN Notiz).
+ */
+async function resolveImageDataUrl(dataSrc: string, vaultPath: string, noteDir: string, fileTree: FileEntry[]): Promise<string | null> {
+  const possiblePaths = [
+    dataSrc.startsWith('/') ? dataSrc : null,
+    noteDir ? `${vaultPath}/${noteDir}/${dataSrc}` : null,
+    `${vaultPath}/${dataSrc}`,
+    `${vaultPath}/.attachments/${dataSrc}`,
+    `${vaultPath}/attachments/${dataSrc}`,
+    `${vaultPath}/assets/${dataSrc}`,
+    `${vaultPath}/images/${dataSrc}`,
+  ].filter(Boolean) as string[]
+  for (const imagePath of possiblePaths) {
+    const result = await window.electronAPI.readImageAsDataUrl(imagePath)
+    if (result.success && result.dataUrl) return result.dataUrl
+  }
+  // Fallback: Obsidian-artige Suche im ganzen Vault (nur bei eindeutigem Namen)
+  if (fileTree.length > 0) {
+    const foundPath = findImageInVault(dataSrc, fileTree)
+    if (foundPath) {
+      const result = await window.electronAPI.readImageAsDataUrl(`${vaultPath}/${foundPath}`)
+      if (result.success && result.dataUrl) return result.dataUrl
+    }
+  }
+  return null
+}
 
 /** Gibt es die Datei schon? Lesen statt eigener IPC — ein Fehler heißt „nicht da“. */
 async function vaultFileExists(fullPath: string): Promise<boolean> {
@@ -4231,6 +4262,20 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
               <div class="wikilink-embed-body">${sanitizeHtml(renderedEmbed)}</div>
             </div>
           `
+          // Bilder der eingebetteten Notiz nachladen. Der normale Bild-Lader sieht nur das
+          // Markdown der eigenen Notiz; diese <img data-src> entstehen erst hier (vorher:
+          // kaputtes Bildsymbol mit Pfad). Relativ zum Ordner der eingebetteten Notiz.
+          const embedNoteDir = targetNote.path.includes('/') ? targetNote.path.substring(0, targetNote.path.lastIndexOf('/')) : ''
+          for (const img of Array.from(embedEl.querySelectorAll<HTMLImageElement>('img[data-src]'))) {
+            const dataSrc = img.getAttribute('data-src')
+            if (!dataSrc || img.getAttribute('src')) continue
+            const cacheKey = `${embedNoteDir}::${dataSrc}`
+            const dataUrl = loadedImagesRef.current.get(cacheKey) ?? await resolveImageDataUrl(dataSrc, vaultPath, embedNoteDir, fileTree)
+            if (dataUrl) {
+              loadedImagesRef.current.set(cacheKey, dataUrl)
+              img.setAttribute('src', dataUrl)
+            }
+          }
         } catch (error) {
           console.error('Fehler beim Laden des Embeds:', error)
           embedEl.innerHTML = `<div class="wikilink-embed-error">Fehler beim Laden von "${escapeHtml(noteName)}"</div>`
@@ -4241,7 +4286,7 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
     // Kurze Verzögerung um sicherzustellen dass das DOM bereit ist
     const timer = setTimeout(processEmbeds, 50)
     return () => clearTimeout(timer)
-  }, [renderedMarkdown, viewMode, notes, vaultPath, contentVersion])
+  }, [renderedMarkdown, viewMode, notes, vaultPath, contentVersion, fileTree])
 
 
   // Load images in preview mode — resolves data-src to data URLs and caches them
@@ -4269,38 +4314,10 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
         if (cancelled) return
 
         try {
-          const possiblePaths = [
-            dataSrc.startsWith('/') ? dataSrc : null,
-            noteDir ? `${vaultPath}/${noteDir}/${dataSrc}` : null,
-            `${vaultPath}/${dataSrc}`,
-            `${vaultPath}/.attachments/${dataSrc}`,
-            `${vaultPath}/attachments/${dataSrc}`,
-            `${vaultPath}/assets/${dataSrc}`,
-            `${vaultPath}/images/${dataSrc}`,
-          ].filter(Boolean) as string[]
-
-          let loaded = false
-          for (const imagePath of possiblePaths) {
-            const result = await window.electronAPI.readImageAsDataUrl(imagePath)
-            if (result.success && result.dataUrl) {
-              loadedImagesRef.current.set(dataSrc, result.dataUrl)
-              newImagesLoaded = true
-              loaded = true
-              break
-            }
-          }
-
-          // Fallback: Obsidian-style vault-wide search
-          if (!loaded && fileTree.length > 0) {
-            const foundPath = findImageInVault(dataSrc, fileTree)
-            if (foundPath) {
-              const result = await window.electronAPI.readImageAsDataUrl(`${vaultPath}/${foundPath}`)
-              if (result.success && result.dataUrl) {
-                loadedImagesRef.current.set(dataSrc, result.dataUrl)
-                newImagesLoaded = true
-                loaded = true
-              }
-            }
+          const dataUrl = await resolveImageDataUrl(dataSrc, vaultPath, noteDir, fileTree)
+          if (dataUrl) {
+            loadedImagesRef.current.set(dataSrc, dataUrl)
+            newImagesLoaded = true
           }
         } catch (error) {
           console.error('[Preview] Image load error:', error)
