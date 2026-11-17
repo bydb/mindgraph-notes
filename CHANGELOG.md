@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.2] - 2026-11-17
+
+**Dateien lassen sich jetzt so leicht verlinken wie Notizen: Nach `[[` schlägt die App auch PDFs, Bilder und Office-Dateien vor, und Sie können Dateien aus der Seitenleiste direkt in eine Notiz ziehen.** Bilder und PDFs erscheinen dabei eingebettet, alles andere als Link; mit `[[` entsteht ein Link, mit `![[` eine Einbettung. Ein Klick auf einen Dateilink öffnet die Datei. Notizen mit großen PDFs brauchen außerdem deutlich weniger Arbeitsspeicher.
+
+### Hintergrund
+
+- **Auslöser:** Die Vervollständigung nach `[[` kannte nur Notizen. Ein PDF ließ sich nur verlinken, wenn man den Dateinamen von Hand abtippte, und ein Klick auf einen solchen Link tat nichts.
+- **Vorschläge:** Notizen werden über ihre Überschrift, ihren Dateinamen und den Titel im Frontmatter gefunden und mit dem Dateinamen eingefügt; ältere Links mit der Überschrift funktionieren weiter. Gibt es mehrere Dateien mit demselben Namen, fügt die App den Pfad ab dem Vault ein. Namen mit `#`, `|`, `^` oder eckigen Klammern lassen sich nicht verlinken; sie erscheinen ausgegraut mit Begründung.
+- **Ziehen:** Funktioniert in allen drei Ansichten. Mehrere markierte Dateien ergeben je eine Zeile. Wer auf einen vorhandenen Link zieht, bekommt den neuen dahinter gesetzt, nicht hinein.
+- **Mehrdeutige Namen:** Heißen mehrere Bilder oder PDFs gleich, zeigt eine Einbettung „mehrdeutig“, statt still eine beliebige Datei zu laden. Ein Pfad im Link wird zuerst ab dem Vault gesucht.
+- **Korrekturen:** Wer im Lesen-Modus eine Notiz mit eingebetteter Notiz (`![[Andere Notiz]]`) bearbeitete, bekam beim Speichern den Inhalt der anderen Notiz fest hineingeschrieben; die Einbettung bleibt jetzt erhalten. Bilder in eingebetteten Notizen werden angezeigt. Ein Klick auf eine Office-Einbettung findet die Datei auch in einem anderen Ordner. Im Schreiben-Modus lädt die Ausweichsuche für Bilder wieder. Beim Löschen einer Verbindung im Graphen verschwindet jede Schreibweise des Links.
+- **Arbeitsspeicher:** Jede angezeigte PDF blieb bis zum Neustart im Speicher. Gemessen mit drei PDFs zu je 20 MB wuchs der Bedarf im Schreiben-Modus bei jedem Öffnen der Notiz um rund 230 MB; jetzt bleibt er nach dem ersten Öffnen gleich.
+
 ## [1.4.1] - 2026-11-16
 
 **Erweiterungen können jetzt die Websuche der App nutzen, etwa um die Anschrift einer Firma oder Einrichtung aus ihrem Impressum zu übernehmen.** In der Rechnungserweiterung Faktura tippen Sie einen Namen ein, und die Anschrift steht im Kundenformular, mit Link auf die Seite, von der sie stammt. Übernommen wird nur, was wörtlich auf der Seite steht; gespeichert wird erst, wenn Sie es geprüft haben.
