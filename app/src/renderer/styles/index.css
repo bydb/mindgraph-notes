@@ -24038,3 +24038,8 @@ body.presentation-mode *::after {
   align-items: flex-start;
   gap: 6px;
 }
+
+/* Notiz-Einbettung im Fließtext: als <span> gerendert (Roundtrip), aber wie ein Block angezeigt */
+.wikilink-embed-inline {
+  display: block;
+}

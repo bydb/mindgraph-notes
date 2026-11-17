@@ -68,6 +68,9 @@ export function extractTags(content: string): string[] {
   return [...new Set(tags)]
 }
 
+export { straightenQuotes } from '../../shared/quoteNormalize'
+import { straightenQuotes } from '../../shared/quoteNormalize'
+
 /**
  * Wikilink → Notiz für Klicks im Editor. Erst der volle vault-relative Pfad
  * (`[[100 - Projekte/110 - Tablet/_STATUS]]`, mit oder ohne `.md`), dann Titel,
@@ -76,19 +79,15 @@ export function extractTags(content: string): string[] {
  * markierte nur den Linktext, die Notiz öffnete sich nicht (in Vaults, die
  * ausschließlich pfadbasiert verlinken, fällt das sofort auf).
  */
-/**
- * Typografische Anführungszeichen auf die geraden Formen zurückführen. Der Lesen-Modus
- * wandelt Wikilinks erst NACH dem Markdown-Rendern um — der Typograph hat aus `You'll` im
- * Linkziel dann schon `You’ll` gemacht, und die Notiz war nicht mehr zu finden (real,
- * 20.09.2026, Readwise-Artikel mit Apostroph im Titel).
- */
-export function straightenQuotes(text: string): string {
-  return text.replace(/[\u2018\u2019\u201A\u2032]/g, "'").replace(/[\u201C\u201D\u201E\u2033]/g, '"').normalize('NFC')
-}
-
 export function findNoteForWikilink(linkText: string, allNotes: Note[]): Note | null {
-  const raw = straightenQuotes(linkText.trim().replace(/^\/+/, ''))
-  if (!raw) return null
+  const trimmed = linkText.trim().replace(/^\/+/, '')
+  if (!trimmed) return null
+  // Exakter Pfad VOR der Anführungszeichen-Angleichung: `You'll.md` und `You’ll.md`
+  // können zwei verschiedene Notizen sein (Codex F28).
+  const exact = trimmed.toLowerCase().replace(/\.md$/, '')
+  const byExactPath = allNotes.find(n => n.path.toLowerCase().replace(/\.md$/, '') === exact)
+  if (byExactPath) return byExactPath
+  const raw = straightenQuotes(trimmed)
   const wanted = raw.toLowerCase().replace(/\.md$/, '')
   const byPath = allNotes.find(n => straightenQuotes(n.path).toLowerCase().replace(/\.md$/, '') === wanted)
   if (byPath) return byPath

@@ -63,6 +63,7 @@ import { speak, stopSpeaking } from '../../utils/voice/tts'
 import { markdownToSpeakable } from '../../../shared/speakableText'
 import { startDictation, type DictationHandle } from '../../utils/voice/stt'
 import { useIsModuleEnabled } from '../../utils/modules'
+import { noteEmbedRule, renderNoteEmbedHtml } from '../../utils/wysiwygNoteEmbedRule'
 import { useVoiceStore } from '../../stores/voiceStore'
 import { getNoteKind, stripNoteKindMarker, splitZettelTitle, addTagToFrontmatter, getFrontmatterTags } from '../../utils/noteKind'
 import { setAiProvenanceInContent, getAiProvenance, todayIsoDate } from '../../../shared/aiProvenance'
@@ -447,6 +448,10 @@ wysiwygTurndown.addRule('taskCheckbox', {
 // Zeile zusammen (Details + Regressionstest in utils/wysiwygCodeBlockRule.ts).
 wysiwygTurndown.addRule('renderedCodeBlock', renderedCodeBlockRule)
 
+// Notiz-Einbettung ![[Notiz]]: ohne diese Regel schrieb der Lesen-Modus den eingebetteten
+// Notizinhalt als Text in die Notiz (Details in utils/wysiwygNoteEmbedRule.ts).
+wysiwygTurndown.addRule('noteEmbed', noteEmbedRule)
+
 wysiwygTurndown.addRule('wikiImage', {
   filter: (node) => {
     if (node.nodeName !== 'IMG') return false
@@ -584,7 +589,7 @@ function editablePreviewHtmlToMarkdown(root: HTMLElement, currentContent: string
   // Turndown's blankRule fängt leere Block-Elemente vor den Custom-Rules ab. In Production
   // haben unsere Embeds immer Inhalt (Loading-Spinner, Icons, SVG), aber als Sicherheitsnetz
   // injizieren wir ein Zero-Width-Space, falls ein Container doch mal leer ist.
-  clone.querySelectorAll('.pdf-embed, .office-embed, .mermaid-container, .dataview-preview-container, .plugin-embed').forEach(el => {
+  clone.querySelectorAll('.pdf-embed, .office-embed, .mermaid-container, .dataview-preview-container, .plugin-embed, .wikilink-embed').forEach(el => {
     if (!el.textContent || !el.textContent.trim()) {
       el.appendChild(document.createTextNode('​'))
     }
@@ -665,7 +670,7 @@ md.renderer.rules.text = (tokens, idx) => {
   const content = tokens[idx].content
 
   // Konvertiere ![[embeds]] - unterscheide zwischen Bildern, PDFs und Notiz-Embeds
-  let result = content.replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_match, linkText, sizeOrAlias) => {
+  let result = content.replace(/!\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_match: string, linkText: string, sizeOrAlias: string | undefined, offset: number) => {
     // Prüfe ob es sich um ein Bild handelt
     if (isImageFile(linkText)) {
       // Bild-Embed: ![[bild.png]] oder ![[bild.png|300]] oder ![[bild.png|300x200]]
@@ -721,14 +726,14 @@ md.renderer.rules.text = (tokens, idx) => {
     }
 
     // Notiz-Embed: ![[noteName]] oder ![[noteName#heading]] oder ![[noteName#^blockid]]
-    const hashIndex = linkText.indexOf('#')
-    const noteName = hashIndex > -1 ? linkText.substring(0, hashIndex) : linkText
-    const fragment = hashIndex > -1 ? linkText.substring(hashIndex + 1) : ''
-    const isBlock = fragment.startsWith('^')
-
-    return `<div class="wikilink-embed" data-note="${md.utils.escapeHtml(straightenQuotes(noteName))}" data-fragment="${md.utils.escapeHtml(straightenQuotes(fragment))}" data-is-block="${isBlock}">
-      <div class="wikilink-embed-loading">Lade ${md.utils.escapeHtml(linkText)}...</div>
-    </div>`
+    // Steht die Einbettung allein im Absatz → Block, sonst im Fließtext (Codex F12/F31).
+    const aloneInParagraph = tokens.length === 1 && content.trim() === _match
+    return renderNoteEmbedHtml({
+      linkText, sizeOrAlias, inline: !aloneInParagraph,
+      spaceBefore: /\s/.test(content[offset - 1] ?? ''),
+      spaceAfter: /\s/.test(content[offset + _match.length] ?? ''),
+      escapeHtml: md.utils.escapeHtml
+    })
   })
 
   // Konvertiere [[wikilinks]] zu klickbaren Links — inklusive Pipe-Alias-Syntax
@@ -4034,13 +4039,9 @@ export const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ noteId, isSecond
 
         if (!noteName) continue
 
-        // Finde die Zielnotiz
-        const targetNote = notes.find(n => {
-          const titleLower = n.title.toLowerCase()
-          const nameLower = noteName.toLowerCase()
-          const fileNameWithoutExt = n.path.split('/').pop()?.replace('.md', '').toLowerCase() || ''
-          return titleLower === nameLower || fileNameWithoutExt === nameLower
-        })
+        // Finde die Zielnotiz — gleicher Resolver wie beim Klick, damit auch
+        // ![[ordner/Notiz]] bei gleichnamigen Notizen die richtige trifft (Codex F02).
+        const targetNote = findNoteForWikilink(noteName, notes)
 
         if (!targetNote || !vaultPath) {
           embedEl.innerHTML = `<div class="wikilink-embed-error">Notiz "${escapeHtml(noteName)}" nicht gefunden</div>`
