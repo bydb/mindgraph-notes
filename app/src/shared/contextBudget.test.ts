@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, linesFittingTokens,
-  maxToolResultTokens, recordServerPromptTokens, remainingForInput, resolveContextWindow, usedTokens,
+  maxToolResultTokens, recordServerPromptTokens, remainingForInput, resolveContextWindow, upgradeContextWindow, usedTokens,
   ASSUMED_CONTEXT_WINDOW, CATALOG_WINDOW_MAX, contextGauge, snapshotBudget
 } from './contextBudget'
 
@@ -161,5 +161,28 @@ describe('contextGauge (Anzeige)', () => {
     expect(snapshotBudget(budget, 'assumed')).toMatchObject({ measured: false, source: 'assumed', window: 32_000 })
     recordServerPromptTokens(budget, 500)
     expect(snapshotBudget(budget, 'assumed')).toMatchObject({ measured: true, used: 500 })
+  })
+})
+
+describe('upgradeContextWindow (Katalog kommt nach dem Start)', () => {
+  it('vergrößert ein angenommenes Fenster auf den Katalogwert, Verbrauch bleibt', () => {
+    const budget = createContextBudget(ASSUMED_CONTEXT_WINDOW, 8_192)
+    budget.reportedPromptTokens = 23_000
+    const before = usedTokens(budget)
+    const next = upgradeContextWindow(budget, { tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' }, 'llmbase', 1_048_576, 8_192)
+    expect(next).toEqual({ tokens: CATALOG_WINDOW_MAX, source: 'catalog' })
+    expect(budget.window).toBe(CATALOG_WINDOW_MAX)
+    expect(budget.outputReserve).toBe(8_192)
+    expect(usedTokens(budget)).toBe(before)
+  })
+
+  it('ändert nichts ohne Katalogwert, bei bekanntem Fenster oder ohne Katalog-Anbieter', () => {
+    const budget = createContextBudget(ASSUMED_CONTEXT_WINDOW)
+    expect(upgradeContextWindow(budget, { tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' }, 'llmbase', null)).toBeNull()
+    expect(upgradeContextWindow(budget, { tokens: 98_304, source: 'catalog' }, 'llmbase', 1_048_576)).toBeNull()
+    expect(upgradeContextWindow(budget, { tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' }, 'lmstudio', 1_048_576)).toBeNull()
+    // Kleines Modell im Katalog verkleinert nie.
+    expect(upgradeContextWindow(budget, { tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' }, 'openrouter', 16_000)).toBeNull()
+    expect(budget.window).toBe(ASSUMED_CONTEXT_WINDOW)
   })
 })

@@ -4820,7 +4820,9 @@ ipcMain.handle('note-agent-route-preflight', async (event, params: { model: stri
     // Nur, wenn dieser Weg für Chat oder Agent freigegeben ist (Codex F12): eine reine Anzeige
     // soll mit gesperrter Cloud keinen Netzaufruf auslösen.
     const cloudCleared = gate.ok || petrolCloudAllowed(params.cloud, ((await loadUISettings()).ollama as { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings } | undefined))
-    if (backend === 'openrouter' && params.cloud?.model && cloudCleared) {
+    // LLMBase genauso (18.11.2026): vorher nur OpenRouter — der erste LLMBase-Lauf nach einer
+    // Pause holte den Katalog kalt selbst, verpasste die 3 s und rechnete mit 32 768 Token.
+    if ((backend === 'openrouter' || backend === 'llmbase') && params.cloud?.model && cloudCleared) {
       void resolveCloudChatOptions(params.cloud).then(r => { if (r) warmPricingCache(r.chatOptions) }).catch(() => undefined)
     }
     return { success: true, route, gate }

@@ -100,6 +100,28 @@ export function resolveContextWindow(
   return { tokens: ASSUMED_CONTEXT_WINDOW, source: 'assumed' }
 }
 
+/**
+ * Katalogwert kam erst nach dem Start (Wartezeit überschritten): Fenster des laufenden Budgets
+ * nachträglich vergrößern. Real, 18.11.2026: Der erste LLMBase-Lauf am Morgen bekam den Katalog
+ * nicht in 3 s, rechnete den ganzen Lauf mit 32 768 Token und verdichtete schon bei ~23k —
+ * obwohl der Wert Sekunden später im Zwischenspeicher lag. Nur von 'assumed' aus und nur nach
+ * oben; ändert `budget` in place. null = nichts geändert.
+ */
+export function upgradeContextWindow(
+  budget: ContextBudget,
+  current: ContextWindow,
+  backend: string | undefined,
+  catalogTokens: number | null | undefined,
+  wantedOutputReserve = ASSUMED_OUTPUT_RESERVE
+): ContextWindow | null {
+  if (current.source !== 'assumed') return null
+  const next = resolveContextWindow(backend, undefined, catalogTokens)
+  if (next.source !== 'catalog' || next.tokens <= budget.window) return null
+  budget.window = next.tokens
+  budget.outputReserve = Math.min(wantedOutputReserve, Math.floor(next.tokens / 2))
+  return next
+}
+
 export interface ContextBudget {
   window: number
   outputReserve: number

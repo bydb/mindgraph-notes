@@ -16,7 +16,7 @@ import { endsWithQuestion } from '../../shared/agentClosingQuestion'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
 import {
   addToBudget, createContextBudget, estimateTokens, hasRoomForNextCall, isReadLocked, maxToolResultTokens,
-  recordServerPromptTokens, remainingForInput, resolveContextWindow, usedTokens, snapshotBudget, creditCompaction, ASSUMED_OUTPUT_RESERVE, TOOL_RESULT_SHARE, type ContextSnapshot
+  recordServerPromptTokens, remainingForInput, resolveContextWindow, upgradeContextWindow, usedTokens, snapshotBudget, creditCompaction, ASSUMED_OUTPUT_RESERVE, TOOL_RESULT_SHARE, type ContextSnapshot
 } from '../../shared/contextBudget'
 import { compactReadResults, refreshCompacted, COMPACTED_PREFIX } from './compaction'
 import { getContextAttachmentInfos, getShellAttachmentPaths } from './contextFiles'
@@ -410,7 +410,14 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Höchstens CATALOG_WAIT_MS warten und abbrechbar (Codex F04) — sonst gilt die Annahme.
   const catalogTokens = await catalogContextLength(chatOptions, { timeoutMs: CATALOG_WAIT_MS, signal: run.abort.signal })
   if (run.abort.signal.aborted) throw new Error('Abgebrochen')
-  const contextWindow = resolveContextWindow(chatOptions.backend, chatOptions.numCtx, catalogTokens)
+  let contextWindow = resolveContextWindow(chatOptions.backend, chatOptions.numCtx, catalogTokens)
+  // Katalog nicht rechtzeitig: der Abruf läuft weiter. Kommt der Wert während des Laufs, wird
+  // das Fenster zu Beginn der nächsten Runde vergrößert (applyLateCatalog), statt den ganzen
+  // Lauf bei der Annahme zu bleiben (real, 18.11.2026, LLMBase am Morgen).
+  let lateCatalog: number | null = null
+  if (contextWindow.source === 'assumed') {
+    void catalogContextLength(chatOptions).then(v => { lateCatalog = v }).catch(() => undefined)
+  }
   ctx.contextWindowTokens = contextWindow.tokens
   const budget = createContextBudget(contextWindow.tokens, chatOptions.maxTokens ?? ASSUMED_OUTPUT_RESERVE)
   const priorTokens = params.continuation?.priorTokens
@@ -430,7 +437,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   } else if (contextWindow.source === 'assumed') {
     onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
   }
-  const maxIterations = contextWindow.source === 'catalog'
+  let maxIterations = contextWindow.source === 'catalog'
     ? MAX_ITERATIONS_LARGE_WINDOW
     : hasFolder || run.shell || run.computer ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   let currentTurn = 0
@@ -529,7 +536,22 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     return true
   }
 
+  const applyLateCatalog = (): void => {
+    if (lateCatalog === null) return
+    const before = budget.window
+    const upgraded = upgradeContextWindow(budget, contextWindow, chatOptions.backend, lateCatalog, chatOptions.maxTokens ?? ASSUMED_OUTPUT_RESERVE)
+    lateCatalog = null
+    if (!upgraded) return
+    contextWindow = upgraded
+    ctx.contextWindowTokens = upgraded.tokens
+    maxIterations = Math.max(maxIterations, MAX_ITERATIONS_LARGE_WINDOW)
+    if (!isReadLocked(budget)) rejectedReads = 0
+    onStep(nextSeq(run), 'kontext', `Kontextgröße laut Anbieterkatalog nachgeliefert — ab jetzt gerechnet mit ${upgraded.tokens.toLocaleString('de-DE')} statt ${before.toLocaleString('de-DE')} Token`)
+    reportContext()
+  }
+
   for (let iteration = 1; iteration <= maxIterations; iteration++) {
+    applyLateCatalog()
     // Vor dem Senden: Reicht der Platz noch für eine Antwort? Sonst laut stoppen statt
     // still überzulaufen (F23) — mit Hinweis, wie der Auftrag doch gelingt.
     // Erst Platz schaffen, dann prüfen: Ein Folgelauf beginnt oft mit vollem Verlauf — ohne diese
