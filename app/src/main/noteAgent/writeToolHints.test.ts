@@ -75,6 +75,19 @@ describe('write_excalidraw: Diagrammart-Weiche (Mindmap, Matrix, Begriffsnetz)',
     expect(res.content).toMatch(/diagram: "matrix"/)
   })
 
+  it('Matrix: unlesbare oder falsch getypte Achse wird abgelehnt, nicht still weggelassen (F02)', async () => {
+    const quadrants = [{ title: 'A' }, { title: 'B' }, { title: 'C' }, { title: 'D' }]
+    const asText = await tool.run({ file_name: 'm.excalidraw', diagram: 'matrix', quadrants, x_axis: 'Dringlichkeit' }, ctx())
+    expect(asText.ok).toBe(false)
+    expect(asText.content).toMatch(/"x_axis" ist kein gültiges JSON/)
+    const broken = await tool.run({ file_name: 'm.excalidraw', diagram: 'matrix', quadrants, y_axis: '{"label":"Wichtigkeit"' }, ctx())
+    expect(broken.ok).toBe(false)
+    expect(broken.content).toMatch(/"y_axis"/)
+    const wrongType = await tool.run({ file_name: 'm.excalidraw', diagram: 'matrix', quadrants, x_axis: ['Dringlichkeit'] }, ctx())
+    expect(wrongType.ok).toBe(false)
+    expect(wrongType.content).toMatch(/"x_axis" muss ein Objekt mit label, low und high sein/)
+  })
+
   it('Begriffsnetz: Listen als JSON-Text werden gelesen, Fehler nennen die Art', async () => {
     const res = await tool.run({
       file_name: 'b.excalidraw', diagram: 'begriffsnetz',

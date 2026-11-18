@@ -16,7 +16,7 @@ const NEGATION = /\b(?:kein\w*|ohne|statt|anstatt|stattdessen|nicht|no|not|witho
 // Web-Lauf). „SWOT“ und „Eisenhower“ bewusst NICHT: eine SWOT-Analyse als Notiz ist ein gültiges
 // Ergebnis, der Hinweis „Zeichnung fehlt“ wäre dort falsch.
 export function asksForMindmap(text: string): boolean {
-  const re = /\bmind[\s-]?maps?\b|\bconcept[\s-]?maps?\b|\bbegriffsnetz(?:e|es)?\b|\bvier[\s-]?felder[\s-]?(?:matrix|tafel)\b/gi
+  const re = /\bmind[\s-]?maps?\b|\bconcept[\s-]?maps?\b|\bbegriffsnetz(?:e|es)?\b|(?:\bvier|\b4)[\s-]?felder[\s-]?(?:matrix|tafel)\b/gi
   for (const m of text.matchAll(re)) {
     if (!NEGATION.test(text.slice(0, m.index))) return true
   }

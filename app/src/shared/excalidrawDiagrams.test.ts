@@ -164,6 +164,16 @@ const CYCLE: ConceptMapInput = {
   ]
 }
 
+/** Gegenläufiges Paar (Codex F01): Lernen ⇄ Motivation, dazu eine normale Kante. */
+const PAIR: ConceptMapInput = {
+  concepts: [{ text: 'Lernen' }, { text: 'Motivation' }, { text: 'Erfolg' }],
+  relations: [
+    { from: 'Lernen', to: 'Erfolg', label: 'führt zu' },
+    { from: 'Motivation', to: 'Lernen', label: 'fördert' },
+    { from: 'Lernen', to: 'Motivation', label: 'stärkt' }
+  ]
+}
+
 function conceptScene(input: ConceptMapInput): El[] {
   return JSON.parse(buildExcalidrawConceptMap(input, { now: NOW }).json).elements
 }
@@ -181,7 +191,7 @@ function excalidrawLabelCenter(arrow: El): { x: number; y: number } {
 }
 
 describe('Begriffsnetz', () => {
-  for (const [name, input] of [['Baum', PHOTO], ['Zyklus', CYCLE]] as const) {
+  for (const [name, input] of [['Baum', PHOTO], ['Zyklus', CYCLE], ['Gegenläufiges Paar', PAIR]] as const) {
     it(`${name}: Verweise, Bindung an beide Begriffe, Pfeilrichtung`, () => {
       const els = conceptScene(input)
       checkRefs(els)
@@ -213,13 +223,24 @@ describe('Begriffsnetz', () => {
     })
   }
 
-  it('Baum: Beschriftungen überlappen einander nicht', () => {
-    const els = conceptScene(PHOTO)
+  it.each([['Baum', PHOTO], ['Zyklus', CYCLE], ['Gegenläufiges Paar', PAIR]] as const)('%s: Beschriftungen überlappen einander nicht (F01)', (_n, input) => {
+    const els = conceptScene(input)
     const arrowIds = new Set(els.filter(e => e.type === 'arrow').map(e => e.id))
     const labels = els.filter(e => e.type === 'text' && arrowIds.has(e.containerId))
     for (let i = 0; i < labels.length; i++) for (let j = i + 1; j < labels.length; j++) {
       expect(overlaps(labels[i], labels[j]), `${labels[i].text} / ${labels[j].text}`).toBe(false)
     }
+  })
+
+  it('Gegenläufiges Paar: zwei getrennte Spuren, keine deckungsgleichen Pfeile (F01)', () => {
+    const els = conceptScene(PAIR)
+    const textOf = (rectId: string) => els.find((e: El) => e.containerId === rectId).text
+    const arrows = els.filter((e: El) => e.type === 'arrow')
+    const pair = arrows.filter((a: El) => ['Lernen', 'Motivation'].includes(textOf(a.startBinding.elementId)) && ['Lernen', 'Motivation'].includes(textOf(a.endBinding.elementId)))
+    expect(pair).toHaveLength(2)
+    const mid = (a: El) => { const m = a.points[Math.floor(a.points.length / 2)]; return { x: a.x + m[0], y: a.y + m[1] } }
+    const [m1, m2] = pair.map(mid)
+    expect(Math.hypot(m1.x - m2.x, m1.y - m2.y)).toBeGreaterThan(30)
   })
 
   it('Hauptbegriff (erster) gefüllt, Kategorie-Farbe, Ursprung im sichtbaren Bereich', () => {

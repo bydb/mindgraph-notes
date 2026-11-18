@@ -1612,11 +1612,22 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         if (diagram === 'matrix') {
           const quadrants = listArg('quadrants', 'genau 4 Felder mit title und items')
           if (typeof quadrants === 'string') return err(quadrants)
-          const axis = (name: string): unknown => { const p = parsed(name); return p.ok ? p.value : undefined }
+          // Eine angegebene Achse, die sich nicht lesen lässt, wird abgelehnt statt still weggelassen —
+          // bei Eisenhower oder Aufwand/Nutzen erklärt gerade die Achse die Felder (Codex F02).
+          const axes: Record<string, MatrixInput['x_axis']> = {}
+          for (const name of ['x_axis', 'y_axis']) {
+            if (args[name] === undefined || args[name] === null || args[name] === '') continue
+            const p = parsed(name)
+            if (!p.ok) return err(`${p.error} Erwartet: {"label": "…", "low": "…", "high": "…"} — oder ${name} ganz weglassen.`)
+            if (typeof p.value !== 'object' || p.value === null || Array.isArray(p.value)) {
+              return err(`Parameter "${name}" muss ein Objekt mit label, low und high sein, z. B. {"label": "Dringlichkeit", "low": "nicht dringend", "high": "dringend"} — oder ${name} ganz weglassen.`)
+            }
+            axes[name] = p.value as MatrixInput['x_axis']
+          }
           const built = buildExcalidrawMatrix({
             title: typeof args.title === 'string' ? args.title : undefined,
             quadrants: quadrants as MatrixInput['quadrants'],
-            x_axis: axis('x_axis') as MatrixInput['x_axis'], y_axis: axis('y_axis') as MatrixInput['y_axis'], style: styleArg
+            x_axis: axes.x_axis, y_axis: axes.y_axis, style: styleArg
           }, { now: Date.now(), ...brand })
           return registerStagedResult(ctx, fileName, 'excalidraw', built.json, built.summary)
         }

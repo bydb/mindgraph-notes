@@ -612,6 +612,14 @@ export function buildExcalidrawConceptMap(input: ConceptMapInput, options: Diagr
     return rect
   })
 
+  // Gegenläufige Paare (A → B und B → A) lägen sonst auf derselben Linie, ihre Beschriftungen
+  // deckungsgleich (Codex F01). Sie bekommen je eine Spur: Mittelpunkt seitlich versetzt.
+  const partner = new Map<number, number>()
+  relations.forEach((r, ri) => {
+    const pi = relations.findIndex(o => o.from === r.to && o.to === r.from)
+    if (pi >= 0) partner.set(ri, pi)
+  })
+
   for (const ch of chains) {
     const r = relations[ch.ri]
     const ids = ch.ids
@@ -635,6 +643,25 @@ export function buildExcalidrawConceptMap(input: ConceptMapInput, options: Diagr
       const t = end.y === start.y ? 0.5 : Math.min(0.85, Math.max(0.15, (yWant - start.y) / (end.y - start.y)))
       labelPoint = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t }
       pts = [start, labelPoint, end]
+      const pi = partner.get(ch.ri)
+      if (pi !== undefined) {
+        // Senkrecht zur Verbindungslinie versetzen, so weit, dass sich die beiden (achsenparallelen)
+        // Beschriftungen waagerecht ODER senkrecht nicht mehr berühren — der kürzere Weg gewinnt.
+        const cU = center(first)
+        const cL = center(last)
+        const len = Math.hypot(cL.x - cU.x, cL.y - cU.y) || 1
+        const px = -(cL.y - cU.y) / len
+        const py = (cL.x - cU.x) / len
+        const needX = (labelSizes[ch.ri].w + labelSizes[pi].w) / 2 + 10
+        const needY = Math.max(labelSizes[ch.ri].h, labelSizes[pi].h) + 8
+        const d = Math.min(
+          Math.abs(px) > 1e-6 ? needX / (2 * Math.abs(px)) : Infinity,
+          Math.abs(py) > 1e-6 ? needY / (2 * Math.abs(py)) : Infinity
+        )
+        const sign = ch.ri < pi ? 1 : -1
+        labelPoint = { x: (cU.x + cL.x) / 2 + sign * d * px, y: (cU.y + cL.y) / 2 + sign * d * py }
+        pts = [edgePoint(conceptBox(first), labelPoint, ARROW_GAP), labelPoint, edgePoint(conceptBox(last), labelPoint, ARROW_GAP)]
+      }
     }
     // Die Beschriftung muss auf dem MITTLEREN Punkt liegen (Excalidraw): kürzere Seite mit Punkten
     // auf der Linie auffüllen, bis der Beschriftungspunkt in der Mitte steht.
