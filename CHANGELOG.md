@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.3] - 2026-11-18
+
+**Der Agent zeichnet jetzt vier neue Formen: Vier-Felder-Matrix und Begriffsnetz als Excalidraw-Zeichnung, Ablaufdiagramm und Zeitstrahl direkt in der Notiz.** Die Zeichnungen sind zum Weiterarbeiten gedacht: In der Matrix ziehen Sie Karten von Feld zu Feld, im Begriffsnetz gehen die beschrifteten Pfeile mit, wenn Sie einen Begriff verschieben. Ablaufdiagramm und Zeitstrahl bleiben als Text in der Notiz bearbeitbar.
+
+### Hintergrund
+
+- **Auslöser:** Bisher konnte der Agent nur Mindmaps zeichnen. Für SWOT-Analysen, Prioritäten, Zusammenhänge zwischen Begriffen oder Abläufe fehlte eine passende Form.
+- **Vier-Felder-Matrix:** Für SWOT, wichtig und dringend (Eisenhower), Aufwand und Nutzen oder Vor- und Nachteile, auf Wunsch mit Achsen. Jeder Eintrag steht auf einer eigenen Karte; Feldflächen und Achsen sind gesperrt, damit man sie beim Ziehen nicht mitnimmt.
+- **Begriffsnetz (Concept Map):** Begriffe mit Pfeilen wie „verursacht“ oder „ist Teil von“; allgemeine Begriffe stehen oben. Kreisläufe und Wechselwirkungen in beide Richtungen werden lesbar getrennt gezeichnet. Bis zu 15 Begriffe und 25 Pfeile.
+- **Ablaufdiagramm und Zeitstrahl:** Schritte und Entscheidungen, Epochen oder ein Projektplan mit Terminen und Meilensteinen. Unter jedem Diagramm steht derselbe Inhalt als Liste oder Tabelle, für den Ausdruck und für Screenreader. Zu sehen sind die Diagramme im Lesen-Modus.
+- **So bekommen Sie sie:** Alle vier sind Starter-Skills. In bestehenden Vaults unter Einstellungen → Skills „Starter-Skills installieren“ wählen; vorhandene Skills werden dabei nicht überschrieben. Die Zeichnungen brauchen das Excalidraw-Plugin und entstehen nur ohne Webrecherche, weil eine Zeichnung keinen Platz für Quellenangaben hat.
+- **Agent mit LLMBase:** Kam die Größe des Kontextfensters beim Start nicht rechtzeitig, rechnete der ganze Lauf mit einem kleinen Fenster und fasste Gelesenes früh zusammen. Jetzt lädt die App die Angabe vorab und übernimmt sie auch, wenn sie erst während des Laufs eintrifft.
+
 ## [1.4.2] - 2026-11-17
 
 **Dateien lassen sich jetzt so leicht verlinken wie Notizen: Nach `[[` schlägt die App auch PDFs, Bilder und Office-Dateien vor, und Sie können Dateien aus der Seitenleiste direkt in eine Notiz ziehen.** Bilder und PDFs erscheinen dabei eingebettet, alles andere als Link; mit `[[` entsteht ein Link, mit `![[` eine Einbettung. Ein Klick auf einen Dateilink öffnet die Datei. Notizen mit großen PDFs brauchen außerdem deutlich weniger Arbeitsspeicher.
