@@ -50,3 +50,39 @@ describe('write_note lehnt .html modus-bewusst ab', () => {
     expect(res.content).not.toContain('write_html')
   })
 })
+
+describe('write_excalidraw: Diagrammart-Weiche (Mindmap, Matrix, Begriffsnetz)', () => {
+  const tool = registry.get('write_excalidraw')!
+  const ctx = (): NoteAgentContext => makeCtx(['write_excalidraw'])
+
+  it('unbekannte Art wird mit den erlaubten Werten abgelehnt', async () => {
+    const res = await tool.run({ file_name: 'x.excalidraw', diagram: 'venn' }, ctx())
+    expect(res.ok).toBe(false)
+    expect(res.content).toMatch(/"mindmap", "matrix" und "begriffsnetz"/)
+  })
+
+  it('ohne Angabe bleibt es die Mindmap (alte Aufrufe ohne diagram)', async () => {
+    const res = await tool.run({ file_name: 'x.excalidraw', title: 'Thema' }, ctx())
+    expect(res.ok).toBe(false)
+    expect(res.content).toMatch(/"branches" fehlt/)
+  })
+
+  it('Matrix: fehlende Felder und falsche Feldzahl werden benannt', async () => {
+    expect((await tool.run({ file_name: 'm.excalidraw', diagram: 'matrix' }, ctx())).content).toMatch(/"quadrants" fehlt/)
+    const res = await tool.run({ file_name: 'm.excalidraw', diagram: 'matrix', quadrants: JSON.stringify([{ title: 'A' }, { title: 'B' }]) }, ctx())
+    expect(res.ok).toBe(false)
+    expect(res.content).toMatch(/Vier-Felder-Matrix wurde nicht erzeugt: 2 Felder — eine Vier-Felder-Matrix hat genau 4/)
+    expect(res.content).toMatch(/diagram: "matrix"/)
+  })
+
+  it('Begriffsnetz: Listen als JSON-Text werden gelesen, Fehler nennen die Art', async () => {
+    const res = await tool.run({
+      file_name: 'b.excalidraw', diagram: 'begriffsnetz',
+      concepts: JSON.stringify([{ text: 'A' }, { text: 'B' }, { text: 'C' }]),
+      relations: JSON.stringify([{ from: 'A', to: 'B', label: 'r' }, { from: 'B', to: 'A', label: 's' }])
+    }, ctx())
+    expect(res.ok).toBe(false)
+    expect(res.content).toMatch(/Das Begriffsnetz wurde nicht erzeugt: Begriff „C" hat keine Beziehung/)
+    expect((await tool.run({ file_name: 'b.excalidraw', diagram: 'begriffsnetz', concepts: [{ text: 'A' }] }, ctx())).content).toMatch(/"relations" fehlt/)
+  })
+})

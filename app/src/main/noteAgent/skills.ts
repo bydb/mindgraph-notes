@@ -37,6 +37,7 @@ import { buildScientificHtmlPage, extractArticleBody, looksLikeFullHtmlDocument,
 import { buildEdumap, EdumapInputError, EDUMAP_COLORS, EDUMAP_LIMITS, type EdumapColumnInput } from '../../shared/edumap'
 import { IGNORED_DIRECTORY_NAMES } from '../../shared/ignoredDirectories'
 import { buildExcalidrawMindmap, MindmapInputError, MINDMAP_LIMITS, resolveWikilinkInPaths, type MindmapBranchInput } from '../../shared/excalidrawMindmap'
+import { buildExcalidrawConceptMap, buildExcalidrawMatrix, CONCEPT_LIMITS, MATRIX_LIMITS, type ConceptMapInput, type MatrixInput } from '../../shared/excalidrawDiagrams'
 import { buildPptxFromTemplate, inspectPptxTemplate, describePptxTemplate, PptxInputError, PPTX_LIMITS, LAYOUT_KINDS, type PptxSlideInput, type PptxSource } from '../../shared/pptxTemplate'
 import { resolveInVaultSafe } from '../telegram/agent/tools/vaultPaths'
 import { webSearch } from '../webResearch/providers'
@@ -1499,36 +1500,41 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
     }
   })
 
-  // Mindmap als Excalidraw-Datei (Skill „Mindmap"). Wie write_edumap liefert das Modell nur
-  // die Gliederung; Szene, Layout, Schrift und Farben baut shared/excalidrawMindmap.ts.
-  // Plan + Codex-Review: docs/codex-collab/excalidraw-mindmap.md
+  // Excalidraw-Zeichnungen (Skills „Mindmap", „Vier-Felder-Matrix", „Begriffsnetz"). Wie write_edumap
+  // liefert das Modell nur Inhalt und Struktur; Szene, Layout, Schrift und Farben bauen
+  // shared/excalidrawMindmap.ts und shared/excalidrawDiagrams.ts. EIN Werkzeug mit `diagram`, damit
+  // Freigaben, Web-Sperre, Formathinweis und Ergebniskarte für alle drei gleich gelten.
+  // Plan + Codex-Review der Mindmap: docs/codex-collab/excalidraw-mindmap.md
+  const kindEnum = { type: 'string', enum: ['problem', 'solution', 'info'] }
+  const axisSchema = { type: 'object', properties: { label: { type: 'string' }, low: { type: 'string' }, high: { type: 'string' } } }
   registry.register({
     name: 'write_excalidraw',
     description:
-      `Erzeugt eine Mindmap als Excalidraw-Zeichnung (.excalidraw) im MindGraph-Stil — Layout, Schrift und Farben setzt die App. Parameter: file_name (Endung .excalidraw), title (Text der Mitte, kurz), branches (Äste, ${MINDMAP_LIMITS.minBranches}–${MINDMAP_LIMITS.maxBranches}; jeder Ast: text, optional kind, optional link, optional children = Blätter mit text, optional kind, optional link; höchstens ${MINDMAP_LIMITS.maxLeavesPerBranch} Blätter je Ast, ${MINDMAP_LIMITS.maxNodes} Knoten insgesamt). Texte sind Stichworte, keine Sätze (Mitte höchstens ${MINDMAP_LIMITS.maxCenterChars} Zeichen, Knoten ${MINDMAP_LIMITS.maxNodeChars}, höchstens ${MINDMAP_LIMITS.maxLines} Zeilen). Nur lateinische Schrift — keine Emojis, kein Markdown. kind färbt einen Knoten: "problem", "solution" oder "info" — nur setzen, wenn der Inhalt es trägt. link: nur "[[Ordner/Notiz]]" auf eine Notiz, die es im Vault gibt (Pfad wie bei note_read, ohne .md); keine URLs, keine Abschnitte. Optional style: "klar" (Standard) oder "skizze" (Handzeichnungs-Optik). Die Zeichnung lässt sich in eine Notiz einbetten — schreibe dafür KEINE eigene Notiz. Die genaue Einbettungszeile zeigt die Ergebniskarte nach dem Übernehmen (der Dateiname kann sich dabei ändern); erwähne in der Abschlussnachricht nur, dass es sie gibt.`,
+      `Erzeugt eine Zeichnung als Excalidraw-Datei (.excalidraw) im MindGraph-Stil, die der Nutzer in Excalidraw weiterbearbeiten kann — Layout, Schrift und Farben setzt die App, du lieferst nur Inhalt und Struktur. Parameter für alle: file_name (Endung .excalidraw), diagram ("mindmap" = Standard, "matrix" oder "begriffsnetz"), optional style ("klar" = Standard, "skizze" = Handzeichnungs-Optik). ` +
+      `MINDMAP: title (Text der Mitte, kurz), branches (Äste, ${MINDMAP_LIMITS.minBranches}–${MINDMAP_LIMITS.maxBranches}; jeder Ast: text, optional kind, optional link, optional children = Blätter mit text, optional kind, optional link; höchstens ${MINDMAP_LIMITS.maxLeavesPerBranch} Blätter je Ast, ${MINDMAP_LIMITS.maxNodes} Knoten insgesamt; Mitte höchstens ${MINDMAP_LIMITS.maxCenterChars} Zeichen, Knoten ${MINDMAP_LIMITS.maxNodeChars}). ` +
+      `MATRIX (Vier-Felder, z. B. SWOT, Eisenhower, Aufwand/Nutzen): optional title (Überschrift), quadrants = genau 4 Felder in der Reihenfolge oben links, oben rechts, unten links, unten rechts; jedes Feld: title, items (Liste kurzer Texte, höchstens ${MATRIX_LIMITS.maxItemsPerQuadrant}, leer erlaubt), optional kind; optional x_axis und y_axis mit label, low, high (x: low links, high rechts; y: low unten, high oben) — nur, wenn die Felder wirklich an zwei Achsen hängen. ` +
+      `BEGRIFFSNETZ (Concept Map): optional title (Leitfrage), concepts = ${CONCEPT_LIMITS.minConcepts}–${CONCEPT_LIMITS.maxConcepts} Begriffe (text, optional kind, optional link; der ERSTE ist der Hauptbegriff), relations = ${CONCEPT_LIMITS.minRelations}–${CONCEPT_LIMITS.maxRelations} Pfeile mit from, to (genau der Text eines Begriffs) und label (Verb oder kurze Wendung, höchstens ${CONCEPT_LIMITS.maxLabelChars} Zeichen, z. B. "verursacht", "ist Teil von"); jeder Begriff braucht mindestens einen Pfeil. ` +
+      `Für alle: Stichworte statt Sätze, höchstens ${MINDMAP_LIMITS.maxLines} Zeilen je Kasten. Nur lateinische Schrift — keine Emojis, kein Markdown. kind färbt: "problem", "solution" oder "info" — nur setzen, wenn der Inhalt es trägt. link: nur "[[Ordner/Notiz]]" auf eine Notiz, die es im Vault gibt (ohne .md); keine URLs. Die Zeichnung lässt sich in eine Notiz einbetten — schreibe dafür KEINE eigene Notiz. Die genaue Einbettungszeile zeigt die Ergebniskarte nach dem Übernehmen; erwähne in der Abschlussnachricht nur, dass es sie gibt.`,
     parameters: {
       type: 'object',
       properties: {
         file_name: { type: 'string' },
-        title: { type: 'string', description: 'Text des Mittelknotens' },
+        diagram: { type: 'string', enum: ['mindmap', 'matrix', 'begriffsnetz'], description: 'Art der Zeichnung, Standard mindmap' },
+        title: { type: 'string', description: 'Mindmap: Text der Mitte. Matrix/Begriffsnetz: Überschrift (optional)' },
         branches: {
           type: 'array',
-          description: 'Äste der Mindmap in Lesereihenfolge',
+          description: 'Nur Mindmap: Äste in Lesereihenfolge',
           items: {
             type: 'object',
             properties: {
               text: { type: 'string' },
-              kind: { type: 'string', enum: ['problem', 'solution', 'info'] },
+              kind: kindEnum,
               link: { type: 'string', description: '[[Ordner/Notiz]] einer existierenden Notiz' },
               children: {
                 type: 'array',
                 items: {
                   type: 'object',
-                  properties: {
-                    text: { type: 'string' },
-                    kind: { type: 'string', enum: ['problem', 'solution', 'info'] },
-                    link: { type: 'string' }
-                  },
+                  properties: { text: { type: 'string' }, kind: kindEnum, link: { type: 'string' } },
                   required: ['text']
                 }
               }
@@ -1536,59 +1542,113 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
             required: ['text']
           }
         },
+        quadrants: {
+          type: 'array',
+          description: 'Nur Matrix: genau 4 Felder — oben links, oben rechts, unten links, unten rechts',
+          items: {
+            type: 'object',
+            properties: { title: { type: 'string' }, items: { type: 'array', items: { type: 'string' } }, kind: kindEnum },
+            required: ['title']
+          }
+        },
+        x_axis: { ...axisSchema, description: 'Nur Matrix, optional: waagerechte Achse (low links, high rechts)' },
+        y_axis: { ...axisSchema, description: 'Nur Matrix, optional: senkrechte Achse (low unten, high oben)' },
+        concepts: {
+          type: 'array',
+          description: 'Nur Begriffsnetz: Begriffe, der erste ist der Hauptbegriff',
+          items: { type: 'object', properties: { text: { type: 'string' }, kind: kindEnum, link: { type: 'string' } }, required: ['text'] }
+        },
+        relations: {
+          type: 'array',
+          description: 'Nur Begriffsnetz: beschriftete Pfeile zwischen Begriffen',
+          items: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' }, label: { type: 'string' } }, required: ['from', 'to', 'label'] }
+        },
         style: { type: 'string', enum: ['klar', 'skizze'] }
       },
-      required: ['file_name', 'title', 'branches']
+      required: ['file_name']
     },
     isWrite: true,
     run: async (args, ctx) => {
       const rawName = requireString(args, 'file_name')
-      const title = requireString(args, 'title')
       if (!rawName) return err('Parameter "file_name" fehlt')
-      if (!title) return err('Parameter "title" fehlt')
-      // Manche Modelle liefern verschachtelte Arrays als JSON-String.
-      let branches: unknown = args.branches
-      if (typeof branches === 'string') {
-        try {
-          branches = JSON.parse(branches)
-        } catch {
-          return err('Parameter "branches" ist kein gültiges JSON-Array. Übergib die Äste als Liste von Objekten mit text und children.')
+      const diagram = (typeof args.diagram === 'string' ? args.diagram.trim().toLowerCase() : '') || 'mindmap'
+      if (!['mindmap', 'matrix', 'begriffsnetz'].includes(diagram)) {
+        return err(`Parameter "diagram" ist "${String(args.diagram)}" — erlaubt sind "mindmap", "matrix" und "begriffsnetz".`)
+      }
+      // Manche Modelle liefern verschachtelte Listen/Objekte als JSON-String.
+      const parsed = (name: string): { ok: true; value: unknown } | { ok: false; error: string } => {
+        const v = args[name]
+        if (typeof v !== 'string') return { ok: true, value: v }
+        try { return { ok: true, value: JSON.parse(v) } } catch { return { ok: false, error: `Parameter "${name}" ist kein gültiges JSON.` } }
+      }
+      const listArg = (name: string, hint: string): unknown[] | string => {
+        const p = parsed(name)
+        if (!p.ok) return p.error
+        if (!Array.isArray(p.value)) {
+          console.warn(`[note-agent] write_excalidraw (${diagram}) abgelehnt (${name} fehlt) — angekommen:`, describeArgs(args))
+          return `Parameter "${name}" fehlt oder ist keine Liste (${hint}). Angekommen ist: ${describeArgs(args)}.`
         }
+        return p.value
       }
-      if (!Array.isArray(branches)) {
-        console.warn('[note-agent] write_excalidraw abgelehnt (branches fehlt) — angekommen:', describeArgs(args))
-        return err(`Parameter "branches" fehlt oder ist keine Liste. Angekommen ist: ${describeArgs(args)}.`)
-      }
+      const styleArg = typeof args.style === 'string' ? args.style : undefined
+      const brand = ctx.run.brand ? { brand: { fill: ctx.run.brand.tokens.fill, tint: ctx.run.brand.tokens.tint } } : {}
       // Links nur auf existierende Notizen, eindeutig aufgelöst (Codex F02). Den Vault nur
       // durchsuchen, wenn überhaupt ein Link vorkommt.
-      const hasLink = (branches as MindmapBranchInput[]).some(b =>
-        (typeof b?.link === 'string' && b.link.trim()) ||
-        (Array.isArray(b?.children) && b.children.some(c => typeof c?.link === 'string' && c.link.trim())))
-      let mdPaths: string[] = []
-      if (hasLink) {
-        try {
-          mdPaths = await listVaultMarkdownPaths(ctx.run.vaultPath)
-        } catch (e) {
-          return err(`Links konnten nicht geprüft werden: ${e instanceof Error ? e.message : String(e)}. Lass die Links weg.`)
+      const linkResolver = async (hasLink: boolean): Promise<((t: string) => { path: string } | { error: string }) | string> => {
+        let mdPaths: string[] = []
+        if (hasLink) {
+          try {
+            mdPaths = await listVaultMarkdownPaths(ctx.run.vaultPath)
+          } catch (e) {
+            return `Links konnten nicht geprüft werden: ${e instanceof Error ? e.message : String(e)}. Lass die Links weg.`
+          }
         }
+        return target => resolveWikilinkInPaths(target, mdPaths)
       }
+      const hasLinkIn = (list: unknown[]): boolean => list.some(x => typeof (x as { link?: unknown })?.link === 'string' && ((x as { link: string }).link).trim() !== '')
+      const fileName = sanitizeOutputFileName(rawName, '.excalidraw')
+      const label = diagram === 'matrix' ? 'Vier-Felder-Matrix' : diagram === 'begriffsnetz' ? 'Das Begriffsnetz' : 'Die Mindmap'
       try {
+        if (diagram === 'matrix') {
+          const quadrants = listArg('quadrants', 'genau 4 Felder mit title und items')
+          if (typeof quadrants === 'string') return err(quadrants)
+          const axis = (name: string): unknown => { const p = parsed(name); return p.ok ? p.value : undefined }
+          const built = buildExcalidrawMatrix({
+            title: typeof args.title === 'string' ? args.title : undefined,
+            quadrants: quadrants as MatrixInput['quadrants'],
+            x_axis: axis('x_axis') as MatrixInput['x_axis'], y_axis: axis('y_axis') as MatrixInput['y_axis'], style: styleArg
+          }, { now: Date.now(), ...brand })
+          return registerStagedResult(ctx, fileName, 'excalidraw', built.json, built.summary)
+        }
+        if (diagram === 'begriffsnetz') {
+          const concepts = listArg('concepts', 'Begriffe mit text')
+          if (typeof concepts === 'string') return err(concepts)
+          const relations = listArg('relations', 'Pfeile mit from, to und label')
+          if (typeof relations === 'string') return err(relations)
+          const resolveLink = await linkResolver(hasLinkIn(concepts))
+          if (typeof resolveLink === 'string') return err(resolveLink)
+          const built = buildExcalidrawConceptMap({
+            title: typeof args.title === 'string' ? args.title : undefined,
+            concepts: concepts as ConceptMapInput['concepts'], relations: relations as ConceptMapInput['relations'], style: styleArg
+          }, { now: Date.now(), resolveLink, ...brand })
+          return registerStagedResult(ctx, fileName, 'excalidraw', built.json, built.summary)
+        }
+        const title = requireString(args, 'title')
+        if (!title) return err('Parameter "title" fehlt (Text der Mitte der Mindmap)')
+        const branches = listArg('branches', 'Äste mit text und children')
+        if (typeof branches === 'string') return err(branches)
+        const resolveLink = await linkResolver((branches as MindmapBranchInput[]).some(b =>
+          (typeof b?.link === 'string' && b.link.trim()) || (Array.isArray(b?.children) && hasLinkIn(b.children))))
+        if (typeof resolveLink === 'string') return err(resolveLink)
         const built = buildExcalidrawMindmap(
-          { title, branches: branches as MindmapBranchInput[], style: typeof args.style === 'string' ? args.style : undefined },
-          { now: Date.now(), resolveLink: target => resolveWikilinkInPaths(target, mdPaths), ...(ctx.run.brand ? { brand: { fill: ctx.run.brand.tokens.fill, tint: ctx.run.brand.tokens.tint } } : {}) }
+          { title, branches: branches as MindmapBranchInput[], style: styleArg },
+          { now: Date.now(), resolveLink, ...brand }
         )
-        const fileName = sanitizeOutputFileName(rawName, '.excalidraw')
         const links = built.linkCount > 0 ? `, ${built.linkCount} Links` : ''
-        return registerStagedResult(
-          ctx,
-          fileName,
-          'excalidraw',
-          built.json,
-          `Mindmap, ${built.branchCount} Äste, ${built.leafCount} Blätter${links}`
-        )
+        return registerStagedResult(ctx, fileName, 'excalidraw', built.json, `Mindmap, ${built.branchCount} Äste, ${built.leafCount} Blätter${links}`)
       } catch (e) {
         if (e instanceof MindmapInputError) {
-          return err(`Die Mindmap wurde nicht erzeugt: ${e.issues.join('; ')}. Überarbeite die Gliederung und rufe write_excalidraw erneut mit der VOLLSTÄNDIGEN Mindmap auf.`)
+          return err(`${label} wurde nicht erzeugt: ${e.issues.join('; ')}. Überarbeite den Inhalt und rufe write_excalidraw erneut mit der VOLLSTÄNDIGEN Zeichnung auf (diagram: "${diagram}").`)
         }
         return err(e instanceof Error ? e.message : String(e))
       }
@@ -1959,7 +2019,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (/\.excalidraw$/i.test(rawName)) {
         return err(
           isToolAvailable(ctx, 'write_excalidraw')
-            ? 'write_note schreibt ausschließlich Markdown. Für eine Mindmap das Werkzeug write_excalidraw benutzen (Parameter: title, branches) — die App baut daraus die Excalidraw-Zeichnung.'
+            ? 'write_note schreibt ausschließlich Markdown. Für eine Mindmap, Vier-Felder-Matrix oder ein Begriffsnetz das Werkzeug write_excalidraw benutzen (diagram: mindmap, matrix oder begriffsnetz) — die App baut daraus die Excalidraw-Zeichnung.'
             : 'write_note schreibt ausschließlich Markdown, und Excalidraw-Zeichnungen sind in diesem Lauf nicht verfügbar. Gib der Datei die Endung .md.'
         )
       }

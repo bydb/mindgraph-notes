@@ -77,7 +77,7 @@ export class MindmapInputError extends Error {
 
 type FontName = 'Nunito' | 'Excalifont'
 
-interface StyleDef {
+export interface StyleDef {
   font: FontName
   /** Excalidraw-FONT_FAMILY-ID (im Plugin eingebettet: renderer.tsx SUPPORTED_FONT_FAMILIES). */
   fontFamily: number
@@ -86,7 +86,7 @@ interface StyleDef {
   roughness: number
 }
 
-const STYLES: Record<MindmapStyle, StyleDef> = {
+export const STYLES: Record<MindmapStyle, StyleDef> = {
   klar: { font: 'Nunito', fontFamily: 6, lineHeight: 1.35, roughness: 0 },
   skizze: { font: 'Excalifont', fontFamily: 5, lineHeight: 1.25, roughness: 1 }
 }
@@ -115,7 +115,7 @@ export function estimateLineWidth(line: string, style: MindmapStyle, fontSize: n
   return (units * fontSize) / 1000 * WIDTH_SAFETY_FACTOR + WIDTH_SAFETY_PX
 }
 
-interface Level {
+export interface Level {
   fontSize: number
   /** Zielbreite des Textes beim Umbruch. */
   wrapWidth: number
@@ -168,26 +168,26 @@ export function wrapLines(text: string, style: MindmapStyle, level: Level): stri
 
 // ── Farben (MindGraph-Hausstil) ──────────────────────────────────────────────────────────────
 
-const PETROL = '#10696b'
+export const PETROL = '#10696b'
 /** Petrol 12 % auf Weiß, als fester Hexwert (Excalidraw kennt kein color-mix). */
-const PETROL_TINT = '#e2eded'
-const TEXT_DARK = '#1e1e1e'
-const WHITE = '#ffffff'
+export const PETROL_TINT = '#e2eded'
+export const TEXT_DARK = '#1e1e1e'
+export const WHITE = '#ffffff'
 
-const KIND_IDS = Object.keys(NOTE_KINDS) as NoteKindId[]
+export const KIND_IDS = Object.keys(NOTE_KINDS) as NoteKindId[]
 
 // ── Eingabe prüfen ───────────────────────────────────────────────────────────────────────────
 
-function str(value: unknown): string {
+export function str(value: unknown): string {
   return typeof value === 'string' ? value : ''
 }
 
 /** Leerraum (auch Zeilenumbrüche, Tabs) auf ein Leerzeichen. Alles andere prüft der Zeichenvorrat. */
-function normalizeText(value: unknown): string {
+export function normalizeText(value: unknown): string {
   return str(value).replace(/[\s ]+/g, ' ').trim().normalize('NFC')
 }
 
-function describeChar(ch: string): string {
+export function describeChar(ch: string): string {
   const cp = ch.codePointAt(0) ?? 0
   return `„${ch}" (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`
 }
@@ -348,7 +348,7 @@ function prepare(input: MindmapInput, options: MindmapBuildOptions): {
 
 // ── Layout ───────────────────────────────────────────────────────────────────────────────────
 
-interface Box {
+export interface Box {
   x: number
   y: number
   width: number
@@ -441,13 +441,13 @@ function layout(center: PreparedNode, branches: PreparedBranch[], style: Mindmap
   return out
 }
 
-const SCENE_MARGIN_X = 40
-const SCENE_MARGIN_Y = 110
+export const SCENE_MARGIN_X = 40
+export const SCENE_MARGIN_Y = 110
 
 // ── Szene ────────────────────────────────────────────────────────────────────────────────────
 
 /** FNV-1a über die normalisierte Eingabe → Seed des PRNG. */
-function hashString(s: string): number {
+export function hashString(s: string): number {
   let h = 0x811c9dc5
   for (let i = 0; i < s.length; i++) {
     h ^= s.charCodeAt(i)
@@ -456,7 +456,7 @@ function hashString(s: string): number {
   return h >>> 0
 }
 
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed
   return () => {
     a = (a + 0x6d2b79f5) | 0
@@ -466,15 +466,15 @@ function mulberry32(seed: number): () => number {
   }
 }
 
-const ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
+export const ID_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'
 
 /** Abstand der Linienenden vom Knotenrand (Excalidraw-Binding `gap`). */
-const ARROW_GAP = 6
+export const ARROW_GAP = 6
 
-const r2 = (n: number): number => Math.round(n * 100) / 100
+export const r2 = (n: number): number => Math.round(n * 100) / 100
 
 /** Punkt auf dem Rechteckrand in Richtung `toward`, um `gap` nach außen versetzt. */
-function edgePoint(box: Box, toward: { x: number; y: number }, gap: number): { x: number; y: number } {
+export function edgePoint(box: Box, toward: { x: number; y: number }, gap: number): { x: number; y: number } {
   const cx = box.x + box.width / 2
   const cy = box.y + box.height / 2
   const dx = toward.x - cx

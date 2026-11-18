@@ -347,13 +347,13 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     if (!wanted) return ''
     if (Array.from(run.results.values()).some(r => r.kind === 'excalidraw')) return ''
     const subject = run.expectedMindmapSkill
-      ? `Der Skill „${run.expectedMindmapSkill}“ verlangt eine Mindmap (Excalidraw-Datei), es ist aber keine entstanden.`
-      : 'Der Auftrag verlangt eine Mindmap, es ist aber keine Excalidraw-Datei entstanden.'
+      ? `Der Skill „${run.expectedMindmapSkill}“ verlangt eine Excalidraw-Zeichnung, es ist aber keine entstanden.`
+      : 'Der Auftrag verlangt eine Zeichnung (Mindmap, Begriffsnetz oder Vier-Felder-Matrix), es ist aber keine Excalidraw-Datei entstanden.'
     const why = run.web
-      ? 'Mit eingeschalteter Webrecherche gibt es das Mindmap-Werkzeug nicht, weil eine Karte keinen Platz für die Quellenangaben hat. Starte den Auftrag ohne Web. Wenn du Inhalte aus dem Netz brauchst: erst mit Web eine Notiz recherchieren lassen, dann daraus ohne Web die Mindmap.'
+      ? 'Mit eingeschalteter Webrecherche gibt es das Zeichenwerkzeug nicht, weil eine Zeichnung keinen Platz für die Quellenangaben hat. Starte den Auftrag ohne Web. Wenn du Inhalte aus dem Netz brauchst: erst mit Web eine Notiz recherchieren lassen, dann daraus ohne Web die Zeichnung.'
       : !allowed.has('write_excalidraw')
-        ? 'In diesem Lauf stand das Mindmap-Werkzeug nicht zur Verfügung.'
-        : 'Das Modell hat das Mindmap-Werkzeug nicht erfolgreich aufgerufen. Starte den Auftrag erneut oder wähle ein anderes Modell.'
+        ? 'In diesem Lauf stand das Zeichenwerkzeug nicht zur Verfügung.'
+        : 'Das Modell hat das Zeichenwerkzeug nicht erfolgreich aufgerufen. Starte den Auftrag erneut oder wähle ein anderes Modell.'
     return `${subject} ${why}`
   }
   // Verdichtete Leseergebnisse (compaction.ts) gehören in den Abschlusstext: Das Modell schrieb
@@ -905,6 +905,11 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
       return `${pick('file_name')}${n ? ` (${n} Folien)` : ''}`
     }
     case 'write_excalidraw': {
+      if (args.diagram === 'matrix') return `${pick('file_name')} (Vier-Felder-Matrix)`
+      if (args.diagram === 'begriffsnetz') {
+        const n = Array.isArray(args.concepts) ? args.concepts.length : 0
+        return `${pick('file_name')} (Begriffsnetz${n ? `, ${n} Begriffe` : ''})`
+      }
       const n = Array.isArray(args.branches) ? args.branches.length : 0
       return `${pick('file_name')}${n ? ` (${n} Äste)` : ''}`
     }

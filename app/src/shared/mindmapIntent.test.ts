@@ -25,6 +25,14 @@ describe('asksForMindmap', () => {
     expect(asksForMindmap('Keine Mindmap aus der alten Notiz, sondern eine neue Mindmap zum Thema')).toBe(true)
   })
 
+  it('erkennt Begriffsnetz und Vier-Felder-Matrix (gleiches Werkzeug)', () => {
+    expect(asksForMindmap('Erstelle ein Begriffsnetz zur Photosynthese')).toBe(true)
+    expect(asksForMindmap('Concept-Map zum Kapitel 3')).toBe(true)
+    expect(asksForMindmap('Ordne die Aufgaben in einer Vier-Felder-Matrix')).toBe(true)
+    expect(asksForMindmap('Bitte kein Begriffsnetz')).toBe(false)
+    expect(asksForMindmap('Mach eine SWOT-Analyse als Notiz')).toBe(false)
+  })
+
   it('verlangt Wortgrenzen', () => {
     expect(asksForMindmap('Lege es in die Mindmappe')).toBe(false)
   })

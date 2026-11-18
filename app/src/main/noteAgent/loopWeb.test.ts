@@ -176,7 +176,7 @@ describe('Hinweis, wenn eine Mindmap verlangt war und keine entstanden ist', () 
     agentRun.instruction = 'Erstelle eine Mindmap zu Hochtouren'
     agentRun.results.set('r1', { kind: 'md' } as never)
     const res = await finish(agentRun)
-    expect(res.text).toContain('verlangt eine Mindmap')
+    expect(res.text).toContain('verlangt eine Zeichnung (Mindmap')
     expect(res.text).toContain('ohne Web')
   })
 
@@ -186,7 +186,7 @@ describe('Hinweis, wenn eine Mindmap verlangt war und keine entstanden ist', () 
     agentRun.expectedMindmapSkill = 'Mindmap'
     agentRun.results.set('r1', { kind: 'md' } as never)
     const res = await finish(agentRun)
-    expect(res.text).toContain('„Mindmap“ verlangt eine Mindmap')
+    expect(res.text).toContain('„Mindmap“ verlangt eine Excalidraw-Zeichnung')
     expect(res.text).toContain('anderes Modell')
   })
 
