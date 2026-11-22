@@ -174,8 +174,11 @@ export function shortenCloudModelId(modelId: string): string {
 
 export function cloudRoutesForFeature(
   feature: CloudFeatureId,
-  providers: { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings }
+  providers: { openrouter?: CloudProviderSettings; llmbase?: CloudProviderSettings; localOnly?: boolean }
 ): CloudFeatureRoute[] {
+  // „KI nur auf diesem Rechner" (11/2026): keine Anbieter-Wege anbieten. Der Main sperrt sie
+  // ohnehin (llm/localOnlyGuard.ts) — so stehen sie gar nicht erst in den Auswahlen.
+  if (providers.localOnly === true) return []
   const routes: CloudFeatureRoute[] = []
   for (const id of ['openrouter', 'llmbase'] as CloudProviderId[]) {
     const settings = providers[id]

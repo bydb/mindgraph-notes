@@ -41,7 +41,7 @@ export const EmailAIChatView: React.FC = () => {
   // noch einmal selbst). Wie im Notes-Chat: freigegebener Anbieter ist voreingestellt,
   // pro Sitzung auf lokal umschaltbar. Mit Cloud geht standardmäßig nur der schlanke
   // Kontext hinaus (Mail + Verlauf mit dem Kontakt), der Rest nur per Schalter.
-  const cloudRoutes = cloudRoutesForFeature('email-draft', { openrouter: ollama.openrouter, llmbase: ollama.llmbase })
+  const cloudRoutes = cloudRoutesForFeature('email-draft', { openrouter: ollama.openrouter, llmbase: ollama.llmbase, localOnly: ollama.localOnly })
   const defaultCloudProvider = cloudRoutes[0]?.provider ?? null
   const [cloudProvider, setCloudProvider] = useState<CloudProviderId | null>(defaultCloudProvider)
   useEffect(() => { setCloudProvider(defaultCloudProvider) }, [defaultCloudProvider])

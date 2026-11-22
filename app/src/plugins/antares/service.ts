@@ -62,7 +62,7 @@ export class AntaresService {
     baseUrl: string,
     username: string,
     password: string,
-    context = 'HE/16',
+    context: string,
     fetchImpl: FetchImpl = fetch
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, '')

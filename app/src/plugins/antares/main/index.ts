@@ -6,6 +6,7 @@
 
 import { definePluginMain } from '@mindgraph/plugin-api'
 import { AntaresService } from '../service'
+import { validateAntaresTarget } from '../target'
 import { ANTARES_CAPABILITIES, manifest } from '../manifest'
 
 interface BasePayload {
@@ -22,8 +23,11 @@ export default definePluginMain(
     host.log('register')
 
     // Baut einen authentifizierten Service aus Payload-Koordinaten + hinterlegten Credentials.
+    // Adresse und Kontext werden ZUERST geprüft (leer, kein https, Zugangsdaten in der URL →
+    // Abbruch) — erst danach werden die Zugangsdaten überhaupt gelesen.
     const makeService = async (payload: unknown): Promise<AntaresService> => {
-      const { baseUrl, context } = payload as BasePayload
+      const raw = (payload ?? {}) as Partial<BasePayload>
+      const { baseUrl, context } = validateAntaresTarget(raw.baseUrl, raw.context)
       const username = await host.secrets.get('username')
       const password = await host.secrets.get('password')
       if (!username || !password) throw new Error('Keine Antares-Zugangsdaten hinterlegt')

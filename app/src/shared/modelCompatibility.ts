@@ -1123,7 +1123,27 @@ export function isHumanFavorite(model: string): boolean {
 // Hard-Lock im Workflow-Runner (keine personenbezogenen Daten in die Cloud).
 export function isCloudModel(model: string): boolean {
   if (!model) return false
-  return /[:-]cloud$/i.test(model.trim())
+  const m = model.trim()
+  return /[:-]cloud$/i.test(m) || remoteOllamaModels.has(m)
+}
+
+// Ollama-Cloud-Modelle mit NEUTRALEM Namen (11/2026): `/api/tags` meldet sie über
+// `remote_model`/`remote_host`, der Name allein verrät nichts. Wer die Modellliste lädt (Renderer
+// über `loadOllamaModels`, Main in `ollama-models` und im chatClient), meldet sie hier an — dann
+// kennzeichnen alle bestehenden `isCloudModel`-Stellen (Chat-Hinweis, Agent, Editor-KI) sie als
+// Cloud, auch ohne „KI nur auf diesem Rechner". Gilt je Prozess; jede neue Liste ersetzt die alte.
+const remoteOllamaModels = new Set<string>()
+
+export function rememberRemoteOllamaModels(
+  models: ReadonlyArray<{ name: string; remoteModel?: string; remoteHost?: string }>
+): void {
+  remoteOllamaModels.clear()
+  for (const m of models) {
+    if (!m?.name || !(m.remoteModel || m.remoteHost)) continue
+    remoteOllamaModels.add(m.name)
+    // `foo:latest` wird oft als `foo` gewählt.
+    if (m.name.endsWith(':latest')) remoteOllamaModels.add(m.name.slice(0, -':latest'.length))
+  }
 }
 
 // ── Tool-Calling-Capability (Notiz-Agent Modus B) ────────────────────────────

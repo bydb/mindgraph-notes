@@ -11,10 +11,14 @@ export interface AntaresConfig {
   baseUrl: string
   context: string
 }
+// Adresse und Kontext sind seit 11/2026 LEER vorbelegt: Vorher stand hier der Server eines
+// bestimmten Medienzentrums — ein anderes Medienzentrum, das die Adresse nicht ändert, hätte seine
+// Zugangsdaten an diesen fremden Server geschickt. Bestehende Installationen, die den alten Default
+// genutzt haben, bekommen ihn per `pinLegacyAntaresTarget` (uiStore) fest in die Config geschrieben.
 export const ANTARES_DEFAULTS: AntaresConfig = {
   enabled: false,
-  baseUrl: 'https://mzantares-he-16.datenbank-bildungsmedien.net',
-  context: 'HE/16',
+  baseUrl: '',
+  context: '',
 }
 
 type Settled<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -64,6 +68,12 @@ type SetState = (partial: Partial<AntaresState>) => void
 async function loadAllSequential(set: SetState): Promise<void> {
   const { baseUrl, context } = getConfig()
   const arg = { baseUrl, context }
+  // Ohne Adresse/Kontext gar nicht erst abfragen (der Main lehnt es ohnehin ab) — das Widget
+  // zeigt einen ruhigen Hinweis statt sechs gleicher Fehler.
+  if (!baseUrl.trim() || !context.trim()) {
+    set({ loading: false, lastError: 'Antares ist noch nicht eingerichtet: Serveradresse und Kontext in den Einstellungen eintragen.' })
+    return
+  }
   set({ loading: true, lastError: null })
   type Verleih = { total: number; rows: AntaresVerleihRow[] }
   // Bewusst NACHEINANDER: Antares hält den Such-Filter (primeSearchMask → /search) serverseitig

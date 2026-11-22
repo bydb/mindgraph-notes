@@ -7,13 +7,14 @@ import { validateManifest, validateManifestSemantics, validateAgainst } from '@m
 
 function buildRegistry() {
   const secrets = new Map<string, string>()
+  const secretReads: string[] = []
   const services: HostServices = {
     readVaultFile: async () => '',
     writeVaultFile: async () => {},
     readVaultBytes: async () => new Uint8Array(),
     writeVaultBytes: async () => {},
     vaultExists: async () => false,
-    secretGet: async (k) => secrets.get(k) ?? null,
+    secretGet: async (k) => { secretReads.push(k); return secrets.get(k) ?? null },
     secretSet: async (k, v) => { secrets.set(k, v) },
     secretDelete: async (k) => { secrets.delete(k) },
     llmGenerate: async () => '',
@@ -33,7 +34,7 @@ function buildRegistry() {
   }
   const registry = new PluginRegistry(createHostFactory(services))
   registry.register([{ manifest, loadEntry: async () => ({ default: entry }) }])
-  return { registry, secrets }
+  return { registry, secrets, secretReads }
 }
 
 describe('Antares-Plugin — Manifest', () => {
@@ -70,6 +71,27 @@ describe('Antares-Plugin — Vertikale durch Registry + Host', () => {
       registry.invoke('antares', 'antares.dashboardCounts', { baseUrl: 'https://mz.datenbank-bildungsmedien.net', context: 'HE/16' })
     ).rejects.toThrow(/Zugangsdaten/)
   })
+})
+
+describe('Antares-Plugin — Adressprüfung vor den Zugangsdaten', () => {
+  const bad: Array<[string, Record<string, unknown>, RegExp]> = [
+    ['leere Adresse', { baseUrl: '', context: 'XX/NN' }, /Serveradresse fehlt/],
+    ['fehlende Adresse', { context: 'XX/NN' }, /Serveradresse fehlt|baseUrl/],
+    ['leerer Kontext', { baseUrl: 'https://mzantares-xx-nn.datenbank-bildungsmedien.net', context: ' ' }, /Kontext fehlt/],
+    ['http statt https', { baseUrl: 'http://mzantares-xx-nn.datenbank-bildungsmedien.net', context: 'XX/NN' }, /https/],
+    ['Zugangsdaten in der URL', { baseUrl: 'https://u:p@mzantares-xx-nn.datenbank-bildungsmedien.net', context: 'XX/NN' }, /Zugangsdaten/],
+  ]
+  for (const [name, payload, msg] of bad) {
+    it(`${name}: Abbruch, Zugangsdaten werden nicht gelesen`, async () => {
+      const { registry, secrets, secretReads } = buildRegistry()
+      secrets.set('plugin:antares:username', 'u')
+      secrets.set('plugin:antares:password', 'p')
+      await registry.activate('antares')
+      secretReads.length = 0 // Readiness-Prüfung beim Aktivieren liest bewusst — hier zählt nur der Abruf
+      await expect(registry.invoke('antares', 'antares.check', payload)).rejects.toThrow(msg)
+      expect(secretReads).toEqual([])
+    })
+  }
 })
 
 describe('Antares-Plugin — Output-Schemas (Envelope-Validierung)', () => {

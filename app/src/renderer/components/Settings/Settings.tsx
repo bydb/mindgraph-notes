@@ -11,6 +11,7 @@ import { TelegramSettings } from './TelegramSettings'
 import { CredentialsSettings } from './CredentialsSettings'
 import { ModelCompatibilitySection, ActiveModelStatusBadge } from './ModelCompatibilitySection'
 import { OpenRouterSection } from './OpenRouterSection'
+import { LocalOnlySection } from './LocalOnlySection'
 import { hasAiRouteFor } from '../../../shared/llmBackend'
 import { LLMBaseSection } from './LLMBaseSection'
 import { WebResearchSection } from './WebResearchSection'
@@ -54,6 +55,7 @@ import {
   generateRandomId
 } from '../../utils/templateEngine'
 import { chatModelsOnly, firstChatModel, isKnownNonChatModel } from '../../../shared/chatModels'
+import { loadOllamaModels } from '../../utils/ollamaModels'
 
 interface SettingsProps {
   isOpen: boolean
@@ -1149,7 +1151,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       setOllamaStatus(connected ? 'connected' : 'disconnected')
 
       if (connected) {
-        const models = await window.electronAPI.ollamaModels()
+        const models = await loadOllamaModels()
         setOllamaModels(models)
         // Wenn Ollama als Backend und noch kein Modell ausgewählt
         // Nicht einfach das erste Modell: das kann ein Embedding-Modell (bge-m3) sein.
@@ -1184,7 +1186,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
         setPullProgress(null)
         setCustomPullModelName('')
         // Refresh models list and auto-select
-        const models = await window.electronAPI.ollamaModels()
+        const models = await loadOllamaModels()
         setOllamaModels(models)
         setOllamaStatus('connected')
         setOllama({ selectedModel: modelToPull, enabled: true, backend: 'ollama' })
@@ -1208,7 +1210,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
       const result = await window.electronAPI.ollamaDeleteModel(modelName)
       if (result.success) {
         // Refresh models
-        const models = await window.electronAPI.ollamaModels()
+        const models = await loadOllamaModels()
         setOllamaModels(models)
         if (ollama.selectedModel === modelName) {
           setOllama({ selectedModel: firstChatModel(models) })
@@ -1824,6 +1826,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   </Card>
 
                   <SectionTitle title={t('settings.aiTab.cloud')} meta={t('settings.aiTab.cloudActive', { n: cloudActiveCount, total: 3 })} />
+                  <div data-settings-anchor="ai-local-only"><LocalOnlySection /></div>
                   <div data-settings-anchor="ai-imagegen"><ImageGenerationSection /></div>
                   <div data-settings-anchor="ai-openrouter"><OpenRouterSection /></div>
                   <div data-settings-anchor="ai-llmbase"><LLMBaseSection /></div>

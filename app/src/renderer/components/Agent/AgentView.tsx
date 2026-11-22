@@ -40,6 +40,7 @@ import { DEFAULT_COMPUTER_CONTROL, activeComputerVerbs, computerVerbLabel } from
 import { NOTE_AGENT_CLOUD_CONSENT_VERSION, type AgentRoute } from '../../../shared/agentRoute'
 import { asksForMindmap } from '../../../shared/mindmapIntent'
 import { chatModelsOnly } from '../../../shared/chatModels'
+import { loadOllamaModels } from '../../utils/ollamaModels'
 
 interface Props {
   /** Tab-ID — zugleich der Bereich im noteAgentStore. */
@@ -284,7 +285,7 @@ export function AgentView({ tabId }: Props) {
       try {
         const list = ollama.backend === 'lm-studio'
           ? await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
-          : await window.electronAPI.ollamaModels()
+          : await loadOllamaModels()
         if (cancelled) return
         if (Array.isArray(list)) { setModels(chatModelsOnly(list)); setLoadedSource(modelsSource); setModelsFailed(false); setNoLocalModel(n => (n === 'notLoaded' ? false : n)) }
         else setModelsFailed(true)

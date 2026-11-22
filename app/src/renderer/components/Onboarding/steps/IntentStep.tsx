@@ -28,6 +28,17 @@ const profiles: { id: Exclude<UserProfile, null>; icon: React.ReactNode }[] = [
     )
   },
   {
+    id: 'school-admin',
+    icon: (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18"/>
+        <path d="M5 21V10l7-5 7 5v11"/>
+        <path d="M10 21v-5h4v5"/>
+        <path d="M9 11h.01M15 11h.01"/>
+      </svg>
+    )
+  },
+  {
     id: 'student',
     icon: (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -141,8 +152,9 @@ export const IntentStep: React.FC<IntentStepProps> = ({
       setLoading(true)
       // Office-Profile bekommen einen eigenen Starter-Vault mit Mittelstands-
       // Vorlagen (Meeting-Protokoll, Projektakte, Kundenmappe). Andere Profile
-      // wie gewohnt den Sprachen-Vault.
-      const variant = selectedProfile === 'office' ? 'office' : language
+      // wie gewohnt den Sprachen-Vault. Die Schulverwaltung bekommt den Büro-Vault mit eigener
+      // Willkommensnotiz (Variante 'school').
+      const variant = selectedProfile === 'office' ? 'office' : selectedProfile === 'school-admin' ? 'school' : language
       await window.electronAPI.createStarterVault(result, variant)
       setVaultPath(result)
     } catch (err) {

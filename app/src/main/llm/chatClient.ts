@@ -21,7 +21,9 @@ import {
   resolveOllamaExecutionProfile,
   type LlmExecutionProfile
 } from '../../shared/agentExecutionProfile'
-import { isCloudModel } from '../../shared/modelCompatibility'
+import { isCloudModel, rememberRemoteOllamaModels } from '../../shared/modelCompatibility'
+import { parseOllamaModels } from '../ollamaCapabilities'
+import { assertCloudAllowed, assertLocalOllamaModel } from './localOnlyGuard'
 import { recordLlmRun, trackPendingTelemetry } from './telemetry'
 import { getModelContextLength, getModelImageInput, getModelPricing } from './cloudPricing'
 import { parseCallUsage, parseModelPricing, sumCalls, type CallUsage, type ModelPricing, type RunCost } from '../../shared/llmCost'
@@ -338,8 +340,11 @@ async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<
   try {
     const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(3000) })
     if (!res.ok) return null
-    const json = await res.json() as { models?: Array<{ name: string }> }
-    const names = (json.models ?? []).map(m => m.name)
+    const parsed = parseOllamaModels(await res.json())
+    // Cloud-Modelle mit neutralem Namen (remote_host) als Cloud anmelden — sonst nimmt der
+    // Auto-Pick unten sie als „lokal" (isCloudModel prüft sonst nur den Namen).
+    rememberRemoteOllamaModels(parsed)
+    const names = parsed.map(m => m.name)
     const requested = preferred?.trim()
     if (requested && requested.toLowerCase() !== 'auto') {
       if (names.includes(requested)) return requested
@@ -363,8 +368,9 @@ async function pickDefaultOllamaModel(url: string, preferred?: string): Promise<
 
 async function chatViaOllama(messages: ChatMessage[], opts: ChatCallOptions): Promise<ChatResult> {
   const url = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
-  const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
-  if (!model) throw new Error('Kein Ollama-Modell verfügbar')
+  const picked = await pickDefaultOllamaModel(url, opts.ollamaModel)
+  if (!picked) throw new Error('Kein Ollama-Modell verfügbar')
+  const model = await assertLocalOllamaModel(picked)
   const execution = resolveOllamaExecutionProfile(opts.executionProfile)
   const ollamaOptions = {
     ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}),
@@ -652,6 +658,7 @@ async function chatViaOpenAiCompatible(
 
 export async function chat(messages: ChatMessage[], opts: ChatCallOptions): Promise<ChatResult> {
   if (isCloudChatBackend(opts.backend)) {
+    await assertCloudAllowed(CLOUD_PROVIDERS[opts.backend].label)
     return chatViaOpenAiCompatible(opts.backend, messages, opts)
   }
   if (opts.backend === 'lmstudio') {
@@ -704,8 +711,9 @@ async function chatWithToolsViaOllama(
   opts: ChatCallOptions
 ): Promise<ChatWithToolsResult> {
   const url = opts.ollamaUrl ?? DEFAULT_OLLAMA_URL
-  const model = await pickDefaultOllamaModel(url, opts.ollamaModel)
-  if (!model) throw new Error('Kein Ollama-Modell verfügbar')
+  const picked = await pickDefaultOllamaModel(url, opts.ollamaModel)
+  if (!picked) throw new Error('Kein Ollama-Modell verfügbar')
+  const model = await assertLocalOllamaModel(picked)
   const execution = resolveOllamaExecutionProfile(opts.executionProfile)
   // Sampling kommt ausschliesslich aus dem Ausfuehrungsprofil, nie aus den generischen
   // ChatOptions: Ollama-Modelle bringen abgestimmte Defaults mit, und der Skill-Benchmark
@@ -944,6 +952,7 @@ export async function chatWithTools(
   opts: ChatCallOptions
 ): Promise<ChatWithToolsResult> {
   if (isCloudChatBackend(opts.backend)) {
+    await assertCloudAllowed(CLOUD_PROVIDERS[opts.backend].label)
     return chatWithToolsViaOpenAiCompatible(opts.backend, messages, tools, opts)
   }
   if (opts.backend === 'lmstudio') {
@@ -979,6 +988,7 @@ export async function streamCloudChat(
   onToken: (delta: string) => void
 ): Promise<string> {
   const label = CLOUD_PROVIDERS[opts.backend].label
+  await assertCloudAllowed(label)
   if (!opts.apiKey) throw new Error(`${label}-API-Key fehlt.`)
   if (!opts.model) throw new Error(`Kein ${label}-Modell ausgewählt.`)
 

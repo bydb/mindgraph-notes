@@ -3,7 +3,7 @@
 // „OpenRouter · deepseek/deepseek…“ sagt nichts. Deshalb hier festgehalten, wann der
 // Organisations-Präfix fliegt und wann nicht.
 import { describe, it, expect } from 'vitest'
-import { shortenCloudModelId, isEmailDraftCloudAllowed } from './llmBackend'
+import { shortenCloudModelId, isEmailDraftCloudAllowed, cloudRoutesForFeature, hasAiRouteFor } from './llmBackend'
 
 describe('shortenCloudModelId', () => {
   it('entfernt den doppelten Anbieter-Präfix', () => {
@@ -51,5 +51,19 @@ describe('isEmailDraftCloudAllowed', () => {
     expect(isEmailDraftCloudAllowed({ model: ready.model }, { openrouter: { ...ready, enabled: false } })).toBe(false)
     expect(isEmailDraftCloudAllowed({ model: '' }, { openrouter: ready })).toBe(false)
     expect(isEmailDraftCloudAllowed(null, { openrouter: ready })).toBe(false)
+  })
+})
+
+describe('cloudRoutesForFeature — „KI nur auf diesem Rechner“', () => {
+  const ready = { enabled: true, hasApiKey: true, model: 'qwen/qwen3', cloudModules: [], cloudFeatures: ['notes-chat' as const] }
+  it('ohne den Schalter: freigegebene Anbieter erscheinen', () => {
+    expect(cloudRoutesForFeature('notes-chat', { openrouter: ready, llmbase: ready }).map(r => r.provider)).toEqual(['openrouter', 'llmbase'])
+  })
+  it('mit dem Schalter: keine Anbieter-Wege, auch wenn freigegeben', () => {
+    expect(cloudRoutesForFeature('notes-chat', { openrouter: ready, llmbase: ready, localOnly: true })).toEqual([])
+  })
+  it('hasAiRouteFor: ohne lokales Modell gibt es mit dem Schalter keinen Weg', () => {
+    expect(hasAiRouteFor('notes-chat', { enabled: true, selectedModel: '', openrouter: ready, localOnly: true } as never)).toBe(false)
+    expect(hasAiRouteFor('notes-chat', { enabled: true, selectedModel: '', openrouter: ready })).toBe(true)
   })
 })

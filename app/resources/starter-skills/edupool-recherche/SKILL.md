@@ -1,6 +1,6 @@
 ---
-name: Edupool-Recherche
-description: Unterrichtsmedien im Edupool Hessen für eine Zielgruppe (Grund- und Förderschule ODER weiterführende Schulen) recherchieren und als Notiz mit Mediennummern und Direktlinks aufbereiten — Grundlage für eine Medienliste, den Startseiten-Text und eine Edumap. Setzt den Shell-Zugriff des Agenten mit freigegebenem Netz voraus.
+name: Edupool-Recherche (Hessen)
+description: Nur für Medienzentren in Hessen. Unterrichtsmedien im Edupool Hessen für eine Zielgruppe (Grund- und Förderschule ODER weiterführende Schulen) recherchieren und als Notiz mit Mediennummern und Direktlinks aufbereiten — Grundlage für eine Medienliste, den Startseiten-Text und eine Edumap. Setzt den Shell-Zugriff des Agenten mit freigegebenem Netz voraus.
 ---
 
 # Edupool-Recherche

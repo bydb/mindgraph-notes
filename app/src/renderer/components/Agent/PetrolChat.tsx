@@ -41,6 +41,7 @@ import { CHAT_IMAGE_MAX_PER_MESSAGE, type ChatImage } from '../../../shared/chat
 import { CHAT_IMAGE_CLOUD_CONSENT_VERSION } from '../../../shared/chatImageGate'
 import { prepareChatImage } from '../../utils/chatImagePrep'
 import { PETROL_HISTORY_HEAD_ID } from './PetrolChatHistory'
+import { loadOllamaModels } from '../../utils/ollamaModels'
 
 interface Props {
   tabId: string
@@ -242,7 +243,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
       try {
         const list = ollama.backend === 'lm-studio'
           ? await window.electronAPI.lmstudioModels(ollama.lmStudioPort)
-          : await window.electronAPI.ollamaModels()
+          : await loadOllamaModels()
         if (!cancelled && Array.isArray(list)) setModels(chatModelsOnly(list))
       } catch (e) {
         console.warn('[PetrolChat] Modell-Liste laden fehlgeschlagen:', e)

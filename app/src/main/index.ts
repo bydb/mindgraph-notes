@@ -187,6 +187,8 @@ import { localOcrModel, ocrImageLocal } from './ocr/localOcr'
 import { createAgentOcrState } from './ocr/agentOcr'
 import { CHAT_IMAGE_MAX_PER_MESSAGE, checkChatImagesWire } from '../shared/chatImages'
 import { ollamaNumCtxForImages } from '../shared/chatImageGate'
+import { assertCloudAllowed, assertLocalOllamaModel, configureLocalOnlyGuard } from './llm/localOnlyGuard'
+import { starterVaultSources } from './starterVaultSources'
 import { listCloudModels, chat as llmChat, chatWithTools, streamCloudChat, isCloudChatBackend, catalogContextLength, catalogImageInput, warmPricingCache, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from './llm/chatClient'
 import { resolveContextWindow } from '../shared/contextBudget'
 import { registerEmailIpc } from './email/ipc'
@@ -274,7 +276,7 @@ import { suggestPalette } from '../shared/brandPalette'
 import { listVaultSkills, listEnabledSkillHeaders, setSkillEnabled, createSkill, readAgentMemory, appendAgentMemory, agentMemoryStatus, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
 import { isAppInternalRealPath } from './telegram/agent/tools/vaultPaths'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
-import { supportsNativeToolCalls, isNonGenerativeModel } from '../shared/modelCompatibility'
+import { supportsNativeToolCalls, isNonGenerativeModel, rememberRemoteOllamaModels } from '../shared/modelCompatibility'
 import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
 import { VaultRagManager } from './rag/vaultRagManager'
 import { locateSource, type SourceRef } from './rag/vaultRetrieve'
@@ -1320,6 +1322,9 @@ async function loadUISettings(): Promise<Record<string, unknown>> {
     return {}
   }
 }
+// „KI nur auf diesem Rechner" (llm/localOnlyGuard.ts) liest den Schalter bei jedem Aufruf frisch
+// aus den gespeicherten Einstellungen — der Renderer kann ihn nicht per Parameter umgehen.
+configureLocalOnlyGuard(loadUISettings)
 
 // UI-Settings speichern (merge mit bestehenden Daten um Datenverlust zu vermeiden).
 // Liefert, ob die Datei wirklich geschrieben wurde — ein Referenz-Ereignis im
@@ -3469,22 +3474,18 @@ ipcMain.handle('create-starter-vault', async (_event, targetPath: string, varian
     }
     const resourcesBase = bundledResourcesDir()
 
-    const vaultName =
-      variant === 'office' ? 'starter-vault-office'
-      : variant === 'demo' ? 'starter-vault-demo'
-      : variant === 'en' ? 'starter-vault-en'
-      : 'starter-vault'
-    const sourcePath = path.join(resourcesBase, vaultName)
-
-    // Prüfen ob Quellverzeichnis existiert
-    try {
-      await fs.access(sourcePath)
-    } catch {
-      console.error('[StarterVault] Source not found:', sourcePath)
-      throw new Error(`Starter vault not found at ${sourcePath}`)
+    // Quellordner je Variante (main/starterVaultSources.ts); spätere überschreiben frühere.
+    for (const vaultName of starterVaultSources(variant)) {
+      const sourcePath = path.join(resourcesBase, vaultName)
+      // Prüfen ob Quellverzeichnis existiert
+      try {
+        await fs.access(sourcePath)
+      } catch {
+        console.error('[StarterVault] Source not found:', sourcePath)
+        throw new Error(`Starter vault not found at ${sourcePath}`)
+      }
+      await copyDirectoryRecursive(sourcePath, targetPath)
     }
-
-    await copyDirectoryRecursive(sourcePath, targetPath)
 
     // Demo-Vault: die gebündelten Agent-Skills gehören zur Demo-Erfahrung dazu
     // (die Demo-Tour führt sie vor). Gleiche Quelle wie `note-skills-install-starter`,
@@ -4597,6 +4598,7 @@ ipcMain.handle('ollama-models', async () => {
 
     const models = parseOllamaModels(await response.json())
     ollamaCapabilityResolver.rememberModels(models)
+    rememberRemoteOllamaModels(models)
     return models
   } catch (error) {
     console.error('[Ollama] Error fetching models:', error)
@@ -6240,6 +6242,8 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
     if (request.cloud?.model && !cloudResolved) {
       return { success: false, error: 'Cloud ist für die Notiz-KI aktiviert, aber kein API-Key hinterlegt (Einstellungen → KI → Cloud-Provider).', model: request.model, action: request.action }
     }
+    // „KI nur auf diesem Rechner": lokales Modell vor dem ersten Chunk prüfen (remote_host u. a.).
+    const localModelName = cloudResolved ? request.model : await assertLocalOllamaModel(request.model)
 
     const pieces: string[] = []
     for (let i = 0; i < chunks.length; i++) {
@@ -6282,7 +6286,7 @@ ipcMain.handle('ollama-generate', async (event, request: OllamaRequest) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: request.model,
+            model: localModelName,
             prompt: chunkPrompt,
             stream: false,
             think: false,
@@ -6351,11 +6355,13 @@ ipcMain.handle('tasks-suggest-tags', async (_event, request: {
   existingTags?: string[]
 }) => {
   try {
-    const model = (request.model || '').trim()
-    if (!model) return { success: false, error: 'Kein Modell konfiguriert' }
-    if (isModelHardLocked(model, 'task-extraction')) {
-      return { success: false, error: `Modell „${model}" ist für die Aufgaben-Analyse gesperrt (Prompt-Injection-Risiko). Bitte ein geeignetes Modell wählen.` }
+    const requestedModel = (request.model || '').trim()
+    if (!requestedModel) return { success: false, error: 'Kein Modell konfiguriert' }
+    if (isModelHardLocked(requestedModel, 'task-extraction')) {
+      return { success: false, error: `Modell „${requestedModel}" ist für die Aufgaben-Analyse gesperrt (Prompt-Injection-Risiko). Bitte ein geeignetes Modell wählen.` }
     }
+    // „KI nur auf diesem Rechner": Aufgaben stammen oft aus Mails (personenbezogen).
+    const model = await assertLocalOllamaModel(requestedModel)
 
     const safeTask = sanitizeUntrustedText(String(request.taskText || '')).slice(0, 600)
     const safeTitle = sanitizeUntrustedText(String(request.noteTitle || '')).slice(0, 200)
@@ -7130,6 +7136,10 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       }
     }
 
+    // „KI nur auf diesem Rechner": Notiz-Chat, Petrol-Chat und Mail-Assistent laufen hier direkt
+    // gegen Ollama, am chatClient vorbei — deshalb eigene Prüfung (remote_host u. a.).
+    const localChatModel = await assertLocalOllamaModel(model)
+
     const controller = new AbortController()
     timeout = setTimeout(() => controller.abort(), 300000) // 5 min timeout
     linkPetrolAbort(petrolReq, controller)
@@ -7139,7 +7149,7 @@ Stelle EINE Prüf-Frage zum Text — oder reagiere als Prüfer auf die letzte An
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model,
+        model: localChatModel,
         messages: allMessages,
         stream: true,
         // Petrol-Chat für Alltagsfragen: verdecktes Nachdenken aus. Gemessen (25.10.2026,
@@ -7302,13 +7312,15 @@ async function streamPetrolWebModel(
       return await streamCloudChat(messages, { backend: cloudResolved.backend, apiKey: cloudResolved.key, model: cloudResolved.model, signal: controller.signal, telemetryModule: 'chat', disableMiddleOut: true }, onDelta)
     }
     const isLmStudio = params.backend === 'lmstudio'
+    // „KI nur auf diesem Rechner": Petrol-Websuche ruft Ollama direkt (remote_host u. a. prüfen).
+    const webModel = isLmStudio ? params.model : await assertLocalOllamaModel(params.model)
     const url = isLmStudio ? `${getLMStudioUrl(params.lmStudioPort)}/v1/chat/completions` : `${OLLAMA_API_URL}/api/chat`
     const startedAt = Date.now()
     let firstTokenMs: number | undefined
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: params.model, messages, stream: true, ...(!isLmStudio && numCtx ? { options: { num_ctx: numCtx } } : {}), ...(!isLmStudio && noThink ? { think: false } : {}) }),
+      body: JSON.stringify({ model: webModel, messages, stream: true, ...(!isLmStudio && numCtx ? { options: { num_ctx: numCtx } } : {}), ...(!isLmStudio && noThink ? { think: false } : {}) }),
       signal: controller.signal
     })
     if (!response.ok || !response.body) throw new Error(isLmStudio ? `LM Studio API Fehler: ${response.status}` : friendlyOllamaError(response.status, await response.text().catch(() => ''), params.model))
@@ -12373,6 +12385,9 @@ async function resolveCloudChatOptions(cloud: CloudRequest | null | undefined): 
 > {
   const model = cloud?.model?.trim()
   if (!model) return null
+  // Zentrale Sperre für alle Cloud-Wege in index.ts (Notiz-/Petrol-Chat, Mail-Assistent,
+  // Editor-KI, Termin-Extraktion …): wirft statt still lokal weiterzumachen.
+  await assertCloudAllowed(cloud?.provider === 'llmbase' ? 'LLMBase' : 'OpenRouter')
   const provider: CloudChatBackend = cloud?.provider === 'llmbase' ? 'llmbase' : 'openrouter'
   const key = await loadCloudKey(provider)
   if (!key) return null
@@ -12762,14 +12777,29 @@ ipcMain.handle('email-extract-event', async (_event, payload: {
   /** Bezugsdatum fuer relative Angaben wie „naechsten Freitag", ISO. */
   todayIso: string
 }) => {
-  const model = (payload.model || '').trim()
-  const cloudResolved = payload.cloud?.model ? await resolveCloudChatOptions(payload.cloud) : null
+  const requestedModel = (payload.model || '').trim()
+  // Sperre „KI nur auf diesem Rechner" (Cloud oder nicht-lokales Ollama-Modell) als normale
+  // Fehlermeldung zurückgeben, nicht als abgelehnten IPC-Aufruf.
+  let cloudResolved: Awaited<ReturnType<typeof resolveCloudChatOptions>> = null
+  try {
+    cloudResolved = payload.cloud?.model ? await resolveCloudChatOptions(payload.cloud) : null
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
+  }
   if (payload.cloud?.model && !cloudResolved) {
     return { success: false, error: 'Cloud ist fuer die Termin-Erkennung aktiviert, aber kein API-Key hinterlegt.' }
   }
-  if (!cloudResolved && !model) return { success: false, error: 'Kein Modell konfiguriert' }
-  if (!cloudResolved && isModelHardLocked(model, 'task-extraction')) {
-    return { success: false, error: `Modell „${model}" ist fuer die Termin-Erkennung gesperrt (Prompt-Injection-Risiko).` }
+  if (!cloudResolved && !requestedModel) return { success: false, error: 'Kein Modell konfiguriert' }
+  if (!cloudResolved && isModelHardLocked(requestedModel, 'task-extraction')) {
+    return { success: false, error: `Modell „${requestedModel}" ist fuer die Termin-Erkennung gesperrt (Prompt-Injection-Risiko).` }
+  }
+  let model = requestedModel
+  if (!cloudResolved) {
+    try {
+      model = await assertLocalOllamaModel(requestedModel)
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
   }
 
   // Der Modellkontext bleibt begrenzt, die deterministische Linksuche darf aber

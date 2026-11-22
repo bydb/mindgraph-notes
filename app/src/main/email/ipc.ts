@@ -17,6 +17,7 @@ import { setAiProvenanceInContent, todayIsoDate } from '../../shared/aiProvenanc
 import { parseRelevanceConfig, stripConfigBlock, buildReplyStats, computeHardSignals, combineRelevance, extractConfigBlock, upsertConfigBlock, emptyRelevanceConfig, isSentMail, isSentFolderName, DEFAULT_VIP_WEIGHT, DEFAULT_DOMAIN_WEIGHT, DEFAULT_KEYWORD_BOOST } from '../../shared/emailRelevance'
 import { isHardLocked as isModelHardLocked } from '../../shared/modelCompatibility'
 import { chat as llmChat, type ChatOptions as LlmChatOptions, type CloudChatBackend } from '../llm/chatClient'
+import { assertLocalOllamaModel } from '../llm/localOnlyGuard'
 import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData } from './store'
 import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connection'
 import { buildOutgoingMail, renderRawMessage, findMissingAttachments, renderBodyWithInlineImages, inlineImageTag, type OutgoingAttachment } from './outgoing'
@@ -1535,6 +1536,9 @@ Schlüsselwörter:
         console.warn(`[Email] email-analyze abgelehnt: Modell „${model}" ist für task-extraction hard-locked (Prompt-Injection-Risiko).`)
         return { success: false, error: `Das Modell „${model}" ist für die Mail-/Task-Analyse gesperrt (Prompt-Injection-Anfälligkeit). Bitte in den Einstellungen ein geeignetes Modell wählen.` }
       }
+      // „KI nur auf diesem Rechner": Mail-Inhalte betreffen Dritte — Ollama-Modell vor dem ersten
+      // Aufruf prüfen (Cloud-Endung, remote_host, nicht installiert). Wirft → Fehlermeldung unten.
+      if (!cloudResolved) model = await assertLocalOllamaModel(model)
       // Emails laden (Startstand — nur um zu entscheiden, WAS analysiert wird;
       // geschrieben wird spaeter immer auf dem frisch gelesenen Bestand).
       type AnalyzableEmail = {

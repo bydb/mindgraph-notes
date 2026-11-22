@@ -27,6 +27,7 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import mermaid from 'mermaid'
 import { chatModelsOnly } from '../../../shared/chatModels'
+import { loadOllamaModels } from '../../utils/ollamaModels'
 
 mermaid.initialize({
   startOnLoad: false,
@@ -222,7 +223,7 @@ export const NotesChat: React.FC<NotesChatProps> = ({ onClose, modeRequest }) =>
         } else {
           available = await window.electronAPI.ollamaCheck()
           if (available) {
-            modelList = await window.electronAPI.ollamaModels()
+            modelList = await loadOllamaModels()
           }
         }
 

@@ -27,6 +27,8 @@ const profileDefaults = (profile: UserProfile): DashboardWidgetId[] => {
   switch (profile) {
     case 'office':
       return ['focus', 'tasks', 'emails', 'calendar', 'activity', 'radar']
+    case 'school-admin':
+      return ['focus', 'tasks', 'emails', 'calendar', 'activity']
     case 'student':
       return ['focus', 'radar', 'activity', 'tasks', 'calendar']
     case 'researcher':

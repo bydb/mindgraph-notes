@@ -14,6 +14,7 @@ import { useTranslation } from '../../../renderer/utils/translations'
 import { invokePlugin } from '../../../renderer/plugins/client'
 import { usePluginConfig } from '../../../renderer/plugins/config'
 import { ANTARES_DEFAULTS } from '../../../renderer/stores/antaresStore'
+import { antaresTestPrecheck } from '../target'
 import { PageHeader, Card, ServiceHead, IconTile, Row, Note, Button, TextInput, SecretField } from '../../../renderer/components/Settings/SettingsUI'
 
 type TestStatus = 'idle' | 'testing' | 'success' | 'failed'
@@ -55,9 +56,11 @@ export default function AntaresSettings({ onGoToModules }: { onGoToModules?: () 
 
   const runTest = async () => {
     setTestError(null)
-    if (!user || !password) {
+    // Erst Adresse/Kontext, dann Zugangsdaten (G03) — dieselbe Prüfung wie im Main.
+    const precheck = antaresTestPrecheck(antares, { username: user, password }, t('settings.agents.antares.saveFirst'))
+    if (precheck) {
       setTestStatus('failed')
-      setTestError(t('settings.agents.antares.saveFirst'))
+      setTestError(precheck)
       return
     }
     await persist(user, password)
@@ -101,11 +104,11 @@ export default function AntaresSettings({ onGoToModules }: { onGoToModules?: () 
             actions={<Button onClick={() => void runTest()} disabled={testStatus === 'testing'}>{t('settings.agents.antares.testConnection')}</Button>}
           />
           {testError && <Note tone="warn" action={t('settings.integ.recheck')} onAction={() => void runTest()}>{testError}</Note>}
-          <Row label={t('settings.agents.antares.baseUrl')}>
-            <TextInput type="url" value={antares.baseUrl} onCommit={v => setAntares({ baseUrl: v })} placeholder="https://mzantares-he-16.datenbank-bildungsmedien.net" />
+          <Row label={t('settings.agents.antares.baseUrl')} hint={t('settings.agents.antares.baseUrlHint')}>
+            <TextInput type="url" value={antares.baseUrl} onCommit={v => setAntares({ baseUrl: v.trim() })} placeholder="https://mzantares-xx-nn.datenbank-bildungsmedien.net" />
           </Row>
-          <Row label={t('settings.agents.antares.context')}>
-            <TextInput narrow value={antares.context} onCommit={v => setAntares({ context: v })} placeholder="HE/16" />
+          <Row label={t('settings.agents.antares.context')} hint={t('settings.agents.antares.contextHint')}>
+            <TextInput narrow value={antares.context} onCommit={v => setAntares({ context: v.trim() })} placeholder="XX/NN" />
           </Row>
           <Row label={t('settings.agents.antares.username')}>
             <TextInput value={user} onCommit={v => { setUser(v); void persist(v, password) }} placeholder={t('settings.agents.antares.username')} />

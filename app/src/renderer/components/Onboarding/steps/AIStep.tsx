@@ -4,11 +4,13 @@ import { useUIStore } from '../../../stores/uiStore'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../../shared/modelCompatibility'
 import { StepIndicator } from './StepIndicator'
 import { AgentFocusHint } from './AgentFocusHint'
-import { chatModelsOnly } from '../../../../shared/chatModels'
+import { chatModelsOnly, withoutCloudModels } from '../../../../shared/chatModels'
+import { onboardingAiCapabilities } from '../../../../shared/profilePresets'
 import { isCloudProviderReady } from '../../../../shared/llmBackend'
 import { shouldSuggestCloud } from '../../../../shared/cloudOnboarding'
 import { CloudSetup } from '../CloudSetup'
 import { WebSearchSetup } from '../WebSearchSetup'
+import { loadOllamaModels } from '../../../utils/ollamaModels'
 
 type AIPath = 'local' | 'cloud'
 
@@ -30,6 +32,8 @@ interface AIStepProps {
   onNext: () => void
   /** Schwerpunkt „Agent“: ehrlicher Satz zum Agenten auf diesem Rechner. */
   showAgentHint?: boolean
+  /** Profil mit „KI nur auf diesem Rechner“ (Schulverwaltung): kein Anbieter-Weg, keine Cloud-Testmodelle. */
+  localOnly?: boolean
   stepNumber: number
   totalSteps: number
 }
@@ -40,6 +44,14 @@ const capabilities = [
     icon: (
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="4" width="20" height="16" rx="2" /><path d="M10 4v4" /><path d="M14 4v4" />
+      </svg>
+    )
+  },
+  {
+    id: 'mail',
+    icon: (
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-10 6L2 7" />
       </svg>
     )
   },
@@ -61,7 +73,7 @@ const capabilities = [
   }
 ]
 
-export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, stepNumber, totalSteps }) => {
+export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, localOnly = false, stepNumber, totalSteps }) => {
   const { t } = useTranslation()
   const { ollama, setOllama } = useUIStore()
   const [ollamaConnected, setOllamaConnected] = useState(false)
@@ -97,7 +109,8 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
           setOllamaConnected(true)
           // Nur Chat-Modelle anbieten und vorwählen — das erste Listenmodell kann ein
           // Embedding-Modell sein, das beim ersten Chat mit „400“ scheitert.
-          const models = chatModelsOnly(await window.electronAPI.ollamaModels())
+          // Bei „nur lokal“ keine Cloud-Modelle anbieten oder vorwählen (G02).
+          const models = withoutCloudModels(chatModelsOnly(await loadOllamaModels()), localOnly)
           if (models.length > 0) {
             hasLocalModel = true
             setOllamaModels(models.map(m => m.name))
@@ -118,7 +131,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
       }
     } finally {
       setChecking(false)
-      if (!pathTouched.current) {
+      if (!pathTouched.current && !localOnly) {
         const byRam = shouldSuggestCloud(useUIStore.getState().systemTotalRamGb, hasLocalModel)
         setSuggestedByRam(byRam)
         // Schon eingerichteter Anbieter ohne lokales Modell: dort weitermachen.
@@ -156,7 +169,7 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
       const result = await window.electronAPI.ollamaPullModel(pullModelName)
       if (result.success) {
         setPullProgress(null)
-        const models = chatModelsOnly(await window.electronAPI.ollamaModels())
+        const models = withoutCloudModels(chatModelsOnly(await loadOllamaModels()), localOnly)
         if (models.length > 0) {
           setOllamaModels(models.map(m => m.name))
         }
@@ -178,8 +191,10 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
       <StepIndicator current={stepNumber} total={totalSteps} />
 
       <h2 className="onboarding-step-title">{t('onboarding.aiFeatures.title')}</h2>
-      <p className="onboarding-step-desc">{t('onboarding.aiPath.subtitle')}</p>
+      {/* Bei „nur lokal“ ersetzt der Profilsatz den Untertitel, statt ihm zu widersprechen (G02). */}
+      <p className="onboarding-step-desc">{t(localOnly ? 'onboarding.aiPath.localOnly' : 'onboarding.aiPath.subtitle')}</p>
 
+      {!localOnly && <>
       <div className="onboarding-guide-label">{t('onboarding.aiPath.label')}</div>
       <div className="onboarding-intent-grid" role="radiogroup" aria-label={t('onboarding.aiPath.label')}>
         {(['local', 'cloud'] as AIPath[]).map(id => (
@@ -202,13 +217,14 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
       {suggestedByRam && ramGb !== null && (
         <div className="onboarding-ai-hint" role="note">{t('onboarding.aiPath.lowRam', { gb: Math.round(ramGb) })}</div>
       )}
+      </>}
 
-      {path === 'cloud' && <CloudSetup onDone={() => setCloudDone(true)} />}
+      {path === 'cloud' && !localOnly && <CloudSetup onDone={() => setCloudDone(true)} />}
 
       {path === 'local' && <>
       {/* Capability cards */}
       <div className="onboarding-capability-cards">
-        {capabilities.map(({ id, icon }) => (
+        {onboardingAiCapabilities(localOnly).map(id => capabilities.find(c => c.id === id)!).map(({ id, icon }) => (
           <div key={id} className="onboarding-capability-card">
             <div className="onboarding-capability-icon">{icon}</div>
             <span className="onboarding-capability-text">
@@ -250,11 +266,13 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
                   disabled={isPulling}
                   style={{ flex: 1, fontSize: '13px' }}
                 >
-                  <optgroup label={t('settings.integrations.ollama.cloudTestGroup')}>
-                    {CLOUD_TEST_MODELS.map(m => (
-                      <option key={m.name} value={m.name}>{m.label}</option>
-                    ))}
-                  </optgroup>
+                  {!localOnly && (
+                    <optgroup label={t('settings.integrations.ollama.cloudTestGroup')}>
+                      {CLOUD_TEST_MODELS.map(m => (
+                        <option key={m.name} value={m.name}>{m.label}</option>
+                      ))}
+                    </optgroup>
+                  )}
                   <optgroup label={t('settings.integrations.ollama.recommendedModels')}>
                     {RECOMMENDED_PULL_MODELS.filter(m => (m.kind ?? 'chat') === 'chat').map(m => (
                       <option key={m.name} value={m.name}>
@@ -342,7 +360,8 @@ export const AIStep: React.FC<AIStepProps> = ({ onBack, onNext, showAgentHint, s
         </div>
       )}
 
-      {ollamaConnected && ollamaModels.length > 0 && <WebSearchSetup />}
+      {/* Websuche ist bei „nur lokal“ aus (Profil Schulverwaltung) — nicht anbieten (G02). */}
+      {!localOnly && ollamaConnected && ollamaModels.length > 0 && <WebSearchSetup />}
       </>}
 
       {showAgentHint && path === 'local' && <AgentFocusHint />}

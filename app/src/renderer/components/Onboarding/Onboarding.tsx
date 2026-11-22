@@ -17,7 +17,7 @@ type OnboardingStep = 'welcome' | 'focus' | 'focus-direct' | 'intent' | 'email-s
 // Profile, für die der Email-Setup-Step im Onboarding eingeblendet wird. Andere
 // Profile sollen den Step nicht sehen — sonst kommt der Demo-Pfad bei einem
 // Studenten aus dem Tritt, wenn er kein IMAP-Account hat.
-const EMAIL_SETUP_PROFILES = new Set(['office', 'professional'])
+const EMAIL_SETUP_PROFILES = new Set(['office', 'school-admin', 'professional'])
 
 export const Onboarding: React.FC = () => {
   const { onboardingOpen, setOnboardingOpen, setOnboardingCompleted, setUserProfile, applyProfileDefaults, setWelcomeNotePending, setWorkFocus } = useUIStore()
@@ -201,6 +201,7 @@ export const Onboarding: React.FC = () => {
             }}
             onNext={() => setStep('dashboard')}
             showAgentHint={selectedFocus === 'agent'}
+            localOnly={selectedProfile === 'school-admin'}
             stepNumber={stepNumbers.ai}
             totalSteps={totalSteps}
           />

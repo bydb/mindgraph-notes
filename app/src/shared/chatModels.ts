@@ -9,7 +9,7 @@
 // Meldet es keine (ältere Versionen, LM Studio), bleibt das Modell drin — außer der Name
 // sagt eindeutig Embedding/Reranker. Reranker melden teils `completion`, chatten aber nicht.
 
-import { isNonGenerativeModel } from './modelCompatibility'
+import { isNonGenerativeModel, isCloudModel } from './modelCompatibility'
 
 export interface ModelListEntry {
   name: string
@@ -40,4 +40,13 @@ export function isKnownNonChatModel(name: string, models: readonly ModelListEntr
   if (!name) return false
   const entry = models.find(m => m.name === name)
   return !!entry && !isChatModel(entry)
+}
+
+/**
+ * „KI nur auf diesem Rechner" (Profil Schulverwaltung, G02): Ollama-Cloud-Modelle — per Endung
+ * oder per `remote_host` angemeldet (`rememberRemoteOllamaModels`) — gar nicht erst anbieten oder
+ * vorwählen. Ohne den Schalter bleibt die Liste unverändert.
+ */
+export function withoutCloudModels<T extends ModelListEntry>(models: readonly T[], localOnly: boolean): T[] {
+  return localOnly ? models.filter(m => !isCloudModel(m.name)) : [...models]
 }

@@ -209,7 +209,8 @@ export const EmailSettingsTab: React.FC<{ t: TabTFn; ollamaModels: Array<{ name:
                 value={cloudProvider && !isCloudProviderReady(ollama[cloudProvider]) ? '' : email.analysisModel}
                 placeholder={{ value: '', label: t('settings.email.analysisModelDefault') }}
                 models={[
-                  ...(['openrouter', 'llmbase'] as CloudProviderId[]).filter(p => isCloudProviderReady(ollama[p])).map(p => ({ name: CLOUD_PROVIDER_META[p].sentinel })),
+                  // Bei „KI nur auf diesem Rechner“ keine Anbieter anbieten (der Main sperrt sie ohnehin).
+                  ...(['openrouter', 'llmbase'] as CloudProviderId[]).filter(p => !ollama.localOnly && isCloudProviderReady(ollama[p])).map(p => ({ name: CLOUD_PROVIDER_META[p].sentinel })),
                   ...ollamaModels
                 ]}
                 getLabel={name => {

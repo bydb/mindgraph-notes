@@ -8,6 +8,7 @@ import type { UpdateInfo } from '../../shared/types'
 import type { NoteKindId } from '../utils/noteKind'
 import { DEFAULT_OPENROUTER_SETTINGS, DEFAULT_LLMBASE_SETTINGS, type CloudProviderSettings } from '../../shared/llmBackend'
 import { toggleTaskFolder } from '../../shared/taskFolderFilter'
+import { buildProfilePatch, type ProfileId } from '../../shared/profilePresets'
 
 type ViewMode = 'editor' | 'split' | 'canvas'
 type Theme = 'light' | 'dark' | 'system'
@@ -32,7 +33,7 @@ type AccentColor = 'ink' | 'blue' | 'orange' | 'green' | 'purple' | 'pink' | 'te
 export type LLMBackend = 'ollama' | 'lm-studio'
 export type Language = 'de' | 'en'
 export type IconSet = 'default' | 'minimal' | 'colorful' | 'emoji'
-export type UserProfile = 'office' | 'student' | 'researcher' | 'professional' | 'writer' | 'developer' | 'viewer' | null
+export type UserProfile = ProfileId | null
 export type OutlineStyle = 'default' | 'lines' | 'minimal' | 'bullets' | 'dashes'
 export type FontFamily = 'system' | 'inter' | 'source-sans' | 'roboto' | 'open-sans' | 'lato' |
   'jetbrains-mono-nerd' | 'fira-code-nerd' | 'hack-nerd' | 'meslo-nerd' | 'cascadia-code-nerd' | 'iosevka-nerd' | 'victor-mono-nerd' | 'agave-nerd'
@@ -281,6 +282,11 @@ interface LLMSettings {
   // ist (shared/llmBackend.ts → defaultCloudRoute). null/fehlend = dieser Rechner. Gesetzt vom
   // Anbieter-Weg im Onboarding und vom Schalter auf der Anbieter-Karte.
   defaultCloudProvider?: 'openrouter' | 'llmbase' | null
+  // „KI nur auf diesem Rechner" (11/2026, Profil Schulverwaltung). Durchgesetzt im MAIN
+  // (main/llm/localOnlyGuard.ts liest die gespeicherten Einstellungen): Cloud-Anbieter und
+  // Ollama-Cloud-Modelle (auch mit neutralem Namen über remote_host) werden abgewiesen —
+  // für Chat, Agent, Mail-Analyse, Editor-KI, Termin- und Tag-Vorschläge und Bilderkennung.
+  localOnly: boolean
 }
 
 // Brain (lokales Tagesgedächtnis — speichert Tageszusammenfassungen im Vault)
@@ -465,6 +471,53 @@ export function migrateLegacyPluginConfig(
     if (migratedFromLegacy.has('edoobox') && !edo.apiVersion) edo.apiVersion = 'v1'
   }
   return pc
+}
+
+/**
+ * Bestandsschutz Antares (11/2026): Bis 1.4.4 waren Serveradresse und Kontext mit dem Server eines
+ * bestimmten Medienzentrums vorbelegt. Wer Antares nur eingeschaltet und die Felder nie geändert
+ * hat, hat `{ enabled: true }` OHNE `baseUrl`/`context` gespeichert und bezog die Werte aus dem
+ * Default. Seit die Defaults leer sind, würde dessen Anbindung still abreißen — deshalb werden die
+ * alten Werte für AKTIVE Installationen fest in die gespeicherte Config geschrieben.
+ * Nur bei `enabled === true`: Wer Antares nie aktiv genutzt hat, bekommt leere Felder, damit
+ * niemand versehentlich Zugangsdaten an einen fremden Server schickt. Pur, idempotent, getestet.
+ */
+export const ANTARES_LEGACY_TARGET = {
+  baseUrl: 'https://mzantares-he-16.datenbank-bildungsmedien.net',
+  context: 'HE/16',
+} as const
+
+export function pinLegacyAntaresTarget(
+  pluginConfig: Record<string, Record<string, unknown>>
+): Record<string, Record<string, unknown>> {
+  const a = pluginConfig.antares
+  if (!a || a.enabled !== true) return pluginConfig
+  const missingUrl = typeof a.baseUrl !== 'string'
+  const missingCtx = typeof a.context !== 'string'
+  if (!missingUrl && !missingCtx) return pluginConfig
+  return {
+    ...pluginConfig,
+    antares: {
+      ...a,
+      ...(missingUrl ? { baseUrl: ANTARES_LEGACY_TARGET.baseUrl } : {}),
+      ...(missingCtx ? { context: ANTARES_LEGACY_TARGET.context } : {}),
+    },
+  }
+}
+
+/**
+ * Einmal-Migration um `pinLegacyAntaresTarget` (Live-GUI-Befund G01, 22.11.2026): Ohne Flag lief der
+ * Bestandsschutz bei JEDEM Start — ein neues Medienzentrum, das Antares einschaltet und vor dem
+ * Eintragen der Adresse neu startet, bekam den fremden Server eingetragen. Jetzt nur, solange die
+ * GESPEICHERTEN Einstellungen das Flag noch nicht tragen (= Profil von vor dem Update); danach nie
+ * wieder. Neue Installationen starten mit dem Flag (Default `true`). Pur, getestet.
+ */
+export function migrateAntaresTargetOnce(
+  savedRaw: Record<string, unknown>,
+  pluginConfig: Record<string, Record<string, unknown>>
+): { pluginConfig: Record<string, Record<string, unknown>>; ranNow: boolean } {
+  if (savedRaw.antaresTargetMigrated === true) return { pluginConfig, ranNow: false }
+  return { pluginConfig: pinLegacyAntaresTarget(pluginConfig), ranNow: true }
 }
 
 // Daily Note Settings
@@ -764,6 +817,8 @@ interface UIState {
   petrolWebSticky: boolean
   /** Einmalig: Globus auf „automatisch“ umgestellt (07.11.2026). */
   petrolWebAutoMigrated: boolean
+  /** Einmalig: Bestandsschutz der Antares-Adresse gelaufen (11/2026, G01). Neue Profile: true. */
+  antaresTargetMigrated: boolean
   // Shell-Zugriff des Notiz-Agenten (experimentell): erste Stufe des Opt-ins; die zweite
   // ist der Schalter pro Lauf. Der Main prüft dieses Flag in ui-settings.json selbst.
   agentShellEnabled: boolean
@@ -1104,6 +1159,7 @@ const defaultState = {
   ollama: {
     enabled: true,
     backend: 'ollama' as LLMBackend,
+    localOnly: false,
     selectedModel: '',
     defaultTranslateLanguage: 'en' as AILanguageCode,
     lmStudioPort: 1234,
@@ -1153,6 +1209,7 @@ const defaultState = {
   // Standard an (07.11.2026): mit automatischer Websuche entscheidet das Modell selbst, ob es sucht.
   petrolWebSticky: true,
   petrolWebAutoMigrated: true,
+  antaresTargetMigrated: true,
   agentShellEnabled: false,
   agentShell: { ...DEFAULT_SHELL_GUARDRAILS },
   agentComputerEnabled: false,
@@ -1381,7 +1438,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'agentMcpEnabled', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'antaresTargetMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'agentMcpEnabled', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1648,102 +1705,8 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setQuickEventModalOpen: (open) => set({ quickEventModalOpen: open }),
   applyProfileDefaults: (profile) => {
     if (!profile) return
-    switch (profile) {
-      case 'office':
-        set({
-          flashcardsEnabled: false,
-          pdfCompanionEnabled: false,
-          smartConnectionsEnabled: false,
-          notesChatEnabled: true,
-          editorDefaultView: 'preview' as EditorViewMode,
-          showFormattingToolbar: true,
-          showRawEditor: false,
-          email: { ...get().email, enabled: true },
-          dashboard: { ...get().dashboard, enabled: true }
-        })
-        break
-      case 'student':
-        set({
-          flashcardsEnabled: true,
-          pdfCompanionEnabled: true,
-          smartConnectionsEnabled: false,
-          notesChatEnabled: true,
-          visionOcr: { ...get().visionOcr, enabled: true },
-          editorDefaultView: 'preview' as EditorViewMode,
-          showFormattingToolbar: true,
-          showRawEditor: false
-        })
-        break
-      case 'researcher':
-        set({
-          flashcardsEnabled: true,
-          pdfCompanionEnabled: true,
-          semanticScholarEnabled: true,
-          zoteroEnabled: true,
-          smartConnectionsEnabled: false,
-          notesChatEnabled: true,
-          visionOcr: { ...get().visionOcr, enabled: true },
-          editorDefaultView: 'preview' as EditorViewMode
-        })
-        break
-      case 'professional':
-        set({
-          flashcardsEnabled: false,
-          pdfCompanionEnabled: false,
-          smartConnectionsEnabled: false,
-          notesChatEnabled: true,
-          editorDefaultView: 'preview' as EditorViewMode
-        })
-        break
-      case 'writer':
-        set({
-          flashcardsEnabled: false,
-          smartConnectionsEnabled: false,
-          notesChatEnabled: true,
-          showFormattingToolbar: true,
-          editorShowWordCount: true,
-          editorDefaultView: 'preview' as EditorViewMode
-        })
-        break
-      case 'developer':
-        set({
-          flashcardsEnabled: false,
-          smartConnectionsEnabled: true,
-          notesChatEnabled: true,
-          showRawEditor: false,
-          editorDefaultView: 'preview' as EditorViewMode
-        })
-        break
-      case 'viewer':
-        // Reiner Read-Only-Modus: alles Schwere aus, nur Preview + Sidebar + Graph
-        set({
-          smartConnectionsEnabled: false,
-          notesChatEnabled: false,
-          flashcardsEnabled: false,
-          semanticScholarEnabled: false,
-          zoteroEnabled: false,
-          pdfCompanionEnabled: false,
-          languageTool: { ...get().languageTool, enabled: false },
-          email: { ...get().email, enabled: false },
-          // Plugin-Vertikalen (generische Config): enabled-Flag pro pluginId aus pluginConfig kippen.
-          pluginConfig: {
-            ...get().pluginConfig,
-            antares: { ...(get().pluginConfig.antares ?? {}), enabled: false },
-            edoobox: { ...(get().pluginConfig.edoobox ?? {}), enabled: false },
-            marketing: { ...(get().pluginConfig.marketing ?? {}), enabled: false },
-            remarkable: { ...(get().pluginConfig.remarkable ?? {}), enabled: false },
-          },
-          readwise: { ...get().readwise, enabled: false },
-          docling: { ...get().docling, enabled: false },
-          visionOcr: { ...get().visionOcr, enabled: false },
-          dashboard: { ...get().dashboard, enabled: false },
-          transport: { ...get().transport, enabled: false, showTitlebarButton: false },
-          editorDefaultView: 'preview' as EditorViewMode,
-          showFormattingToolbar: false,
-          showRawEditor: false
-        })
-        break
-    }
+    // Werte liegen zentral in shared/profilePresets.ts (gleiche Schlüssel wie hier im Store).
+    set(buildProfilePatch(get() as unknown as Record<string, unknown>, profile) as Partial<UIState>)
   }
 }))
 
@@ -1987,6 +1950,14 @@ export async function initializeUISettings(): Promise<void> {
         savedSettings as Record<string, unknown>,
         (validSettings.pluginConfig ?? {}) as Record<string, Record<string, unknown>>
       )
+      // Antares-Bestandsschutz genau EINMAL (G01): Flag aus den rohen gespeicherten Daten lesen —
+      // der Default `true` aus deepMerge würde ein Bestandsprofil sonst für migriert halten.
+      const antaresMigration = migrateAntaresTargetOnce(
+        savedSettings as Record<string, unknown>,
+        validSettings.pluginConfig as Record<string, Record<string, unknown>>
+      )
+      validSettings.pluginConfig = antaresMigration.pluginConfig
+      validSettings.antaresTargetMigrated = true
       // Einmalige Migration (Paket 2 Modul-Entflechtung): Google-Imagen-Key lag als
       // Klartext in pluginConfig.marketing.googleImagenApiKey (localStorage) → jetzt
       // safeStorage im Main (image-generation-Modul). Wer einen Key hatte, bekommt das
@@ -2032,6 +2003,20 @@ export async function initializeUISettings(): Promise<void> {
         }
       }
       useUIStore.setState(validSettings)
+      // Flag und ggf. festgeschriebene Antares-Werte sofort sichern (G01): sonst liefe die
+      // Migration beim nächsten Start erneut, falls bis dahin nichts anderes gespeichert wurde.
+      // saveUISettings im Main MERGT mit der Datei — es geht kein Feld verloren. (Bei Legacy-
+      // Cleanup speichert der Block darunter ohnehin den vollen Stand.)
+      if (antaresMigration.ranNow && legacyPresent.length === 0) {
+        try {
+          const persisted: Record<string, unknown> = {}
+          const st = useUIStore.getState()
+          for (const key of persistedKeys) persisted[key] = st[key as keyof typeof st]
+          await window.electronAPI.saveUISettings(persisted)
+        } catch (err) {
+          console.error('[UIStore] Antares-Migrationsflag nicht gespeichert (nächster Start versucht es erneut):', err)
+        }
+      }
       // Karteileichen entfernen: erst die migrierte pluginConfig persistieren (crash-sicher),
       // DANN die alten Top-Level-Keys von der Platte prunen (saveUISettings mergt sonst weiter).
       if (legacyPresent.length > 0) {
