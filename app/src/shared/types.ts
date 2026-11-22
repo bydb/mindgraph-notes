@@ -765,6 +765,10 @@ export interface ElectronAPI {
   // UI-Settings Persistenz
   loadUISettings: () => Promise<Record<string, unknown>>;
   saveUISettings: (settings: Record<string, unknown>) => Promise<boolean>;
+  /** Zustand der Readwise-/LanguageTool-Schlüssel in ui-settings.json (main/uiSettingsSecrets.ts). */
+  uiSecretsStatus: () => Promise<Record<'readwise' | 'languageTool', 'encrypted' | 'unreadable' | 'plaintext' | 'none'> | null>;
+  /** Schlüssel ausdrücklich löschen — ein leeres Feld beim gewöhnlichen Speichern löscht nie. */
+  clearUiSecret: (group: 'readwise' | 'languageTool') => Promise<boolean>;
   pruneUISettingsKeys: (keys: string[]) => Promise<boolean>;
   setMainLanguage: (lang: string) => Promise<boolean>;
   clipboardWriteText: (text: string) => Promise<boolean>;
@@ -1274,6 +1278,8 @@ export interface ElectronAPI {
   getAppVersion: () => Promise<string>;
   getSystemMemory: () => Promise<{ totalGB: number; freeGB: number; cpus: number }>;
   checkForUpdates: () => Promise<UpdateInfo>;
+  /** MINDGRAPH_DISABLE_UPDATE_CHECK gesetzt: Prüfung und Download sind im Main gesperrt. */
+  updateCheckDisabledByAdmin: boolean;
   installUpdate: () => Promise<boolean>;
   getWhatsNewContent: (version: string) => Promise<string | null>;
   onAutoUpdateAvailable: (callback: (info: { version: string }) => void) => void;

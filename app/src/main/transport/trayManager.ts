@@ -1,6 +1,8 @@
 import { Tray, Menu, globalShortcut, BrowserWindow, app, screen, nativeImage } from 'electron'
 import * as path from 'path'
 import { SECURE_WEB_PREFERENCES } from '../windowSecurity'
+import { attachNavigationGuard } from '../navigationGuard'
+import { pathToFileURL } from 'url'
 
 let tray: Tray | null = null
 let transportWindow: BrowserWindow | null = null
@@ -128,6 +130,12 @@ function createTransportWindow(_resourcesPath: string): BrowserWindow {
   })
 
   // In Entwicklung: Vite Dev Server
+  // Gleiche Sperre wie das Hauptfenster: dieses Fenster trägt denselben preload (Codex F03).
+  const transportUrl = process.env.NODE_ENV === 'development'
+    ? 'http://localhost:5173/transport.html'
+    : pathToFileURL(path.join(__dirname, '../renderer/transport.html')).href
+  attachNavigationGuard(transportWindow.webContents, transportUrl, 'Schnellerfassung')
+
   if (process.env.NODE_ENV === 'development') {
     transportWindow.loadURL('http://localhost:5173/transport.html')
   } else {

@@ -16,7 +16,7 @@ interface CredentialRow {
   note?: string
   settingsTab: TabId
   checkSet: () => Promise<boolean>
-  inUiStore?: boolean    // true = Klartext im uiStore (Audit-Hinweis)
+  secretGroup?: 'readwise' | 'languageTool'  // liegt in ui-settings.json; Zustand meldet der Main (main/uiSettingsSecrets.ts)
 }
 
 interface Props {
@@ -35,6 +35,8 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
   const languageTool = useUIStore(s => s.languageTool)
 
   const [statuses, setStatuses] = useState<Record<string, boolean>>({})
+
+  const [secretStates, setSecretStates] = useState<Awaited<ReturnType<typeof window.electronAPI.uiSecretsStatus>> | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Dynamische Credential-Liste — Email-Accounts kommen aus dem uiStore
@@ -81,8 +83,8 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       checkSet: async () => { const creds = await wordpressService.loadCredentials(); return !!(creds && creds.wpAppPassword) }
     })
     rows.push({ id: 'openalex-key', label: 'OpenAlex API-Key', category: 'Forschung', note: 'Höhere Limits im Research-Panel', settingsTab: 'integrations', checkSet: async () => !!(await window.electronAPI.openAlexLoadKey()) })
-    rows.push({ id: 'readwise', label: 'Readwise API-Key', category: 'Forschung', note: 'Highlights-Synchronisation', settingsTab: 'integrations', checkSet: async () => !!readwise?.apiKey, inUiStore: true })
-    rows.push({ id: 'languagetool', label: 'LanguageTool API-Key', category: 'Editor', note: 'Nur bei LanguageTool Premium API', settingsTab: 'integrations', checkSet: async () => !!languageTool?.apiKey, inUiStore: true })
+    rows.push({ id: 'readwise', label: 'Readwise API-Key', category: 'Forschung', note: 'Highlights-Synchronisation', settingsTab: 'integrations', checkSet: async () => !!readwise?.apiKey || ((await window.electronAPI.uiSecretsStatus())?.readwise ?? 'none') !== 'none', secretGroup: 'readwise' })
+    rows.push({ id: 'languagetool', label: 'LanguageTool API-Key', category: 'Editor', note: 'Nur bei LanguageTool Premium API', settingsTab: 'integrations', checkSet: async () => !!languageTool?.apiKey || ((await window.electronAPI.uiSecretsStatus())?.languageTool ?? 'none') !== 'none', secretGroup: 'languageTool' })
     rows.push({ id: 'imagen', label: 'Google AI Studio API-Key', category: 'KI-Cloud', note: 'Nano-Banana-Bildgenerierung — genutzt von Marketing und Notiz-Agent', settingsTab: 'ai', checkSet: async () => !!(await window.electronAPI.imageGenLoadKey()) })
     return rows
   }, [email, readwise, languageTool])
@@ -94,6 +96,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
       try { result[c.id] = await c.checkSet() } catch { result[c.id] = false }
     }))
     setStatuses(result)
+    setSecretStates(await window.electronAPI.uiSecretsStatus().catch(() => null))
     setLoading(false)
   }, [credentials])
 
@@ -109,7 +112,10 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
   }, [credentials])
 
   const setCount = Object.values(statuses).filter(Boolean).length
-  const hasUiStoreClearText = credentials.some(c => c.inUiStore && statuses[c.id])
+  // Seit 22.11.2026 versiegelt der Main diese Schlüssel auf der Platte. Angezeigt wird der Zustand
+  // aus der Datei (Codex F07): „Klartext“ nur, wenn er dort wirklich unverschlüsselt liegt.
+  const secretState = (row: CredentialRow) => row.secretGroup && secretStates ? secretStates[row.secretGroup] : null
+  const hasUiStoreClearText = credentials.some(c => secretState(c) === 'plaintext')
 
   return (
     <div className="settings-section">
@@ -127,7 +133,7 @@ export const CredentialsSettings: React.FC<Props> = ({ onNavigateToTab }) => {
           {rows.map(row => {
             const isSet = statuses[row.id]
             return (
-              <Row key={row.id} label={row.label} hint={<>{row.note}{row.inUiStore && <> · <b>{t('settings.credentials.plaintext')}</b></>}</>}>
+              <Row key={row.id} label={row.label} hint={<>{row.note}{secretState(row) === 'plaintext' && <> · <b>{t('settings.credentials.plaintext')}</b></>}{secretState(row) === 'unreadable' && <> · <b>{t('settings.credentials.unreadable')}</b></>}</>}>
                 <StatusChip tone={loading ? 'checking' : isSet ? 'ok' : 'off'} label={loading ? t('settings.credentials.checking') : isSet ? t('settings.credentials.set') : t('settings.credentials.missing')} />
                 <Button variant="link" onClick={() => onNavigateToTab(row.settingsTab)}>{isSet ? t('settings.credentials.change') : t('settings.credentials.setup')}</Button>
               </Row>

@@ -35,6 +35,9 @@ export const GeneralSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
   const setFontFamily = useUIStore(s => s.setFontFamily)
   const loadLastVaultOnStart = useUIStore(s => s.loadLastVaultOnStart)
   const setLoadLastVaultOnStart = useUIStore(s => s.setLoadLastVaultOnStart)
+  const updateCheckOnStart = useUIStore(s => s.updateCheckOnStart)
+  const setUpdateCheckOnStart = useUIStore(s => s.setUpdateCheckOnStart)
+  const updateCheckByAdmin = window.electronAPI?.updateCheckDisabledByAdmin === true
   const notesRootFolder = useUIStore(s => s.notesRootFolder)
   const setNotesRootFolder = useUIStore(s => s.setNotesRootFolder)
   const projectsRootFolder = useUIStore(s => s.projectsRootFolder)
@@ -207,6 +210,13 @@ export const GeneralSettingsTab: React.FC<{ t: TabTFn }> = ({ t }) => {
       <Card>
         <Row label={t('settings.general.loadLastVault')} htmlFor="general-load-last-vault">
           <Toggle id="general-load-last-vault" checked={loadLastVaultOnStart} onChange={setLoadLastVaultOnStart} />
+        </Row>
+        <Row
+          label={t('settings.general.updateCheck')}
+          hint={updateCheckByAdmin ? t('settings.general.updateCheckAdmin') : t('settings.general.updateCheckHint')}
+          htmlFor="general-update-check"
+        >
+          <Toggle id="general-update-check" checked={updateCheckOnStart && !updateCheckByAdmin} onChange={setUpdateCheckOnStart} disabled={updateCheckByAdmin} />
         </Row>
       </Card>
 

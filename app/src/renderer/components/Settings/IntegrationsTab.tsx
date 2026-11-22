@@ -51,6 +51,30 @@ export const IntegrationsTab: React.FC<{
   const setLanguageTool = useUIStore(s => s.setLanguageTool)
   const readwise = useUIStore(s => s.readwise)
   const setReadwise = useUIStore(s => s.setReadwise)
+  // Zustand der beiden Schlüssel auf der Platte (main/uiSettingsSecrets.ts): Ist der Schlüsselbund
+  // gesperrt, kommt im Store ein leeres Feld an, obwohl ein Schlüssel gespeichert ist. Dann trotzdem
+  // „gespeichert“ zeigen, damit Entfernen erreichbar bleibt (Codex F06).
+  const [secretStates, setSecretStates] = React.useState<Awaited<ReturnType<typeof window.electronAPI.uiSecretsStatus>> | null>(null)
+  const refreshSecretStates = React.useCallback(() => {
+    void window.electronAPI.uiSecretsStatus().then(setSecretStates).catch(() => setSecretStates(null))
+  }, [])
+  React.useEffect(() => { refreshSecretStates() }, [refreshSecretStates])
+  // Ein leeres Feld beim gewöhnlichen Speichern löscht nie — Entfernen braucht den eigenen Befehl.
+  // Erst löschen, dann den Store leeren: Scheitert das Löschen (Schreibrechte, Lesefehler), bleibt
+  // das Feld „gespeichert“, Entfernen erreichbar, und es gibt eine Meldung (Codex F09).
+  const [secretRemoveFailed, setSecretRemoveFailed] = React.useState<'readwise' | 'languageTool' | null>(null)
+  const removeSecret = async (group: 'readwise' | 'languageTool'): Promise<boolean> => {
+    const ok = await window.electronAPI.clearUiSecret(group).catch(() => false)
+    if (ok) {
+      if (group === 'readwise') setReadwise({ apiKey: '' })
+      else setLanguageTool({ apiKey: '' })
+    }
+    setSecretRemoveFailed(ok ? null : group)
+    refreshSecretStates()
+    return ok
+  }
+  const readwiseUnreadable = !readwise.apiKey && secretStates?.readwise === 'unreadable'
+  const languageToolUnreadable = !languageTool.apiKey && secretStates?.languageTool === 'unreadable'
 
   const enable = (id: string) => { void setModuleEnabled(id, true).catch(err => console.error('[settings] Modul einschalten:', err)) }
 
@@ -154,13 +178,13 @@ export const IntegrationsTab: React.FC<{
           )}
           <Row
             label={t('settings.readwise.apiKey')}
-            hint={<>{t('settings.integ.readwise.keyHint')} <ExternalLink href="https://readwise.io/access_token">readwise.io</ExternalLink></>}
+            hint={<>{t('settings.integ.readwise.keyHint')} <ExternalLink href="https://readwise.io/access_token">readwise.io</ExternalLink>{readwiseUnreadable && <> · <b>{t('settings.integ.secretUnreadable')}</b></>}{secretRemoveFailed === 'readwise' && <> · <b>{t('settings.integ.secretRemoveFailed')}</b></>}</>}
           >
             <SecretField
-              saved={!!readwise.apiKey}
+              saved={!!readwise.apiKey || readwiseUnreadable}
               suffix={readwise.apiKey ? readwise.apiKey.slice(-4) : null}
               onSave={key => { setReadwise({ apiKey: key }); void status.checkReadwise(key) }}
-              onRemove={() => { setReadwise({ apiKey: '' }); void status.checkReadwise('') }}
+              onRemove={async () => { if (await removeSecret('readwise')) void status.checkReadwise('') }}
               placeholder={t('settings.readwise.apiKeyHint')}
             />
           </Row>
@@ -338,12 +362,12 @@ export const IntegrationsTab: React.FC<{
               <Row label={t('settings.languagetool.apiUsername')}>
                 <TextInput type="email" value={languageTool.apiUsername || ''} onCommit={v => setLanguageTool({ apiUsername: v })} placeholder={t('settings.languagetool.apiUsernamePlaceholder')} />
               </Row>
-              <Row label={t('settings.languagetool.apiKey')}>
+              <Row label={t('settings.languagetool.apiKey')} hint={secretRemoveFailed === 'languageTool' ? <b>{t('settings.integ.secretRemoveFailed')}</b> : languageToolUnreadable ? <b>{t('settings.integ.secretUnreadable')}</b> : undefined}>
                 <SecretField
-                  saved={!!languageTool.apiKey}
+                  saved={!!languageTool.apiKey || languageToolUnreadable}
                   suffix={languageTool.apiKey ? languageTool.apiKey.slice(-4) : null}
                   onSave={k => setLanguageTool({ apiKey: k })}
-                  onRemove={() => setLanguageTool({ apiKey: '' })}
+                  onRemove={async () => { await removeSecret('languageTool') }}
                   placeholder={t('settings.languagetool.apiKeyPlaceholder')}
                 />
               </Row>

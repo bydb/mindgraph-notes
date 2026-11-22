@@ -79,4 +79,32 @@ describe('SECURE_WEB_PREFERENCES', () => {
     // Sanity: der Scan hat tatsächlich Fenster gefunden (sonst wäre der Guard wirkungslos).
     expect(totalWindows).toBeGreaterThanOrEqual(3)
   })
+
+  // Guard gegen Regressionen (Prüfung 22.11.2026, Codex F03): Ein Fenster mit dem App-preload
+  // trägt electronAPI. Navigiert sein Hauptdokument auf fremden Inhalt, bekommt dieser alle
+  // Rechte der App — jede Datei, die so ein Fenster baut, muss die Navigationssperre setzen.
+  it('jedes Fenster mit App-preload setzt attachNavigationGuard', () => {
+    const tsFiles: string[] = []
+    const walk = (dir: string): void => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = join(dir, e.name)
+        if (e.isDirectory()) walk(p)
+        else if (e.name.endsWith('.ts') && !e.name.endsWith('.test.ts')) tsFiles.push(p)
+      }
+    }
+    walk('src/main')
+
+    let preloadWindows = 0
+    for (const f of tsFiles) {
+      const src = readFileSync(f, 'utf8')
+      if (!/new BrowserWindow\(/.test(src)) continue
+      const withPreload = (src.match(/preload:\s*path\.join\([^)]*preload\/index\.js/g) ?? []).length
+      if (withPreload === 0) continue
+      preloadWindows += withPreload
+      const guards = (src.match(/attachNavigationGuard\(/g) ?? []).length
+      expect(guards, `${f}: Fenster mit App-preload ohne attachNavigationGuard`).toBeGreaterThanOrEqual(withPreload)
+    }
+    // Hauptfenster + Schnellerfassung
+    expect(preloadWindows).toBeGreaterThanOrEqual(2)
+  })
 })

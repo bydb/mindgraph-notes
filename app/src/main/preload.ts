@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { isUpdateCheckDisabledByEnv } from '../shared/updateCheckPolicy'
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Settings / Vault Persistenz
@@ -8,6 +9,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // UI-Settings Persistenz
   loadUISettings: () => ipcRenderer.invoke('load-ui-settings'),
   saveUISettings: (settings: object) => ipcRenderer.invoke('save-ui-settings', settings),
+  uiSecretsStatus: () => ipcRenderer.invoke('ui-secrets-status'),
+  clearUiSecret: (group: 'readwise' | 'languageTool') => ipcRenderer.invoke('ui-secret-clear', group),
   pruneUISettingsKeys: (keys: string[]) => ipcRenderer.invoke('prune-ui-settings-keys', keys),
   setMainLanguage: (lang: string) => ipcRenderer.invoke('set-main-language', lang),
 
@@ -643,6 +646,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getSystemMemory: () => ipcRenderer.invoke('get-system-memory'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  // Fester Wert beim Laden: die IT setzt die Variable vor dem Start (shared/updateCheckPolicy.ts).
+  updateCheckDisabledByAdmin: isUpdateCheckDisabledByEnv(process.env),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   downloadUpdate: () => ipcRenderer.invoke('download-update'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),

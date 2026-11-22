@@ -4,6 +4,12 @@
 // und nur die rohen Samples hierhin geschickt — der Worker hat kein AudioContext.
 
 import { pipeline, env, type AutomaticSpeechRecognitionPipeline } from '@huggingface/transformers'
+// ONNX-Laufzeit aus dem App-Paket statt von cdn.jsdelivr.net (Prüfung 22.11.2026): transformers.js
+// setzt beim Import als Default eine CDN-Adresse; dadurch lud die App zur Laufzeit fremden
+// Programmcode nach, und die CSP des Hauptfensters musste jsdelivr als Skriptquelle erlauben.
+// Dieselbe Variante (asyncify), die transformers.js außerhalb von Safari vom CDN gewählt hätte.
+import ortWasmFactoryUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.mjs?url'
+import ortWasmBinaryUrl from 'onnxruntime-web/ort-wasm-simd-threaded.asyncify.wasm?url'
 
 // Wir laden Modelle nur aus dem HF-Hub und cachen sie im Browser-Cache (IndexedDB).
 env.allowLocalModels = false
@@ -12,6 +18,7 @@ env.useBrowserCache = true
 // SharedArrayBuffer, was mehrthread-WASM blockieren würde.
 if (env.backends?.onnx?.wasm) {
   env.backends.onnx.wasm.numThreads = 1
+  env.backends.onnx.wasm.wasmPaths = { mjs: ortWasmFactoryUrl, wasm: ortWasmBinaryUrl }
 }
 
 type LoadMessage = {

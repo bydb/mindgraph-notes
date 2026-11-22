@@ -54,7 +54,7 @@ import { TagsPanel } from './components/TagsPanel/TagsPanel'
 import { SmartConnectionsPanel } from './components/SmartConnectionsPanel/SmartConnectionsPanel'
 import { NotesChat } from './components/NotesChat/NotesChat'
 import { TabBar } from './components/TabBar/TabBar'
-import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initializeUISettings } from './stores/uiStore'
+import { useUIStore, ACCENT_COLORS, FONT_FAMILIES, BACKGROUND_COLORS, initializeUISettings, uiSettingsReady } from './stores/uiStore'
 import { usePluginEnabled } from './plugins/config'
 import { useTabStore } from './stores/tabStore'
 import { useTranslation } from './utils/translations'
@@ -717,8 +717,15 @@ const App: React.FC = () => {
           setLastSeenVersion(currentVersion)
         }
 
-        // 3. Update-Check nach 5s Verzögerung (im Hintergrund)
-        setTimeout(async () => {
+        // 3. Update-Check nach 5s Verzögerung (im Hintergrund) — abschaltbar in den Einstellungen,
+        // zentral per MINDGRAPH_DISABLE_UPDATE_CHECK (dann verweigert ohnehin der Main-Prozess).
+        // Erst nach dem Laden der Einstellungen entscheiden und vor der Anfrage erneut prüfen —
+        // sonst galt bei langsamem Laden noch der Default „an“ (Codex F04).
+        const updateCheckAllowed = () =>
+          useUIStore.getState().updateCheckOnStart !== false && !window.electronAPI.updateCheckDisabledByAdmin
+        await uiSettingsReady
+        if (updateCheckAllowed()) setTimeout(async () => {
+          if (!updateCheckAllowed()) return
           try {
             const updateInfo = await window.electronAPI.checkForUpdates()
             console.log('[App] Update check result:', updateInfo)

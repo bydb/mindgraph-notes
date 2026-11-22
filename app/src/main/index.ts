@@ -31,6 +31,10 @@ import { setAiProvenanceInContent, todayIsoDate, buildProvenanceFooterHtml } fro
 import { passwordStoreOverride } from '../shared/linuxPasswordStore'
 import { focusExistingWindow } from './singleInstance'
 import { isOpenableExternalUrl } from '../shared/externalUrl'
+import { attachNavigationGuard } from './navigationGuard'
+import { isUpdateCheckDisabledByEnv } from '../shared/updateCheckPolicy'
+import { pathToFileURL } from 'url'
+import { sealUiSecrets, openUiSecrets, hasPlaintextSecrets, uiSecretStatus, clearUiSecret, isSealedKeyGroup, type SecretCipher } from './uiSettingsSecrets'
 
 // Dev-only userData-Isolation: ungepackt (`npm run dev`/`start`) NIEMALS das produktive Profil der
 // installierten App anfassen — sonst migriert/schreibt der Dev-Build die echten Settings (real passiert).
@@ -1257,6 +1261,56 @@ function matchPlistKey(xml: string, key: string): string | null {
   return m ? m[1].trim() || null : null
 }
 
+const uiSecretCipher: SecretCipher = {
+  available: () => safeStorage.isEncryptionAvailable(),
+  encrypt: (plain) => safeStorage.encryptString(plain).toString('base64'),
+  decrypt: (sealed) => safeStorage.decryptString(Buffer.from(sealed, 'base64'))
+}
+
+/**
+ * ui-settings.json strikt lesen: fehlende Datei = leere Einstellungen, jeder andere Lese- oder
+ * Parsefehler bleibt ein Fehler (Codex F10). loadUISettings() macht aus allem `{}` — für die
+ * Schlüssel-Handler hieße das „kein Schlüssel“ bzw. „gelöscht“, obwohl nichts passiert ist.
+ */
+async function readUISettingsStrict(): Promise<{ ok: true; settings: Record<string, unknown> } | { ok: false; error: unknown }> {
+  let content: string
+  try {
+    content = await fs.readFile(getUISettingsPath(), 'utf-8')
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') return { ok: true, settings: {} }
+    return { ok: false, error }
+  }
+  try {
+    const parsed: unknown = JSON.parse(content)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { ok: false, error: new Error('ui-settings.json ist kein Objekt') }
+    return { ok: true, settings: parsed as Record<string, unknown> }
+  } catch (error) {
+    return { ok: false, error }
+  }
+}
+
+/** Atomar ersetzen (temporäre Datei + rename): kein Leser sieht je eine halb geschriebene Datei (Codex F10). */
+async function writeUISettingsAtomic(settings: Record<string, unknown>): Promise<void> {
+  const target = getUISettingsPath()
+  const tmp = `${target}.${process.pid}.${Date.now()}.tmp`
+  try {
+    await fs.writeFile(tmp, JSON.stringify(settings, null, 2), 'utf-8')
+    try {
+      await fs.rename(tmp, target)
+    } catch (error) {
+      // Windows: rename scheitert, solange ein anderer Prozess (Virenscanner, Indexer) die Datei
+      // offen hält — dann wie früher direkt schreiben, statt die Einstellung zu verlieren.
+      const code = (error as NodeJS.ErrnoException)?.code
+      if (process.platform !== 'win32' || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) throw error
+      await fs.writeFile(target, JSON.stringify(settings, null, 2), 'utf-8')
+      await fs.unlink(tmp).catch(() => undefined)
+    }
+  } catch (error) {
+    await fs.unlink(tmp).catch(() => undefined)
+    throw error
+  }
+}
+
 // UI-Settings laden
 async function loadUISettings(): Promise<Record<string, unknown>> {
   try {
@@ -1280,8 +1334,10 @@ async function saveUISettings(settings: Record<string, unknown>): Promise<boolea
     } catch {
       // Datei existiert nicht oder ist korrupt — kein Problem
     }
-    const merged = { ...existing, ...settings }
-    await fs.writeFile(getUISettingsPath(), JSON.stringify(merged, null, 2), 'utf-8')
+    // Zugangsschlüssel nie im Klartext auf die Platte (main/uiSettingsSecrets.ts).
+    // Ein leeres Feld löscht dabei nie — Löschen geht nur über `ui-secret-clear`.
+    const merged = sealUiSecrets({ ...existing, ...settings }, existing, uiSecretCipher)
+    await writeUISettingsAtomic(merged)
     return true
   } catch (error) {
     console.error('Fehler beim Speichern der UI-Settings:', error)
@@ -1641,18 +1697,13 @@ function createWindow(): void {
     Menu.buildFromTemplate(menuItems).popup()
   })
 
-  // Navigation zu externen URLs abfangen
-  mainWindow.webContents.on('will-navigate', (event, url) => {
-    const appUrl = process.env.NODE_ENV === 'development'
-      ? 'http://localhost:5173'
-      : `file://${path.join(__dirname, '../renderer/index.html')}`
-
-    // Wenn es keine App-interne Navigation ist, im Browser öffnen
-    if (!url.startsWith(appUrl) && (url.startsWith('http://') || url.startsWith('https://'))) {
-      event.preventDefault()
-      shell.openExternal(url)
-    }
-  })
+  // Navigation des Hauptfensters: nur das App-Dokument bleibt, Web-/Mail-Adressen gehen an
+  // das Betriebssystem, alles andere (fremde file:-Seiten, UNC, data:, …) wird verworfen.
+  // Begründung und Fälle: shared/mainNavigation.ts.
+  const appUrl = process.env.NODE_ENV === 'development'
+    ? 'http://localhost:5173'
+    : pathToFileURL(path.join(__dirname, '../renderer/index.html')).href
+  attachNavigationGuard(mainWindow.webContents, appUrl, 'Hauptfenster')
 }
 
 
@@ -1861,7 +1912,48 @@ ipcMain.handle('set-last-vault', async (_event, vaultPath: string) => {
 
 // UI-Settings laden
 ipcMain.handle('load-ui-settings', async () => {
-  return await loadUISettings()
+  let raw = await loadUISettings()
+  // Alte Klartext-Schlüssel sofort versiegeln, nicht erst bei der nächsten Einstellungsänderung
+  // (Codex F02). Über die Schreibkette, damit kein paralleles Speichern dazwischenfunkt.
+  if (hasPlaintextSecrets(raw) && uiSecretCipher.available()) {
+    const run = uiSettingsWriteChain.then(() => saveUISettings({}))
+    uiSettingsWriteChain = run.catch(() => undefined)
+    if (await run) raw = await loadUISettings()
+  }
+  // Nur hier, für den Renderer, die versiegelten Schlüssel öffnen (main/uiSettingsSecrets.ts).
+  return openUiSecrets(raw, uiSecretCipher)
+})
+
+// Zustand der Zugangsschlüssel in ui-settings.json, so wie er auf der Platte liegt (Codex F07):
+// encrypted / unreadable (gespeichert, Schlüsselbund gerade nicht lesbar) / plaintext / none.
+// Strikt gelesen und in der Schreibkette (Codex F10): ein Lesefehler ist kein „kein Schlüssel“ (→ null),
+// und eine halb geschriebene Datei kann es wegen des atomaren Ersetzens nicht geben.
+ipcMain.handle('ui-secrets-status', () => {
+  const run = uiSettingsWriteChain.then(async () => {
+    const read = await readUISettingsStrict()
+    return read.ok ? uiSecretStatus(read.settings, uiSecretCipher) : null
+  })
+  uiSettingsWriteChain = run.catch(() => undefined)
+  return run.catch(() => null)
+})
+
+// Zugangsschlüssel ausdrücklich löschen — auch einen gerade unlesbaren (Codex F06). Ein
+// gewöhnliches Speichern mit leerem Feld löscht nie (main/uiSettingsSecrets.ts).
+ipcMain.handle('ui-secret-clear', (event, group: unknown) => {
+  if (!isTrustedSender(event) || !isSealedKeyGroup(group)) return false
+  const run = uiSettingsWriteChain.then(async () => {
+    // Strikt lesen (Codex F10): Ein Lesefehler darf nicht als „gelöscht“ zurückkommen.
+    const read = await readUISettingsStrict()
+    if (!read.ok) throw read.error
+    const cleared = clearUiSecret(read.settings, group)
+    if (cleared !== read.settings) await writeUISettingsAtomic(cleared)
+    return true
+  })
+  uiSettingsWriteChain = run.catch(() => undefined)
+  return run.catch((error) => {
+    console.error('[Settings] Zugangsschlüssel löschen fehlgeschlagen:', error)
+    return false
+  })
 })
 
 // UI-Settings speichern
@@ -11125,6 +11217,8 @@ ipcMain.handle('remove-custom-logo', async () => {
 
 // GitHub Releases auf neue Version prüfen (Fallback für Windows/Linux)
 ipcMain.handle('check-for-updates', async () => {
+  // Von der IT abgeschaltet: keine Verbindung zu GitHub (shared/updateCheckPolicy.ts).
+  if (isUpdateCheckDisabledByEnv(process.env)) return { available: false }
   // macOS: Use electron-updater
   if (process.platform === 'darwin' && process.env.NODE_ENV !== 'development') {
     try {
@@ -11197,6 +11291,7 @@ ipcMain.handle('install-update', async () => {
 })
 
 ipcMain.handle('download-update', async () => {
+  if (isUpdateCheckDisabledByEnv(process.env)) return false
   try {
     const autoUpdater = await ensureAutoUpdater()
     await autoUpdater.downloadUpdate()

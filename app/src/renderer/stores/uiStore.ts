@@ -672,6 +672,8 @@ interface UIState {
   accentColor: AccentColor
   backgroundColor: BackgroundColor
   loadLastVaultOnStart: boolean
+  /** Beim Start bei GitHub nach einer neuen Version fragen. Firmen-IT verteilt Updates oft selbst. */
+  updateCheckOnStart: boolean
   language: Language
   fontFamily: FontFamily
 
@@ -901,6 +903,7 @@ interface UIState {
   setAccentColor: (color: AccentColor) => void
   setBackgroundColor: (color: BackgroundColor) => void
   setLoadLastVaultOnStart: (value: boolean) => void
+  setUpdateCheckOnStart: (value: boolean) => void
   setLanguage: (lang: Language) => void
   setFontFamily: (font: FontFamily) => void
   setEditorFontSize: (size: number) => void
@@ -1046,6 +1049,7 @@ const defaultState = {
   accentColor: 'ink' as AccentColor,
   backgroundColor: 'default' as BackgroundColor,
   loadLastVaultOnStart: true,
+  updateCheckOnStart: true,
   language: 'de' as Language,
   fontFamily: 'system' as FontFamily,
 
@@ -1370,7 +1374,7 @@ const defaultState = {
 
 // Felder die persistiert werden sollen (keine Funktionen, keine transienten Werte)
 const persistedKeys = [
-  'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart',
+  'viewMode', 'theme', 'accentColor', 'backgroundColor', 'loadLastVaultOnStart', 'updateCheckOnStart',
   'language', 'fontFamily', 'editorFontSize', 'editorLineNumbers', 'editorDefaultView',
   'autoSaveInterval', 'editorHeadingFolding', 'editorOutlining', 'outlineStyle', 'editorShowWordCount', 'editorShowBacklinks', 'editorShowContextPanel', 'editorLastExport', 'editorHeaderActions', 'imagesFolder',
   'sidebarWidth', 'sidebarVisible', 'editorPreviewSplit', 'textSplitEnabled', 'textSplitPosition',
@@ -1413,6 +1417,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setAccentColor: (color) => set({ accentColor: color }),
   setBackgroundColor: (color) => set({ backgroundColor: color }),
   setLoadLastVaultOnStart: (value) => set({ loadLastVaultOnStart: value }),
+  setUpdateCheckOnStart: (value) => set({ updateCheckOnStart: value }),
   setLanguage: (lang) => {
     set({ language: lang })
     window.electronAPI.setMainLanguage(lang)
@@ -1744,6 +1749,10 @@ export const useUIStore = create<UIState>()((set, get) => ({
 
 // Guard: Verhindert dass Settings gespeichert werden bevor sie geladen wurden
 let settingsInitialized = false
+// Für Abläufe beim Start, die eine gespeicherte Einstellung respektieren müssen (Codex F04:
+// die Update-Prüfung las sonst den Default, wenn das Laden länger als eine Sekunde brauchte).
+let resolveUISettingsReady: () => void = () => {}
+export const uiSettingsReady: Promise<void> = new Promise(resolve => { resolveUISettingsReady = resolve })
 
 // Deep merge: Saved settings mit Defaults zusammenführen, sodass neue Sub-Properties
 // aus Updates nicht verloren gehen (z.B. neues Feld in dailyNote, languageTool etc.)
@@ -2044,6 +2053,7 @@ export async function initializeUISettings(): Promise<void> {
   } finally {
     // Settings dürfen erst NACH dem Laden gespeichert werden
     settingsInitialized = true
+    resolveUISettingsReady()
     console.log('[UIStore] Settings initialization complete, saving enabled')
   }
 }
