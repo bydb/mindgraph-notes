@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.5] - 2026-11-22
+
+**Für Schulsekretariate gibt es jetzt ein eigenes Profil „Schulverwaltung“, bei dem die KI nur auf Ihrem Rechner rechnet.** Wählen Sie es beim ersten Start: Anbieter im Netz sind dann gesperrt, Websuche, Bilderzeugung und andere Verbindungen nach außen bleiben aus, und E-Mail und Dashboard sind sofort da. Den Schalter „KI nur auf diesem Rechner“ gibt es auch in allen anderen Profilen unter Einstellungen → KI & Modelle.
+
+### Hintergrund
+
+- **Auslöser:** Weitere Medienzentren wollen MindGraph einführen, und Schulen wollen es in der Schulverwaltung erproben. Dort fragen Datenschutzbeauftragte zuerst, welche Daten den Rechner verlassen.
+- **KI nur auf diesem Rechner:** Gewählte Cloud-Anbieter (OpenRouter, LLMBase) werden abgewiesen, und Ollama-Modelle werden vor jedem Aufruf daraufhin geprüft, ob sie wirklich lokal laufen. Das gilt für Notiz-Chat, Petrol-Chat, Agent, Mail-Analyse und Mail-Assistent, die KI im Editor sowie Termin- und Tag-Vorschläge. Die Auswahlen bieten Cloud-Modelle dann gar nicht erst an.
+- **Ollama-Cloud-Modelle erkennbar:** Manche Cloud-Modelle von Ollama tragen keinen Hinweis „cloud“ im Namen. Die App erkennt sie jetzt an den Angaben von Ollama und kennzeichnet sie überall als Cloud, auch ohne den neuen Schalter.
+- **Antares für weitere Medienzentren:** Serveradresse und Kontext sind nicht mehr vorbelegt. Vorher stand dort die Adresse eines bestimmten Medienzentrums; wer sie nicht änderte, hätte seine Zugangsdaten dorthin geschickt. Wer Antares schon nutzt, behält seine bisherige Einstellung. Die Verbindung wird erst aufgebaut, wenn eine gültige https-Adresse eingetragen ist.
+- **Hessen gekennzeichnet:** Die Edupool-Recherche und die IQ-Auswertung tragen jetzt den Zusatz „Hessen“, weil sie nur dort passen.
+- **Grenzen:** Quiz, Workflows, Zettel-Erfassung, Projekt-Auswertung und Plugins prüfen die Herkunft von Ollama-Modellen noch nicht; die Einstellung nennt das. Der Plugin-Katalog wird weiterhin aus dem Netz geladen. Eine zentrale Vorgabe durch die IT, die Nutzer nicht ändern können, gibt es noch nicht.
+
 ## [1.4.4] - 2026-11-22
 
 **MindGraph Notes ist jetzt besser für den Einsatz in Firmen, Schulen und Behörden abgesichert.** Links in Antworten der KI können keine Dateien von Ihrem Rechner oder aus dem Netzwerk mehr ins Programmfenster laden. Zugangsschlüssel für Readwise und LanguageTool liegen verschlüsselt im Schlüsselbund des Systems, und die eingebaute Spracherkennung lädt keinen Programmcode mehr aus dem Internet nach. Wer Updates selbst verteilt, kann die automatische Update-Suche abschalten.
