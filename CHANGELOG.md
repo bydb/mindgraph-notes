@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.4] - 2026-11-22
+
+**MindGraph Notes ist jetzt besser für den Einsatz in Firmen, Schulen und Behörden abgesichert.** Links in Antworten der KI können keine Dateien von Ihrem Rechner oder aus dem Netzwerk mehr ins Programmfenster laden. Zugangsschlüssel für Readwise und LanguageTool liegen verschlüsselt im Schlüsselbund des Systems, und die eingebaute Spracherkennung lädt keinen Programmcode mehr aus dem Internet nach. Wer Updates selbst verteilt, kann die automatische Update-Suche abschalten.
+
+### Hintergrund
+
+- **Auslöser:** Eine Sicherheitsprüfung vor dem Einsatz bei Firmen und Institutionen, mit unabhängiger Gegenprüfung der Korrekturen.
+- **Links im Programmfenster:** Bisher konnte ein Link in einer KI-Antwort, etwa im Chat zur Notiz, eine lokale HTML-Datei ins Programmfenster laden; unter Windows auch eine Datei von einem Netzlaufwerk. Diese Seite hätte dieselben Rechte wie die App gehabt. Das gelingt nur, wenn jemand eine präparierte Datei vorher an die passende Stelle gebracht hat und Sie den Link anklicken. Jetzt bleiben Haupt- und Schnellerfassungsfenster immer bei der App; Web- und Mail-Adressen öffnen wie gewohnt im Browser oder Mailprogramm, alles andere wird verworfen.
+- **Zugangsschlüssel:** Die Schlüssel für Readwise und LanguageTool standen bisher im Klartext in der Einstellungsdatei. Beim ersten Start der neuen Version werden sie automatisch verschlüsselt, ohne dass Sie etwas tun müssen. Ist der Schlüsselbund einmal gesperrt, bleibt der Schlüssel erhalten und erscheint unter Einstellungen → Zugangsdaten als „gespeichert, derzeit nicht lesbar“. Unter Linux ohne Schlüsselbund bleibt es beim Klartext; die Seite Zugangsdaten zeigt das an.
+- **Spracherkennung:** Die eingebaute Diktierfunktion holte einen Teil ihrer Laufzeit beim ersten Gebrauch von einem fremden Server. Sie liegt jetzt der App bei. Das Sprachmodell selbst wird weiterhin einmalig von Hugging Face geladen.
+- **Update-Suche:** Unter Einstellungen → Allgemein → Start lässt sich „Beim Start nach Updates suchen“ ausschalten. Für verwaltete Rechner schaltet die Umgebungsvariable `MINDGRAPH_DISABLE_UPDATE_CHECK=1` Suche und Download zentral ab.
+- **Grenze:** Wer einen Schlüssel entfernt, während die Schnellerfassung offen ist, sollte sie danach einmal schließen; sonst kann sie den alten Schlüssel beim nächsten Speichern einer Einstellung zurückschreiben.
+
 ## [1.4.3] - 2026-11-18
 
 **Der Agent zeichnet jetzt vier neue Formen: Vier-Felder-Matrix und Begriffsnetz als Excalidraw-Zeichnung, Ablaufdiagramm und Zeitstrahl direkt in der Notiz.** Die Zeichnungen sind zum Weiterarbeiten gedacht: In der Matrix ziehen Sie Karten von Feld zu Feld, im Begriffsnetz gehen die beschrifteten Pfeile mit, wenn Sie einen Begriff verschieben. Ablaufdiagramm und Zeitstrahl bleiben als Text in der Notiz bearbeitbar.
