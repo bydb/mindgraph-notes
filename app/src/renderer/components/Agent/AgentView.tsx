@@ -159,7 +159,10 @@ export function AgentView({ tabId }: Props) {
   const shellModule = useIsModuleEnabled('agent-shell')
   const computerModule = useIsModuleEnabled('agent-computer')
   const mcpModule = useIsModuleEnabled('agent-mcp')
-  const imageModule = useIsModuleEnabled('image-generation')
+  // „KI nur auf diesem Rechner“ sperrt die Bildgenerierung über Google im Main — die Karte
+  // darf sie dann nicht als möglichen Datenweg ankündigen.
+  const localOnly = useUIStore(s => s.ollama.localOnly)
+  const imageModule = useIsModuleEnabled('image-generation') && !localOnly
   const computerSettings = useUIStore(s => s.agentComputer) ?? DEFAULT_COMPUTER_CONTROL
   const shellNetwork = useUIStore(s => s.agentShell?.network === true)
   const webResearchConfig = useUIStore(s => s.webResearchConfig)

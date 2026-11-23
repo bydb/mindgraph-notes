@@ -18,6 +18,7 @@ vi.mock('fs', () => ({
 }))
 
 import { generateImage } from './imagenService'
+import { configureLocalOnlyGuard } from '../llm/localOnlyGuard'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -34,6 +35,18 @@ describe('Nano-Banana-Bildgenerierung', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
+  })
+
+  it('sendet nichts an Google, wenn „KI nur auf diesem Rechner“ eingeschaltet ist', async () => {
+    configureLocalOnlyGuard(async () => ({ ollama: { localOnly: true } }))
+    try {
+      const res = await generateImage('Ein Haus am See')
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('KI nur auf diesem Rechner')
+      expect(fetch).not.toHaveBeenCalled()
+    } finally {
+      configureLocalOnlyGuard(null)
+    }
   })
 
   it('nutzt Gemini 3.1 Flash Image über das aktuelle Interactions-Schema', async () => {

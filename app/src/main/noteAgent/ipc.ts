@@ -54,6 +54,7 @@ import type { VaultQueryResult } from '../rag/vaultRetrieve'
 import { resolveLocalModel, LocalModelError } from '../rag/localModel'
 import { classifyRoute, evaluateCloudGate, type AgentRoute } from '../../shared/agentRoute'
 import { probeImageView } from './describeImage'
+import { isLocalOnlyInSettings } from '../llm/localOnlyGuard'
 
 
 export async function classifyAgentRoute(backend: 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase', model: string): Promise<AgentRoute> {
@@ -546,7 +547,8 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       let imageGen = false
       try {
         const ui = await loadUISettings() as Record<string, unknown>
-        if (ui.imageGenerationEnabled === true) {
+        // Nicht bei „KI nur auf diesem Rechner“: das Werkzeug gar nicht erst anbieten.
+        if (ui.imageGenerationEnabled === true && !isLocalOnlyInSettings(ui)) {
           const { loadImagenKey } = await import('../imageGen/imagenService')
           imageGen = !!(await loadImagenKey())
         }

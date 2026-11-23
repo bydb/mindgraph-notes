@@ -1,6 +1,6 @@
 // Schalter „KI nur auf diesem Rechner“ (11/2026, Profil Schulverwaltung). Durchgesetzt wird er im
 // Main (main/llm/localOnlyGuard.ts), hier wird er nur gesetzt und ehrlich beschrieben — inklusive
-// dessen, was er NICHT abdeckt (Websuche, Bilder, Plugins usw. haben eigene Schalter).
+// dessen, was er NICHT abdeckt (Websuche, Sprachausgabe, Plugins usw. haben eigene Schalter; die Bilderzeugung über Google ist seit 23.11.2026 mit gesperrt).
 import React from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'

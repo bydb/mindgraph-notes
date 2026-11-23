@@ -10,6 +10,7 @@
 import { app, safeStorage } from 'electron'
 import { promises as fs } from 'fs'
 import path from 'path'
+import { assertCloudAllowed } from '../llm/localOnlyGuard'
 
 const IMAGE_MODEL = 'gemini-3.1-flash-image'
 const INTERACTIONS_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions'
@@ -141,6 +142,9 @@ export async function generateImage(
   }
 ): Promise<ImageGenResult> {
   try {
+    // „KI nur auf diesem Rechner“: Der Bild-Prompt ginge an Google — auch aus einem lokalen
+    // Agent-Lauf heraus. Hier und nicht bei den Aufrufern, damit kein Weg daran vorbeiführt.
+    await assertCloudAllowed('Bildgenerierung über Google')
     const apiKey = await loadImagenKey()
     if (!apiKey) {
       return { success: false, error: 'Kein Google-AI-Studio-API-Key hinterlegt (Einstellungen → KI → Bild-Generierung)' }
