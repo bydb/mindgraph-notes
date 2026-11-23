@@ -253,13 +253,11 @@ import { recordNoteWrite, recordNoteMove, readDayLog } from './dayLog'
 import type { DayLogOrigin } from '../shared/dayLog'
 import { readActivityEvents, recordActivity, appendActivityEvent, readActivitySummary, onActivityChanged, setEmailForegroundMs, raiseJobActiveMs, appendTimeCorrection } from './activityLedger'
 import { VALUED_TYPES, isActivityEvent, normalizeSkillReferences, normalizeSkillIdList, type ActivityEvent } from '../shared/activityLog'
-import { skillActivityId, vaultActivityKey } from './skillActivityId'
 import { stopAgentShellProcesses } from './noteAgent/shellExecution'
 import { findBrand, saveBrand, setBrandEnabled, removeBrand, readBrandLogo, type PendingLogo } from './brand/brandService'
 import { rasterLogo } from './brand/logoRaster'
 import { suggestPalette } from '../shared/brandPalette'
-import { listVaultSkills, setSkillEnabled, createSkill, SKILLS_DIRNAME } from './noteAgent/skillsLoader'
-import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './noteAgent/skillsCatalog'
+import { registerNoteSkillsIpc } from './noteAgent/skillsIpc'
 import { rememberRemoteOllamaModels } from '../shared/modelCompatibility'
 import { OllamaCapabilityResolver, parseOllamaModels } from './ollamaCapabilities'
 import { VaultRagManager } from './rag/vaultRagManager'
@@ -5071,106 +5069,8 @@ ipcMain.handle('activity-summary', async (event, vaultPath: string, range?: { fr
   }
 })
 
-// ── Agent-Skills Stufe 1: Vault-Skills verwalten (docs/agent-skills-plan.md) ──
-ipcMain.handle('note-skills-list', async (event, vaultPath: string) => {
-  if (!isTrustedSender(event)) return { skills: [], error: 'Nicht autorisierter Aufrufer' }
-  try {
-    assertApprovedVault(vaultPath, 'note-skills-list')
-    // activityId: dieselbe opake Kennung, die use_skill ins Protokoll schreibt — die
-    // Zeitbilanz-Einstellung schlüsselt Skill-Referenzen danach (vault-gebunden).
-    const skills = await listVaultSkills(vaultPath)
-    return { skills: skills.map(s => ({ ...s, activityId: skillActivityId(vaultPath, s.folderName) })), vaultKey: vaultActivityKey(vaultPath) }
-  } catch (error) {
-    return { skills: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
-
-ipcMain.handle('note-skills-set-enabled', async (event, vaultPath: string, folderName: string, enabled: boolean) => {
-  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
-  try {
-    assertApprovedVault(vaultPath, 'note-skills-set-enabled')
-    await setSkillEnabled(vaultPath, path.basename(folderName), enabled)
-    return { success: true }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
-
-ipcMain.handle('note-skills-create', async (event, vaultPath: string, name: string) => {
-  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
-  try {
-    assertApprovedVault(vaultPath, 'note-skills-create')
-    const res = await createSkill(vaultPath, name)
-    return { success: true, ...res }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
-
-// Gebündelte Starter-Skills (resources/starter-skills/*) in den Vault kopieren —
-// vorhandene Skill-Ordner werden NIE überschrieben.
-ipcMain.handle('note-skills-install-starter', async (event, vaultPath: string) => {
-  if (!isTrustedSender(event)) return { success: false, installed: [], error: 'Nicht autorisierter Aufrufer' }
-  try {
-    assertApprovedVault(vaultPath, 'note-skills-install-starter')
-    const sourceDir = path.join(bundledResourcesDir(), 'starter-skills')
-    const entries = await fs.readdir(sourceDir, { withFileTypes: true })
-    const installed: string[] = []
-    for (const e of entries) {
-      if (!e.isDirectory()) continue
-      const target = path.join(vaultPath, SKILLS_DIRNAME, e.name)
-      try {
-        await fs.access(target)
-        continue // existiert — nicht überschreiben
-      } catch {
-        /* frei — kopieren */
-      }
-      await copyDirectoryRecursive(path.join(sourceDir, e.name), target)
-      installed.push(e.name)
-    }
-    return { success: true, installed }
-  } catch (error) {
-    return { success: false, installed: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
-
-// ── Agent-Skills Stufe 2: kuratierter Katalog + Import (docs/agent-skills-plan.md) ──
-ipcMain.handle('note-skills-catalog', async (event) => {
-  if (!isTrustedSender(event)) return { skills: [], error: 'Nicht autorisierter Aufrufer' }
-  try {
-    return { skills: await fetchSkillsCatalog() }
-  } catch (error) {
-    return { skills: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
-
-ipcMain.handle('note-skills-catalog-install', async (event, vaultPath: string, id: string) => {
-  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
-  try {
-    assertApprovedVault(vaultPath, 'note-skills-catalog-install')
-    const res = await installCatalogSkill(vaultPath, id)
-    return { success: true, ...res }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
-
-// Import vom Rechner: SKILL.md-Datei oder Skill-Ordner — die Dialog-Auswahl ist die Freigabe.
-ipcMain.handle('note-skills-import-dialog', async (event, vaultPath: string) => {
-  if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
-  try {
-    assertApprovedVault(vaultPath, 'note-skills-import-dialog')
-    const result = await dialog.showOpenDialog({
-      title: 'Skill importieren (SKILL.md oder Skill-Ordner)',
-      properties: ['openFile', 'openDirectory']
-    })
-    if (result.canceled || result.filePaths.length === 0) return { success: false, cancelled: true }
-    const res = await importSkillFromPath(vaultPath, result.filePaths[0])
-    return { success: true, ...res }
-  } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
-  }
-})
+// Agent-Skills: Liste, Aktivierung, Anlegen, Starter-Skills, Katalog, Import (main/noteAgent/skillsIpc.ts).
+registerNoteSkillsIpc({ assertApprovedVault, copyDirectoryRecursive })
 
 
 // Liest die registrierten Kontext-Dateien des Senders und baut den Prompt-Abschnitt.
