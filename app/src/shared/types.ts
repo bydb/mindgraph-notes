@@ -606,6 +606,10 @@ export interface NoteAgentSkill {
   folderName: string;
   relPath: string;
   enabled: boolean;
+  /** Länge des Anleitungstexts ohne Frontmatter. */
+  bodyChars: number;
+  /** true = der Agent bekommt nur den Anfang zu lesen (Lese-Grenze je Skill). */
+  truncated: boolean;
   /** Opake, vault-gebundene Kennung für die Zeitbilanz (Skill-Referenzen, Tätigkeitsprotokoll). */
   activityId: string;
 }
@@ -987,7 +991,7 @@ export interface ElectronAPI {
   noteAgentMemoryStatus: (vaultPath: string) => Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }>;
   imageGenHasKey: () => Promise<boolean>;
   // Agent-Skills Stufe 1
-  noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; vaultKey?: string; error?: string }>;
+  noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; vaultKey?: string; skipped?: { tooLarge: string[]; overLimit: number }; bodyLimit?: number; error?: string }>;
   brandGet: (vaultPath: string) => Promise<BrandStatusResult & { logoDataUrl?: string | null }>;
   brandPickLogo: () => Promise<{ success: boolean; canceled?: boolean; error?: string; token?: string; width?: number; height?: number; dataUrl?: string; suggestion?: import('./brandPalette').PaletteSuggestion }>;
   brandSave: (vaultPath: string, data: BrandSaveData, logoToken?: string) => Promise<BrandStatusResult>;

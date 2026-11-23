@@ -68,7 +68,7 @@ const MAX_BYTES_TEXT = 5 * 1024 * 1024 // md/txt/csv
 const MAX_XLSX_SHEETS = 5
 const MAX_XLSX_ROWS_PER_SHEET = 200
 const MAX_PDF_PAGES = 50
-const MAX_CHARS_PER_FILE = 15_000 // nach Extraktion
+export const MAX_CHARS_PER_FILE = 15_000 // nach Extraktion
 const MAX_CHARS_TOTAL = 30_000 // kumulativ pro Generate-Aufruf (wie emailContextBuilder)
 // Ordner-Kontext (Stufe 1, Plan „Erweiterung: Ordner als Kontext"): nur direkte Dateien,
 // begrenzte Anzahl gelesener Dateien, kleineres Pro-Datei-Budget, damit mehrere reinpassen.

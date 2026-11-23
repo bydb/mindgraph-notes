@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { useNotesStore } from '../../stores/notesStore'
 import { useTranslation } from '../../utils/translations'
 import { generateNoteId } from '../../utils/linkExtractor'
@@ -21,6 +21,9 @@ export function SkillsSection({ onClose }: Props) {
   const [skills, setSkills] = useState<NoteAgentSkill[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Was in der Liste fehlt (zu groß, über der Obergrenze) und ab wann gekürzt wird.
+  const [skipped, setSkipped] = useState<{ tooLarge: string[]; overLimit: number }>({ tooLarge: [], overLimit: 0 })
+  const [bodyLimit, setBodyLimit] = useState(18000)
   const [newName, setNewName] = useState('')
   const [installStatus, setInstallStatus] = useState<string | null>(null)
   // Stufe 2: kuratierter Katalog (Vorschau-vor-Install ist Pflicht-UX) + Import.
@@ -33,6 +36,8 @@ export function SkillsSection({ onClose }: Props) {
     setLoading(true)
     const res = await window.electronAPI.noteSkillsList(vaultPath)
     setSkills(res.skills)
+    setSkipped(res.skipped ?? { tooLarge: [], overLimit: 0 })
+    if (res.bodyLimit) setBodyLimit(res.bodyLimit)
     setError(res.error || null)
     setLoading(false)
   }, [vaultPath])
@@ -152,8 +157,8 @@ export function SkillsSection({ onClose }: Props) {
         ) : skills.length === 0 ? (
           <Note tone="muted">{t('settings.skills.empty')}</Note>
         ) : skills.map(skill => (
+          <Fragment key={skill.folderName}>
           <Row
-            key={skill.folderName}
             label={skill.name}
             htmlFor={`skill-${skill.folderName}`}
             hint={
@@ -165,7 +170,11 @@ export function SkillsSection({ onClose }: Props) {
           >
             <Toggle id={`skill-${skill.folderName}`} checked={skill.enabled} onChange={() => void toggleSkill(skill)} ariaLabel={skill.enabled ? t('settings.skills.disable') : t('settings.skills.enable')} />
           </Row>
+          {skill.truncated && <Note tone="warn">{t('settings.skills.truncated', { limit: bodyLimit.toLocaleString('de-DE'), chars: skill.bodyChars.toLocaleString('de-DE') })}</Note>}
+          </Fragment>
         ))}
+        {skipped.tooLarge.length > 0 && <Note tone="warn">{t('settings.skills.skippedLarge', { names: skipped.tooLarge.join(', ') })}</Note>}
+        {skipped.overLimit > 0 && <Note tone="warn">{t('settings.skills.skippedLimit', { n: skipped.overLimit })}</Note>}
         <Details title={t('settings.skills.newHint')}>
           <p>{t('settings.skills.limitNote')}</p>
         </Details>

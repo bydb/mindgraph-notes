@@ -10,7 +10,14 @@ import * as path from 'path'
 
 export const SKILLS_DIRNAME = 'Skills'
 const MAX_SKILLS = 50
-const MAX_SKILL_BODY_CHARS = 12_000
+/**
+ * Lese-Grenze je SKILL.md — eine Konstante für Leser, Skill-Liste und Tests.
+ * Bis 23.11.2026 12 000; angehoben, damit „Veranstaltungsjournal“ (16 808 Zeichen, geschätzt
+ * 7 035 Token) ganz ankommt. Höher geht ohne Weiteres nicht: Ein einzelnes Werkzeugergebnis darf
+ * ein Viertel des Kontexts füllen (TOOL_RESULT_SHARE), bei lokalen 32 768 Token also 8 192 —
+ * ein Skill darüber würde vom Lauf ganz abgelehnt statt gekürzt.
+ */
+export const MAX_SKILL_BODY_CHARS = 18_000
 const MAX_SKILL_FILE_BYTES = 512 * 1024
 
 export interface VaultSkillHeader {
@@ -22,12 +29,27 @@ export interface VaultSkillHeader {
 export interface VaultSkillInfo extends VaultSkillHeader {
   relPath: string // vault-relativer Pfad zur SKILL.md
   enabled: boolean
+  /** Länge des Anleitungstexts ohne Frontmatter — so, wie der Leser ihn zählt. */
+  bodyChars: number
+  /** true = use_skill liefert dem Modell nur die ersten MAX_SKILL_BODY_CHARS Zeichen. */
+  truncated: boolean
+}
+
+/** Skill-Ordner, die in der Liste fehlen, obwohl eine SKILL.md da ist. */
+export interface VaultSkillsSkipped {
+  /** Ordnernamen mit einer SKILL.md über 512 KB. */
+  tooLarge: string[]
+  /** Anzahl weiterer Skill-Ordner hinter der Obergrenze von MAX_SKILLS. */
+  overLimit: number
 }
 
 // Minimaler Frontmatter-Parser für die zwei Spec-Pflichtfelder — bewusst ohne
 // YAML-Dependency (einzeilige `name:`/`description:`-Werte, wie in der Spec üblich).
 function parseSkillFile(content: string): { name?: string; description?: string; body: string } {
-  const m = content.match(/^---\n([\s\S]*?)\n---\n?/)
+  // \r?\n: unter Windows angelegte Dateien haben \r\n — ohne das galt der Frontmatter-Block
+  // als Anleitungstext, Name und Beschreibung fielen auf den Ordnernamen zurück.
+  content = content.replace(/^\uFEFF/, '')
+  const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/)
   if (!m) return { body: content }
   const body = content.slice(m[0].length)
   const pick = (key: string): string | undefined => {
@@ -51,35 +73,49 @@ async function readSkillsDisabled(vaultPath: string): Promise<Set<string>> {
 }
 
 export async function listVaultSkills(vaultPath: string): Promise<VaultSkillInfo[]> {
+  return (await listVaultSkillsDetailed(vaultPath)).skills
+}
+
+/**
+ * Skill-Liste samt dem, was NICHT in ihr steht. Zu große Dateien und Ordner hinter der
+ * Obergrenze fielen vorher lautlos weg — der Nutzer sah nur, dass sein Skill fehlt.
+ */
+export async function listVaultSkillsDetailed(vaultPath: string): Promise<{ skills: VaultSkillInfo[]; skipped: VaultSkillsSkipped }> {
   const skillsDir = path.join(vaultPath, SKILLS_DIRNAME)
+  const skipped: VaultSkillsSkipped = { tooLarge: [], overLimit: 0 }
   let dirents
   try {
     dirents = await fs.readdir(skillsDir, { withFileTypes: true })
   } catch {
-    return []
+    return { skills: [], skipped }
   }
   const disabled = await readSkillsDisabled(vaultPath)
   const out: VaultSkillInfo[] = []
   for (const d of dirents) {
     if (!d.isDirectory() || d.name.startsWith('.')) continue
-    if (out.length >= MAX_SKILLS) break
     const skillFile = path.join(skillsDir, d.name, 'SKILL.md')
     try {
       const st = await fs.stat(skillFile)
-      if (!st.isFile() || st.size > MAX_SKILL_FILE_BYTES) continue
+      if (!st.isFile()) continue
+      if (out.length >= MAX_SKILLS) { skipped.overLimit++; continue }
+      if (st.size > MAX_SKILL_FILE_BYTES) { skipped.tooLarge.push(d.name); continue }
       const parsed = parseSkillFile(await fs.readFile(skillFile, 'utf-8'))
+      const bodyChars = parsed.body.trim().length
       out.push({
         name: parsed.name || d.name,
         description: parsed.description || '',
         folderName: d.name,
         relPath: `${SKILLS_DIRNAME}/${d.name}/SKILL.md`,
-        enabled: !disabled.has(d.name)
+        enabled: !disabled.has(d.name),
+        bodyChars,
+        truncated: bodyChars > MAX_SKILL_BODY_CHARS
       })
     } catch {
       /* Ordner ohne SKILL.md überspringen */
     }
   }
-  return out.sort((a, b) => a.name.localeCompare(b.name, 'de'))
+  skipped.tooLarge.sort((a, b) => a.localeCompare(b, 'de'))
+  return { skills: out.sort((a, b) => a.name.localeCompare(b.name, 'de')), skipped }
 }
 
 export async function listEnabledSkillHeaders(vaultPath: string): Promise<VaultSkillHeader[]> {
@@ -102,15 +138,40 @@ async function assertInsideSkill(vaultPath: string, folderName: string, absTarge
 
 // Voller Skill-Body für use_skill — ohne Frontmatter, Budget-gekappt.
 export async function readSkillBody(vaultPath: string, folderName: string): Promise<string> {
+  return (await readSkillBodyDetailed(vaultPath, folderName)).body
+}
+
+export interface SkillBodyRead {
+  /** Text fürs Modell — bei Überlänge gekappt, mit Vermerk. */
+  body: string
+  /** Ungekürzter Anleitungstext. Nur für Prüfungen der App, nie fürs Modell. */
+  fullBody: string
+  totalChars: number
+  truncated: boolean
+}
+
+/** Wie readSkillBody, sagt aber dazu, ob und wie viel gekappt wurde. */
+export async function readSkillBodyDetailed(vaultPath: string, folderName: string): Promise<SkillBodyRead> {
   const safeFolder = path.basename(folderName)
   const skillFile = await assertInsideSkill(vaultPath, safeFolder, path.join(vaultPath, SKILLS_DIRNAME, safeFolder, 'SKILL.md'))
   const content = await fs.readFile(skillFile, 'utf-8')
   const { body } = parseSkillFile(content)
   const trimmed = body.trim()
   if (!trimmed) throw new Error(`Skill "${safeFolder}" hat keinen Anleitungstext`)
-  return trimmed.length > MAX_SKILL_BODY_CHARS
-    ? trimmed.slice(0, MAX_SKILL_BODY_CHARS) + '\n[gekürzt: Skill-Budget erreicht]'
-    : trimmed
+  const truncated = trimmed.length > MAX_SKILL_BODY_CHARS
+  return {
+    body: truncated
+      ? trimmed.slice(0, MAX_SKILL_BODY_CHARS) + `\n[gekürzt: Skill-Budget erreicht — ${fmtChars(MAX_SKILL_BODY_CHARS)} von ${fmtChars(trimmed.length)} Zeichen gelesen, der Rest der Anleitung fehlt]`
+      : trimmed,
+    fullBody: trimmed,
+    totalChars: trimmed.length,
+    truncated
+  }
+}
+
+/** 16808 → „16 808“ (schmales geschütztes Leerzeichen wäre in Protokollen unhandlich). */
+export function fmtChars(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
 // Deaktivierungs-Liste in vault-settings.json fortschreiben — andere Felder

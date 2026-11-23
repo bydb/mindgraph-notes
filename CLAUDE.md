@@ -193,7 +193,7 @@ Diese Datei hält nur, was überall gilt. Feature-Wissen liegt in pfadgebundenen
 | Datei | Inhalt |
 |---|---|
 | `petrol-chat.md` | Agent-Tab Chat: Gesprächsführung im Main, Verlauf, Websuche (schnell/gründlich/Schleife), Satzprüfung, automatische Suche, Lernkarten |
-| `note-agent.md` | Notiz-Agent Kern: Ordner auswerten, Modellweg + Cloud-Zustimmung, Webrecherche, Bilder/OCR, Skill-Zeichengrenze (12 000) |
+| `note-agent.md` | Notiz-Agent Kern: Ordner auswerten, Modellweg + Cloud-Zustimmung, Webrecherche, Bilder/OCR, Skill-Zeichengrenze (18 000) |
 | `note-agent-outputs.md` | `write_html`, `write_docx`, `write_pptx`, `write_excalidraw`, `write_edumap`, Veranstaltungsjournal, Edupool, Hausdesign-Builder |
 | `note-agent-system-access.md` | Agent-Shell (Sandbox) und Rechner-Steuerung |
 | `mcp.md` | Externe Werkzeuge (MCP): wer garantiert was, Freigabedialoge, Sandbox mit allen Vaults, Netzweg, Herkunft |

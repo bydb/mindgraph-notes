@@ -9,7 +9,7 @@ import * as fs from 'fs/promises'
 import { isTrustedSender } from '../plugins/transport'
 import { bundledResourcesDir } from '../bundledResources'
 import { skillActivityId, vaultActivityKey } from '../skillActivityId'
-import { listVaultSkills, setSkillEnabled, createSkill, SKILLS_DIRNAME } from './skillsLoader'
+import { listVaultSkillsDetailed, setSkillEnabled, createSkill, SKILLS_DIRNAME, MAX_SKILL_BODY_CHARS } from './skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './skillsCatalog'
 
 export interface NoteSkillsIpcDeps {
@@ -27,8 +27,15 @@ export function registerNoteSkillsIpc(deps: NoteSkillsIpcDeps): void {
       assertApprovedVault(vaultPath, 'note-skills-list')
       // activityId: dieselbe opake Kennung, die use_skill ins Protokoll schreibt — die
       // Zeitbilanz-Einstellung schlüsselt Skill-Referenzen danach (vault-gebunden).
-      const skills = await listVaultSkills(vaultPath)
-      return { skills: skills.map(s => ({ ...s, activityId: skillActivityId(vaultPath, s.folderName) })), vaultKey: vaultActivityKey(vaultPath) }
+      // skipped/bodyLimit: was in der Liste fehlt bzw. gekürzt beim Modell ankommt, soll in den
+      // Einstellungen sichtbar sein statt still zu passieren (Codex F01).
+      const { skills, skipped } = await listVaultSkillsDetailed(vaultPath)
+      return {
+        skills: skills.map(s => ({ ...s, activityId: skillActivityId(vaultPath, s.folderName) })),
+        vaultKey: vaultActivityKey(vaultPath),
+        skipped,
+        bodyLimit: MAX_SKILL_BODY_CHARS
+      }
     } catch (error) {
       return { skills: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
     }

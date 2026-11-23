@@ -29,7 +29,7 @@ import { queryDataset, markdownTable, fillDatasetPlaceholders, DatasetQueryError
 import { wrapForeignResult } from '../../shared/mcp'
 import { estimateTokens } from '../../shared/contextBudget'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
-import { readSkillBody, listSkillFiles, resolveSkillFile } from './skillsLoader'
+import { readSkillBodyDetailed, listSkillFiles, resolveSkillFile, fmtChars, MAX_SKILL_BODY_CHARS } from './skillsLoader'
 import { markdownToDocx, markdownToDocxBuffer } from '../office/officeService'
 import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from '../../shared/docxTemplateFill'
 import { fillDocxTableCells, MAX_FILL_ENTRIES, type DocxCellEntry } from '../../shared/docxTableFill'
@@ -884,7 +884,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (!skill) {
         return err(`Skill "${name}" nicht gefunden. Verfügbar: ${ctx.run.skills.map(s => s.name).join(', ') || '(keine)'}`)
       }
-      const body = await readSkillBody(ctx.run.vaultPath, skill.folderName)
+      const { body, fullBody, totalChars, truncated } = await readSkillBodyDetailed(ctx.run.vaultPath, skill.folderName)
       ctx.run.sources.add(`Skill: ${skill.name}`)
       // Zeitbilanz: welcher Skill den Lauf geprägt hat (Bewertung je Skill). Nur die opake
       // Kennung geht ins Protokoll; der Name bleibt am Lauf für die Ergebniskarte.
@@ -892,15 +892,27 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       if (!ctx.run.skillsUsed.some(s => s.id === skillId)) ctx.run.skillsUsed.push({ id: skillId, label: skill.name })
       // Ein Skill, der write_pptx verlangt, erwartet eine PowerPoint-Datei — entsteht am
       // Ende keine, sagt loop.ts das ausdrücklich (sonst sieht man nur eine .md).
-      if (body.includes('write_pptx')) ctx.run.expectedPptxSkill = skill.name
-      if (body.includes('write_excalidraw')) ctx.run.expectedMindmapSkill = skill.name
+      // Am UNGEKÜRZTEN Text prüfen: steht das Werkzeug erst hinter der Lese-Grenze, entfiele
+      // sonst mit der Kappung auch der Hinweis am Laufende.
+      if (fullBody.includes('write_pptx')) ctx.run.expectedPptxSkill = skill.name
+      if (fullBody.includes('write_excalidraw')) ctx.run.expectedMindmapSkill = skill.name
       // references/assets sichtbar machen (Stufe 3) — gelesen wird per read_skill_file.
       const files = await listSkillFiles(ctx.run.vaultPath, skill.folderName, !!ctx.run.shell)
       const filesNote = files.length
         ? `\n\n[Zusatzdateien dieses Skills — bei Bedarf mit read_skill_file lesen: ${files.join(', ')}]`
         : ''
       const shellNote = ctx.run.shell ? `\nSkill-Ordner für Shell-Befehle: ${JSON.stringify(path.join(ctx.run.vaultPath, 'Skills', skill.folderName))}. Skripte vor der Ausführung mit read_skill_file prüfen.` : ''
-      return { ok: true, content: body + filesNote + shellNote, display: `use_skill: ${skill.name}` }
+      // Kappung nicht nur dem Modell sagen: Der Protokollschritt nennt sie dem Nutzer, und das
+      // Modell soll sie in seiner Abschlussmeldung erwähnen (Codex F01, 23.11.2026).
+      const cutInfo = `${fmtChars(MAX_SKILL_BODY_CHARS)} von ${fmtChars(totalChars)} Zeichen gelesen`
+      const cutNote = truncated
+        ? `\n\n[Hinweis der App: Diese Anleitung ist zu lang und kam nur gekürzt bei dir an (${cutInfo}). Regeln am Ende fehlen dir.${files.length ? ' Prüfe, ob die Zusatzdateien unten den fehlenden Teil enthalten.' : ''} Sage dem Nutzer in deiner Abschlussmeldung in einem Satz, dass der Skill „${skill.name}“ gekürzt gelesen wurde.]`
+        : ''
+      return {
+        ok: true,
+        content: body + cutNote + filesNote + shellNote,
+        display: truncated ? `use_skill: ${skill.name} — gekürzt, ${cutInfo}` : `use_skill: ${skill.name}`
+      }
     }
   })
 
