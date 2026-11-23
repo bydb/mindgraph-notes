@@ -2123,6 +2123,24 @@ export async function setChatImageConsentDurable(provider: 'openrouter' | 'llmba
   return ok
 }
 
+/**
+ * „KI nur auf diesem Rechner“ umlegen und sofort schreiben (Codex F27): Der Main liest den
+ * Schalter aus ui-settings.json. Mit dem üblichen Aufschub von 300 ms war er im Fenster schon
+ * an, im Main aber noch aus. Scheitert das Schreiben, springt der Wert zurück.
+ */
+export async function setLocalOnlyDurable(value: boolean): Promise<boolean> {
+  const st = useUIStore.getState()
+  const previous = st.ollama.localOnly === true
+  st.setOllama({ localOnly: value })
+  let ok = false
+  try {
+    ok = await flushUISettings()
+  } finally {
+    if (!ok) useUIStore.getState().setOllama({ localOnly: previous })
+  }
+  return ok
+}
+
 export async function flushUISettings(): Promise<boolean> {
   if (!settingsInitialized) return false
   if (saveTimeout) { clearTimeout(saveTimeout); saveTimeout = null }

@@ -2,14 +2,24 @@
 // Main (main/llm/localOnlyGuard.ts), hier wird er nur gesetzt und ehrlich beschrieben — inklusive
 // dessen, was er NICHT abdeckt (Websuche, Sprachausgabe, Plugins usw. haben eigene Schalter; die Bilderzeugung über Google ist seit 23.11.2026 mit gesperrt).
 import React from 'react'
-import { useUIStore } from '../../stores/uiStore'
+import { useUIStore, setLocalOnlyDurable } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { Card, ServiceHead, IconTile, Note } from './SettingsUI'
 
 export const LocalOnlySection: React.FC = () => {
   const { t } = useTranslation()
   const localOnly = useUIStore(s => s.ollama.localOnly === true)
-  const setOllama = useUIStore(s => s.setOllama)
+  // Der Main liest den Schalter aus der gespeicherten Datei: sofort schreiben, und während des
+  // Schreibens weder als ein- noch als umschaltbar zeigen (Codex F27).
+  const [saving, setSaving] = React.useState(false)
+  const [failed, setFailed] = React.useState(false)
+  const toggle = async (v: boolean): Promise<void> => {
+    setSaving(true)
+    setFailed(false)
+    const ok = await setLocalOnlyDurable(v)
+    setSaving(false)
+    setFailed(!ok)
+  }
   return (
     <Card>
       <ServiceHead
@@ -24,8 +34,9 @@ export const LocalOnlySection: React.FC = () => {
         name={t('settings.localOnly.name')}
         desc={t('settings.localOnly.desc')}
         dimmed={!localOnly}
-        toggle={{ checked: localOnly, onChange: v => setOllama({ localOnly: v }), ariaLabel: t('settings.localOnly.name') }}
+        toggle={{ checked: localOnly, onChange: v => { void toggle(v) }, disabled: saving, ariaLabel: t('settings.localOnly.name') }}
       />
+      {failed && <Note tone="muted">{t('settings.localOnly.saveFailed')}</Note>}
       {localOnly && <Note tone="muted">{t('settings.localOnly.scope')}</Note>}
     </Card>
   )

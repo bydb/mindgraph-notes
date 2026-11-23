@@ -8,7 +8,7 @@ vi.mock('electron', () => ({
 }))
 
 import {
-  configureLocalOnlyGuard, isLocalOnlyInSettings, isLocalOnlyActive,
+  configureLocalOnlyGuard, isLocalOnlyInSettings, isLocalOnlyActive, localOnlyState,
   assertCloudAllowed, assertLocalOllamaModel, LocalOnlyError
 } from './localOnlyGuard'
 import { chat, chatWithTools, streamCloudChat } from './chatClient'
@@ -56,11 +56,15 @@ describe('isLocalOnlyInSettings', () => {
     expect(isLocalOnlyInSettings({})).toBe(false)
     expect(isLocalOnlyInSettings(null)).toBe(false)
   })
-  it('ohne Konfiguration oder bei Lesefehler: aus (Verhalten wie vor 11/2026)', async () => {
+  it('ohne Konfiguration: aus (Verhalten wie vor 11/2026)', async () => {
     configureLocalOnlyGuard(null)
     expect(await isLocalOnlyActive()).toBe(false)
+  })
+  it('Einstellungen nicht lesbar: Stand unbekannt, Cloud gesperrt mit eigener Meldung (Codex F27)', async () => {
     configureLocalOnlyGuard(async () => { throw new Error('kaputt') })
-    expect(await isLocalOnlyActive()).toBe(false)
+    expect(await localOnlyState()).toBe('unknown')
+    expect(await isLocalOnlyActive()).toBe(true)
+    await expect(assertCloudAllowed('OpenRouter')).rejects.toThrow(/Einstellungen lassen sich gerade nicht lesen/)
   })
   it('liest den Schalter bei jedem Aufruf frisch', async () => {
     expect(await isLocalOnlyActive()).toBe(false)

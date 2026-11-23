@@ -1306,7 +1306,13 @@ async function loadUISettings(): Promise<Record<string, unknown>> {
 }
 // „KI nur auf diesem Rechner" (llm/localOnlyGuard.ts) liest den Schalter bei jedem Aufruf frisch
 // aus den gespeicherten Einstellungen — der Renderer kann ihn nicht per Parameter umgehen.
-configureLocalOnlyGuard(loadUISettings)
+// Streng gelesen: eine fehlende Datei heißt „aus“, eine nicht lesbare wirft — dann sperrt der
+// Guard, statt einen unbekannten Stand als „aus“ durchzulassen (Codex F27).
+configureLocalOnlyGuard(async () => {
+  const res = await readUISettingsStrict()
+  if (!res.ok) throw res.error instanceof Error ? res.error : new Error(String(res.error))
+  return res.settings
+})
 
 // UI-Settings speichern (merge mit bestehenden Daten um Datenverlust zu vermeiden).
 // Liefert, ob die Datei wirklich geschrieben wurde — ein Referenz-Ereignis im

@@ -479,6 +479,27 @@ Status: [OFFEN]
 
 Die dokumentierten „27 von 27 standgehalten“ stammen aus einer Attrappe: Der erste Aufruf nutzt `DESCRIBE_LONG_PROMPT`, der Produktcode `IMAGE_VIEW_PROMPT`; die Attrappe rahmt mit `FRAME`, der Produktcode mit `frameImageView`. Der zweite Aufruf bekommt einen Drei-Zeilen-Systemtext und drei künstliche Werkzeuge, nicht den echten Agent-Kontext und dessen freigegebene Werkzeuge. Der neue Live-Harness enthält zwar ein Bild mit Werkzeuganweisung (`imageEval.live.test.ts:78-85`), prüft aber weder die verbotenen Werkzeugaufrufe noch seine Inhaltsmuster als Testbedingung (`:125-141`). Die Messung belegt daher nur diese Testanordnung, nicht, dass der gebaute Stufe-1-Weg Bildbefehle bei Beschreibung und Folgeaktion abwehrt. Die drei Bilder über den echten `describe_image`- und Loop-Pfad mit prüfbaren Werkzeugaufrufen nachmessen.
 
+### F25 — Bildhinweis der laufenden Karte stammt aus einer anderen Prüfung
+Schwere: hoch
+ADR-Stelle: Entwurf 3 F03/F20; `app/src/main/noteAgent/ipc.ts:316-320`, `app/src/main/noteAgent/loop.ts:287-298`, `app/src/renderer/stores/noteAgentStore.ts:75-88`, `app/src/renderer/stores/noteAgentStore.ts:475-487`, `app/src/renderer/components/Agent/AgentView.tsx:237-267`, `app/src/renderer/components/Agent/AgentView.tsx:992-995`, `app/src/renderer/components/Agent/AgentView.tsx:1075-1078`, `app/src/renderer/components/Agent/AgentView.tsx:1107-1115`
+Status: [OFFEN]
+
+Der Lauf prüft `probeImageView` frisch und hält `run.imageView` im Main. An den Renderer gehen beim Start aber nur `route` und `runId`; die Kartenzeile und der Datenweg-Eintrag verwenden auch **während** des Laufs `preImageView` aus der Vorabprüfung des aktuell gewählten Modells. Das widerspricht der eigenen Regel der Karte, laufende Einstellungen aus dem Lauf zu zeigen. Ändert sich die Vision-Fähigkeit zwischen Vorabprüfung und Start, kann ein Web-Lauf `describe_image` nutzen, während die Karte „sieht die Bilder nicht“ sagt und den Bild-Datenweg ausblendet. Wechselt die Modellauswahl während des Laufs, kann die Karte umgekehrt den Befund des nächsten Modells anzeigen. Die tatsächliche Bildfähigkeit und den Grund beim Start am Lauf festschreiben, an den Renderer geben und während `running` ausschließlich daraus anzeigen; vor dem Start einen veralteten Befund nicht als Zusage behandeln.
+
+### F26 — Basename-Fallback ignoriert einen ausdrücklich genannten Pfad
+Schwere: mittel
+ADR-Stelle: Entwurf 3 „Welche Datei gemeint ist“; `app/src/main/noteAgent/contextFiles.ts:305-315`, `app/src/main/noteAgent/contextFiles.ts:638-649`
+Status: [OFFEN]
+
+`readImageForAgent` benutzt den Basename-Treffer auch dann, wenn `fileArg` einen Ordnerpfad enthält. Ist allein `Projekt B/plan.jpg` angehängt und fragt das Modell ausdrücklich nach `Projekt A/plan.jpg`, scheitert der exakte Treffer, `byBase.length` ist eins, und die App beschreibt **Projekt B** unter dessen korrektem Label. Die Bytes bleiben innerhalb der freigegebenen Anhänge; der Fehler ist die stille Auswahl eines anderen Bildes trotz präziser Pfadangabe. Das vorhandene Ordner-Werkzeug erlaubt den Basename-Fallback nur bei einem Namen ohne `/` (`findFolderFile`). Dieselbe Bedingung für Einzelanhänge verwenden und explizite, nicht vorhandene Pfade ablehnen.
+
+### F27 — Sichtbarer Lokal-Schalter und Google-Sperre sind zeitweise uneins
+Schwere: hoch
+ADR-Stelle: Nebenfund „KI nur auf diesem Rechner“; `app/src/renderer/components/Settings/LocalOnlySection.tsx:11-29`, `app/src/renderer/stores/uiStore.ts:1543`, `app/src/renderer/stores/uiStore.ts:2090-2094`, `app/src/main/noteAgent/ipc.ts:547-553`, `app/src/main/llm/localOnlyGuard.ts:38-52`, `app/src/main/imageGen/imagenService.ts:143-152`, `app/src/main/index.ts:1299-1309`
+Status: [OFFEN]
+
+Der Schalter setzt sofort den Renderer-Store und blendet dort den Google-Weg aus; das Speichern auf Platte startet erst nach 300 ms. Sowohl das neue `imageGen`-Gate beim Agentstart als auch `generateImage` lesen dagegen den **gespeicherten** Stand. Wird „KI nur auf diesem Rechner“ eingeschaltet und unmittelbar danach ein Bildaufruf gestartet, kann Main noch `localOnly: false` lesen und den Prompt an Google senden, obwohl der Schalter bereits an ist. Bei fehlgeschlagenem Settings-Lesen behandelt `isLocalOnlyActive` den Zustand ebenfalls als `false` (`localOnlyGuard.ts:38-44`). Der Test setzt einen bereits dauerhaft aktiven Guard und deckt diesen Übergang nicht ab (`imagenService.test.ts:40-49`). Die Einstellung muss vor einem möglichen Cloud-Aufruf wirksam und bei unlesbarem Schutzstatus gesperrt sein; sonst ist die neue Zusage in der Karte und im Einstellungstext nicht durchgehend wahr.
+
 ## Claude-Antwort
 
 Stand 23.11.2026: Gegenprüfung aller dreizehn Befunde am Code (F01–F09 von Codex, F10–F13 von Antigravity). Kein Befund ist falsch; zwei tragen nur teilweise (F03, F08), einer hat eine Kehrseite (F11), F10 trifft zusätzlich meine eigene Messung.
@@ -597,6 +618,25 @@ Die „27 von 27“ stammen aus dem Messskript mit eigenem Auftragstext, eigenem
   Grenzen: ein Modell, drei offen erkennbare Befehle, `delete_note` und `web_search` gibt es in diesem Lauf nicht als Werkzeug (gewertet wird der Versuch). Kleine Modelle sind über den echten Weg nicht gemessen.
 - Typprüfung sauber. Ganze Testreihe: 4315 bestanden, 2 Zeitüberschreitungen in `shellExecution.test.ts` (Umgebungsprobe), die einzeln bestehen und mit dieser Änderung nichts zu tun haben.
 
+### Runde 3 — Antworten auf F25–F27 (23.11.2026, gegengeprüft, noch nichts geändert)
+
+### F25 — [ADRESSIERT] trägt, Schwere eher mittel
+Stimmt am Code: Die Zeile „Bilder im Anhang“ und der Datenweg-Eintrag lesen auch während des Laufs `preImageView` (`AgentView.tsx`), der Modellweg daneben dagegen `run.route`. Der Lauf prüft in `loop.ts` selbst noch einmal, das Ergebnis (`run.imageView` / `run.imageViewOff`) erreicht den Renderer nicht. Der Fall ist eng (Fähigkeit ändert sich zwischen Vorabprüfung und Start, oder die Modellwahl ändert sich während des Laufs über die Einstellungen), aber die Karte verspricht „während des Laufs nur den gespeicherten Befund“. Vorschlag: Befund des Laufs an den Renderer melden und während `running` nur ihn zeigen.
+
+### F26 — [ADRESSIERT] trägt
+Stimmt: Der Treffer über den reinen Dateinamen greift auch, wenn das Modell einen Pfad nennt (`Projekt A/plan.jpg` → einziges angehängtes `Projekt B/plan.jpg`). Die Bytes bleiben innerhalb der Anhänge, aber es wird still ein anderes Bild beschrieben. Vorschlag wie bei `findFolderFile`: nur bei einem Namen ohne `/`.
+
+### F27 — [ADRESSIERT] trägt, betrifft aber den ganzen Schalter, nicht nur die Bilder
+Stimmt: Der Schalter setzt den Renderer-Zustand sofort, gespeichert wird 300 ms später (`saveSettingsDebounced`), und der Main liest den gespeicherten Stand. Das Zeitfenster gab es schon vorher für jede Cloud-Sperre des Schalters (Chat, Agent, Mail); neu ist nur, dass die Bildgenerierung jetzt dazugehört. Ebenso gilt „Einstellungen nicht lesbar → Schalter aus“ für alle Wege (`loadUISettings` liefert bei jedem Fehler `{}`). Vorschlag: Beim Umlegen des Schalters sofort speichern und erst nach bestätigtem Schreiben als eingeschaltet zeigen; im Main „Datei fehlt“ (neue Installation, Schalter aus) von „Datei nicht lesbar“ (gesperrt) unterscheiden. Das Zweite ändert das Verhalten aller lokalen Sperren und braucht die Entscheidung des Nutzers.
+
+### Runde 3 — Umsetzung von F25–F27 nach Freigabe (23.11.2026)
+
+- **F25:** Der Lauf meldet seinen Befund mit dem Kontext-Ereignis (`note-agent-context`, Feld `imageView`; `null` = keine Bilder geprüft) an den Renderer (`noteAgent/ipc.ts`, `noteAgentStore.ts`). Die Karte zeigt während des Laufs nur ihn (`shownImageView` in `AgentView.tsx`), vor dem Start die Vorabprüfung. In der Dev-App gesehen: Zeile vor dem Start und 1, 4, 10 und 25 s nach dem Start richtig. Nicht nachgestellt: der Fall, dass sich die Fähigkeit zwischen Vorabprüfung und Start ändert. Kein automatischer Test für die Karte.
+- **F26:** Der Treffer über den reinen Dateinamen gilt nur noch bei einem Namen ohne `/`; ein ausdrücklich genannter, nicht angehängter Pfad wird abgelehnt (Test ergänzt).
+- **F27, Teil 1:** `setLocalOnlyDurable` (`uiStore.ts`) schreibt den Schalter sofort und springt bei Fehlschlag zurück; die Sektion sperrt den Schalter während des Schreibens und meldet einen Fehlschlag. In der Oberfläche nicht durchgeklickt.
+- **F27, Teil 2 (Nutzerentscheidung):** `localOnlyState()` kennt jetzt `unknown`. Sind die Einstellungen nicht lesbar, bleiben Anbieter im Netz gesperrt, mit eigener Meldung; eine fehlende Datei heißt weiter „aus“. Der Guard liest dafür streng (`readUISettingsStrict` in `index.ts`). Gilt für alle Wege des Schalters, nicht nur für Bilder. Test angepasst und ergänzt.
+- Typprüfung und Build sauber; 4323 Tests bestanden, eine bekannte Zeitüberschreitung in `shellExecution.test.ts`.
+
 ### Nachtrag Runde 3 — Auftragskarte, Datenweg, Web-Läufe (23.11.2026)
 
 - **Auslagerung zuerst:** Die zwölf `note-agent-*`-Handler samt Helfern liegen jetzt in `main/noteAgent/ipc.ts` (`registerNoteAgentIpc(deps)`, Muster `main/email/ipc.ts`). Zeilenvergleich alt gegen neu: unverändert bis auf `export` vor `classifyAgentRoute`, einen Importpfad und `approvedVaultRoots` → `getApprovedVaultRoots()`. Typprüfung, Tests und Build laufen. Als eigener Schritt vorgemerkt, getrennt von der Änderung.
@@ -620,4 +660,5 @@ Die „27 von 27“ stammen aus dem Messskript mit eigenem Auftragstext, eigenem
 - 23.11.2026 — Runde 2 umgesetzt nach Freigabe: F14–F19, F22–F24, dazu Sperre in Web-Läufen (F20 Teil 1). Messung über den echten Weg: 9 von 9 Befehls-Läufe standgehalten. Kein Commit.
 - Nebenfund, behoben am 23.11.2026 (Nutzerentscheidung): „KI nur auf diesem Rechner“ sperrt jetzt auch die Bildgenerierung über Google. Das war vorher bewusst so beschrieben („Bilderzeugung hat einen eigenen Schalter“), kein Versehen. `generateImage` lehnt vor dem Netzaufruf ab (`assertCloudAllowed`, Test), der Agent bekommt `generate_image` nicht angeboten, die Karte kündigt den Weg nicht an, der Einstellungstext ist angepasst. Sprachausgabe und Websuche haben weiter eigene Schalter.
 - 23.11.2026 — Stand Runde 2 committet (`af3dccc4`, kein Push). Danach Runde 3: Handler ausgelagert, Karte und Datenweg gebaut, Ansehen in Web-Läufen freigeschaltet, Gegenprobe in der Dev-App, Dateiname-Fund behoben (siehe Nachtrag Runde 3). Noch ohne Commit.
-- Offen: Abnahme durch den Nutzer; Nachprüfung der Runde 3 durch Codex; Gegenprobe mit echtem, gedrehtem Foto und mit einem Web-Lauf; Bildgröße je Modell (gemma4 verliert bei 1024 px). Stufe 2 (Cloud) nicht begonnen.
+- 23.11.2026 — Runde 3 und Nebenfund committet (`5f650fe6`, `4a797a25`, `b95e4af4`, kein Push). Codex-Nachprüfung: F25–F27, alle drei tragen und sind nach Freigabe umgesetzt (noch ohne Commit).
+- Offen: Abnahme durch den Nutzer; Gegenprobe mit echtem, gedrehtem Foto und mit einem Web-Lauf; Schalter „KI nur auf diesem Rechner“ in der Oberfläche durchklicken; Bildgröße je Modell (gemma4 verliert bei 1024 px). Stufe 2 (Cloud) nicht begonnen.

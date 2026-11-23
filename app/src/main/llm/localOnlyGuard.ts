@@ -11,7 +11,8 @@
 //
 // Die Einstellungen kommen über `configureLocalOnlyGuard` aus index.ts (loadUISettings) —
 // index.ts ist der Einstiegspunkt und nicht importierbar. Ohne Konfiguration (Tests, sehr früher
-// Start) gilt der Schalter als aus; das ist das Verhalten vor 11/2026.
+// Start) gilt der Schalter als aus; das ist das Verhalten vor 11/2026. Wirft der Leser dagegen
+// (Einstellungen nicht lesbar), wird gesperrt — siehe localOnlyState.
 
 import { resolveLocalModel, describeLocalModelError, type LocalModelOptions } from '../rag/localModel'
 
@@ -35,21 +36,37 @@ export function isLocalOnlyInSettings(ui: Record<string, unknown> | null | undef
   return ollama?.localOnly === true
 }
 
-export async function isLocalOnlyActive(): Promise<boolean> {
-  if (!readSettings) return false
+/**
+ * Stand des Schalters. `unknown`: Die Einstellungen ließen sich nicht lesen (Datei beschädigt,
+ * kein Zugriff) — dann ist nicht bekannt, ob der Nutzer „nur lokal“ gewählt hat, und es wird
+ * gesperrt statt durchgelassen (Codex F27, Nutzerentscheidung 23.11.2026). Der Leser muss dafür
+ * bei einem Lesefehler WERFEN; eine fehlende Datei (neue Installation) ist kein Fehler und heißt aus.
+ */
+export async function localOnlyState(): Promise<'on' | 'off' | 'unknown'> {
+  if (!readSettings) return 'off'
   try {
-    return isLocalOnlyInSettings(await readSettings())
+    return isLocalOnlyInSettings(await readSettings()) ? 'on' : 'off'
   } catch {
-    return false
+    return 'unknown'
   }
+}
+
+/** Gilt die Sperre? Auch bei unbekanntem Stand (siehe localOnlyState). */
+export async function isLocalOnlyActive(): Promise<boolean> {
+  return (await localOnlyState()) !== 'off'
 }
 
 const CLOUD_BLOCKED =
   'KI nur auf diesem Rechner ist eingeschaltet: Anbieter im Netz sind gesperrt. Bitte ein lokales Modell wählen oder den Schalter unter Einstellungen → KI ausschalten.'
 
+const SETTINGS_UNREADABLE =
+  'Die Einstellungen lassen sich gerade nicht lesen. Ob „KI nur auf diesem Rechner“ eingeschaltet ist, steht deshalb nicht fest — Anbieter im Netz bleiben so lange gesperrt. Bitte die App neu starten; hilft das nicht, die Einstellungen prüfen.'
+
 /** Wirft, wenn ein Cloud-Anbieter genutzt werden soll und „nur lokal" aktiv ist. */
 export async function assertCloudAllowed(what = 'Cloud-Anbieter'): Promise<void> {
-  if (await isLocalOnlyActive()) throw new LocalOnlyError(`${what}: ${CLOUD_BLOCKED}`)
+  const state = await localOnlyState()
+  if (state === 'on') throw new LocalOnlyError(`${what}: ${CLOUD_BLOCKED}`)
+  if (state === 'unknown') throw new LocalOnlyError(`${what}: ${SETTINGS_UNREADABLE}`)
 }
 
 /**
