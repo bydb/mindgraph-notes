@@ -56,6 +56,8 @@ Kommen später Gäste dazu, bekommt deren erste Seite eine Begrüßungsbox mit V
 `body_html` = zuerst die Zeile `[[skill-block:journal-stil]]`, danach alle Seiten, ganz am Ende die
 Zeile `[[skill-block:journal-broschuere]]`. **Die beiden Blöcke unten nicht abschreiben** — die App
 setzt ihren Wortlaut an die Stelle der Platzhalter. Sie stehen hier nur, damit du die Klassen kennst.
+Ausnahme für ältere App-Versionen: Nennt dir `use_skill` unter dieser Anleitung keine „Festen Blöcke“,
+kennt die App die Platzhalter nicht — dann schreibe beide Blöcke an denselben Stellen wörtlich und vollständig ab.
 Nur die Bausteine unten verwenden, keine eigenen Stile, kein `$`-Zeichen, keine weiteren Skripte.
 Jede Seite ist ein `<section class="seite …">`. Fläche einer Seite: ca. 24 Linien-Einheiten
 (Kopf ≈ 4, eine Frage ≈ 1, `--n:5` ≈ 5). Lieber eine Seite mehr als eine überfüllte —
