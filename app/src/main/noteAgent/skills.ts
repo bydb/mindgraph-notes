@@ -29,6 +29,7 @@ import { queryDataset, markdownTable, fillDatasetPlaceholders, DatasetQueryError
 import { wrapForeignResult } from '../../shared/mcp'
 import { estimateTokens } from '../../shared/contextBudget'
 import { sanitizeOutputFileName, writeStagingFile } from './staging'
+import { parseSkillBlocks, applySkillBlocks } from './skillBlocks'
 import { readSkillBodyDetailed, listSkillFiles, resolveSkillFile, fmtChars, MAX_SKILL_BODY_CHARS } from './skillsLoader'
 import { markdownToDocx, markdownToDocxBuffer } from '../office/officeService'
 import { fillDocxTemplate, MAX_TEMPLATE_FIELDS, MAX_TEMPLATE_FIELD_CHARS } from '../../shared/docxTemplateFill'
@@ -908,9 +909,19 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const cutNote = truncated
         ? `\n\n[Hinweis der App: Diese Anleitung ist zu lang und kam nur gekürzt bei dir an (${cutInfo}). Regeln am Ende fehlen dir.${files.length ? ' Prüfe, ob die Zusatzdateien unten den fehlenden Teil enthalten.' : ''} Sage dem Nutzer in deiner Abschlussmeldung in einem Satz, dass der Skill „${skill.name}“ gekürzt gelesen wurde.]`
         : ''
+      // Feste Blöcke (skillBlocks.ts): aus dem ungekürzten Text, damit sie auch bei einem
+      // gekappten Skill vollständig sind. Das Modell schreibt nur den Platzhalter.
+      const blocks = parseSkillBlocks(fullBody)
+      if (blocks.size > 0) {
+        ctx.run.skillBlocks ??= new Map()
+        for (const [k, v] of blocks) ctx.run.skillBlocks.set(k, v)
+      }
+      const blockNote = blocks.size
+        ? `\n\n[Feste Blöcke dieses Skills: ${[...blocks.keys()].join(', ')}. Schreibe sie NICHT ab. Setze in body_html von write_html an die Stelle eines Blocks nur den Platzhalter, zum Beispiel [[skill-block:${[...blocks.keys()][0]}]] — die App fügt den Wortlaut ein.]`
+        : ''
       return {
         ok: true,
-        content: body + cutNote + filesNote + shellNote,
+        content: body + cutNote + blockNote + filesNote + shellNote,
         display: truncated ? `use_skill: ${skill.name} — gekürzt, ${cutInfo}` : `use_skill: ${skill.name}`
       }
     }
@@ -1398,7 +1409,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'write_html',
     description:
-      'Erzeugt eine wissenschaftliche HTML-Seite im Staging (Formeln via LaTeX, Grafiken als Inline-SVG). Parameter: file_name, title (Seitentitel — wird als Überschrift gesetzt, NICHT im Body wiederholen), body_html (NUR vollständig ausgearbeiteter Artikel-Inhalt — niemals Platzhalter, Auslassungspunkte oder leere Gerüst-Elemente; kein html/head/body-Gerüst), optional lang ("de"/"en"). CSS-Klassen des Seiten-Templates: div.equation umschließt eine $$-Display-Formel (wird automatisch nummeriert); Inline-Formeln in \\( \\); figure.fig enthält ein Inline-SVG ODER ein <img> plus figcaption (wird automatisch als Abbildung nummeriert) — <img src="dateiname.jpg"> ist NUR für Bilder erlaubt, die du in diesem Lauf selbst mit generate_image erzeugt hast (reiner Dateiname ohne Pfad, Bild und Seite landen im selben Ordner); Bild-URLs aus dem Web lädt die Seite nicht; div.abstract für die Zusammenfassung; div.table-wrap um Tabellen; section.references mit ol fürs Literaturverzeichnis, Textverweise als sup.cite-Anker. SVG-Regeln: viewBox setzen (z.B. 0 0 640 300), alle Koordinaten innerhalb der viewBox, polyline-points NUR mit Leerzeichen/Komma trennen (keine Semikolons), Farben aus var(--fig-line), var(--fig-line-2), var(--muted), var(--fig-grid) oder currentColor, Beschriftung als text-Elemente ohne LaTeX.',
+      'Erzeugt eine wissenschaftliche HTML-Seite im Staging (Formeln via LaTeX, Grafiken als Inline-SVG). Parameter: file_name, title (Seitentitel — wird als Überschrift gesetzt, NICHT im Body wiederholen), body_html (NUR vollständig ausgearbeiteter Artikel-Inhalt — niemals Platzhalter, Auslassungspunkte oder leere Gerüst-Elemente; kein html/head/body-Gerüst), optional lang ("de"/"en"). CSS-Klassen des Seiten-Templates: div.equation umschließt eine $$-Display-Formel (wird automatisch nummeriert); Inline-Formeln in \\( \\); figure.fig enthält ein Inline-SVG ODER ein <img> plus figcaption (wird automatisch als Abbildung nummeriert) — <img src="dateiname.jpg"> ist NUR für Bilder erlaubt, die du in diesem Lauf selbst mit generate_image erzeugt hast (reiner Dateiname ohne Pfad, Bild und Seite landen im selben Ordner); Bild-URLs aus dem Web lädt die Seite nicht; div.abstract für die Zusammenfassung; div.table-wrap um Tabellen; section.references mit ol fürs Literaturverzeichnis, Textverweise als sup.cite-Anker. SVG-Regeln: viewBox setzen (z.B. 0 0 640 300), alle Koordinaten innerhalb der viewBox, polyline-points NUR mit Leerzeichen/Komma trennen (keine Semikolons), Farben aus var(--fig-line), var(--fig-line-2), var(--muted), var(--fig-grid) oder currentColor, Beschriftung als text-Elemente ohne LaTeX. Nennt ein gelesener Skill feste Blöcke, schreibe sie nicht ab, sondern setze den Platzhalter [[skill-block:name]] — die App fügt den Wortlaut ein.',
     parameters: {
       type: 'object',
       properties: {
@@ -1434,10 +1445,21 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         }
         articleHtml = extracted
       }
+      // Feste Blöcke eines gelesenen Skills einsetzen (skillBlocks.ts). Ein Platzhalter ohne
+      // Block wird abgelehnt: sonst stünde er als Text in der Seite und das Layout fehlte.
+      const blockResult = applySkillBlocks(articleHtml, ctx.run.skillBlocks)
+      if (blockResult.unknown.length > 0) {
+        const known = [...(ctx.run.skillBlocks?.keys() ?? [])]
+        return err(
+          `Unbekannter Platzhalter: ${blockResult.unknown.map(n => `[[skill-block:${n}]]`).join(', ')}. ` +
+          (known.length ? `Vorhanden sind: ${known.join(', ')}.` : 'In diesem Lauf wurde kein Skill mit festen Blöcken gelesen — lies den Skill zuerst mit use_skill.') +
+          ' Rufe write_html noch einmal mit dem vollständigen body_html auf.'
+        )
+      }
       const lang = typeof args.lang === 'string' ? args.lang : 'de'
-      // Wortzahl für die Ergebnis-Karte VOR dem Quellenblock — der ist App-Beiwerk,
-      // der Nutzer will die Länge des Artikels sehen.
+      // Wortzahl VOR dem Einsetzen der Blöcke: gezählt wird, was das Modell geschrieben hat.
       const wordCount = articleHtml.split(/\s+/).length
+      articleHtml = blockResult.html
       // Web-Lauf (0e): genau EIN Ergebnis-Write, egal ob Notiz oder Seite; den
       // Quellenblock hängt die App deterministisch an — hier als HTML-Sektion.
       if (ctx.run.web) {
@@ -1485,7 +1507,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         fileName,
         'html',
         html,
-        `${wordCount} Wörter, wissenschaftliche HTML-Seite${styleRestored ? ', Stil-Block der Vorlage wiederhergestellt' : ''}`
+        `${wordCount} Wörter, wissenschaftliche HTML-Seite${styleRestored ? ', Stil-Block der Vorlage wiederhergestellt' : ''}${blockResult.used.length ? `, feste Blöcke des Skills eingesetzt: ${blockResult.used.join(', ')}` : ''}`
       )
       if (res.ok && ctx.run.web) {
         ctx.run.web.wrote = true

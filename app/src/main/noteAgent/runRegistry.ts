@@ -107,6 +107,8 @@ export interface AgentRun {
   expectedPptxSkill?: string
   // Dasselbe für einen Skill, der write_excalidraw verlangt (Mindmap).
   expectedMindmapSkill?: string
+  /** Feste Blöcke der in diesem Lauf gelesenen Skills (skillBlocks.ts) — write_html setzt sie für [[skill-block:name]] ein. */
+  skillBlocks?: Map<string, string>
   // Aktive Zeit, die der Nutzer mit dem Formulieren des Auftrags verbracht hat
   // (Renderer-Messung, nur bei Fenster im Vordergrund). Undefiniert, wenn nicht gemessen.
   instructionMs?: number

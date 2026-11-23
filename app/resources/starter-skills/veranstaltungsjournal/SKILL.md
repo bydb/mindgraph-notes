@@ -53,16 +53,17 @@ Kommen später Gäste dazu, bekommt deren erste Seite eine Begrüßungsbox mit V
 ## Schritt 4: HTML schreiben
 
 `write_html` genau einmal: `file_name` = `journal-<kurzname>.html`, `title` = Veranstaltungstitel,
-`body_html` = zuerst der Stil-Block unten **wörtlich und vollständig**, danach alle Seiten.
-Ganz am Ende von `body_html` steht der Broschüren-Block unten, ebenfalls **wörtlich und vollständig**.
+`body_html` = zuerst die Zeile `[[skill-block:journal-stil]]`, danach alle Seiten, ganz am Ende die
+Zeile `[[skill-block:journal-broschuere]]`. **Die beiden Blöcke unten nicht abschreiben** — die App
+setzt ihren Wortlaut an die Stelle der Platzhalter. Sie stehen hier nur, damit du die Klassen kennst.
 Nur die Bausteine unten verwenden, keine eigenen Stile, kein `$`-Zeichen, keine weiteren Skripte.
 Jede Seite ist ein `<section class="seite …">`. Fläche einer Seite: ca. 24 Linien-Einheiten
 (Kopf ≈ 4, eine Frage ≈ 1, `--n:5` ≈ 5). Lieber eine Seite mehr als eine überfüllte —
 was nicht passt, wird abgeschnitten.
 
-### Stil-Block (wörtlich übernehmen)
+### Stil-Block (fügt die App ein: `[[skill-block:journal-stil]]`)
 
-```html
+```html skill-block=journal-stil
 <style>
 @page{size:148mm 210mm;margin:0}
 :root{color-scheme:light;--rahmen:#0b5254;--rahmen-h:#e4efef;--linie:#d6d1c7;--text:#1c1a17;--grau:#5c574e}
@@ -126,13 +127,13 @@ table.tag th{background:var(--f)}table.tag td{background:var(--h)}
 </style>
 ```
 
-### Broschüren-Block (wörtlich übernehmen, als Letztes in body_html)
+### Broschüren-Block (fügt die App ein: `[[skill-block:journal-broschuere]]`, als Letztes in body_html)
 
 Er setzt eine Leiste über das Journal: „A5-Einzelseiten“ oder „Broschüre A4“. In der Broschüren-Ansicht
 stehen je zwei A5-Seiten nebeneinander auf einem A4-Querbogen, schon in Heftreihenfolge (Rückstich);
 fehlende Seiten bis zur durch 4 teilbaren Zahl ergänzt er als Leerseiten vor der Rückseite.
 
-```html
+```html skill-block=journal-broschuere
 <style>
 @page bogen{size:297mm 210mm;margin:0}
 .werkzeug{position:sticky;top:0;z-index:9;display:flex;gap:2mm;align-items:center;justify-content:center;flex-wrap:wrap;padding:2.5mm;background:#0b5254;color:#fff;font:9pt -apple-system,"Segoe UI",Helvetica,Arial,sans-serif}
