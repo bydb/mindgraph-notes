@@ -53,11 +53,11 @@ export interface OcrReadContext {
 export const OCR_TEXT_NOTE = 'per Texterkennung auf diesem Rechner gelesen — kann Lesefehler enthalten, Zahlen vor Verwendung prüfen'
 
 /** JPEG/PNG → gedrehtes, verkleinertes JPEG (base64). Ohne EXIF, weil neu kodiert. */
-export function prepareImageForOcr(buf: Buffer): string {
+export function prepareImageForOcr(buf: Buffer, maxSide = AGENT_OCR_MAX_SIDE): string {
   const img = nativeImage.createFromBuffer(buf)
   if (img.isEmpty()) throw new Error('Bild lässt sich nicht öffnen (unterstützt: JPEG, PNG)')
   const size = img.getSize()
-  const fit = fitImageSize(size.width, size.height, AGENT_OCR_MAX_SIDE)
+  const fit = fitImageSize(size.width, size.height, maxSide)
   const small = fit.width === size.width ? img : img.resize({ width: fit.width, height: fit.height, quality: 'best' })
   const orientation = jpegExifOrientation(buf)
   if (orientation <= 1) return small.toJPEG(85).toString('base64')

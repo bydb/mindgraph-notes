@@ -9,7 +9,7 @@
 //   Sanitization (Codeblöcke in Arbeitsunterlagen bleiben erhalten), nur Hygiene
 //   (Control-Chars, Zero-Width, Bidi-Overrides).
 
-import { promises as fs } from 'fs'
+import { promises as fs, constants as fsConstants } from 'fs'
 import * as path from 'path'
 import { extractArticleBody, extractAuthoredBodyHtml } from '../../shared/scientificHtmlPage'
 import { randomBytes } from 'crypto'
@@ -250,6 +250,75 @@ export async function readAttachmentRaw(
   let content = truncated ? full.slice(0, MAX_CHARS_PER_FILE) + '\n[gekürzt: Datei-Budget erreicht]' : full
   if (truncated && meta.pdfNotes) content = appendPdfNotes(content, meta.pdfNotes)
   return { name: entry.name, content, truncated }
+}
+
+/**
+ * Einzelanhang über EIN Datei-Handle lesen (Codex F15): Pfad prüfen, ohne Symlink-Folgen öffnen,
+ * Identität und Größe am Handle prüfen, begrenzt lesen, danach Pfad und Datei erneut prüfen.
+ * Zwischen „geprüft“ und „gelesen“ lässt sich so keine andere oder größere Datei unterschieben —
+ * dasselbe Muster wie `readFileInFolder` für Ordner. (`extractContent` liest noch per Pfad.)
+ */
+async function readEntryBytesStrict(entry: AttachmentEntry, maxBytes: number): Promise<Buffer> {
+  const changed = (): Error => new Error(`"${entry.name}" wurde während des Lesens verändert — nicht gelesen.`)
+  const src = await assertEntryReadable(entry)
+  const before = await fs.lstat(src)
+  if (!before.isFile()) throw new Error(`"${entry.name}" ist keine Datei`)
+  if (before.size > maxBytes) throw new Error(`"${entry.name}" ist zu groß (${Math.round(before.size / 1024 / 1024)} MB)`)
+  const fh = await fs.open(src, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+  try {
+    const st = await fh.stat()
+    if (!st.isFile() || st.dev !== before.dev || st.ino !== before.ino) throw changed()
+    if (st.size > maxBytes) throw new Error(`"${entry.name}" ist zu groß (${Math.round(st.size / 1024 / 1024)} MB)`)
+    const chunks: Buffer[] = []
+    let total = 0
+    for (;;) {
+      const chunk = Buffer.alloc(Math.min(1024 * 1024, maxBytes + 1 - total))
+      const { bytesRead } = await fh.read(chunk, 0, chunk.length, null)
+      if (bytesRead === 0) break
+      chunks.push(bytesRead === chunk.length ? chunk : chunk.subarray(0, bytesRead))
+      total += bytesRead
+      if (total > maxBytes) throw new Error(`"${entry.name}" ist zu groß (während des Lesens gewachsen)`)
+    }
+    const after = await fh.stat()
+    if (after.size !== st.size || after.mtimeMs !== st.mtimeMs || total !== st.size) throw changed()
+    // Der Pfad muss weiterhin auf dieselbe Datei innerhalb der Grenze zeigen.
+    if ((await assertEntryReadable(entry)) !== src) throw changed()
+    return Buffer.concat(chunks, total)
+  } finally {
+    await fh.close()
+  }
+}
+
+/**
+ * Rohbytes EINES Bildes für `describe_image` — über dieselben Wege und Grenzen wie die Leser:
+ * ein angehängtes Bild (Name aus der Anhang-Liste) oder eine Bilddatei in einem angehängten
+ * Ordner. Das Modell kann keine Datei benennen, die nicht angehängt ist.
+ */
+export async function readImageForAgent(
+  senderId: number,
+  ids: string[],
+  fileArg: string,
+  folderArg?: string
+): Promise<{ label: string; buf: Buffer }> {
+  const all = attachmentsOf(senderId, ids)
+  if (!folderArg) {
+    const single = all.filter(e => e.kind !== 'folder')
+    const hit = single.find(e => e.name === fileArg) || single.find(e => e.name.toLowerCase() === fileArg.toLowerCase())
+    if (hit) {
+      if (hit.kind !== 'image') throw new Error(`"${hit.name}" ist kein Bild (JPEG, PNG) — lies die Datei mit read_attachment`)
+      return { label: hit.name, buf: await readEntryBytesStrict(hit, MAX_BYTES_BINARY) }
+    }
+    if (!all.some(e => e.kind === 'folder')) {
+      const images = single.filter(e => e.kind === 'image').map(e => e.name)
+      throw new Error(`Bild "${fileArg}" ist nicht angehängt. Angehängte Bilder: ${images.join(', ') || '(keine)'}`)
+    }
+  }
+  const entry = requireFolderEntry(senderId, ids, folderArg ?? '')
+  const { files } = await listSupportedFolderFiles(entry)
+  const info = findFolderFile(entry, files, fileArg)
+  if (info.kind !== 'image') throw new Error(`"${info.name}" ist kein Bild (JPEG, PNG) — lies die Datei mit read_context_file`)
+  if (info.sizeBytes > maxBytesFor(info.kind)) throw new Error(`"${info.name}" ist zu groß (${Math.round(info.sizeBytes / 1024 / 1024)} MB)`)
+  return { label: `${entry.name}/${info.name}`, buf: await readFolderBuffer(entry, info) }
 }
 
 export function clearContextAttachments(senderId: number): void {

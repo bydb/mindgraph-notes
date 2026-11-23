@@ -52,6 +52,7 @@ export interface PublicAgentResult {
 }
 
 import type { AgentOcrState } from '../ocr/agentOcr'
+import type { AgentImageViewState } from './describeImage'
 import type { McpRunState } from '../mcp/agentTools'
 import type { McpForeignData } from '../../shared/mcp'
 
@@ -143,6 +144,10 @@ export interface AgentRun {
   // Texterkennung für Bilder in Anhängen (main/ocr/agentOcr.ts): Einstellungen beim Start,
   // Seitenbudget und Zwischenspeicher je Inhalt — gemeinsam für alle Lesewerkzeuge (F32).
   ocr?: AgentOcrState
+  // Bilder ansehen (describe_image, noteAgent/describeImage.ts): Zustand, wenn das Lauf-Modell
+  // lokal rechnet und Bilder versteht — sonst der Grund. Vom Loop beim Start gesetzt.
+  imageView?: AgentImageViewState
+  imageViewOff?: string
   // Gesprächsverlauf am Ende eines erfolgreichen Laufs — Grundlage für „Antworten und
   // weitermachen“ (Folgelauf mit allem bisher Gelesenen). Nur Main-seitig, nie an den Renderer.
   transcript?: ChatMessage[]
