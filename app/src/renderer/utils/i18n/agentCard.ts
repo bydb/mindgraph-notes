@@ -96,6 +96,13 @@ export const de = {
   'agentCard.pickLocal': 'Lokales Modell wählen',
 
   'agentCard.rowImages': 'Bilder',
+  'agentCard.rowImageView': 'Bilder im Anhang',
+  'agentCard.imageViewChecking': 'wird geprüft …',
+  'agentCard.imageViewYes': 'Dieses Modell kann Bilder ansehen – auf diesem Rechner, höchstens {n} je Lauf.',
+  'agentCard.imageViewWeb': 'Mit Webrecherche kann Inhalt aus den Bildern in Suchanfragen einfließen.',
+  'agentCard.imageViewNo': 'Das Modell sieht die Bilder nicht – es bekommt nur erkannten Text, sofern die Texterkennung eingerichtet ist.',
+  'agentCard.flowImageViewHead': 'Bilder im Anhang ansehen',
+  'agentCard.flowImageViewBody': 'Ein Modell auf diesem Rechner sieht das Bild an und beschreibt es; das Bild selbst verlässt den Rechner nicht. Die Beschreibung geht wie alles Gelesene an das Modell des Laufs. Was der Agent daraus übernimmt, kann in Suchanfragen der Webrecherche, in einen Bild-Prompt an Google oder in Anfragen an externe Werkzeuge einfließen – jeweils nur, wenn dieser Weg für den Lauf eingeschaltet ist.',
   'agentCard.images': 'Bilder möglich über Google – der Bild-Prompt kann Angaben aus Auftrag, Notizen oder Anhängen enthalten.',
 
   'agentCard.rowMemory': 'Gedächtnis',
@@ -220,6 +227,13 @@ export const en: Record<keyof typeof de, string> = {
   'agentCard.pickLocal': 'Choose a local model',
 
   'agentCard.rowImages': 'Images',
+  'agentCard.rowImageView': 'Attached images',
+  'agentCard.imageViewChecking': 'checking …',
+  'agentCard.imageViewYes': 'This model can look at images – on this computer, at most {n} per run.',
+  'agentCard.imageViewWeb': 'With web research, content from the images can end up in search queries.',
+  'agentCard.imageViewNo': 'The model does not see the images – it only gets recognised text, provided text recognition is set up.',
+  'agentCard.flowImageViewHead': 'Looking at attached images',
+  'agentCard.flowImageViewBody': 'A model on this computer looks at the image and describes it; the image itself does not leave the computer. The description goes to the model of the run like everything else that is read. What the agent takes from it can end up in web research queries, in an image prompt to Google or in requests to external tools – only where that path is switched on for the run.',
   'agentCard.images': 'Images possible via Google – the image prompt can contain details from the task, notes or attachments.',
 
   'agentCard.rowMemory': 'Memory',

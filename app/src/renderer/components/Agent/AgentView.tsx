@@ -232,7 +232,7 @@ export function AgentView({ tabId }: Props) {
   const consentVersion = useUIStore(s => s.noteAgentCloudConsentVersion)
   const setConsentVersion = useUIStore(s => s.setNoteAgentCloudConsentVersion)
   const routeKey = `${ollama.backend}|${effectiveModel}|${activeCloudRoute ? `${activeCloudRoute.provider}:${activeCloudRoute.model}` : ''}`
-  type Preflight = { key: string; route?: AgentRoute; gate?: { ok: true } | { ok: false; code: 'optin' | 'consent'; error: string } }
+  type Preflight = { key: string; route?: AgentRoute; gate?: { ok: true } | { ok: false; code: 'optin' | 'consent'; error: string }; imageView?: { ok: true; model: string; budget: number } | { ok: false; reason: string } }
   const [preflight, setPreflight] = useState<Preflight | null>(null)
   const preflightReq = useRef(0)
   const runPreflight = useCallback(() => {
@@ -244,7 +244,7 @@ export function AgentView({ tabId }: Props) {
       localBackend: ollama.backend === 'lm-studio' ? 'lmstudio' : 'ollama',
       cloud: activeCloudRoute ? { model: activeCloudRoute.model, provider: activeCloudRoute.provider } : null
     }).then(r => {
-      if (req === preflightReq.current && r.success) setPreflight({ key: routeKey, route: r.route, gate: r.gate })
+      if (req === preflightReq.current && r.success) setPreflight({ key: routeKey, route: r.route, gate: r.gate, imageView: r.imageView })
     }).catch(() => { /* bleibt „wird geprüft“ */ })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey, consentVersion])
@@ -259,6 +259,9 @@ export function AgentView({ tabId }: Props) {
   }, [runPreflight])
   const preRoute = preflight?.key === routeKey ? preflight.route : undefined
   const preGate = preflight?.key === routeKey ? preflight.gate : undefined
+  // Bilder im Anhang (oder ein Ordner, der welche enthalten kann): Die Karte sagt vor dem Start,
+  // ob das Modell sie ansieht oder nur erkannten Text bekommt (Codex F20). Befund aus dem Main.
+  const preImageView = preflight?.key === routeKey ? preflight.imageView : undefined
   const cloudSelected = preRoute ? preRoute.kind === 'cloud' : (!!activeCloudRoute || ollamaCloudModel)
   const cloudProviderLabel = preRoute?.providerLabel ?? (activeCloudRoute ? CLOUD_PROVIDER_META[activeCloudRoute.provider].label : 'ollama.com')
 
@@ -334,6 +337,7 @@ export function AgentView({ tabId }: Props) {
       .catch(() => { if (req === imageReq.current) setImageKey('unknown') })
   }, [imageModule])
   const imagesPossible = imageModule && imageKey === 'yes'
+  const imageViewRelevant = scope.attachments.some(a => a.kind === 'image' || a.kind === 'folder')
   const imagesUnknown = imageModule && imageKey === 'unknown'
   const imagesChecking = imageModule && imageKey === 'checking'
 
@@ -1065,6 +1069,10 @@ export function AgentView({ tabId }: Props) {
                           <dt>{t('agentCard.flowWebHead')}</dt>
                           <dd>{t('agentCard.flowWebBody', { provider: webProviderLabel || '—' })}</dd>
                         </>)}
+                        {imageViewRelevant && preImageView?.ok && (<>
+                          <dt>{t('agentCard.flowImageViewHead')}</dt>
+                          <dd>{t('agentCard.flowImageViewBody')}</dd>
+                        </>)}
                         {imagesPossible && (<>
                           <dt>{t('agentCard.flowImagesHead')}</dt>
                           <dd>{t('agentCard.flowImagesBody')}</dd>
@@ -1093,6 +1101,18 @@ export function AgentView({ tabId }: Props) {
             </div>
           </div>
 
+          {imageViewRelevant && (
+            <div className="agent-card-row is-two-col">
+              <span className="agent-card-label">{t('agentCard.rowImageView')}</span>
+              <span className={`agent-card-value ${preImageView?.ok ? '' : 'agent-card-muted'}`}>
+                {!preImageView
+                  ? t('agentCard.imageViewChecking')
+                  : preImageView.ok
+                    ? <>{t('agentCard.imageViewYes', { n: preImageView.budget })}{(running ? runWeb : webOn) && <> <span className="agent-card-out-text">{t('agentCard.imageViewWeb')}</span></>}</>
+                    : <>{t('agentCard.imageViewNo')} <span className="agent-card-help">{preImageView.reason}</span></>}
+              </span>
+            </div>
+          )}
           {imagesChecking && (
             <div className="agent-card-row is-two-col">
               <span className="agent-card-label">{t('agentCard.rowImages')}</span>

@@ -53,6 +53,9 @@ import { withOllamaActivity } from '../rag/ollamaActivity'
 import type { VaultQueryResult } from '../rag/vaultRetrieve'
 import { resolveLocalModel, LocalModelError } from '../rag/localModel'
 import { classifyRoute, evaluateCloudGate, type AgentRoute } from '../../shared/agentRoute'
+import { probeImageView } from './describeImage'
+
+
 export async function classifyAgentRoute(backend: 'ollama' | 'lmstudio' | 'openrouter' | 'llmbase', model: string): Promise<AgentRoute> {
   if (backend !== 'ollama') return classifyRoute(backend, model)
   try {
@@ -309,7 +312,11 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       if ((backend === 'openrouter' || backend === 'llmbase') && params.cloud?.model && cloudCleared) {
         void resolveCloudChatOptions(params.cloud).then(r => { if (r) warmPricingCache(r.chatOptions) }).catch(() => undefined)
       }
-      return { success: true, route, gate }
+      // Bilder ansehen (describe_image): dieselbe Prüfung wie beim Laufstart, damit die Karte
+      // VOR dem Start sagt, ob das Modell Bilder sieht oder nur erkannten Text bekommt (Codex F20).
+      const probe = await probeImageView(route, backend, model)
+      const imageView = 'state' in probe ? { ok: true as const, model: probe.state.model, budget: probe.state.left } : { ok: false as const, reason: probe.reason }
+      return { success: true, route, gate, imageView }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }

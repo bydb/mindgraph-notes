@@ -552,10 +552,10 @@ Der Zwischenspeicher hält das fertig gerahmte Ergebnis samt erstem Dateinamen; 
 ### F19 — [ADRESSIERT] trägt (bekannte Lücke)
 Nur „Bild angesehen“ ist markiert; „Text erkannt“ steht weiter als nackter Dateiname. Das hatte ich als Vereinfachung gebaut und gemeldet, es erfüllt Entwurf 3 aber nicht. Vorschlag: beim erfolgreichen Lesen eines Bildes per Texterkennung ebenfalls einen eigenen Eintrag („Text erkannt: …“) statt des nackten Namens. Das bleibt eine Zeichenkette in `run.sources`, also ohne Umbau der Karte.
 
-### F20 — [DISKUSSION] trägt
+### F20 — [ADRESSIERT] trägt
 Der Nutzer hat das Ansehen in Web-Läufen **mit sichtbarem Hinweis** freigegeben; gebaut ist nur der Satz im Systemtext des Modells. Auftragskarte und Datenweg-Aufklapper sind unverändert. Vorschlag in zwei Schritten: sofort `describe_image` in Web-Läufen **nicht** anbieten, bis der Hinweis steht (eine Zeile im Loop, hält die Zusage ein); danach die Karte bauen — Vorabprüfung liefert die Bildfähigkeit des Modells, Karte zeigt „kann Bilder ansehen“ bzw. „bekommt nur erkannten Text“, bei Web zusätzlich den Satz zu Suchanfragen. Das berührt den Start-Handler in `main/index.ts`; dort greift die Projektregel „Bereich erst unverändert auslagern“.
 
-### F21 — [DISKUSSION] trägt teilweise
+### F21 — [ADRESSIERT] trägt teilweise (Datenweg genannt; Bildgenerierung bei „KI nur auf diesem Rechner“ bleibt eigener Punkt)
 Richtig ist: Hat der Lauf Bildgenerierung oder externe Werkzeuge, kann das Modell Bildinhalte in deren Parameter schreiben. Das sind bestehende, vom Nutzer einzeln freigeschaltete Wege, die heute schon für jeden Anhang gelten; neu ist nur die Menge an Bildinhalt. Vorschlag: im Datenweg-Aufklapper mit nennen, zusammen mit F20. Der zweite Teil ist ein eigener Befund außerhalb dieses Plans: In `main/imageGen/` gibt es keine Prüfung auf „KI nur auf diesem Rechner“. Ob der Start des Laufs die Bildgenerierung in diesem Fall abschaltet, habe ich nicht bis zum Ende verfolgt (`index.ts:5149-5157` prüft nur Modul und Schlüssel). Das sollte unabhängig von den Bildern geklärt werden.
 
 ### F22 — [ADRESSIERT] trägt
@@ -597,6 +597,14 @@ Die „27 von 27“ stammen aus dem Messskript mit eigenem Auftragstext, eigenem
   Grenzen: ein Modell, drei offen erkennbare Befehle, `delete_note` und `web_search` gibt es in diesem Lauf nicht als Werkzeug (gewertet wird der Versuch). Kleine Modelle sind über den echten Weg nicht gemessen.
 - Typprüfung sauber. Ganze Testreihe: 4315 bestanden, 2 Zeitüberschreitungen in `shellExecution.test.ts` (Umgebungsprobe), die einzeln bestehen und mit dieser Änderung nichts zu tun haben.
 
+### Nachtrag Runde 3 — Auftragskarte, Datenweg, Web-Läufe (23.11.2026)
+
+- **Auslagerung zuerst:** Die zwölf `note-agent-*`-Handler samt Helfern liegen jetzt in `main/noteAgent/ipc.ts` (`registerNoteAgentIpc(deps)`, Muster `main/email/ipc.ts`). Zeilenvergleich alt gegen neu: unverändert bis auf `export` vor `classifyAgentRoute`, einen Importpfad und `approvedVaultRoots` → `getApprovedVaultRoots()`. Typprüfung, Tests und Build laufen. Als eigener Schritt vorgemerkt, getrennt von der Änderung.
+- **F20:** Die Vorabprüfung (`note-agent-route-preflight`) meldet `imageView` (dieselbe Prüfung wie beim Laufstart, `probeImageView`). Die Karte zeigt bei einem Bild oder Ordner im Anhang die Zeile „Bilder im Anhang“: „Dieses Modell kann Bilder ansehen – auf diesem Rechner, höchstens 8 je Lauf“, bei eingeschalteter Webrecherche zusätzlich „… kann Inhalt aus den Bildern in Suchanfragen einfließen“; sonst „Das Modell sieht die Bilder nicht – es bekommt nur erkannten Text …“ mit dem Grund. Im Aufklapper „Welche Daten wohin gehen“ steht der Eintrag „Bilder im Anhang ansehen“. Damit ist die Sperre in Web-Läufen entfernt (`loop.ts`). Test `loopImageView.test.ts` (4 Fälle: angeboten, auch im Web-Lauf samt Regel im Systemtext, nicht ohne bildfähiges Modell, nicht ohne Bild).
+- **F21:** Der Datenweg-Eintrag nennt alle drei Abflüsse (Suchanfragen, Bild-Prompt an Google, externe Werkzeuge), jeweils nur bei eingeschaltetem Weg. Die Frage „KI nur auf diesem Rechner“ und Google-Bildgenerierung bleibt der getrennte Nebenfund.
+- **Gegenprobe in der Dev-App** (Wegwerf-Profil und -Vault, über den Prüfport): Karte bei Cloud-Modell „sieht die Bilder nicht“ mit Grund, bei `qwen3.8:27b-mlx` „kann Bilder ansehen“, Datenweg-Eintrag sichtbar. Echter Lauf mit dem 1600-px-Testbild „Ablauf“: Notiz richtig (fünf Stationen, roter Pfeil Freigabe → Entwurf), Quelle „Bild angesehen: Bilder/ablauf.jpg (qwen3.8:27b-mlx)“. Damit ist auch das Verkleinern in der App einmal über den echten Weg gelaufen. Nicht gesehen: ein gedrehtes Handyfoto, ein Web-Lauf mit Bild (Webrecherche ist im Testprofil nicht eingerichtet — die Zeile mit dem Suchanfragen-Satz ist deshalb nur am Code geprüft).
+- **Fund aus dieser Gegenprobe:** Ein Anhang aus dem Vault heißt wie sein Pfad (`Bilder/ablauf.jpg`); das Modell nannte sechsmal nur `ablauf.jpg` und wurde abgewiesen (373 s, 7 Bildaufrufe statt 1). `readImageForAgent` nimmt jetzt den reinen Dateinamen, wenn er unter den Anhängen eindeutig ist; bei zwei gleichnamigen wird nicht geraten (Test). Zweiter Lauf danach: 3 Runden, 1 Bildaufruf, 200 s einschließlich Modell-Laden.
+
 ## Status
 
 - 22.11.2026 — Entwurf 1 geschrieben. Kein Code geändert, kein Commit, kein Push.
@@ -611,4 +619,5 @@ Die „27 von 27“ stammen aus dem Messskript mit eigenem Auftragstext, eigenem
 - 23.11.2026 — Code-Prüfung durch Codex: F14–F24. Claude hat alle elf gegengeprüft und beantwortet (alle `[DISKUSSION]`), nichts geändert.
 - 23.11.2026 — Runde 2 umgesetzt nach Freigabe: F14–F19, F22–F24, dazu Sperre in Web-Läufen (F20 Teil 1). Messung über den echten Weg: 9 von 9 Befehls-Läufe standgehalten. Kein Commit.
 - Nebenfund, außerhalb dieses Plans, offen: „KI nur auf diesem Rechner“ schaltet die Bildgenerierung über Google nicht ab (`main/index.ts:5149-5156`, `main/imageGen/imagenService.ts`).
-- Offen: Auftragskarte und Datenweg-Aufklapper (F20 Teil 2, F21) samt Handler-Auslagerung; Vorführung/Gegenprobe in der Dev-App (Bildaufbereitung, Protokoll, Ergebniskarte), Hinweis auf der Auftragskarte vor dem Start, Eintrag in `.claude/rules/note-agent.md`, Code-Prüfung durch Codex, echte Fotos, Abnahme durch den Nutzer. Stufe 2 (Cloud) nicht begonnen.
+- 23.11.2026 — Stand Runde 2 committet (`af3dccc4`, kein Push). Danach Runde 3: Handler ausgelagert, Karte und Datenweg gebaut, Ansehen in Web-Läufen freigeschaltet, Gegenprobe in der Dev-App, Dateiname-Fund behoben (siehe Nachtrag Runde 3). Noch ohne Commit.
+- Offen: Abnahme durch den Nutzer; Nachprüfung der Runde 3 durch Codex; Nebenfund Bildgenerierung; Gegenprobe mit echtem, gedrehtem Foto und mit einem Web-Lauf; Bildgröße je Modell (gemma4 verliert bei 1024 px). Stufe 2 (Cloud) nicht begonnen.

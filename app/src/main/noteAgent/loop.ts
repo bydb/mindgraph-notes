@@ -284,13 +284,10 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Bilder ansehen (describe_image): nur wenn Bilder im Spiel sein können und das Lauf-Modell
   // lokal rechnet und Bilder versteht. Unabhängig von der Texterkennung (F07). Der Zustand
   // überlebt einen Folgeauftrag nicht — jeder Lauf prüft und zählt neu.
-  // In Recherche-Läufen noch NICHT: Der Nutzer hat das Ansehen dort nur mit sichtbarem Hinweis
-  // auf Auftragskarte und Datenweg-Aufklapper freigegeben (Bildinhalte können in Suchanfragen
-  // einfließen) — beides ist noch nicht gebaut (Codex F20). Erst mit dem Hinweis freischalten.
-  if (run.web) {
-    run.imageView = undefined
-    run.imageViewOff = 'in Recherche-Läufen mit Websuche ist das Ansehen von Bildern noch nicht freigeschaltet'
-  } else if (attachments.some(a => a.kind === 'image' || a.kind === 'folder')) {
+  // Auch in Recherche-Läufen (Nutzerentscheidung F03): Die Auftragskarte nennt vor dem Start,
+  // dass Bildinhalte in Suchanfragen einfließen können, der Datenweg-Aufklapper ebenso (Codex F20).
+  // Wer das hier ändert, ändert die Zusage auf der Karte mit (AgentView, agentCard.imageView*).
+  if (attachments.some(a => a.kind === 'image' || a.kind === 'folder')) {
     const probe = await probeImageView(run.route, params.chatOptions?.backend, params.chatOptions?.ollamaModel)
     if (run.abort.signal.aborted) throw new Error('Abgebrochen')
     if ('state' in probe) {

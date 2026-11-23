@@ -303,7 +303,13 @@ export async function readImageForAgent(
   const all = attachmentsOf(senderId, ids)
   if (!folderArg) {
     const single = all.filter(e => e.kind !== 'folder')
+    // Ein Anhang aus dem Vault heißt wie sein Pfad („Bilder/ablauf.jpg“). Modelle nennen oft nur den
+    // Dateinamen — real sechs abgewiesene Aufrufe in einem Lauf (Dev-App, 23.11.2026). Der reine
+    // Dateiname gilt deshalb, wenn er unter den Anhängen eindeutig ist; bei mehreren wird nicht geraten.
+    const base = (n: string): string => n.slice(n.lastIndexOf('/') + 1).toLowerCase()
+    const byBase = single.filter(e => base(e.name) === base(fileArg))
     const hit = single.find(e => e.name === fileArg) || single.find(e => e.name.toLowerCase() === fileArg.toLowerCase())
+      || (byBase.length === 1 ? byBase[0] : undefined)
     if (hit) {
       if (hit.kind !== 'image') throw new Error(`"${hit.name}" ist kein Bild (JPEG, PNG) — lies die Datei mit read_attachment`)
       return { label: hit.name, buf: await readEntryBytesStrict(hit, MAX_BYTES_BINARY) }

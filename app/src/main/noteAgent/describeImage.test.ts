@@ -288,6 +288,31 @@ describe('readImageForAgent — nur Angehängtes, nur Bilder', () => {
     }
   })
 
+  it('findet ein Bild aus dem Vault auch über den reinen Dateinamen — aber nur, wenn er eindeutig ist', async () => {
+    const senderId = 741_004
+    const dir = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'mindgraph-image-base-')))
+    try {
+      await fs.mkdir(path.join(dir, 'Bilder'), { recursive: true })
+      await fs.mkdir(path.join(dir, 'Alt'), { recursive: true })
+      await fs.writeFile(path.join(dir, 'Bilder', 'ablauf.jpg'), 'NEU')
+      await fs.writeFile(path.join(dir, 'Alt', 'ablauf.jpg'), 'ALT')
+      const first = await registerContextAttachment(senderId, path.join(dir, 'Bilder', 'ablauf.jpg'), true, dir)
+      if (!first.ok) throw new Error(first.error)
+      expect(first.attachment.name).toBe('Bilder/ablauf.jpg')
+      const hit = await readImageForAgent(senderId, [first.attachment.id], 'Ablauf.jpg')
+      expect(hit.label).toBe('Bilder/ablauf.jpg')
+      expect(hit.buf.toString()).toBe('NEU')
+      const second = await registerContextAttachment(senderId, path.join(dir, 'Alt', 'ablauf.jpg'), true, dir)
+      if (!second.ok) throw new Error(second.error)
+      const ids = [first.attachment.id, second.attachment.id]
+      await expect(readImageForAgent(senderId, ids, 'ablauf.jpg')).rejects.toThrow(/nicht angehängt/)
+      expect((await readImageForAgent(senderId, ids, 'Alt/ablauf.jpg')).buf.toString()).toBe('ALT')
+    } finally {
+      clearContextAttachments(senderId)
+      await fs.rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it('lehnt Nicht-Bilder, nicht Angehängtes und Pfade aus dem Ordner hinaus ab', async () => {
     const senderId = 741_002
     const { dir, ids, outside } = await setup(senderId)

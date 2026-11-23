@@ -578,7 +578,8 @@ export interface GraphData {
 export interface NoteAgentAttachment {
   id: string;
   name: string;
-  kind: 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'folder';
+  // Wie ContextFileKind im Main (noteAgent/contextFiles.ts) — 'html' und 'image' fehlten hier.
+  kind: 'xlsx' | 'docx' | 'pptx' | 'pdf' | 'md' | 'txt' | 'csv' | 'html' | 'image' | 'folder';
   insideVault: boolean;
   sizeBytes: number;
 }
@@ -958,6 +959,8 @@ export interface ElectronAPI {
     success: boolean;
     route?: import('./agentRoute').AgentRoute;
     gate?: { ok: true } | { ok: false; code: 'optin' | 'consent'; error: string };
+    /** Kann das Modell dieses Wegs angehängte Bilder ansehen (describe_image)? */
+    imageView?: { ok: true; model: string; budget: number } | { ok: false; reason: string };
     error?: string;
   }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
