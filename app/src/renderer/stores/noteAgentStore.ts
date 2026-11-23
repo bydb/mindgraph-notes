@@ -86,6 +86,8 @@ export interface AgentRunUiState {
   mcp?: McpRunProvenance
   /** Main-seitig beim Start festgestellter Modellweg — die Karte zeigt während des Laufs nur ihn. */
   route?: AgentRoute
+  /** Befund des Laufs zum Bilder-Ansehen (describe_image). `null`: für diesen Lauf nicht geprüft (kein Bild im Spiel). */
+  imageView?: { ok: true; model: string; budget: number } | { ok: false; reason: string } | null
   // Mitlernen (Stufe 3): Merksatz-Vorschlag des Modells, trifft asynchron nach dem
   // Done-Event ein und befüllt das Merken-Feld vor (solange der Nutzer nichts tippt).
   rememberSuggestion?: string
@@ -618,7 +620,7 @@ export function initNoteAgentEvents(): void {
   })
 
   window.electronAPI.onNoteAgentContext(p => {
-    store.setState(s => patchRun(s, p.runId, run => ({ ...run, context: p.context, turns: p.turns ?? run.turns })) ?? {})
+    store.setState(s => patchRun(s, p.runId, run => ({ ...run, context: p.context, turns: p.turns ?? run.turns, imageView: p.imageView !== undefined ? p.imageView : run.imageView })) ?? {})
   })
 
   window.electronAPI.onNoteAgentDone(p => {

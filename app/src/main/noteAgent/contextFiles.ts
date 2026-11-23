@@ -307,7 +307,9 @@ export async function readImageForAgent(
     // Dateinamen — real sechs abgewiesene Aufrufe in einem Lauf (Dev-App, 23.11.2026). Der reine
     // Dateiname gilt deshalb, wenn er unter den Anhängen eindeutig ist; bei mehreren wird nicht geraten.
     const base = (n: string): string => n.slice(n.lastIndexOf('/') + 1).toLowerCase()
-    const byBase = single.filter(e => base(e.name) === base(fileArg))
+    // Nur bei einem Namen OHNE Ordnerteil (wie findFolderFile): Nennt das Modell ausdrücklich
+    // „Projekt A/plan.jpg“, darf nicht still „Projekt B/plan.jpg“ beschrieben werden (Codex F26).
+    const byBase = fileArg.includes('/') ? [] : single.filter(e => base(e.name) === base(fileArg))
     const hit = single.find(e => e.name === fileArg) || single.find(e => e.name.toLowerCase() === fileArg.toLowerCase())
       || (byBase.length === 1 ? byBase[0] : undefined)
     if (hit) {

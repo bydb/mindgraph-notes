@@ -299,6 +299,8 @@ describe('readImageForAgent — nur Angehängtes, nur Bilder', () => {
       const first = await registerContextAttachment(senderId, path.join(dir, 'Bilder', 'ablauf.jpg'), true, dir)
       if (!first.ok) throw new Error(first.error)
       expect(first.attachment.name).toBe('Bilder/ablauf.jpg')
+      // Ein ausdrücklich genannter, nicht angehängter Pfad wird abgelehnt statt umgedeutet (Codex F26).
+      await expect(readImageForAgent(senderId, [first.attachment.id], 'Alt/ablauf.jpg')).rejects.toThrow(/nicht angehängt/)
       const hit = await readImageForAgent(senderId, [first.attachment.id], 'Ablauf.jpg')
       expect(hit.label).toBe('Bilder/ablauf.jpg')
       expect(hit.buf.toString()).toBe('NEU')

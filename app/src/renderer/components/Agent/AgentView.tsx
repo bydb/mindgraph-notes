@@ -265,6 +265,9 @@ export function AgentView({ tabId }: Props) {
   // Bilder im Anhang (oder ein Ordner, der welche enthalten kann): Die Karte sagt vor dem Start,
   // ob das Modell sie ansieht oder nur erkannten Text bekommt (Codex F20). Befund aus dem Main.
   const preImageView = preflight?.key === routeKey ? preflight.imageView : undefined
+  // Während des Laufs gilt nur, was der Lauf selbst beim Start festgestellt hat (Codex F25) —
+  // nicht die Vorabprüfung des gerade gewählten Modells. `null` = der Lauf hat keine Bilder geprüft.
+  const shownImageView = run.phase === 'running' ? run.imageView : preImageView
   const cloudSelected = preRoute ? preRoute.kind === 'cloud' : (!!activeCloudRoute || ollamaCloudModel)
   const cloudProviderLabel = preRoute?.providerLabel ?? (activeCloudRoute ? CLOUD_PROVIDER_META[activeCloudRoute.provider].label : 'ollama.com')
 
@@ -1072,7 +1075,7 @@ export function AgentView({ tabId }: Props) {
                           <dt>{t('agentCard.flowWebHead')}</dt>
                           <dd>{t('agentCard.flowWebBody', { provider: webProviderLabel || '—' })}</dd>
                         </>)}
-                        {imageViewRelevant && preImageView?.ok && (<>
+                        {imageViewRelevant && shownImageView?.ok && (<>
                           <dt>{t('agentCard.flowImageViewHead')}</dt>
                           <dd>{t('agentCard.flowImageViewBody')}</dd>
                         </>)}
@@ -1104,15 +1107,15 @@ export function AgentView({ tabId }: Props) {
             </div>
           </div>
 
-          {imageViewRelevant && (
+          {imageViewRelevant && shownImageView !== null && (
             <div className="agent-card-row is-two-col">
               <span className="agent-card-label">{t('agentCard.rowImageView')}</span>
-              <span className={`agent-card-value ${preImageView?.ok ? '' : 'agent-card-muted'}`}>
-                {!preImageView
+              <span className={`agent-card-value ${shownImageView?.ok ? '' : 'agent-card-muted'}`}>
+                {!shownImageView
                   ? t('agentCard.imageViewChecking')
-                  : preImageView.ok
-                    ? <>{t('agentCard.imageViewYes', { n: preImageView.budget })}{(running ? runWeb : webOn) && <> <span className="agent-card-out-text">{t('agentCard.imageViewWeb')}</span></>}</>
-                    : <>{t('agentCard.imageViewNo')} <span className="agent-card-help">{preImageView.reason}</span></>}
+                  : shownImageView.ok
+                    ? <>{t('agentCard.imageViewYes', { n: shownImageView.budget })}{(running ? runWeb : webOn) && <> <span className="agent-card-out-text">{t('agentCard.imageViewWeb')}</span></>}</>
+                    : <>{t('agentCard.imageViewNo')} <span className="agent-card-help">{shownImageView.reason}</span></>}
               </span>
             </div>
           )}

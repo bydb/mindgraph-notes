@@ -53,7 +53,7 @@ import { withOllamaActivity } from '../rag/ollamaActivity'
 import type { VaultQueryResult } from '../rag/vaultRetrieve'
 import { resolveLocalModel, LocalModelError } from '../rag/localModel'
 import { classifyRoute, evaluateCloudGate, type AgentRoute } from '../../shared/agentRoute'
-import { probeImageView } from './describeImage'
+import { probeImageView, AGENT_IMAGE_VIEW_BUDGET } from './describeImage'
 import { isLocalOnlyInSettings } from '../llm/localOnlyGuard'
 
 
@@ -316,7 +316,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       // Bilder ansehen (describe_image): dieselbe Prüfung wie beim Laufstart, damit die Karte
       // VOR dem Start sagt, ob das Modell Bilder sieht oder nur erkannten Text bekommt (Codex F20).
       const probe = await probeImageView(route, backend, model)
-      const imageView = 'state' in probe ? { ok: true as const, model: probe.state.model, budget: probe.state.left } : { ok: false as const, reason: probe.reason }
+      const imageView = 'state' in probe ? { ok: true as const, model: probe.state.model, budget: AGENT_IMAGE_VIEW_BUDGET } : { ok: false as const, reason: probe.reason }
       return { success: true, route, gate, imageView }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
@@ -763,7 +763,14 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
               if (!sender.isDestroyed()) sender.send('note-agent-progress', { runId: run.runId, seq, skill, summary })
             },
             onContext: (context, turns) => {
-              if (!sender.isDestroyed()) sender.send('note-agent-context', { runId: run.runId, context, turns })
+              if (!sender.isDestroyed()) sender.send('note-agent-context', {
+                runId: run.runId, context, turns,
+                // Befund DIESES Laufs zum Bilder-Ansehen (Codex F25): Die Karte zeigt während des
+                // Laufs nur ihn, nicht die Vorabprüfung des gerade gewählten Modells.
+                imageView: run.imageView
+                  ? { ok: true as const, model: run.imageView.model, budget: AGENT_IMAGE_VIEW_BUDGET }
+                  : run.imageViewOff ? { ok: false as const, reason: run.imageViewOff } : null
+              })
             }
           })
           finishRun(run, 'done')
