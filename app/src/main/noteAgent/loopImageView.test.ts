@@ -17,7 +17,7 @@ vi.mock('./describeImage', async (orig) => ({
 
 import { chatWithTools } from '../llm/chatClient'
 import { probeImageView, createAgentImageViewState } from './describeImage'
-import { runNoteAgentLoop } from './loop'
+import { runNoteAgentLoop, agentRequestTimeoutMs } from './loop'
 import { registerContextAttachment, clearContextAttachments } from './contextFiles'
 import type { AgentRun, WebRunState } from './runRegistry'
 
@@ -99,5 +99,14 @@ describe('describe_image im Loop', () => {
     const { names } = await offered([await attach('notiz.txt')])
     expect(names).not.toContain('describe_image')
     expect(mockProbe).not.toHaveBeenCalled()
+  })
+})
+
+describe('Zeitgrenze eines Modellaufrufs', () => {
+  it('lokal 20 Minuten, Cloud 10 Minuten — und der Lauf reicht sie an den Aufruf durch', async () => {
+    expect([agentRequestTimeoutMs('ollama'), agentRequestTimeoutMs('lmstudio'), agentRequestTimeoutMs(undefined)]).toEqual([1_200_000, 1_200_000, 1_200_000])
+    expect([agentRequestTimeoutMs('openrouter'), agentRequestTimeoutMs('llmbase')]).toEqual([600_000, 600_000])
+    await offered([await attach('notiz.txt')])
+    expect((mockChat.mock.calls[0][2] as { timeoutMs: number }).timeoutMs).toBe(1_200_000)
   })
 })

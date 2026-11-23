@@ -32,7 +32,7 @@ import { recordActivity } from '../activityLedger'
 import { MAX_RUN_SKILLS, deriveActivityType } from '../../shared/activityLog'
 import { vaultActivityKey } from '../skillActivityId'
 import { acquireStayAwake } from '../powerGuard'
-import { runNoteAgentLoop } from './loop'
+import { runNoteAgentLoop, agentRequestTimeoutMs } from './loop'
 import { authorizeShell, probeShellEnvironment } from './shellExecution'
 import { sandboxAvailability as shellSandboxAvailability } from './shellSandbox'
 import { normalizeShellGuardrails, describeShellGuardrails } from '../../shared/shellGuardrails'
@@ -845,7 +845,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
             const singleReads = totalFolderReads(run)
             message = singleReads >= 5
               ? `Zeitüberschreitung. Der Agent hat ${singleReads} Dateien einzeln gelesen, statt sie mit einem Aufruf zusammenzuführen — dadurch wurde der Auftrag zu groß für das Modell. Ein anderes Modell wählen oder den Lauf wiederholen; der Auftrag selbst ist nicht zu umfangreich.`
-              : 'Zeitüberschreitung: Das Modell hat nicht innerhalb von 10 Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.'
+              : `Zeitüberschreitung: Das Modell hat nicht innerhalb von ${agentRequestTimeoutMs(chatOptions.backend) / 60_000} Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.`
           }
           if (!sender.isDestroyed()) {
             sender.send('note-agent-done', {

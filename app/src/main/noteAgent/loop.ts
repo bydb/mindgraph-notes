@@ -10,7 +10,7 @@ import { asksForMindmap } from '../../shared/mindmapIntent'
 import { describeShellGuardrails } from '../../shared/shellGuardrails'
 import { computerVerbLabel, COMPUTER_TOOL_BY_VERB } from '../../shared/computerControl'
 import { chatWithTools, type ChatMessage, type ChatOptions } from '../llm/chatClient'
-import { catalogContextLength, costOfCalls, warmPricingCache } from '../llm/chatClient'
+import { catalogContextLength, costOfCalls, warmPricingCache, isCloudChatBackend } from '../llm/chatClient'
 import type { CallUsage, RunCost } from '../../shared/llmCost'
 import { endsWithQuestion } from '../../shared/agentClosingQuestion'
 import { looksTruncated, contextTruncationMessage, AGENT_NUM_CTX, AGENT_NUM_CTX_WEB } from '../../shared/contextGuard'
@@ -261,6 +261,17 @@ AKTUELLE NOTIZ (der Auftrag bezieht sich hierauf):
 ${noteExcerpt}`
 }
 
+/**
+ * Zeitgrenze EINES Modellaufrufs im Agent-Lauf. Lokal 20 Minuten (seit 23.11.2026, vorher 10):
+ * qwen3.8:27b-mlx schrieb das Veranstaltungsjournal in einem Aufruf mit 13 082 Ausgabe-Token
+ * (samt verborgenem Denken) — bei 30 Token/s 533 s, bei 22 Token/s über 600 s. Zwei von drei
+ * Läufen brachen deshalb ohne Ergebnis ab. Cloud-Modelle schreiben schneller, dort bleibt es
+ * bei 10 Minuten.
+ */
+export function agentRequestTimeoutMs(backend: ChatOptions['backend'] | undefined): number {
+  return isCloudChatBackend(backend) ? 600_000 : 1_200_000
+}
+
 export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<NoteAgentLoopResult> {
   const { run, onStep } = params
   const ctx: NoteAgentContext = {
@@ -421,13 +432,13 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         { role: 'user', content: `Antwort auf deine letzte Nachricht: ${params.continuation.answer}\n\nSetze den Auftrag damit fort. Alles, was du oben schon gelesen hast, gilt weiter — lies es nicht erneut.${compactedPriorHint(params.continuation.priorMessages)}` }
       ]
     : [systemMessage, { role: 'user', content: run.instruction + (run.chatContext ? chatContextBlock(run.chatContext) : '') }]
-  // 10-Minuten-Fenster pro Request: große lokale Modelle (z.B. qwen3.6:27b-mlx) brauchen
-  // mit gewachsenem Tool-Kontext deutlich länger als die 180s-Default — der Nutzer hat
-  // einen echten Abbrechen-Button, das Timeout ist nur noch die Notbremse.
+  // Zeitfenster pro Request: große lokale Modelle brauchen mit gewachsenem Tool-Kontext
+  // deutlich länger als die 180s-Default — der Nutzer hat einen echten Abbrechen-Button,
+  // das Timeout ist nur noch die Notbremse (agentRequestTimeoutMs).
   const chatOptions: ChatOptions = {
     ...params.chatOptions,
     signal: run.abort.signal,
-    timeoutMs: 600_000,
+    timeoutMs: agentRequestTimeoutMs(params.chatOptions?.backend),
     // Explizit statt geerbt: Ohne num_ctx hängt der Überlauf an Ollamas globaler
     // Einstellung, die die App nicht kennt — und der Überlauf ist still.
     // Externe Dienste (MCP) holen wie die Webrecherche fremde Seiten in den Kontext: gleiches
