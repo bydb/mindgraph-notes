@@ -82,6 +82,16 @@ describe('Übersprungene Skills', () => {
     const { skills, skipped } = await listVaultSkillsDetailed(vault)
     expect(skills).toHaveLength(50)
     expect(skipped.overLimit).toBe(3)
+    // Welche fehlen, ist festgelegt: die letzten nach Ordnernamen (N03).
+    expect(skills.map(s => s.folderName).sort()).toEqual(Array.from({ length: 50 }, (_, i) => `s${String(i).padStart(2, '0')}`))
+  })
+
+  it('eine zu große Datei hinter der Obergrenze wird mit ihrem Grund gemeldet, nicht als „zu viele“', async () => {
+    for (let i = 0; i < 50; i++) await skill(`s${String(i).padStart(2, '0')}`, head(`S${i}`) + 'Text.')
+    await skill('zz-riesig', head('Riesig') + 'x'.repeat(513 * 1024))
+    const { skills, skipped } = await listVaultSkillsDetailed(vault)
+    expect(skills).toHaveLength(50)
+    expect(skipped).toEqual({ tooLarge: ['zz-riesig'], overLimit: 0 })
   })
 
   it('ohne Skills-Ordner: leere Liste, nichts übersprungen', async () => {
@@ -90,23 +100,26 @@ describe('Übersprungene Skills', () => {
 })
 
 describe('use_skill bei gekürztem Skill', () => {
-  async function use(folder: string): Promise<{ res: { ok: boolean; content: string; display?: string }; run: AgentRun }> {
+  async function use(folder: string): Promise<{ res: { ok: boolean; content: string; display?: string }; run: AgentRun; steps: string[] }> {
     const run = {
       runId: 'r', senderId: 1, vaultPath: vault, abort: new AbortController(),
       skills: [{ name: 'Lang', description: '', folderName: folder }], skillsUsed: [], sources: new Set<string>()
     } as unknown as AgentRun
-    const res = await createNoteAgentRegistry().get('use_skill')!.run({ name: 'Lang' }, { senderId: 1, run } as NoteAgentContext)
-    return { res, run }
+    const steps: string[] = []
+    const ctx = { senderId: 1, run, onStep: (skill: string, summary: string) => { steps.push(`${skill}: ${summary}`) } } as NoteAgentContext
+    const res = await createNoteAgentRegistry().get('use_skill')!.run({ name: 'Lang' }, ctx)
+    return { res, run, steps }
   }
 
   it('erkennt das verlangte Format auch hinter der Lese-Grenze und nennt die Kürzung im Protokollschritt', async () => {
     await skill('lang', head('Lang') + 'a'.repeat(MAX_SKILL_BODY_CHARS + 500) + '\nAm Ende: write_pptx aufrufen.')
     await fs.mkdir(path.join(vault, 'Skills', 'lang', 'references'), { recursive: true })
     await fs.writeFile(path.join(vault, 'Skills', 'lang', 'references', 'vorlage.md'), 'Vorlage', 'utf8')
-    const { res, run } = await use('lang')
+    const { res, run, steps } = await use('lang')
     expect(res.ok).toBe(true)
     expect(run.expectedPptxSkill).toBe('Lang')
-    expect(res.display).toBe(`use_skill: Lang — gekürzt, ${fmtChars(MAX_SKILL_BODY_CHARS)} von ${fmtChars(MAX_SKILL_BODY_CHARS + 500 + '\nAm Ende: write_pptx aufrufen.'.length)} Zeichen gelesen`)
+    // Der Lauf liest `display` nicht aus — sichtbar wird die Kürzung nur über onStep (N01).
+    expect(steps).toEqual([`use_skill: „Lang“ gekürzt, ${fmtChars(MAX_SKILL_BODY_CHARS)} von ${fmtChars(MAX_SKILL_BODY_CHARS + 500 + '\nAm Ende: write_pptx aufrufen.'.length)} Zeichen gelesen`])
     expect(res.content).not.toContain('write_pptx aufrufen')
     expect(res.content).toContain('nur gekürzt bei dir an')
     expect(res.content).toContain('Zusatzdateien unten')
@@ -115,8 +128,8 @@ describe('use_skill bei gekürztem Skill', () => {
 
   it('ein kurzer Skill bleibt ohne Hinweis', async () => {
     await skill('kurz', head('Lang') + 'Kurze Anleitung.')
-    const { res, run } = await use('kurz')
-    expect(res.display).toBe('use_skill: Lang')
+    const { res, run, steps } = await use('kurz')
+    expect(steps).toEqual([])
     expect(res.content).not.toContain('gekürzt')
     expect(run.expectedPptxSkill).toBeUndefined()
   })

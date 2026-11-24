@@ -91,14 +91,18 @@ export async function listVaultSkillsDetailed(vaultPath: string): Promise<{ skil
   }
   const disabled = await readSkillsDisabled(vaultPath)
   const out: VaultSkillInfo[] = []
+  // Nach Namen sortiert: readdir liefert Dateisystem-Reihenfolge, bei mehr als MAX_SKILLS
+  // wäre sonst zufällig, welche Skills geladen werden (Gegenprüfung N03).
+  dirents.sort((a, b) => a.name.localeCompare(b.name, 'de'))
   for (const d of dirents) {
     if (!d.isDirectory() || d.name.startsWith('.')) continue
     const skillFile = path.join(skillsDir, d.name, 'SKILL.md')
     try {
       const st = await fs.stat(skillFile)
       if (!st.isFile()) continue
-      if (out.length >= MAX_SKILLS) { skipped.overLimit++; continue }
+      // Größe zuerst: eine zu große Datei wird mit ihrem Grund gemeldet und zählt nicht gegen die Obergrenze.
       if (st.size > MAX_SKILL_FILE_BYTES) { skipped.tooLarge.push(d.name); continue }
+      if (out.length >= MAX_SKILLS) { skipped.overLimit++; continue }
       const parsed = parseSkillFile(await fs.readFile(skillFile, 'utf-8'))
       const bodyChars = parsed.body.trim().length
       out.push({

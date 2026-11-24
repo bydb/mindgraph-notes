@@ -310,6 +310,7 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
       datasets: new Map(run.datasets),
       folderReads: new Map(run.folderReads),
       collectedFolders: new Set(run.collectedFolders),
+      ...(run.skillBlocks?.size ? { skillBlocks: new Map(run.skillBlocks) } : {}),
       ...(run.foreignData ? { foreignData: run.foreignData } : {}),
       ...(run.mcpServers?.length ? { mcpServers: run.mcpServers } : {})
     })
@@ -329,6 +330,9 @@ export interface RunContinuation {
   datasets: Map<string, CollectedTable>
   folderReads: Map<string, number>
   collectedFolders: Set<string>
+  /** Feste Blöcke der im Vorgänger gelesenen Skills — der Folgelauf soll nichts erneut lesen,
+   *  write_html braucht sie aber für [[skill-block:name]] (Gegenprüfung N02). */
+  skillBlocks?: Map<string, string>
   /** Herkunft aus externen Werkzeugen, über die ganze Kette vererbt (E19). */
   foreignData?: McpForeignData
   /** Im Vorgänger gewählte externe Server (E17′: Folgeauftrag nur dieselben oder weniger). */
@@ -336,6 +340,16 @@ export interface RunContinuation {
 }
 
 const continuations = new Map<number, RunContinuation>()
+
+/** Übernimmt in einen Folgelauf, worauf sich der mitgegebene Verlauf bezieht: Datensätze
+ *  (collect_table), Lese-Zähler und die festen Blöcke gelesener Skills. Der Verlauf nennt
+ *  ihre IDs und Namen, und das Modell soll nichts davon erneut lesen. */
+export function inheritContinuation(run: AgentRun, prev: RunContinuation): void {
+  for (const [id, table] of prev.datasets) run.datasets.set(id, table)
+  for (const [folder, n] of prev.folderReads) run.folderReads.set(folder, n)
+  for (const folder of prev.collectedFolders) run.collectedFolders.add(folder)
+  if (prev.skillBlocks?.size) run.skillBlocks = new Map(prev.skillBlocks)
+}
 
 /** Stand zum Fortsetzen — nur für denselben Absender und genau diesen Lauf. Nur lesen:
  *  gelöscht wird er erst, wenn der Folgelauf wirklich gestartet ist (dropContinuation) —

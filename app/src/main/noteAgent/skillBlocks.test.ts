@@ -7,7 +7,7 @@ import * as os from 'os'
 import * as path from 'path'
 import { parseSkillBlocks, applySkillBlocks } from './skillBlocks'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
-import type { AgentRun } from './runRegistry'
+import { finishRun, peekContinuation, inheritContinuation, type AgentRun } from './runRegistry'
 
 const SKILL = [
   '# Test', '', 'Text davor.', '',
@@ -102,6 +102,26 @@ describe('use_skill und write_html zusammen', () => {
     expect(res.ok).toBe(false)
     expect(res.content).toContain('Vorhanden sind: stil, ende')
     expect(run.results.size).toBe(0)
+  })
+
+  // Gegenprüfung N02: Bei „Antworten und weitermachen“ liest das Modell den Skill nicht neu
+  // (loop.ts sagt es ihm ausdrücklich) — die Blöcke müssen aus dem Vorgänger mitkommen.
+  it('ein Folgeauftrag kennt die Blöcke des Vorgängers, ohne den Skill neu zu lesen', async () => {
+    const reg = createNoteAgentRegistry()
+    const first = { ...makeRun(), runId: 'blocks-erst', senderId: 4711, datasets: new Map(), folderReads: new Map(), collectedFolders: new Set<string>() } as unknown as AgentRun
+    await reg.get('use_skill')!.run({ name: 'Test' }, { senderId: 4711, run: first } as NoteAgentContext)
+    first.transcript = [{ role: 'user', content: 'Auftrag' }]
+    finishRun(first, 'done')
+    const prev = peekContinuation(4711, 'blocks-erst')!
+    expect([...(prev.skillBlocks?.keys() ?? [])]).toEqual(['stil', 'ende'])
+
+    const next = { ...makeRun(), runId: 'blocks-folge', senderId: 4711, datasets: new Map(), folderReads: new Map(), collectedFolders: new Set<string>() } as unknown as AgentRun
+    inheritContinuation(next, prev)
+    expect(next.skillBlocks).not.toBe(first.skillBlocks)
+    const written = await reg.get('write_html')!.run({ file_name: 'korrektur.html', title: 'Korrektur', body_html: '[[skill-block:stil]]\n<section>Korrigierte Seite</section>' }, { senderId: 4711, run: next } as NoteAgentContext)
+    expect(written.ok, written.content).toBe(true)
+    const html = await fs.readFile(Array.from(next.results.values())[0].stagingPath, 'utf8')
+    expect(html).toContain('<style>.a{color:red}</style>')
   })
 })
 

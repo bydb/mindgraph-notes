@@ -22,7 +22,7 @@ import { getMcpStore, mcpMicrosoftToken, mcpOAuthToken, confirmMcpPersonalDataFo
 import { prepareMcpForRun, closeMcpForRun, mcpProvenance, type McpRunState } from '../mcp/agentTools'
 import { mcpRunGate } from '../../shared/mcp'
 import { registerContextAttachment, registerContextFolder, removeContextAttachment, clearContextAttachments } from './contextFiles'
-import { startRun, peekContinuation, dropContinuation, type RunContinuation, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState, type AgentRun } from './runRegistry'
+import { startRun, peekContinuation, dropContinuation, inheritContinuation, type RunContinuation, getRunForSender, finishRun, publicResults, takeResult, peekResult, cancelRunsForSender, pruneRunIfConsumed, consumeEvictedRuns, totalFolderReads, nextSeq, type WebRunState, type AgentRun } from './runRegistry'
 import { updateComparisons } from '../comparisonStore'
 import { addSession, setAccepted } from '../../shared/comparison/model'
 import type { WorkSession } from '../../shared/comparison/types'
@@ -653,10 +653,8 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       // Abbrechen schließt die Verbindungen sofort (ein laufender Aufruf endet damit).
       if (mcp) run.abort.signal.addEventListener('abort', () => { void closeMcpForRun(mcp) }, { once: true })
       if (continuation) {
-        // Datensätze (collect_table) und Lese-Zähler gehen mit — der Verlauf nennt ihre IDs.
-        for (const [id, table] of continuation.prev.datasets) run.datasets.set(id, table)
-        for (const [folder, n] of continuation.prev.folderReads) run.folderReads.set(folder, n)
-        for (const folder of continuation.prev.collectedFolders) run.collectedFolders.add(folder)
+        // Datensätze, Lese-Zähler und feste Skill-Blöcke gehen mit — der Verlauf nennt sie.
+        inheritContinuation(run, continuation.prev)
         dropContinuation(event.sender.id, continuation.prev.runId)
       }
       hookNoteAgentCleanup(event.sender)

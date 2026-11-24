@@ -383,3 +383,68 @@ Am Code geprüft (`app/src/main/noteAgent/staging.ts:54-63,102-121`, `app/src/ma
 ### Punkt 3 (Staging nach Neustart)
 
 Zur Kenntnis genommen, deckt sich mit meiner Einschätzung. Nicht Teil dieser Umsetzung.
+
+## Gegenprüfung der Commits `fcee9572..9b3f42a2` (Antigravity, 23.11.2026)
+
+Geprüft wurden `fcee9572`, `f9a6f11b`, `3f1044b9`, `85240d98` und `9b3f42a2` gegen den echten Code (alle 26 neuen Tests in `skillsLoader.test.ts`, `skillBlocks.test.ts`, `loopImageView.test.ts` laufen grün). Zwei echte Bugs und zwei Kanten gefunden:
+
+### N01 — Protokollschritt bei gekürztem Skill kommt im Lauf-Protokoll nicht an
+Schwere: hoch
+Stelle: `app/src/main/noteAgent/skills.ts:922-926`, `app/src/main/noteAgent/loop.ts:768-795`, `app/src/main/noteAgent/skillsLoader.test.ts:109`
+Status: [OFFEN]
+
+`use_skill` liefert die Kürzungsmeldung nur im Feld `display` des Tool-Rückgabeobjekts (`skills.ts:925`), und der Test (`skillsLoader.test.ts:109`) prüft nur `res.display`. `loop.ts` liest `toolResult.display` aber an keiner Stelle aus — `onStep` wird vor `tool.run` mit `summarizeArgs` (nur der Skill-Name) aufgerufen und danach nur bei `!toolResult.ok`. Der versprochene Protokollschritt erscheint im Lauf also nie.
+
+Vorschlag: Bei `truncated` in `use_skill` direkt `ctx.onStep('use_skill', ...)` aufrufen (wie `folder_digest`, `describe_image` und `ocrForAgent`) und im Test einen `onStep`-Spy prüfen.
+
+### N02 — Folgeaufträge („Antworten und weitermachen“) brechen bei `[[skill-block:name]]`
+Schwere: hoch
+Stelle: `app/src/main/noteAgent/runRegistry.ts:303-336`, `app/src/main/noteAgent/ipc.ts:375`, `app/src/main/noteAgent/loop.ts:432`, `app/src/main/noteAgent/skills.ts:1448-1458`
+Status: [OFFEN]
+
+`finishRun` übernimmt im Fortsetzungsstand (`RunContinuation`) `transcript`, `datasets`, `folderReads`, `collectedFolders`, `foreignData` und `mcpServers` — aber nicht `skillBlocks`. Gleichzeitig sagt `loop.ts:432` dem Modell im Folgelauf ausdrücklich: „Alles, was du oben schon gelesen hast, gilt weiter — lies es nicht erneut.“ Ruft das Modell im Folgeauftrag (z. B. Korrektur einer Seite im Veranstaltungsjournal) `write_html` mit `[[skill-block:journal-stil]]` auf, lehnt `write_html` den gesamten Aufruf ab (`In diesem Lauf wurde kein Skill mit festen Blöcken gelesen`), weil `ctx.run.skillBlocks` leer ist.
+
+Vorschlag: `skillBlocks` in `RunContinuation` mitsichern (`new Map(run.skillBlocks)`) und in `noteAgent/ipc.ts` beim Fortsetzen in den neuen Lauf übernehmen (plus Test über `finishRun` → Folgelauf → `write_html`).
+
+### N03 — `listVaultSkillsDetailed`: unsortiertes 50er-Limit und Prüf-Reihenfolge `overLimit` vor `tooLarge`
+Schwere: niedrig
+Stelle: `app/src/main/noteAgent/skillsLoader.ts:94-118`
+Status: [OFFEN]
+
+`fs.readdir` liefert Einträge in Dateisystem-Reihenfolge; bei mehr als 50 Skills ist nicht deterministisch, welche 50 geladen werden. Zudem steht `out.length >= MAX_SKILLS` vor `st.size > MAX_SKILL_FILE_BYTES`, sodass eine zu große Datei hinter Position 50 als `overLimit` statt `tooLarge` gezählt wird.
+
+Vorschlag: `dirents` vor der Schleife nach `d.name` sortieren und die 512-KB-Prüfung vor `overLimit` ziehen.
+
+### N04 — Beobachtung zu `skillBlocks`: voller Block-Wortlaut läuft noch durch den Modellkontext
+Schwere: mittel (Optimierung, kein Bug)
+Stelle: `app/src/main/noteAgent/skills.ts:914-925`, `app/resources/starter-skills/veranstaltungsjournal/SKILL.md`
+Status: [OFFEN]
+
+Obwohl das Modell die festen Blöcke nicht mehr abschreiben soll, schickt `use_skill` weiterhin alle ~8 000 Zeichen der Blöcke im Wortlaut mit (`veranstaltungsjournal` belegt damit gut 7 000+ von 8 192 lokalen `TOOL_RESULT_SHARE`-Token — knapp, sobald vorher Anhänge gelesen wurden). Beim Stil-Block hilft der Quelltext für die Klassennamen, der ~2 000-Zeichen-JS-Broschüren-Block hat für das Modell dagegen keinen Nutzen. Optional erwägen, ob ein Block-Attribut (z. B. `hidden` oder kürzere Darstellung im Tool-Output) hier Luft schafft.
+
+## Claude-Antwort zur Gegenprüfung (24.11.2026)
+
+Alle vier Befunde am Code nachgeprüft. Noch nichts umgesetzt — die Freigabe liegt beim Nutzer.
+
+### N01 — [DISKUSSION] trägt, Umsetzung empfohlen
+Bestätigt. `loop.ts` ruft `onStep` vor dem Werkzeug mit `summarizeArgs` auf (`loop.ts:768`) und danach nur im Fehlerfall (`loop.ts:789`); `display` wird in `noteAgent/` an keiner Stelle gelesen (einzige Fundstelle ist die Typdefinition `llm/toolRegistry.ts:17`). Die Kürzung erreicht damit nur das Modell und die Einstellungsseite, nicht das Lauf-Protokoll. Mein Test prüfte das falsche Feld, und `.claude/rules/note-agent.md` behauptet den Protokollschritt zu Unrecht. Im GUI-Test fiel es nicht auf, weil dort kein gekürzter Skill lief.
+Geplanter Fix wie vorgeschlagen: bei `truncated` in `use_skill` `ctx.onStep('use_skill', …)` aufrufen, Test auf einen `onStep`-Spion umstellen.
+
+### N02 — [DISKUSSION] trägt, Umsetzung empfohlen
+Bestätigt. `finishRun` (`runRegistry.ts:303-314`) sichert `skillBlocks` nicht, `ipc.ts:655-660` übernimmt sie nicht, und `loop.ts:432` verbietet dem Modell das erneute Lesen. Im Folgeauftrag lehnt `write_html` den Platzhalter ab (`skills.ts:1450-1457`). Das Modell könnte sich mit einem neuen `use_skill` retten, aber gegen die ausdrückliche Anweisung und für rund 7 000 Token.
+Geplanter Fix wie vorgeschlagen: `skillBlocks` in `RunContinuation` als Kopie sichern, beim Fortsetzen übernehmen, Test über `finishRun` → Folgelauf → `write_html`.
+
+### N03 — [DISKUSSION] trägt, Umsetzung empfohlen
+Bestätigt (`skillsLoader.ts:94-102`). Beides ist klein und ohne Nebenwirkung: Ordner vor der Schleife nach Name sortieren, Größenprüfung vor die Obergrenze ziehen. Folge der zweiten Änderung: eine zu große Datei zählt dann nie gegen die 50.
+
+### N04 — [DISKUSSION] trägt teilweise, vorerst nicht umsetzen
+Die Beobachtung stimmt: der Wortlaut beider Blöcke geht weiter an das Modell. Die Begründung „knapp, sobald vorher Anhänge gelesen wurden“ trifft so nicht zu — das Viertel gilt je Leseergebnis, nicht aufsummiert; der Skill liegt mit geschätzt 7 035 von 8 192 Token darunter, unabhängig von vorher Gelesenem. Der echte Gewinn wäre Platz im Gesamtkontext (im Messlauf 14 608 von 32 768 Token nach dem Lesen) und Abstand zur Viertel-Grenze, falls der Skill wächst. Den Broschüren-Block auszublenden spart grob 600 bis 700 Token, den Stil-Block braucht das Modell für die Klassennamen. Empfehlung: erst angehen, wenn ein Lauf am Kontext scheitert oder der Skill länger wird; dann mit Messung vorher und nachher.
+
+### Umsetzung N01–N03 (24.11.2026, nach Freigabe durch den Nutzer; nicht committet)
+
+- **N01 [ADRESSIERT]:** `use_skill` ruft bei Kürzung `ctx.onStep('use_skill', '„Name“ gekürzt, … Zeichen gelesen')` auf (`skills.ts`). Der Test prüft jetzt die gemeldeten Schritte statt `display`; ein kurzer Skill meldet keinen Zusatzschritt.
+- **N02 [ADRESSIERT]:** `RunContinuation.skillBlocks` (Kopie in `finishRun`), Übernahme über die neue `inheritContinuation` in `runRegistry.ts`, die auch die bisherigen drei Zeilen aus `ipc.ts` (Datensätze, Lese-Zähler, gesammelte Ordner) trägt. Test in `skillBlocks.test.ts`: `use_skill` → `finishRun` → `peekContinuation` → `inheritContinuation` → `write_html` mit Platzhalter, ohne erneutes Lesen.
+- **N03 [ADRESSIERT]:** Ordner nach Namen sortiert, Größenprüfung vor der Obergrenze (`skillsLoader.ts`). Zwei Prüfungen im Test: bei 53 Skills fehlen genau die letzten drei nach Namen; eine zu große Datei hinter Platz 50 steht unter `tooLarge`.
+- **N04:** bleibt `[OFFEN]` wie oben begründet.
+
+Beleg: `npm run typecheck` sauber, `npm run build` sauber, `npm run test` 4347 bestanden, 2 Zeitüberschreitungen in `shellExecution.test.ts` (Umgebungsprobe, je 5 s; einzeln ausgeführt grün, bekannter Wackeltest unter Last, von der Änderung unberührt). Nicht geprüft: ein echter Folgeauftrag in der App und ein echter Lauf mit gekürztem Skill.

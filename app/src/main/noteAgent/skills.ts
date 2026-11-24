@@ -916,6 +916,10 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         ctx.run.skillBlocks ??= new Map()
         for (const [k, v] of blocks) ctx.run.skillBlocks.set(k, v)
       }
+      // Eigener Protokollschritt: loop.ts schreibt vor dem Aufruf nur den Skill-Namen ins
+      // Protokoll und liest `display` nicht aus — ohne diese Zeile sähe der Nutzer die
+      // Kürzung im Lauf nie (Gegenprüfung N01, 24.11.2026).
+      if (truncated) ctx.onStep?.('use_skill', `„${skill.name}“ gekürzt, ${cutInfo}`)
       const blockNote = blocks.size
         ? `\n\n[Feste Blöcke dieses Skills: ${[...blocks.keys()].join(', ')}. Schreibe sie NICHT ab. Setze in body_html von write_html an die Stelle eines Blocks nur den Platzhalter, zum Beispiel [[skill-block:${[...blocks.keys()][0]}]] — die App fügt den Wortlaut ein.]`
         : ''
