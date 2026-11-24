@@ -2,7 +2,7 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
-## [Unveröffentlicht]
+## [1.4.8] - 2026-11-24
 
 **Agent und Chat haben eine neue, ruhigere Oberfläche, und der Agent kann bei lokalen Modellen mit einem größeren Kontextfenster arbeiten.** In der Auftragskarte stehen nur noch Eingabe, ein „+“ für Unterlagen und der Startknopf; Zielordner, Befugnisse und Modell liegen in einer leisen Zeile darunter. Das Kontextfenster stellen Sie im Modell-Menü oder unter Einstellungen → KI ein. Dateien mit Umlaut im Namen kann der Agent jetzt lesen.
 
