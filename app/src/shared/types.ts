@@ -967,6 +967,15 @@ export interface ElectronAPI {
     imageView?: { ok: true; model: string; budget: number } | { ok: false; reason: string };
     error?: string;
   }>;
+  /** Kontextfenster-Einstellung: was Ollama über das lokale Modell weiß. `local: false` = kein lokales Ollama-Modell. */
+  noteAgentContextInfo: (params: { model: string }) => Promise<{
+    success: boolean;
+    local?: boolean;
+    modelMax?: number | null;
+    loaded?: { sizeBytes: number; vramBytes: number; contextLength: number | null } | null;
+    totalRamBytes?: number;
+    error?: string;
+  }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   computerControlPickApp: () => Promise<{ success: boolean; app?: { id: string; label: string; path: string }; error?: string }>;
   // Externe Werkzeuge (MCP) — Einstellungen. Speichern nur nach nativem Dialog im Main.

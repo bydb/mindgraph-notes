@@ -236,6 +236,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   }) => ipcRenderer.invoke('note-agent-run', params),
   noteAgentRoutePreflight: (params: { model: string; localBackend?: 'ollama' | 'lmstudio'; cloud?: { model: string; provider?: 'openrouter' | 'llmbase' } | null }) =>
     ipcRenderer.invoke('note-agent-route-preflight', params),
+  noteAgentContextInfo: (params: { model: string }) => ipcRenderer.invoke('note-agent-context-info', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
   // Rechner-Steuerung: Programm über den Systemdialog freigeben (liefert Bundle-Kennung).
   computerControlPickApp: () => ipcRenderer.invoke('computer-control-pick-app'),

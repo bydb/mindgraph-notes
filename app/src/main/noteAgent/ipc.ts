@@ -15,6 +15,8 @@ import { createAgentOcrState } from '../ocr/agentOcr'
 import { isCloudChatBackend, warmPricingCache, type ChatOptions as LlmChatOptions, type CloudChatBackend, type ChatMessage } from '../llm/chatClient'
 import { collectRunTotals } from '../llm/telemetry'
 import { sanitizeChatContext } from './chatContext'
+import { agentContextInfo, ollamaModelContextMax } from './localContext'
+import { chooseAgentContext, agentContextNote } from '../../shared/agentContext'
 import { type CloudProviderSettings } from '../../shared/llmBackend'
 import { petrolCloudAllowed } from '../../shared/webChat'
 import { isTrustedSender } from '../plugins/transport'
@@ -323,6 +325,20 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
     }
   })
 
+  // Kontextfenster-Einstellung: Maximum des Modells, aktuelle Speicherbelegung, Arbeitsspeicher.
+  // Nur Abfragen am lokalen Ollama, keine Inhalte.
+  ipcMain.handle('note-agent-context-info', async (event, params: { model: string }) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+    try {
+      const model = typeof params?.model === 'string' ? params.model : ''
+      const route = await classifyAgentRoute('ollama', model)
+      if (route.kind !== 'local') return { success: true, local: false }
+      return { success: true, local: true, ...(await agentContextInfo(model)) }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   // Web-Provenienz fürs done-Event (Renderer zeigt „N Suchen · M Seiten" + Liste). Enthält
   // bewusst NUR das, was tatsächlich passiert ist — inkl. Fehlversuchen.
   function webRunProvenance(run: { web?: WebRunState }): { queries: Array<{ query: string; status: string }>; fetches: Array<{ url: string; title: string; status: string; partial?: boolean; browserOnly?: boolean }>; searchCount: number; fetchCount: number } | undefined {
@@ -484,6 +500,22 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       )
       const gate = await checkNoteAgentCloudGate(route, params.cloud?.model)
       if (!gate.ok) return { success: false, error: gate.error, code: gate.code, route }
+
+      // Kontextfenster laut Einstellung (shared/agentContext.ts) — nur für nachweislich lokale
+      // Ollama-Läufe. Ollama-Cloud und LM Studio bleiben beim Standard. Der Main liest den Wert
+      // selbst und begrenzt ihn auf das Maximum des Modells: ein zu großes `num_ctx` kürzt Ollama
+      // still, das Budget rechnete dann mit Platz, den es nicht gibt.
+      let contextNote: string | null = null
+      if (chatOptions.backend === 'ollama' && route.kind === 'local') {
+        const ui = await loadUISettings().catch(() => ({} as Record<string, unknown>))
+        const wanted = chooseAgentContext(ui.noteAgentLocalContextTokens, null).wanted
+        if (wanted > chooseAgentContext(undefined, null).wanted) {
+          const modelMax = await ollamaModelContextMax(params.model)
+          const choice = chooseAgentContext(wanted, modelMax)
+          if (choice.numCtx) chatOptions = { ...chatOptions, numCtx: choice.numCtx }
+          contextNote = agentContextNote(choice, modelMax)
+        }
+      }
 
       // Cloud-Läufe: Ausgabegrenze setzen und OpenRouter pro Request auf Zero Data
       // Retention festlegen. In einem Praxistest endete ein Cloud-Lauf mitten im
@@ -757,6 +789,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
             noteContent: params.noteContent || '',
             agentMemory,
             chatOptions,
+            contextNote: contextNote ?? undefined,
             continuation: continuation ? { priorMessages: continuation.priorMessages, answer: continuation.answer, priorTokens: continuation.priorTokens } : undefined,
             onStep: (seq, skill, summary) => {
               if (!sender.isDestroyed()) sender.send('note-agent-progress', { runId: run.runId, seq, skill, summary })

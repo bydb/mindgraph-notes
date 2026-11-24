@@ -80,6 +80,8 @@ export interface NoteAgentLoopParams {
   // Verdichten älterer Leseergebnisse (compaction.ts). Standard an; `false` nur für den
   // Vergleichslauf im Mess-Harness (eval/contextEval.live.test.ts).
   compaction?: boolean
+  // Protokollzeile zum eingestellten Kontextfenster (shared/agentContext.ts), vom Aufrufer gebaut.
+  contextNote?: string
   // Folgelauf („Antworten und weitermachen“): Verlauf des Vorgängers (ohne dessen
   // Systemprompt, der wird für diesen Lauf frisch gebaut) plus die Antwort des Nutzers.
   // `priorTokens`: Budgetstand des Vorgängers zum übernommenen Verlauf (siehe AgentRun.transcriptTokens).
@@ -435,6 +437,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Zeitfenster pro Request: große lokale Modelle brauchen mit gewachsenem Tool-Kontext
   // deutlich länger als die 180s-Default — der Nutzer hat einen echten Abbrechen-Button,
   // das Timeout ist nur noch die Notbremse (agentRequestTimeoutMs).
+  const runDefaultNumCtx = run.web || (run.mcp?.tools.size ?? 0) > 0 || run.foreignData ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX
   const chatOptions: ChatOptions = {
     ...params.chatOptions,
     signal: run.abort.signal,
@@ -445,7 +448,9 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     // Fenster. Im GUI-Test (15.11.2026, Notion) lasen sechs Abrufe ~31 700 Zeichen, der Lauf
     // endete bei 32 768 Token „eng“. Speicherpreis von 64k ist gemessen (siehe AGENT_NUM_CTX_WEB).
     // Auch bei geerbten Fremddaten ohne aktuelle Werkzeuge (Codex F46): der Verlauf trägt sie mit.
-    numCtx: params.chatOptions?.numCtx ?? (run.web || (run.mcp?.tools.size ?? 0) > 0 || run.foreignData ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX),
+    // Ein vom Nutzer eingestelltes größeres Fenster (params.chatOptions.numCtx, nur lokales Ollama)
+    // gilt, aber nie unter dem Standard dieses Laufs.
+    numCtx: Math.max(params.chatOptions?.numCtx ?? 0, runDefaultNumCtx),
     // Überlauf bei OpenRouter laut melden statt still die Mitte zu kürzen (F35).
     disableMiddleOut: true
   }
@@ -485,7 +490,11 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   } else if (contextWindow.source === 'assumed') {
     onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
   }
-  let maxIterations = contextWindow.source === 'catalog'
+  if (params.contextNote) onStep(nextSeq(run), 'kontext', params.contextNote)
+  // Vom Nutzer angehobenes lokales Fenster ist wie ein Katalogfenster sicher bekannt (die App
+  // setzt num_ctx selbst): dann begrenzen die Runden, nicht der Platz.
+  const raisedLocalWindow = contextWindow.source === 'num_ctx' && contextWindow.tokens > runDefaultNumCtx
+  let maxIterations = contextWindow.source === 'catalog' || raisedLocalWindow
     ? MAX_ITERATIONS_LARGE_WINDOW
     : hasFolder || run.shell || run.computer ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   let currentTurn = 0
