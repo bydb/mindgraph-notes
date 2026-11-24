@@ -2,6 +2,21 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.6] - 2026-11-24
+
+**Der Agent sieht sich jetzt Bilder an: Fotos, Diagramme und Abläufe im Anhang wertet ein Modell auf Ihrem Rechner aus.** Die Auftragskarte zeigt schon vor dem Start, ob das gewählte Modell Bilder ansehen kann. Bei der Webrecherche verliert der Agent keine Abrufe mehr an Websites, die ihn abweisen, und lange Skills kommen vollständig beim Modell an.
+
+### Hintergrund
+
+- **Auslöser:** Bisher las der Agent Bilder nur über die Texterkennung; Schaubilder, Abläufe und Fotos blieben ihm verschlossen. Dazu kamen Befunde aus einer Prüfung von Agent und Chat mit unabhängiger Gegenprüfung.
+- **Bilder ansehen:** Der Agent stellt zu einem Bild eine gezielte Frage, ein lokales Modell mit Bildfähigkeit beantwortet sie. Das Bild selbst geht nie an einen Anbieter im Netz. Je Lauf höchstens 8 Bilder; im Ergebnis steht „Bild angesehen“ als Quelle. Ein Bild aus dem Vault findet der Agent auch über den bloßen Dateinamen, wenn er eindeutig ist.
+- **Webrecherche:** Antwortet eine Website mit einer Abweisung oder Drosselung (HTTP 401, 403, 429, 451), ruft der Agent weitere Treffer von dort in diesem Lauf nicht mehr ab und behält seine Abrufe für andere Quellen. Eine Website, die er im selben Lauf schon lesen konnte, bleibt nach einer einzelnen gesperrten Unterseite erreichbar.
+- **Skills:** Ein zu langer Skill wurde bisher still gekürzt. Die Lesegrenze liegt jetzt bei 18 000 Zeichen, Einstellungen → Skills warnt an jedem Skill, der darüber liegt, und der Lauf nennt eine Kürzung. Feste Textbausteine eines Skills setzt die App selbst ein, statt das Modell sie abschreiben zu lassen; das Veranstaltungsjournal nutzt das.
+- **Präsentation nach Vorlage:** Der mitgelieferte Skill prüft vor dem Erzeugen, ob Titel verständlich, Begriffe eingeführt und Zeiten stimmig sind, und erfindet keine Beispiele aus dem Alltag des Publikums.
+- **Lokale Läufe:** Ein einzelner Modellaufruf darf lokal 20 statt 10 Minuten dauern. Lange Ergebnisse brachen vorher bei langsameren Rechnern ohne Datei ab.
+- **KI nur auf diesem Rechner:** Der Schalter gilt sofort beim Umlegen und sperrt jetzt auch die Bilderzeugung über Google. Lassen sich die Einstellungen nicht lesen, bleiben Anbieter im Netz gesperrt.
+- **Grenzen:** Bilder ansehen setzt ein lokales Modell mit Bildfähigkeit voraus; ohne ein solches bleibt es bei der Texterkennung. Die Website-Sperre ist eine Annahme aus einer Antwort, kein Beweis; läuft ein Treffer über eine Weiterleitung, kann ein zweiter Abruf zum selben Ziel noch anfallen. Bestehende Vaults behalten ihre bisherige Fassung eines mitgelieferten Skills.
+
 ## [1.4.5] - 2026-11-22
 
 **Für Schulsekretariate gibt es jetzt ein eigenes Profil „Schulverwaltung“, bei dem die KI nur auf Ihrem Rechner rechnet.** Wählen Sie es beim ersten Start: Anbieter im Netz sind dann gesperrt, Websuche, Bilderzeugung und andere Verbindungen nach außen bleiben aus, und E-Mail und Dashboard sind sofort da. Den Schalter „KI nur auf diesem Rechner“ gibt es auch in allen anderen Profilen unter Einstellungen → KI & Modelle.
