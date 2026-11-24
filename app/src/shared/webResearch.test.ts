@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   normalizeWebUrl,
   hostnameFromUrl,
+  DENYING_HTTP_STATUS,
+  isDenyingHttpStatus,
+  webSiteKey,
   isPrivateIp,
   isForbiddenHostname,
   extractUrlsFromInstruction,
@@ -542,6 +545,21 @@ describe('hostnameFromUrl', () => {
     expect(hostnameFromUrl('https://Example.COM/x')).toBe('example.com')
     expect(hostnameFromUrl('http://[::1]/')).toBe('::1')
     expect(hostnameFromUrl('kaputt')).toBeNull()
+  })
+})
+
+describe('Host-Sperre (isDenyingHttpStatus, webSiteKey)', () => {
+  it('erkennt genau 401, 403, 429 und 451 als abweisend', () => {
+    expect([...DENYING_HTTP_STATUS].sort((a, b) => a - b)).toEqual([401, 403, 429, 451])
+    for (const s of [401, 403, 429, 451]) expect(isDenyingHttpStatus(s)).toBe(true)
+    for (const s of [undefined, 200, 301, 400, 404, 410, 500, 502, 503]) expect(isDenyingHttpStatus(s)).toBe(false)
+  })
+
+  it('normalisiert www., Großschreibung und abschließende Punkte, trennt aber Subdomains', () => {
+    expect(webSiteKey('WWW.Idealo.DE.')).toBe('idealo.de')
+    expect(webSiteKey('idealo.de')).toBe('idealo.de')
+    expect(webSiteKey('shop.idealo.de')).toBe('shop.idealo.de')
+    expect(webSiteKey('www.shop.idealo.de..')).toBe('shop.idealo.de')
   })
 })
 

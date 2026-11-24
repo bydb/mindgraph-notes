@@ -173,3 +173,190 @@ describe('web_fetch — Links derselben Website (07.11.2026)', () => {
     expect(web.allowedUrls.has('https://start.example/kontakt')).toBe(false)
   })
 })
+
+describe('web_fetch — Host-Sperre nach 401/403/429/451 (F02)', () => {
+  const fetchTool = createNoteAgentRegistry().get('web_fetch')!
+  const okPage = (url: string) => ({
+    record: { requestedUrl: url, finalUrl: url, redirectChain: [url], title: 'OK', fetchedAt: '2026-11-24T10:00:00.000Z', status: 'ok' },
+    markdown: 'Inhalt', truncated: false, originalChars: 6, bodyTruncated: false, links: []
+  })
+
+  it('sperrt dieselbe Website (inkl. www.) nach HTTP 403 — Folgetreffer kostet kein Budget und keinen Netzabruf', async () => {
+    mockFetch.mockReset()
+    mockFetch.mockImplementationOnce(async () => {
+      throw new FetchExtractError('Seite antwortete mit HTTP 403', {
+        finalUrl: 'https://www.shop.example/a',
+        redirectChain: ['https://www.shop.example/a'],
+        status: 403
+      })
+    })
+    const web = makeWeb()
+    web.allowedUrls = new Set(['https://www.shop.example/a', 'https://shop.example/b', 'https://other.example/c'])
+    const run = makeRun(web)
+
+    const first = await fetchTool.run({ url: 'https://www.shop.example/a' }, { senderId: 1, run } as NoteAgentContext)
+    expect(first.ok).toBe(false)
+    expect(first.content).toContain('vermutlich')
+    expect(first.content).toContain('HTTP 403')
+    expect(first.content).toContain('Noch 9 Abrufe frei — wähle eine andere Website oder schreibe das Ergebnis mit dem, was du hast.')
+    expect(web.fetchCount).toBe(1)
+    expect(web.fetches).toHaveLength(1)
+
+    // Zweiter Treffer derselben Website (ohne www.): vor dem Zähler abgewiesen, kein fetchAndExtract.
+    const second = await fetchTool.run({ url: 'https://shop.example/b' }, { senderId: 1, run } as NoteAgentContext)
+    expect(second.ok).toBe(false)
+    expect(second.content).toContain('Nicht abgerufen')
+    expect(second.content).toContain('HTTP 403')
+    expect(second.content).toContain('Noch 9 Abrufe frei — wähle eine andere Website oder schreibe das Ergebnis mit dem, was du hast.')
+    expect(web.fetchCount).toBe(1)
+    expect(web.fetches).toHaveLength(1)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+
+    // Andere Website bleibt unberührt und abrufbar.
+    mockFetch.mockImplementationOnce(async (u: string) => okPage(u))
+    const third = await fetchTool.run({ url: 'https://other.example/c' }, { senderId: 1, run } as NoteAgentContext)
+    expect(third.ok).toBe(true)
+    expect(web.fetchCount).toBe(2)
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('HTTP 429 formuliert „vermutlich gedrosselt“ und sperrt Folgetreffer ohne Budgetverbrauch', async () => {
+    mockFetch.mockReset()
+    mockFetch.mockImplementationOnce(async () => {
+      throw new FetchExtractError('Seite antwortete mit HTTP 429', {
+        finalUrl: 'https://rate.example/1',
+        redirectChain: ['https://rate.example/1'],
+        status: 429
+      })
+    })
+    const web = makeWeb()
+    web.allowedUrls = new Set(['https://rate.example/1', 'https://rate.example/2'])
+    const run = makeRun(web)
+
+    const first = await fetchTool.run({ url: 'https://rate.example/1' }, { senderId: 1, run } as NoteAgentContext)
+    expect(first.ok).toBe(false)
+    expect(first.content).toContain('drosselt Abrufe vermutlich')
+    expect(first.content).toContain('zu viele Anfragen')
+
+    const second = await fetchTool.run({ url: 'https://rate.example/2' }, { senderId: 1, run } as NoteAgentContext)
+    expect(second.ok).toBe(false)
+    expect(second.content).toContain('vermutlich gedrosselt')
+    expect(web.fetchCount).toBe(1)
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('HTTP 404, 500 und BrowserOnly sperren den Host NICHT', async () => {
+    mockFetch.mockReset()
+    mockFetch
+      .mockImplementationOnce(async () => { throw new FetchExtractError('HTTP 404', { finalUrl: 'https://news.example/404', status: 404 }) })
+      .mockImplementationOnce(async () => { throw new FetchExtractError('HTTP 500', { finalUrl: 'https://news.example/500', status: 500 }) })
+      .mockImplementationOnce(async () => { throw new BrowserOnlyPageError('shell', 'https://news.example/app', ['https://news.example/app']) })
+      .mockImplementationOnce(async (u: string) => okPage(u))
+    const web = makeWeb()
+    web.allowedUrls = new Set(['https://news.example/404', 'https://news.example/500', 'https://news.example/app', 'https://news.example/ok'])
+    const run = makeRun(web)
+
+    await fetchTool.run({ url: 'https://news.example/404' }, { senderId: 1, run } as NoteAgentContext)
+    await fetchTool.run({ url: 'https://news.example/500' }, { senderId: 1, run } as NoteAgentContext)
+    await fetchTool.run({ url: 'https://news.example/app' }, { senderId: 1, run } as NoteAgentContext)
+    const ok = await fetchTool.run({ url: 'https://news.example/ok' }, { senderId: 1, run } as NoteAgentContext)
+    expect(ok.ok).toBe(true)
+    expect(web.deniedHosts?.size ?? 0).toBe(0)
+    expect(web.fetchCount).toBe(4)
+  })
+
+  it('abgebrochener Lauf trägt keinen Host als gesperrt ein', async () => {
+    mockFetch.mockReset()
+    const web = makeWeb()
+    web.allowedUrls = new Set(['https://abort.example/a'])
+    const run = makeRun(web)
+    mockFetch.mockImplementationOnce(async () => {
+      run.abort.abort()
+      throw new FetchExtractError('HTTP 403', { finalUrl: 'https://abort.example/a', status: 403 })
+    })
+    await fetchTool.run({ url: 'https://abort.example/a' }, { senderId: 1, run } as NoteAgentContext)
+    expect(web.deniedHosts?.size ?? 0).toBe(0)
+  })
+
+  it('beim letzten (10.) Abruf mit 403 verweist die Meldung aufs Schreiben statt auf andere Websites', async () => {
+    mockFetch.mockReset()
+    mockFetch.mockImplementationOnce(async () => {
+      throw new FetchExtractError('HTTP 403', { finalUrl: 'https://last.example/a', status: 403 })
+    })
+    const web = makeWeb()
+    web.fetchCount = 9
+    web.allowedUrls = new Set(['https://last.example/a'])
+    const res = await fetchTool.run({ url: 'https://last.example/a' }, { senderId: 1, run: makeRun(web) } as NoteAgentContext)
+    expect(res.ok).toBe(false)
+    expect(res.content).toContain('Abruf-Limit erreicht')
+    expect(res.content).not.toContain('wähle eine andere Website')
+  })
+
+  it('sperrt nach Weiterleitung den Zielhost aus finalUrl, nicht den Weiterleitungs-Host (P1)', async () => {
+    mockFetch.mockReset()
+    mockFetch.mockImplementationOnce(async () => {
+      throw new FetchExtractError('Seite antwortete mit HTTP 403', {
+        finalUrl: 'https://ziel.example/blockiert',
+        redirectChain: ['https://verteiler.example/go', 'https://ziel.example/blockiert'],
+        status: 403
+      })
+    })
+    const web = makeWeb()
+    web.allowedUrls = new Set(['https://verteiler.example/go', 'https://verteiler.example/anderes', 'https://ziel.example/seite2'])
+    const run = makeRun(web)
+
+    const first = await fetchTool.run({ url: 'https://verteiler.example/go' }, { senderId: 1, run } as NoteAgentContext)
+    expect(first.ok).toBe(false)
+    expect(first.content).toContain('ziel.example weist automatische Abrufe vermutlich ab')
+    expect(web.deniedHosts?.has('ziel.example')).toBe(true)
+    expect(web.deniedHosts?.has('verteiler.example')).toBe(false)
+
+    // Direkter Treffer auf Zielhost wird ohne Budget abgewiesen.
+    const blockedTarget = await fetchTool.run({ url: 'https://ziel.example/seite2' }, { senderId: 1, run } as NoteAgentContext)
+    expect(blockedTarget.ok).toBe(false)
+    expect(blockedTarget.content).toContain('Nicht abgerufen')
+    expect(web.fetchCount).toBe(1)
+
+    // Anderer Link über den Weiterleitungs-Host bleibt frei.
+    mockFetch.mockImplementationOnce(async (u: string) => okPage(u))
+    const viaRelay = await fetchTool.run({ url: 'https://verteiler.example/anderes' }, { senderId: 1, run } as NoteAgentContext)
+    expect(viaRelay.ok).toBe(true)
+    expect(web.fetchCount).toBe(2)
+  })
+
+  it('ein einzelnes 403 auf einer bereits gelesenen Website sperrt andere Unterseiten NICHT; 429 sperrt weiter (P2)', async () => {
+    mockFetch.mockReset()
+    mockFetch
+      .mockImplementationOnce(async (u: string) => okPage(u))
+      .mockImplementationOnce(async () => { throw new FetchExtractError('HTTP 403', { finalUrl: 'https://firma.example/login', status: 403 }) })
+      .mockImplementationOnce(async (u: string) => okPage(u))
+      .mockImplementationOnce(async () => { throw new FetchExtractError('HTTP 429', { finalUrl: 'https://firma.example/viel', status: 429 }) })
+    const web = makeWeb()
+    web.allowedUrls = new Set([
+      'https://firma.example/',
+      'https://firma.example/login',
+      'https://firma.example/oeffnungszeiten',
+      'https://firma.example/viel',
+      'https://firma.example/danach'
+    ])
+    const run = makeRun(web)
+
+    expect((await fetchTool.run({ url: 'https://firma.example/' }, { senderId: 1, run } as NoteAgentContext)).ok).toBe(true)
+    const login403 = await fetchTool.run({ url: 'https://firma.example/login' }, { senderId: 1, run } as NoteAgentContext)
+    expect(login403.ok).toBe(false)
+    expect(login403.content).not.toContain('nicht mehr ab')
+    expect(web.deniedHosts?.has('firma.example') ?? false).toBe(false)
+
+    // Öffnungszeiten derselben Website bleiben abrufbar.
+    expect((await fetchTool.run({ url: 'https://firma.example/oeffnungszeiten' }, { senderId: 1, run } as NoteAgentContext)).ok).toBe(true)
+
+    // HTTP 429 sperrt die Website auch nach erfolgreichen Abrufen.
+    const rate = await fetchTool.run({ url: 'https://firma.example/viel' }, { senderId: 1, run } as NoteAgentContext)
+    expect(rate.ok).toBe(false)
+    expect(web.deniedHosts?.get('firma.example')).toBe(429)
+    const after429 = await fetchTool.run({ url: 'https://firma.example/danach' }, { senderId: 1, run } as NoteAgentContext)
+    expect(after429.ok).toBe(false)
+    expect(after429.content).toContain('Nicht abgerufen')
+    expect(web.fetchCount).toBe(4)
+  })
+})

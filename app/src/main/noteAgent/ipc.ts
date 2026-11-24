@@ -535,6 +535,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
           allowedUrls: new Set(extractUrlsFromInstruction(params.instruction)),
           queries: [],
           fetches: [],
+          deniedHosts: new Map(),
           searchCount: 0,
           fetchCount: 0,
           wrote: false

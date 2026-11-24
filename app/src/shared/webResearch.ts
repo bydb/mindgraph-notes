@@ -196,6 +196,24 @@ export function hostnameFromUrl(input: string): string | null {
   }
 }
 
+// ── Host-Sperre nach abweisenden HTTP-Antworten (Chat & Notiz-Agent) ─────────
+// Statuscodes, mit denen eine Website automatische Abrufe abweist (401/403/451) oder
+// drosselt (429). Eine solche Seite liefert meist auch für weitere Treffer desselben Laufs
+// nichts — weitere Abrufe würden nur Budget und Runden kosten.
+// Eine Annahme, kein Beweis (z. B. 429 kann vorübergehend sein): Meldungen ans Modell
+// formulieren deshalb „vermutlich“.
+export const DENYING_HTTP_STATUS: ReadonlySet<number> = new Set([401, 403, 429, 451])
+
+/** True für HTTP-Statuscodes, nach denen weitere Abrufe derselben Website vermutlich scheitern. */
+export function isDenyingHttpStatus(status: number | undefined): boolean {
+  return status !== undefined && DENYING_HTTP_STATUS.has(status)
+}
+
+/** `www.` und abschließender Punkt gelten als dieselbe Website (F58). Weiterleitungen bleiben unberücksichtigt. */
+export function webSiteKey(host: string): string {
+  return host.toLowerCase().replace(/\.+$/, '').replace(/^www\./, '')
+}
+
 /** IPv4-„a.b.c.d" → [a,b,c,d] mit strikter 0–255-Prüfung, sonst null. */
 function parseIpv4(ip: string): number[] | null {
   const parts = ip.split('.')

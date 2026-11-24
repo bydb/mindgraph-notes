@@ -76,6 +76,18 @@ describe('web_search', () => {
     expect(res.ok).toBe(false)
     expect(res.content).toMatch(/zu lang/)
   })
+
+  it('markiert Treffer bereits abweisender Websites in der Suchausgabe (F02)', async () => {
+    const stub = await startSearxngStub('https://www.blocked.example/artikel')
+    const web = makeWeb({ provider: 'searxng', searxngUrl: stub.url, approvedPrivateOrigin: stub.origin })
+    web.deniedHosts = new Map([['blocked.example', 403]])
+    const ctx: NoteAgentContext = { senderId: 1, run: makeRun(web) }
+    try {
+      const res = await webSearchTool.run({ query: 'test' }, ctx)
+      expect(res.ok).toBe(true)
+      expect(res.content).toContain('(Website sperrt vermutlich Abrufe)')
+    } finally { await stub.close() }
+  })
 })
 
 describe('web_fetch', () => {

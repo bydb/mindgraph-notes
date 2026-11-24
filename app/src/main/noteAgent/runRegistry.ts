@@ -27,6 +27,8 @@ export interface WebRunState {
   allowedUrls: Set<string>              // normalisierte URLs, die web_fetch abrufen darf
   queries: Array<{ query: string; status: 'ok' | 'failed' }>
   fetches: WebFetchRecord[]
+  /** Websites (`webSiteKey`), die in diesem Lauf einen Abruf mit 401/403/429/451 abgewiesen haben (F02). */
+  deniedHosts?: Map<string, number>
   searchCount: number
   fetchCount: number
   wrote: boolean                        // 0e: genau EIN write_note pro Web-Lauf

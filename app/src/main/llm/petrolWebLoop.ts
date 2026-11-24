@@ -20,11 +20,10 @@
 //   Schleife `fallback: 'no-tools'` — der Main nimmt dann die gründliche Suche.
 
 import type { ChatMessage, ToolCall, ToolDefinition } from './chatClient'
-import { normalizeQuery, isQueryTooLong, type WebSearchHit } from '../../shared/webResearch'
+import { normalizeQuery, isQueryTooLong, hostnameFromUrl, isDenyingHttpStatus, webSiteKey, type WebSearchHit } from '../../shared/webResearch'
 import { splitSkippedHits, type QueueEntry, type WebDeepHit, type WebFetchOutcome, type WebSkippedHit } from '../../shared/webChat'
 import { mergeCandidatesRoundRobin, stripUnaskedDates, type DeepCandidate } from '../../shared/webChatDeep'
 import { PAGE_LINKS_SHOWN_LOOP, rankPageLinks } from '../../shared/pageLinks'
-import { hostnameFromUrl } from '../../shared/webResearch'
 import { UNTRUSTED_BEGIN, UNTRUSTED_END, sanitizeHeaderPart } from '../rag/vaultPrompt'
 import type { DeepPhase, DeepResult, DeepTrace } from './petrolDeepSearch'
 
@@ -97,11 +96,6 @@ const QUERY_LONG_DIGITS = /\d{6,}/
 // unterscheiden — diese Grenze ist bekannt und benannt, kein Filter behauptet mehr.
 const QUERY_IPV4 = /(?<![\d.])\d{1,3}(?:\.\d{1,3}){3}(?![\d.])/
 
-// Statuscodes, mit denen eine Website automatische Abrufe abweist (real 26.10.2026: raspberrypi.com
-// antwortet mit 403). Eine solche Seite liefert auch für jeden weiteren Treffer nichts — das Modell
-// nahm drei Treffer derselben Seite, alle gesperrt, und gab dann mit fünf freien Abrufen auf.
-const DENYING_STATUS = new Set([401, 403, 429, 451])
-
 /** Grund eines Fehlabrufs in Worten fürs Modell (die Anzeige hat eigene Texte). */
 function failText(outcome: Extract<WebFetchOutcome, { ok: false }>): string {
   switch (outcome.reason) {
@@ -122,12 +116,7 @@ function failText(outcome: Extract<WebFetchOutcome, { ok: false }>): string {
  * Eine Annahme, kein Beweis: der Text ans Modell sagt deshalb „vermutlich“.
  */
 function deniesHost(outcome: Extract<WebFetchOutcome, { ok: false }>): boolean {
-  return outcome.reason === 'http' && outcome.status !== undefined && DENYING_STATUS.has(outcome.status)
-}
-
-/** `www.` und abschließender Punkt gelten als dieselbe Website (F58). Weiterleitungen bleiben unberücksichtigt. */
-function siteKey(host: string): string {
-  return host.toLowerCase().replace(/\.+$/, '').replace(/^www\./, '')
+  return outcome.reason === 'http' && isDenyingHttpStatus(outcome.status)
 }
 
 /** Einmaliger Anstoß, wenn das Modell ohne eine einzige lesbare Seite aufhören will. */
@@ -285,7 +274,7 @@ export async function runLoopResearch(
       else if (linkOnly.delete(k)) trace.candidates++
       const title = sanitizeHeaderPart(c.title || c.host, deps.sanitize)
       const snippet = sanitizeHeaderPart(c.snippet.slice(0, LOOP_LIMITS.snippetMax), deps.sanitize)
-      const note = fetched.has(k) ? ' (schon gelesen)' : deniedHosts.has(siteKey(c.host)) ? ' (Website sperrt vermutlich Abrufe)' : ''
+      const note = fetched.has(k) ? ' (schon gelesen)' : deniedHosts.has(webSiteKey(c.host)) ? ' (Website sperrt vermutlich Abrufe)' : ''
       return `${k + 1}. ${title} · ${c.host}${note}${snippet ? `\n   ${snippet}` : ''}`
     })
     return wrap(lines.join('\n')) + statusLine()
@@ -297,7 +286,7 @@ export async function runLoopResearch(
     const k = n - 1
     if (fetched.has(k)) return `Treffer ${n} wurde schon gelesen.`
     const c = registry[k]
-    if (deniedHosts.has(siteKey(c.host))) {
+    if (deniedHosts.has(webSiteKey(c.host))) {
       // Als gesperrt eintragen, ohne Abrufbudget — sonst stünde der gewählte Treffer als „nicht gewählt“ in der Spur (F57).
       trace.picked++
       if (linkOnly.delete(k)) trace.candidates++
@@ -323,7 +312,7 @@ export async function runLoopResearch(
     if (!outcome.ok) {
       const left = maxFetches - trace.fetches
       const hostNote = deniesHost(outcome) && !halted()
-        ? (deniedHosts.add(siteKey(c.host)), ` ${c.host} sperrt vermutlich automatische Abrufe, weitere Treffer von dort ruft die App nicht mehr ab.`)
+        ? (deniedHosts.add(webSiteKey(c.host)), ` ${c.host} sperrt vermutlich automatische Abrufe, weitere Treffer von dort ruft die App nicht mehr ab.`)
         : ''
       return `Treffer ${n} (${c.host}) konnte nicht gelesen werden: ${failText(outcome)}.${hostNote} Noch ${left} Abrufe frei — nimm Treffer anderer Websites oder suche neu.`
     }
