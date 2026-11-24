@@ -2,6 +2,20 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [Unveröffentlicht]
+
+**Agent und Chat haben eine neue, ruhigere Oberfläche, und der Agent kann bei lokalen Modellen mit einem größeren Kontextfenster arbeiten.** In der Auftragskarte stehen nur noch Eingabe, ein „+“ für Unterlagen und der Startknopf; Zielordner, Befugnisse und Modell liegen in einer leisen Zeile darunter. Das Kontextfenster stellen Sie im Modell-Menü oder unter Einstellungen → KI ein. Dateien mit Umlaut im Namen kann der Agent jetzt lesen.
+
+### Hintergrund
+
+- **Auslöser:** Für einen Projektordner mit einem Dutzend Notizen, PDF und Präsentation reichte das feste Kontextfenster von 32 768 Token nicht; der Agent musste mitten im Lauf Gelesenes zusammenfassen. Die Auftragskarte zeigte außerdem alle Bedingungen eines Laufs gleichzeitig und Warnmarken schon im leeren Zustand.
+- **Kontextfenster:** Der Regler reicht von 32 768 bis höchstens 262 144 Token und endet beim Maximum des gewählten Modells. Er gilt nur für lokale Modelle über Ollama; der Standard bleibt unverändert. Mit angehobenem Fenster und angehängtem Ordner liest der Agent den Ordner ganz: Will er schreiben, bevor alle Dateien gelesen sind, nennt ihm die App einmal die fehlenden.
+- **Auftragskarte:** Unterlagen hängen Sie über das „+“ im Eingabefeld an, das Ergebnis legen Sie über „Ergebnis ablegen in“ unter der Karte ab. Quelle und Ziel sind damit getrennt. Befugnisse sind nach „Lesen“ und „Ausführen“ geordnet; was auf dem Rechner handelt, erscheint eingeschaltet in Warnfarbe. Fehlende Angaben nennt die Karte erst nach einem Startversuch. Wohin Daten gehen, steht bei einem Cloud-Modell weiterhin fest und sichtbar unter der Karte.
+- **Chat:** Der Chat hat denselben Aufbau, die Modellwahl steht unter dem Eingabefeld. Leer stehen Chat und Auftrag mittig auf gleicher Höhe. Der Hinweis zur Websuche ist auf einen Satz mit dem Empfänger der Suchanfragen gekürzt; die ausführliche Fassung erscheint, wenn Sie mit der Maus darauf zeigen.
+- **Beispiele:** In Chat und Auftrag blenden Sie die Beispiele über „Beispiele zeigen“ ein.
+- **Umlaute in Dateinamen:** Auf dem Mac konnte der Agent Dateien aus einem angehängten Ordner nicht öffnen, wenn ihr Name einen Umlaut enthielt. Das ist behoben.
+- **Grenzen:** Ein größeres Kontextfenster braucht mehr Arbeitsspeicher und macht jede Runde langsamer. Gemessen auf einem Rechner mit 32 GB: 16 Dateien bei 65 536 Token dauerten mit einem großen lokalen Modell über 40 Minuten. Für umfangreiche Ordner bleibt deshalb das Standardfenster oder ein Cloud-Modell der schnellere Weg. Dauert eine Runde länger als 20 Minuten, bricht der Lauf ab und nennt das Fenster als Ursache; ein bis dahin fertiges Ergebnis bleibt zur Übernahme erhalten.
+
 ## [1.4.7] - 2026-11-24
 
 **Mitgelieferte Skills lassen sich jetzt mit einem Klick auf die neue Fassung bringen.** Unter Einstellungen → Skills steht an jedem veralteten Skill „Neue Fassung verfügbar“ mit dem Knopf „Aktualisieren“. Haben Sie einen Skill selbst angepasst, zeigt die App vorher, was sich ändern würde, und Sie entscheiden. Die bisherige Fassung bleibt in jedem Fall als Sicherung erhalten.
