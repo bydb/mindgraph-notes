@@ -19,7 +19,8 @@ import {
   recordServerPromptTokens, remainingForInput, resolveContextWindow, upgradeContextWindow, usedTokens, snapshotBudget, creditCompaction, ASSUMED_OUTPUT_RESERVE, TOOL_RESULT_SHARE, type ContextSnapshot
 } from '../../shared/contextBudget'
 import { compactReadResults, refreshCompacted, COMPACTED_PREFIX } from './compaction'
-import { getContextAttachmentInfos, getShellAttachmentPaths } from './contextFiles'
+import { getContextAttachmentInfos, getShellAttachmentPaths, listAllFolderFiles } from './contextFiles'
+import { unreadFolderFiles, coverageMessage } from '../../shared/folderCoverage'
 import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { AGENT_IMAGE_VIEW_BUDGET, markImageViewCut, probeImageView } from './describeImage'
 import { isMcpAgentToolName } from '../../shared/mcp'
@@ -471,6 +472,16 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   if (contextWindow.source === 'assumed') {
     void catalogContextLength(chatOptions).then(v => { lateCatalog = v }).catch(() => undefined)
   }
+  // Angehobenes lokales Fenster + Ordner-Anhang: Die Ordner-Anleitung oben ist für 32k geschrieben
+  // („wenige bestimmte Dateien“, „nicht jede einzeln“). Im GUI-Test (24.11.2026, 262 144 Token,
+  // 17 Dateien) las das Modell deshalb nur sechs und schrieb sofort. Mit Platz gilt das Gegenteil.
+  // Vor der Budgetrechnung, damit der Zusatz mitgezählt wird.
+  const readWholeFolder = hasFolder && !run.web && chatOptions.backend === 'ollama' && contextWindow.source === 'num_ctx' && contextWindow.tokens > runDefaultNumCtx
+  if (readWholeFolder) {
+    systemMessage.content += `
+
+GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, vom Nutzer eingestellt): Die Warnung vor vollem Kontext gilt hier nicht. Meint der Auftrag den Ordner als Ganzes (Überblick, Abläufe, Zusammenhänge, Zusammenfassung) und zeigt das Manifest höchstens etwa 30 lesbare Dateien, dann lies JEDE lesbare Datei des Manifests mit read_context_file, bevor du schreibst — keine Auswahl, keine Stichprobe. Hilfsdateien ohne Inhalt zum Thema (Schriften, Skripte, Stylesheets, Lizenzen) lässt du aus. Bei mehr Dateien bleibt folder_digest der Weg. Nenne im Ergebnis jede Datei, die du nicht gelesen hast, mit Grund.`
+  }
   ctx.contextWindowTokens = contextWindow.tokens
   const budget = createContextBudget(contextWindow.tokens, chatOptions.maxTokens ?? ASSUMED_OUTPUT_RESERVE)
   const priorTokens = params.continuation?.priorTokens
@@ -549,6 +560,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Abgelehnte Leseversuche in Folge (Kontext voll). Ab zwei gibt es nur noch Schreibwerkzeuge:
   // Vorher las das Modell trotz Ablehnung weiter, bis das Schrittlimit kam (real, 11.11.2026).
   let rejectedReads = 0
+  let coverageDeferredTurn = 0
   // Verdichtungen je Lauf begrenzen: jede kostet einen Modellaufruf und etwas Genauigkeit.
   let compactions = 0
   // Zwei Verdichtungsaufrufe ohne verwertbare Antwort: dieses Modell kann es nicht — nicht weiter versuchen.
@@ -789,6 +801,32 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
         pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: msg })
         rejectedReads++
         continue
+      }
+      // Lese-Abdeckung (shared/folderCoverage.ts): bei angehobenem Fenster den ERSTEN Schreibversuch
+      // einmal zurückstellen, wenn Dateien des angehängten Ordners ungelesen sind. Eine Bitte im
+      // Prompt reichte nicht (GUI-Test 24.11.2026: 5 von 17 gelesen). Nicht kurz vor Schluss und
+      // nicht bei vollem Kontext — dort zählt, dass überhaupt ein Ergebnis entsteht.
+      // Weitere Schreibaufrufe derselben Runde ebenfalls zurückstellen — sonst schreibt das Modell
+      // das zweite Ergebnis, bevor es die Rückfrage gesehen hat.
+      if (tool.isWrite && coverageDeferredTurn === iteration) {
+        pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: 'Noch nicht geschrieben — siehe die Rückfrage der App zu den ungelesenen Dateien oben.' })
+        continue
+      }
+      if (readWholeFolder && tool.isWrite && !run.coverageAsked && run.results.size === 0
+        && iteration <= maxIterations - 3 && !isReadLocked(budget)
+        && !run.toolsUsed.has('folder_digest')) {
+        run.coverageAsked = true
+        const folders = await listAllFolderFiles(run.senderId, run.attachmentIds).catch(() => [])
+        const unread = unreadFolderFiles(folders, run.folderFilesRead ?? new Map(), {
+          imagesReadable: Boolean(run.imageView || run.ocr), skipFolders: run.collectedFolders
+        })
+        if (unread && unread.length > 0) {
+          const msg = coverageMessage(unread, Boolean(run.imageView))
+          onStep(nextSeq(run), 'kontext', `Schreiben einmal zurückgestellt — ${unread.length} ${unread.length === 1 ? 'Datei' : 'Dateien'} des Ordners noch nicht gelesen: ${unread.slice(0, 6).map(u => u.name).join(', ')}${unread.length > 6 ? ' …' : ''}`)
+          pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: msg })
+          coverageDeferredTurn = iteration
+          continue
+        }
       }
       try {
         const toolResult = await tool.run(call.arguments, ctx)

@@ -875,7 +875,15 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
             // Modell 31 Dateien einzeln geladen, statt sie mit EINEM Aufruf
             // zusammenzuführen. Die App weiß das — also sagt sie es auch.
             const singleReads = totalFolderReads(run)
-            message = singleReads >= 5
+            // Angehobenes Kontextfenster: dort liest der Agent den Ordner ausdrücklich ganz (Lese-Abdeckung).
+            // Der Vorwurf „einzeln gelesen statt zusammengeführt“ wäre falsch — real (24.11.2026, 27B-Modell,
+            // 65 536 Token, 16 Dateien) brauchte die letzte Runde über 20 Minuten, weil jede Runde alles
+            // Gelesene neu verarbeitet, NACHDEM das Ergebnis schon geschrieben war.
+            const raisedWindow = typeof chatOptions.numCtx === 'number' && chatOptions.numCtx > 32_768
+            const kept = run.results.size
+            message = raisedWindow
+              ? `Zeitüberschreitung: Eine Runde hat länger als ${agentRequestTimeoutMs(chatOptions.backend) / 60_000} Minuten gedauert. Mit dem großen Kontextfenster (${chatOptions.numCtx!.toLocaleString('de-DE')} Token) verarbeitet das Modell in jeder Runde alles Gelesene neu — auf diesem Rechner ist das für diesen Umfang zu langsam.${kept ? ` ${kept === 1 ? 'Ein Ergebnis war schon fertig und liegt' : `${kept} Ergebnisse waren schon fertig und liegen`} zur Übernahme bereit; ob der Agent noch etwas ergänzen wollte, ist offen.` : ''} Abhilfe: Kontextfenster eine Stufe kleiner stellen, weniger Unterlagen anhängen oder ein schnelleres Modell wählen.`
+              : singleReads >= 5
               ? `Zeitüberschreitung. Der Agent hat ${singleReads} Dateien einzeln gelesen, statt sie mit einem Aufruf zusammenzuführen — dadurch wurde der Auftrag zu groß für das Modell. Ein anderes Modell wählen oder den Lauf wiederholen; der Auftrag selbst ist nicht zu umfangreich.`
               : `Zeitüberschreitung: Das Modell hat nicht innerhalb von ${agentRequestTimeoutMs(chatOptions.backend) / 60_000} Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.`
           }

@@ -94,6 +94,10 @@ export interface AgentRun {
   // paar Dateien auf collect_table verweist, und eine ehrliche Fehlermeldung bei
   // Zeitüberschreitung (real: 31 Einzeldateien statt EINES Zusammenführens).
   folderReads: Map<string, number>
+  // Welche Dateien je Ordner gelesen oder angesehen wurden — für die Lese-Abdeckung bei
+  // angehobenem Kontextfenster (shared/folderCoverage.ts). `coverageAsked`: die eine Rückfrage kam schon.
+  folderFilesRead: Map<string, Set<string>>
+  coverageAsked?: boolean
   // Ordner, für die collect_table bereits gelaufen ist — danach sind gezielte
   // Einzelabfragen wieder legitim (nur nicht unbegrenzt).
   collectedFolders: Set<string>
@@ -252,6 +256,7 @@ export function startRun(params: {
     results: new Map(),
     datasets: new Map(),
     folderReads: new Map(),
+    folderFilesRead: new Map(),
     collectedFolders: new Set(),
     sources: new Set(),
     startedAt: Date.now(),
@@ -290,6 +295,14 @@ export function getRunForSender(senderId: number, runId: string): AgentRun | nul
 }
 
 /** Werkzeugnamen eines erfolgreichen Aufrufs merken — Grundlage der Tätigkeitsart. */
+export function recordFolderFileRead(run: AgentRun, folder: string, file: string): void {
+  // Testläufe bauen ihren Lauf teils von Hand, ohne dieses Feld.
+  if (!run.folderFilesRead) run.folderFilesRead = new Map()
+  const set = run.folderFilesRead.get(folder) ?? new Set<string>()
+  set.add(file)
+  run.folderFilesRead.set(folder, set)
+}
+
 export function recordToolUse(run: AgentRun, toolName: string): void {
   run.toolsUsed.add(toolName)
 }
@@ -311,6 +324,8 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
       transcriptTokens: run.transcriptTokens,
       datasets: new Map(run.datasets),
       folderReads: new Map(run.folderReads),
+      folderFilesRead: new Map([...(run.folderFilesRead ?? [])].map(([k, v]) => [k, new Set(v)])),
+      coverageAsked: run.coverageAsked,
       collectedFolders: new Set(run.collectedFolders),
       ...(run.skillBlocks?.size ? { skillBlocks: new Map(run.skillBlocks) } : {}),
       ...(run.foreignData ? { foreignData: run.foreignData } : {}),
@@ -331,6 +346,8 @@ export interface RunContinuation {
   transcriptTokens?: number
   datasets: Map<string, CollectedTable>
   folderReads: Map<string, number>
+  folderFilesRead?: Map<string, Set<string>>
+  coverageAsked?: boolean
   collectedFolders: Set<string>
   /** Feste Blöcke der im Vorgänger gelesenen Skills — der Folgelauf soll nichts erneut lesen,
    *  write_html braucht sie aber für [[skill-block:name]] (Gegenprüfung N02). */
@@ -349,6 +366,8 @@ const continuations = new Map<number, RunContinuation>()
 export function inheritContinuation(run: AgentRun, prev: RunContinuation): void {
   for (const [id, table] of prev.datasets) run.datasets.set(id, table)
   for (const [folder, n] of prev.folderReads) run.folderReads.set(folder, n)
+  for (const [folder, names] of prev.folderFilesRead ?? []) for (const name of names) recordFolderFileRead(run, folder, name)
+  if (prev.coverageAsked) run.coverageAsked = true
   for (const folder of prev.collectedFolders) run.collectedFolders.add(folder)
   if (prev.skillBlocks?.size) run.skillBlocks = new Map(prev.skillBlocks)
 }

@@ -625,6 +625,17 @@ export function resolveFolderName(senderId: number, ids: string[], folderName: s
   return requireFolderEntry(senderId, ids, folderName).name
 }
 
+/** Alle lesbaren Dateien aller angehängten Ordner samt Unterordnern (für die Lese-Abdeckung, shared/folderCoverage.ts). */
+export async function listAllFolderFiles(senderId: number, ids: string[]): Promise<Array<{ folder: string; files: Array<{ name: string; kind: ContextFileKind }> }>> {
+  const out: Array<{ folder: string; files: Array<{ name: string; kind: ContextFileKind }> }> = []
+  for (const info of getContextAttachmentInfos(senderId, ids)) {
+    if (info.kind !== 'folder') continue
+    const { files } = await listSupportedFolderFiles(requireFolderEntry(senderId, ids, info.name))
+    out.push({ folder: info.name, files: files.map(f => ({ name: f.name, kind: f.kind })) })
+  }
+  return out
+}
+
 /** Wie viele Tabellen (Excel/CSV) liegen im Ordner samt Unterordnern? Ohne Parser. */
 export async function countFolderTables(senderId: number, ids: string[], folderName: string): Promise<number> {
   const entry = requireFolderEntry(senderId, ids, folderName)
@@ -639,10 +650,14 @@ export async function countFolderTables(senderId: number, ids: string[], folderN
  */
 function findFolderFile(entry: AttachmentEntry, files: FolderFileInfo[], fileArg: string): FolderFileInfo {
   const wanted = parseFolderRelPath(fileArg).join('/')
-  const exact = files.find(f => f.name === wanted) || files.find(f => f.name.toLowerCase() === wanted.toLowerCase())
+  // macOS legt Dateinamen zerlegt ab („a“ + Trema), Modelle schreiben den Umlaut als EIN Zeichen:
+  // ohne Angleichung war jede Datei mit Umlaut im Namen „nicht im Ordner“ (real, 24.11.2026,
+  // zwei von 16 Dateien eines Ordners blieben so ungelesen).
+  const same = (a: string, b: string): boolean => a.normalize('NFC').toLowerCase() === b.normalize('NFC').toLowerCase()
+  const exact = files.find(f => f.name === wanted) || files.find(f => same(f.name, wanted))
   if (exact) return exact
   if (!wanted.includes('/')) {
-    const byBase = files.filter(f => path.posix.basename(f.name).toLowerCase() === wanted.toLowerCase())
+    const byBase = files.filter(f => same(path.posix.basename(f.name), wanted))
     if (byBase.length === 1) return byBase[0]
     if (byBase.length > 1) {
       throw new Error(`"${wanted}" gibt es mehrfach in "${entry.name}" — gib den Pfad an: ${byBase.slice(0, 10).map(f => f.name).join(', ')}${byBase.length > 10 ? ' …' : ''}`)

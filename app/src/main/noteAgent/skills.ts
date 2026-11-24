@@ -23,7 +23,7 @@ import {
   listFolderManifest, readFolderFile, collectFolderTable,
   resolveFolderName, countFolderTables, describeIncomplete, readImageForAgent, contextKindFromFilename, type FolderManifest
 } from './contextFiles'
-import { registerResult, registerDataset, getDataset, type AgentRun } from './runRegistry'
+import { registerResult, registerDataset, getDataset, recordFolderFileRead, type AgentRun } from './runRegistry'
 import { formatCollectReport, type RowFilter, type RowFilterOp, type CollectedTable } from '../../shared/tableCollect'
 import { queryDataset, markdownTable, fillDatasetPlaceholders, DatasetQueryError, WHERE_OPS, AGG_OPS, type DatasetQuery } from '../../shared/datasetQuery'
 import { wrapForeignResult } from '../../shared/mcp'
@@ -560,6 +560,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         const isImage = contextKindFromFilename(res.fileName) === 'image'
         ctx.run.sources.add(isImage ? `Text erkannt: ${safeImageLabel(`${res.folderName}/${res.fileName}`)}` : `${res.folderName}/${res.fileName}`)
         ctx.run.folderReads.set(res.folderName, (ctx.run.folderReads.get(res.folderName) ?? 0) + 1)
+        recordFolderFileRead(ctx.run, res.folderName, res.fileName)
         if (ctx.run.imageView && isImage) res.content += IMAGE_VIEW_HINT
         return {
           ok: true,
@@ -614,6 +615,17 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         // Eigener Quelleneintrag, nur bei Erfolg: „angesehen“ darf nicht aus einem gelesenen
         // Dateinamen oder einem Fehlversuch abgeleitet werden (F09).
         ctx.run.sources.add(`Bild angesehen: ${safeImageLabel(label)} (${state.model})`)
+        // Für die Lese-Abdeckung merken. Ohne folder-Angabe nennt das Modell das Bild oft mit dem
+        // Ordner davor („Ordner/bild.png“) — sonst gälte ein angesehenes Bild als ungelesen (real, 24.11.2026).
+        const viewedFolder = requireString(args, 'folder')
+        if (viewedFolder) {
+          try { recordFolderFileRead(ctx.run, resolveFolderName(ctx.senderId, ctx.run.attachmentIds, viewedFolder), file) } catch { /* Ordnername nicht auflösbar: zählt nicht */ }
+        } else {
+          for (const info of getContextAttachmentInfos(ctx.senderId, ctx.run.attachmentIds)) {
+            if (info.kind !== 'folder') continue
+            for (const name of [file, label]) if (name.startsWith(`${info.name}/`)) recordFolderFileRead(ctx.run, info.name, name.slice(info.name.length + 1))
+          }
+        }
         return { ok: true, content, display: `describe_image: ${label}` }
       } catch (e) {
         if (ctx.run.abort.signal.aborted) throw new Error('Abgebrochen')
