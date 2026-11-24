@@ -25,7 +25,7 @@ import { createNoteAgentRegistry, type NoteAgentContext } from './skills'
 import { AGENT_IMAGE_VIEW_BUDGET, markImageViewCut, probeImageView } from './describeImage'
 import { isMcpAgentToolName } from '../../shared/mcp'
 import { mcpPromptBlock } from '../mcp/agentTools'
-import { nextSeq, recordToolUse, type AgentRun } from './runRegistry'
+import { nextSeq, recordToolUse, forgetFolderFileRead, type AgentRun } from './runRegistry'
 import { chatContextBlock } from './chatContext'
 import { CUT_AFTER_RESULT_NOTE, CUT_TEXT_MESSAGE, MAX_OUTPUT_CUTS, cutToolCallMessage, repeatedCutMessage } from './outputCut'
 
@@ -183,11 +183,13 @@ ${run.skills.map(s => `- ${s.name}: ${s.description || '(keine Beschreibung)'}`)
   // Hausdesign (F03): Rangfolge und Vorlagen, Name nur als zitierte Daten.
   const brandBlock = run.brand ? brandPromptBlock(run.brand.profile, run.brand.folderRel, run.brand.letterSkills) : ''
 
-  // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen — immer beachten.
+  // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen. Bis 25.11.2026 „immer einhalten“ —
+  // eine aus EINEM Auftrag gewonnene Regel („Tabellen im Excel-Format, Recherche in kleinen Schritten“)
+  // stand damit auch über Aufträgen, zu denen sie nicht passt. Jetzt gilt sie nur, wenn sie passt.
   const memoryBlock = agentMemory
     ? `
 
-GEDÄCHTNIS DES NUTZERS (bestätigte Regeln aus früheren Läufen — immer einhalten):
+GEDÄCHTNIS DES NUTZERS (vom Nutzer bestätigte Regeln aus früheren Läufen. Halte eine Regel ein, wenn sie zu DIESEM Auftrag passt. Passt sie nicht zu ihm — etwa eine Tabellenregel bei einer Zeichnung —, lass sie beiseite: der Auftrag geht vor):
 ${agentMemory}`
     : ''
 
@@ -273,6 +275,15 @@ ${noteExcerpt}`
  */
 export function agentRequestTimeoutMs(backend: ChatOptions['backend'] | undefined): number {
   return isCloudChatBackend(backend) ? 600_000 : 1_200_000
+}
+
+/**
+ * Fenster, das ein lokaler Lauf ohne Nutzereinstellung anfordert: 64k mit Websuche, externen
+ * Diensten oder geerbten Fremddaten, sonst 32k. Eine Quelle für den Loop und für die
+ * Zeitüberschreitungs-Meldung in ipc.ts (Codex F17).
+ */
+export function agentRunDefaultNumCtx(run: Pick<AgentRun, 'web' | 'mcp' | 'foreignData'>): number {
+  return run.web || (run.mcp?.tools.size ?? 0) > 0 || run.foreignData ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX
 }
 
 export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<NoteAgentLoopResult> {
@@ -438,7 +449,7 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
   // Zeitfenster pro Request: große lokale Modelle brauchen mit gewachsenem Tool-Kontext
   // deutlich länger als die 180s-Default — der Nutzer hat einen echten Abbrechen-Button,
   // das Timeout ist nur noch die Notbremse (agentRequestTimeoutMs).
-  const runDefaultNumCtx = run.web || (run.mcp?.tools.size ?? 0) > 0 || run.foreignData ? AGENT_NUM_CTX_WEB : AGENT_NUM_CTX
+  const runDefaultNumCtx = agentRunDefaultNumCtx(run)
   const chatOptions: ChatOptions = {
     ...params.chatOptions,
     signal: run.abort.signal,
@@ -502,10 +513,10 @@ GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, v
     onStep(nextSeq(run), 'kontext', `Kontextgröße dieses Modellwegs unbekannt — vorsichtig mit ${contextWindow.tokens.toLocaleString('de-DE')} Token gerechnet`)
   }
   if (params.contextNote) onStep(nextSeq(run), 'kontext', params.contextNote)
-  // Vom Nutzer angehobenes lokales Fenster ist wie ein Katalogfenster sicher bekannt (die App
-  // setzt num_ctx selbst): dann begrenzen die Runden, nicht der Platz.
-  const raisedLocalWindow = contextWindow.source === 'num_ctx' && contextWindow.tokens > runDefaultNumCtx
-  let maxIterations = contextWindow.source === 'catalog' || raisedLocalWindow
+  // Ein vom Nutzer angehobenes lokales Fenster bekommt KEINE zusätzlichen Runden. Am 24.11.2026
+  // standen hier kurz 30 — ohne Messung im Kontext-Harness, die die Projektregel verlangt, und der
+  // eine echte Lauf brauchte 8 Runden in 42 Minuten (Codex F18). Erst messen, dann anheben.
+  let maxIterations = contextWindow.source === 'catalog'
     ? MAX_ITERATIONS_LARGE_WINDOW
     : hasFolder || run.shell || run.computer ? MAX_ITERATIONS_FOLDER : MAX_ITERATIONS
   let currentTurn = 0
@@ -561,6 +572,7 @@ GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, v
   // Vorher las das Modell trotz Ablehnung weiter, bis das Schrittlimit kam (real, 11.11.2026).
   let rejectedReads = 0
   let coverageDeferredTurn = 0
+  let nudgedAfterCoverage = false
   // Verdichtungen je Lauf begrenzen: jede kostet einen Modellaufruf und etwas Genauigkeit.
   let compactions = 0
   // Zwei Verdichtungsaufrufe ohne verwertbare Antwort: dieses Modell kann es nicht — nicht weiter versuchen.
@@ -759,6 +771,17 @@ GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, v
         }
         throw failWithHint('Der Lauf wurde ohne Ergebnis beendet — keine Datei erzeugt und keine Antwort gegeben. Bitte den Auftrag konkreter formulieren oder ein stärkeres Modell wählen.')
       }
+      // Die App hat einen Schreibversuch zurückgestellt (Lese-Abdeckung), und das Modell endet jetzt
+      // mit Text statt mit dem Ergebnis: einmal nachfassen. Ohne das gälte ein Lauf als erledigt,
+      // dessen fertige Datei die App selbst abgelehnt hat (Codex F14).
+      if (coverageDeferredTurn > 0 && run.results.size === 0 && !nudgedAfterCoverage && iteration < maxIterations) {
+        nudgedAfterCoverage = true
+        pushMessage({
+          role: 'user',
+          content: 'Du wolltest vorhin ein Ergebnis schreiben, und die App hat es einmal zurückgestellt. Es ist noch keine Datei entstanden. Erzeuge das Ergebnis JETZT mit dem Schreib-Werkzeug — die Rückfrage kommt nicht noch einmal.'
+        })
+        continue
+      }
       // Rückfrage statt Ergebnis: Der Nutzer kann mitten im Lauf nicht antworten. Einmal
       // zurückschicken — der Agent soll selbst entscheiden, die Annahme nennen und schreiben.
       // Bleibt danach eine Frage offen, kann der Nutzer auf der Karte antworten (Fortsetzung).
@@ -813,13 +836,14 @@ GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, v
         continue
       }
       if (readWholeFolder && tool.isWrite && !run.coverageAsked && run.results.size === 0
-        && iteration <= maxIterations - 3 && !isReadLocked(budget)
-        && !run.toolsUsed.has('folder_digest')) {
-        run.coverageAsked = true
-        const folders = await listAllFolderFiles(run.senderId, run.attachmentIds).catch(() => [])
-        const unread = unreadFolderFiles(folders, run.folderFilesRead ?? new Map(), {
-          imagesReadable: Boolean(run.imageView || run.ocr), skipFolders: run.collectedFolders
+        && iteration <= maxIterations - 3 && !isReadLocked(budget)) {
+        // Erst nach gelungener Bestandsaufnahme als gefragt merken: ein einmaliger Fehler beim
+        // Auflisten soll die Prüfung nicht für den ganzen Lauf verbrauchen (Codex F13).
+        const folders = await listAllFolderFiles(run.senderId, run.attachmentIds).catch(() => null)
+        const unread = folders && unreadFolderFiles(folders, run.folderFilesRead ?? new Map(), {
+          imagesReadable: Boolean(run.imageView || run.ocr), skipFolders: run.digestedFolders, tablesCollected: run.collectedFolders
         })
+        if (folders) run.coverageAsked = true
         if (unread && unread.length > 0) {
           const msg = coverageMessage(unread, Boolean(run.imageView))
           onStep(nextSeq(run), 'kontext', `Schreiben einmal zurückgestellt — ${unread.length} ${unread.length === 1 ? 'Datei' : 'Dateien'} des Ordners noch nicht gelesen: ${unread.slice(0, 6).map(u => u.name).join(', ')}${unread.length > 6 ? ' …' : ''}`)
@@ -847,6 +871,8 @@ GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, v
             content = `Fehler: Das Ergebnis wäre zu groß für den verbleibenden Kontext (etwa ${size.toLocaleString('de-DE')} Token, Platz für ${limit.toLocaleString('de-DE')}). ${smallerPiecesHint(call.name)} — oder schreibe das Ergebnis aus dem, was du schon hast.`
             onStep(nextSeq(run), call.name, shortToolError(content))
             rejectedReads++
+            // Beim Modell kam nichts an — für die Lese-Abdeckung gilt die Datei wieder als ungelesen (Codex F10).
+            if (call.name === 'read_context_file' && typeof call.arguments?.file === 'string') forgetFolderFileRead(run, call.arguments.file)
           } else if (toolResult.ok) {
             rejectedReads = 0
           }

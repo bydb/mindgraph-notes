@@ -5,8 +5,9 @@
 // der Anzeigename kommt aus dem Frontmatter. Deaktivierte Skills stehen in
 // vault-settings.json unter `skillsDisabled` (SKILL.md bleibt spec-rein).
 
-import { promises as fs } from 'fs'
+import { promises as fs, constants as fsConstants } from 'fs'
 import * as path from 'path'
+import { parseMemoryRules, countMemoryFreeLines, type MemoryRule } from '../../shared/agentMemoryRules'
 
 export const SKILLS_DIRNAME = 'Skills'
 const MAX_SKILLS = 50
@@ -243,32 +244,62 @@ export async function resolveSkillFile(vaultPath: string, folderName: string, fi
 // jederzeit im Editor les-, änder- und löschbar.
 export const AGENT_MEMORY_RELPATH = `${SKILLS_DIRNAME}/Agent-Gedächtnis.md`
 const MAX_MEMORY_CHARS = 6_000
+/** So viele Regeln zeigt die Karte; der Rest wird gezählt und genannt. */
+const MEMORY_RULES_SHOWN = 12
 
-export async function readAgentMemory(vaultPath: string): Promise<string> {
+/**
+ * Gedächtnis-Notiz lesen — nur die Datei selbst, an ihrem Ort im Vault. Eine Verknüpfung an
+ * dieser Stelle wird nicht verfolgt (O_NOFOLLOW), und auch ein verknüpfter `Skills`-Ordner, der
+ * nach außen zeigt, zählt nicht: sonst ginge der Inhalt einer fremden Datei in jeden Lauf-Prompt
+ * (bei Cloud-Modellen an den Anbieter) und in die Karte (Codex F01). Fehlt/unlesbar = ''.
+ */
+async function readMemoryNoteRaw(vaultPath: string): Promise<string> {
+  const abs = path.join(vaultPath, AGENT_MEMORY_RELPATH)
+  let handle: fs.FileHandle | undefined
   try {
-    const raw = await fs.readFile(path.join(vaultPath, AGENT_MEMORY_RELPATH), 'utf-8')
-    const trimmed = raw.trim()
-    if (!trimmed) return ''
-    return trimmed.length > MAX_MEMORY_CHARS
-      ? trimmed.slice(0, MAX_MEMORY_CHARS) + '\n[gekürzt: Gedächtnis-Budget erreicht]'
-      : trimmed
+    const [vaultReal, dirReal] = await Promise.all([fs.realpath(vaultPath), fs.realpath(path.dirname(abs))])
+    if (dirReal !== path.join(vaultReal, SKILLS_DIRNAME)) return ''
+    handle = await fs.open(abs, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW)
+    if (!(await handle.stat()).isFile()) return ''
+    return await handle.readFile('utf-8')
   } catch {
     return ''
+  } finally {
+    await handle?.close().catch(() => undefined)
   }
 }
 
+/** Der Teil der Notiz, den ein Lauf bekommt (ohne Kürzungsvermerk) — eine Quelle für Prompt und Karte. */
+function memoryForRun(raw: string): { text: string; cut: boolean } {
+  const trimmed = raw.trim()
+  return trimmed.length > MAX_MEMORY_CHARS ? { text: trimmed.slice(0, MAX_MEMORY_CHARS), cut: true } : { text: trimmed, cut: false }
+}
+
+export async function readAgentMemory(vaultPath: string): Promise<string> {
+  const { text, cut } = memoryForRun(await readMemoryNoteRaw(vaultPath))
+  if (!text) return ''
+  return cut ? text + '\n[gekürzt: Gedächtnis-Budget erreicht]' : text
+}
+
 /**
- * Zustand des Gedächtnisses für die Auftragskarte — dieselbe Schwelle wie
- * readAgentMemory, damit „wird gekürzt“ genau dann erscheint, wenn der Prompt
- * tatsächlich gekürzt bekommt. Leer heißt: es gibt keinen Gedächtnisblock im Lauf.
+ * Zustand des Gedächtnisses für die Auftragskarte. Die Regeln stammen aus genau dem Text, den
+ * der Lauf bekommt: Was hinter der Kürzungsgrenze steht, erscheint nicht als Regel, sondern in
+ * `rulesNotInRun` (Codex F04). Leer heißt: es gibt keinen Gedächtnisblock im Lauf.
  */
-export async function agentMemoryStatus(vaultPath: string): Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }> {
-  let trimmed = ''
-  try {
-    trimmed = (await fs.readFile(path.join(vaultPath, AGENT_MEMORY_RELPATH), 'utf-8')).trim()
-  } catch { /* fehlt = leer */ }
-  const state = !trimmed ? 'empty' : trimmed.length > MAX_MEMORY_CHARS ? 'long' : 'filled'
-  return { state, relPath: AGENT_MEMORY_RELPATH }
+export async function agentMemoryStatus(vaultPath: string): Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string; rules: MemoryRule[]; rulesHidden: number; rulesNotInRun: number; freeLines: number }> {
+  const raw = (await readMemoryNoteRaw(vaultPath)).trim()
+  const { text, cut } = memoryForRun(raw)
+  const state = !text ? 'empty' : cut ? 'long' : 'filled'
+  // Eine an der Kürzungsgrenze abgeschnittene letzte Zeile ist keine vollständige Regel.
+  const inRun = parseMemoryRules(cut ? text.slice(0, Math.max(0, text.lastIndexOf('\n'))) : text)
+  const all = parseMemoryRules(raw)
+  const shown = inRun.slice(0, MEMORY_RULES_SHOWN)
+  return {
+    state, relPath: AGENT_MEMORY_RELPATH, rules: shown,
+    rulesHidden: inRun.length - shown.length,
+    rulesNotInRun: Math.max(0, all.length - inRun.length),
+    freeLines: countMemoryFreeLines(text)
+  }
 }
 
 // Bestätigten Merksatz als datiertes Bullet anhängen; legt die Datei beim ersten

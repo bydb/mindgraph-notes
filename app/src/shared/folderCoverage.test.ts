@@ -16,6 +16,20 @@ describe('unreadFolderFiles', () => {
     const read = new Map([['Quellen', new Set(['ablauf.md', './stand.png'])]])
     expect(unreadFolderFiles(f, read, { imagesReadable: true })).toEqual([])
   })
+  it('hält gleichnamige Dateien in verschiedenen Unterordnern auseinander', () => {
+    const f = [{ folder: 'Quellen', files: [{ name: 'A/bericht.md', kind: 'md' }, { name: 'B/bericht.md', kind: 'md' }] }]
+    expect(unreadFolderFiles(f, new Map([['Quellen', new Set(['A/bericht.md'])]]), { imagesReadable: true })?.map(u => u.name)).toEqual(['B/bericht.md'])
+    // Ein nackter, mehrdeutiger Name deckt keine der beiden ab.
+    expect(unreadFolderFiles(f, new Map([['Quellen', new Set(['bericht.md'])]]), { imagesReadable: true })).toHaveLength(2)
+  })
+  it('erkennt Umlaute in zerlegter und zusammengesetzter Form als dieselbe Datei', () => {
+    const f = [{ folder: 'Quellen', files: [{ name: 'Pa\u0308dagogik.pdf', kind: 'pdf' }] }]
+    expect(unreadFolderFiles(f, new Map([['Quellen', new Set(['P\u00e4dagogik.pdf'])]]), { imagesReadable: true })).toEqual([])
+  })
+  it('nimmt nach collect_table nur die Tabellen aus der Abdeckung', () => {
+    const f = [{ folder: 'Quellen', files: [{ name: 'a.xlsx', kind: 'xlsx' }, { name: 'b.csv', kind: 'csv' }, { name: 'bericht.pdf', kind: 'pdf' }] }]
+    expect(unreadFolderFiles(f, new Map(), { imagesReadable: true, tablesCollected: new Set(['Quellen']) })?.map(u => u.name)).toEqual(['bericht.pdf'])
+  })
   it('lässt Bilder aus, wenn sie nicht lesbar sind', () => {
     const f = folder(1, [{ name: 'foto.jpg', kind: 'image' }])
     const read = new Map([['Quellen', new Set(['notiz-0.md'])]])

@@ -34,7 +34,7 @@ import { recordActivity } from '../activityLedger'
 import { MAX_RUN_SKILLS, deriveActivityType } from '../../shared/activityLog'
 import { vaultActivityKey } from '../skillActivityId'
 import { acquireStayAwake } from '../powerGuard'
-import { runNoteAgentLoop, agentRequestTimeoutMs } from './loop'
+import { runNoteAgentLoop, agentRequestTimeoutMs, agentRunDefaultNumCtx } from './loop'
 import { authorizeShell, probeShellEnvironment } from './shellExecution'
 import { sandboxAvailability as shellSandboxAvailability } from './shellSandbox'
 import { normalizeShellGuardrails, describeShellGuardrails } from '../../shared/shellGuardrails'
@@ -69,6 +69,8 @@ export async function classifyAgentRoute(backend: 'ollama' | 'lmstudio' | 'openr
     return classifyRoute('ollama', model, { ok: false, reason })
   }
 }
+
+const EMPTY_MEMORY_STATUS = { state: 'empty' as const, relPath: '', rules: [], rulesHidden: 0, rulesNotInRun: 0, freeLines: 0 }
 
 export interface NoteAgentIpcDeps {
   loadUISettings: () => Promise<Record<string, unknown>>
@@ -545,7 +547,10 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       // Agent-Skills Stufe 1: aktivierte Vault-Skills als Discovery-Metadaten mitgeben.
       const skills = await listEnabledSkillHeaders(params.vaultPath).catch(() => [])
       // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen in den Prompt.
-      const agentMemory = await readAgentMemory(params.vaultPath).catch(() => '')
+      // Seit 25.11.2026 nur noch auf Wunsch (Einstellungen → KI, Standard aus): Regeln aus einzelnen
+      // Läufen standen sonst über jedem Auftrag, und nach jedem Lauf kam ein Vorschlag (Nutzer: „störend“).
+      const memoryEnabled = (await loadUISettings().catch(() => ({} as Record<string, unknown>))).noteAgentMemoryEnabled === true
+      const agentMemory = memoryEnabled ? await readAgentMemory(params.vaultPath).catch(() => '') : ''
 
       // Webrecherche (Opt-in): nur wenn der Renderer sie für diesen Lauf aktiviert hat UND
       // die Provider-Config Main-seitig vollständig ist. Der Main führt die erlaubte URL-Liste
@@ -841,7 +846,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
           // Mitlernen (Stufe 3): Merksatz-Vorschlag asynchron NACH dem Done-Event —
           // kostet die Ergebnis-Karten keine Latenz. Reines Komfort-Feature: Fehler
           // bleiben still, gespeichert wird nur per „Merken"-Klick des Nutzers.
-          if (run.results.size > 0) {
+          if (memoryEnabled && run.results.size > 0) {
             void suggestAgentMemory(run, chatOptions)
               .then(suggestion => {
                 if (suggestion && !sender.isDestroyed()) {
@@ -879,10 +884,14 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
             // Der Vorwurf „einzeln gelesen statt zusammengeführt“ wäre falsch — real (24.11.2026, 27B-Modell,
             // 65 536 Token, 16 Dateien) brauchte die letzte Runde über 20 Minuten, weil jede Runde alles
             // Gelesene neu verarbeitet, NACHDEM das Ergebnis schon geschrieben war.
-            const raisedWindow = typeof chatOptions.numCtx === 'number' && chatOptions.numCtx > 32_768
+            // Maßgeblich ist das Fenster, mit dem der Lauf wirklich rechnete (nie unter seinem Standard),
+            // und „angehoben“ heißt: über diesem Standard — ein Web-Lauf mit seinen üblichen 64k zählt nicht (Codex F17).
+            const runDefault = agentRunDefaultNumCtx(run)
+            const usedWindow = Math.max(chatOptions.numCtx ?? 0, runDefault)
+            const raisedWindow = chatOptions.backend === 'ollama' && usedWindow > runDefault
             const kept = run.results.size
             message = raisedWindow
-              ? `Zeitüberschreitung: Eine Runde hat länger als ${agentRequestTimeoutMs(chatOptions.backend) / 60_000} Minuten gedauert. Mit dem großen Kontextfenster (${chatOptions.numCtx!.toLocaleString('de-DE')} Token) verarbeitet das Modell in jeder Runde alles Gelesene neu — auf diesem Rechner ist das für diesen Umfang zu langsam.${kept ? ` ${kept === 1 ? 'Ein Ergebnis war schon fertig und liegt' : `${kept} Ergebnisse waren schon fertig und liegen`} zur Übernahme bereit; ob der Agent noch etwas ergänzen wollte, ist offen.` : ''} Abhilfe: Kontextfenster eine Stufe kleiner stellen, weniger Unterlagen anhängen oder ein schnelleres Modell wählen.`
+              ? `Zeitüberschreitung: Eine Runde hat länger als ${agentRequestTimeoutMs(chatOptions.backend) / 60_000} Minuten gedauert. Mit dem großen Kontextfenster (${usedWindow.toLocaleString('de-DE')} Token) verarbeitet das Modell in jeder Runde alles Gelesene neu — auf diesem Rechner ist das für diesen Umfang zu langsam.${kept ? ` ${kept === 1 ? 'Ein Ergebnis war schon fertig und liegt' : `${kept} Ergebnisse waren schon fertig und liegen`} zur Übernahme bereit; ob der Agent noch etwas ergänzen wollte, ist offen.` : ''} Abhilfe: Kontextfenster eine Stufe kleiner stellen, weniger Unterlagen anhängen oder ein schnelleres Modell wählen.`
               : singleReads >= 5
               ? `Zeitüberschreitung. Der Agent hat ${singleReads} Dateien einzeln gelesen, statt sie mit einem Aufruf zusammenzuführen — dadurch wurde der Auftrag zu groß für das Modell. Ein anderes Modell wählen oder den Lauf wiederholen; der Auftrag selbst ist nicht zu umfangreich.`
               : `Zeitüberschreitung: Das Modell hat nicht innerhalb von ${agentRequestTimeoutMs(chatOptions.backend) / 60_000} Minuten geantwortet. Kleineres/schnelleres Modell wählen oder den Auftrag verkleinern.`
@@ -1068,12 +1077,14 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
 
   // Auftragskarte im Agent-Tab: Gedächtnis leer / gefüllt / wird gekürzt.
   ipcMain.handle('note-agent-memory-status', async (event, vaultPath: string) => {
-    if (!isTrustedSender(event)) return { state: 'empty', relPath: '' }
+    if (!isTrustedSender(event)) return { ...EMPTY_MEMORY_STATUS }
     try {
       assertApprovedVault(vaultPath, 'note-agent-memory-status')
+      // Ausgeschaltet = es gibt keinen Gedächtnisblock im Lauf, also auch keine Zeile in der Karte.
+      if ((await loadUISettings().catch(() => ({} as Record<string, unknown>))).noteAgentMemoryEnabled !== true) return { ...EMPTY_MEMORY_STATUS }
       return await agentMemoryStatus(vaultPath)
     } catch {
-      return { state: 'empty', relPath: '' }
+      return { ...EMPTY_MEMORY_STATUS }
     }
   })
 

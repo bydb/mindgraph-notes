@@ -389,7 +389,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     webModelPath
   ].filter(Boolean)
   // Für die kurze Zeile: nur, was über den Normalfall hinausgeht.
-  const webPathExtra = webPathParts.filter(p => p !== t('petrolChat.webPathPages') && p !== t('petrolChat.webPathLocal'))
+  // „Seiten von diesem Rechner“ bleibt sichtbar: die besuchten Websites sehen diesen Rechner (Codex F08).
+  const webPathExtra = webPathParts.filter(p => p !== t('petrolChat.webPathLocal'))
   // Senden mit Globus wartet auf die Wegprüfung; scheitert sie, ist Senden erlaubt.
   const webWaitsForRoute = webOn && !routeSettled
   const followUpMissing = followUpActive && !followUpMsg
@@ -1096,7 +1097,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           <div className="petrol-web-line">
             {/* Ein Satz mit Empfänger der Suchanfragen; die vollständige Fassung (Grenzen, Seitenabruf, Modellweg)
                 steht als Tooltip. Was den Rechner zusätzlich verlässt (eigene Suchinstanz, Themen, Cloud-Modell),
-                bleibt sichtbar — nur „Seiten von diesem Rechner“ und „Modell auf diesem Rechner“ entfallen (F11). */}
+                und der Seitenabruf von diesem Rechner bleiben sichtbar — nur „Modell auf diesem Rechner“ und die Obergrenzen entfallen (F11). */}
             <span title={[t(webLoopOn ? 'petrolChat.webLoopConsent' : 'petrolChat.webDeepConsent', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathParts].join(' · ')}>
               {[t(webLoopOn ? 'petrolChat.webLoopConsentShort' : 'petrolChat.webDeepConsentShort', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathExtra].join(' · ')}
             </span>
@@ -1235,7 +1236,9 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             ariaLabel={t('petrolChat.modelLabel')}
             maxWidth={260}
           />
-          {hasModel && <span className={`agent-card-route ${routeClass}`}>{routeText}</span>}
+          {/* Cloud: Der Anbieter steht schon in der Modellwahl daneben — die Marke nennt nur noch die Folge,
+                sonst bricht die Zeile um (Nutzerbefund 25.11.2026). Der volle Text bleibt als Tooltip. */}
+            {hasModel && <span className={`agent-card-route ${routeClass}`} title={routeText}>{routeKind === 'cloud' ? t('petrolChat.routeCloudShort') : routeText}</span>}
         </span>
       </div>
     </div>

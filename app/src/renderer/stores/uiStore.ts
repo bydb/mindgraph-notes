@@ -842,6 +842,9 @@ interface UIState {
   /** Kontextfenster lokaler Agentenläufe in Token (shared/agentContext.ts). Der Main liest den Wert selbst. */
   noteAgentLocalContextTokens: number
   setNoteAgentLocalContextTokens: (tokens: number) => void
+  /** Agent-Gedächtnis (Regel-Vorschläge nach Läufen, Regeln in jedem Lauf). Standard aus; der Main liest den Wert selbst. */
+  noteAgentMemoryEnabled: boolean
+  setNoteAgentMemoryEnabled: (enabled: boolean) => void
   /** Zustimmung „Bilder an Cloud-Anbieter senden“ im Petrol-Chat, je Anbieter die Version
    *  (shared/chatImageGate CHAT_IMAGE_CLOUD_CONSENT_VERSION). Der Main liest sie selbst. */
   chatImageCloudConsent: { openrouter?: number; llmbase?: number }
@@ -1222,6 +1225,7 @@ const defaultState = {
   imageGenerationEnabled: false,
   noteAgentCloudConsentVersion: 0,
   noteAgentLocalContextTokens: 32_768,
+  noteAgentMemoryEnabled: false,
   chatImageCloudConsent: {},
   chatImageConsentSaving: false,
   semanticScholarEnabled: true,
@@ -1442,7 +1446,7 @@ const persistedKeys = [
   'canvasFilterPath', 'canvasViewMode', 'canvasShowEdges', 'canvasShowTags', 'canvasShowLinks', 'canvasShowImages', 'canvasShowSummaries',
   'canvasCompactMode', 'canvasReadMode', 'canvasHoverScale', 'canvasDefaultCardWidth', 'splitPosition', 'fileTreeDisplayMode', 'fileTreeKindFilter', 'notesRootFolder', 'projectsRootFolder', 'ollama', 'brain',
   'pdfCompanionEnabled', 'pdfDisplayMode', 'iconSet',
-  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'antaresTargetMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'agentMcpEnabled', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'noteAgentLocalContextTokens', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
+  'smartConnectionsEnabled', 'notesChatEnabled', 'projectRagEnabled', 'flashcardsEnabled', 'workflowCanvasEnabled', 'webResearchEnabled', 'petrolWebLoop', 'petrolWebCheckMarks', 'petrolChatRetentionDays', 'petrolChatHistoryOpen', 'petrolWebSticky', 'petrolWebAutoMigrated', 'antaresTargetMigrated', 'agentShellEnabled', 'agentShell', 'agentComputerEnabled', 'agentComputer', 'agentMcpEnabled', 'imageGenerationEnabled', 'noteAgentCloudConsentVersion', 'noteAgentLocalContextTokens', 'noteAgentMemoryEnabled', 'chatImageCloudConsent', 'imagenKeyMigratedToSafeStorage', 'semanticScholarEnabled', 'zoteroEnabled', 'smartConnectionsWeights', 'smartConnectionsRerankerEnabled', 'docling', 'visionOcr', 'readwise', 'languageTool', 'email', 'pluginConfig', 'dailyNote', 'taskExcludedFolders', 'taskIncludedFolders', 'speech',
   'editorDefaultViewForcedToPreview',
   'appearanceMigratedToLight',
   'lastSeenVersion',
@@ -1571,6 +1575,7 @@ export const useUIStore = create<UIState>()((set, get) => ({
   setImageGenerationEnabled: (enabled) => set({ imageGenerationEnabled: enabled }),
   setNoteAgentCloudConsentVersion: (version) => set({ noteAgentCloudConsentVersion: version }),
   setNoteAgentLocalContextTokens: (tokens) => set({ noteAgentLocalContextTokens: tokens }),
+  setNoteAgentMemoryEnabled: (enabled) => set({ noteAgentMemoryEnabled: enabled }),
   setChatImageCloudConsent: (provider, version) => set((st) => ({ chatImageCloudConsent: { ...st.chatImageCloudConsent, [provider]: version } })),
   setWebResearchConfig: (config) => set({ webResearchConfig: config }),
   setSpeech: (settings) => set((state) => ({ speech: { ...state.speech, ...settings } })),

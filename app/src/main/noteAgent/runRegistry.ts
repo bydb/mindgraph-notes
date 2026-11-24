@@ -98,6 +98,8 @@ export interface AgentRun {
   // angehobenem Kontextfenster (shared/folderCoverage.ts). `coverageAsked`: die eine Rückfrage kam schon.
   folderFilesRead: Map<string, Set<string>>
   coverageAsked?: boolean
+  // Ordner, die folder_digest ganz ausgewertet hat — nur DIESE gelten für die Lese-Abdeckung als erledigt (Codex F12).
+  digestedFolders?: Set<string>
   // Ordner, für die collect_table bereits gelaufen ist — danach sind gezielte
   // Einzelabfragen wieder legitim (nur nicht unbegrenzt).
   collectedFolders: Set<string>
@@ -303,6 +305,17 @@ export function recordFolderFileRead(run: AgentRun, folder: string, file: string
   run.folderFilesRead.set(folder, set)
 }
 
+/** Ein Leseergebnis kam beim Modell nicht an (zu groß, durch einen Hinweis ersetzt): die Datei gilt wieder als ungelesen. */
+export function forgetFolderFileRead(run: AgentRun, file: string): void {
+  const wanted = file.normalize('NFC').toLowerCase()
+  for (const set of run.folderFilesRead?.values() ?? []) {
+    for (const name of [...set]) {
+      const n = name.normalize('NFC').toLowerCase()
+      if (n === wanted || n.endsWith(`/${wanted}`) || wanted.endsWith(`/${n}`)) set.delete(name)
+    }
+  }
+}
+
 export function recordToolUse(run: AgentRun, toolName: string): void {
   run.toolsUsed.add(toolName)
 }
@@ -326,6 +339,7 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
       folderReads: new Map(run.folderReads),
       folderFilesRead: new Map([...(run.folderFilesRead ?? [])].map(([k, v]) => [k, new Set(v)])),
       coverageAsked: run.coverageAsked,
+      ...(run.digestedFolders?.size ? { digestedFolders: new Set(run.digestedFolders) } : {}),
       collectedFolders: new Set(run.collectedFolders),
       ...(run.skillBlocks?.size ? { skillBlocks: new Map(run.skillBlocks) } : {}),
       ...(run.foreignData ? { foreignData: run.foreignData } : {}),
@@ -348,6 +362,7 @@ export interface RunContinuation {
   folderReads: Map<string, number>
   folderFilesRead?: Map<string, Set<string>>
   coverageAsked?: boolean
+  digestedFolders?: Set<string>
   collectedFolders: Set<string>
   /** Feste Blöcke der im Vorgänger gelesenen Skills — der Folgelauf soll nichts erneut lesen,
    *  write_html braucht sie aber für [[skill-block:name]] (Gegenprüfung N02). */
@@ -368,6 +383,7 @@ export function inheritContinuation(run: AgentRun, prev: RunContinuation): void 
   for (const [folder, n] of prev.folderReads) run.folderReads.set(folder, n)
   for (const [folder, names] of prev.folderFilesRead ?? []) for (const name of names) recordFolderFileRead(run, folder, name)
   if (prev.coverageAsked) run.coverageAsked = true
+  if (prev.digestedFolders?.size) run.digestedFolders = new Set(prev.digestedFolders)
   for (const folder of prev.collectedFolders) run.collectedFolders.add(folder)
   if (prev.skillBlocks?.size) run.skillBlocks = new Map(prev.skillBlocks)
 }

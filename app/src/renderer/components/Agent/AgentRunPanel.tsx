@@ -184,6 +184,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
   }
 
   // Mitlernen (Stufe 3): Merksatz-Eingabe in der Review-Phase.
+  const memoryEnabled = useUIStore(st => st.noteAgentMemoryEnabled)
   const [rememberText, setRememberText] = useState('')
   const [rememberFeedback, setRememberFeedback] = useState<{ kind: 'saved'; relPath: string } | { kind: 'error'; text: string } | null>(null)
   // true, sobald der Nutzer selbst getippt/geleert hat — dann überschreibt kein Vorschlag mehr.
@@ -405,7 +406,9 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
           ))}
           {/* Zeitbilanz: Referenzzeit des Skills erfragen, sobald alle Karten entschieden sind */}
           <SkillReferencePrompt run={run} />
-          {/* Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz */}
+          {/* Mitlernen (Stufe 3): bestätigter Merksatz → Agent-Gedächtnis-Notiz. Nur bei eingeschaltetem
+              Gedächtnis (Einstellungen → KI, Standard aus) — das Feld nach jedem Lauf empfand der Nutzer als störend. */}
+          {memoryEnabled && (<>
           <div className="ai-bar-agent-remember">
             <input
               className="ai-bar-context-search"
@@ -424,6 +427,7 @@ export function AgentRunPanel({ run, onCancel, onAccept, onDiscard, onPreview, o
           {rememberFeedback?.kind === 'error' && (
             <div className="ai-bar-context-error">{rememberFeedback.text}</div>
           )}
+          </>)}
           <div className="ai-bar-agent-row">
             <span />
             <button type="button" className="ai-bar-cancel" onClick={onDismiss}>{t('aiBar.agent.close')}</button>

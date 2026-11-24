@@ -353,7 +353,8 @@ export function AgentView({ tabId }: Props) {
   // Gedächtnis: leer / gefüllt / wird gekürzt. Neu lesen nach jedem Lauf — „Merken“
   // schreibt in genau diese Notiz.
   type MemoryState = 'empty' | 'filled' | 'long' | 'checking' | 'unknown'
-  const [memory, setMemory] = useState<{ state: MemoryState; relPath: string; vault: string }>({ state: 'checking', relPath: '', vault: '' })
+  type MemoryRule = { raw: string; text: string; date?: string }
+  const [memory, setMemory] = useState<{ state: MemoryState; relPath: string; vault: string; rules?: MemoryRule[]; rulesHidden?: number; rulesNotInRun?: number; freeLines?: number }>({ state: 'checking', relPath: '', vault: '' })
   const memoryReq = useRef(0)
   const refreshMemory = useCallback(() => {
     const req = ++memoryReq.current
@@ -652,12 +653,23 @@ export function AgentView({ tabId }: Props) {
   const summaryRoute = running ? run.route : preRoute
   const summaryOut = summaryRoute ? summaryRoute.kind === 'cloud' : cloudSelected
   const autoOpen = summaryOut || summaryRoute?.kind === 'unverified' || modelMissing || !!gateBlock
+  // Während des Laufs zählt, was DIESER Lauf darf — nicht die Schalter für den nächsten: nach dem
+  // Start setzt die Karte Shell und Rechner zurück, die Zeile zeigte dann „keine“ neben einem Lauf
+  // mit Shell-Zugriff (Codex F07).
   const summaryPerms = [
     (running ? runWeb : webOn) ? t('aiBar.web.label') : '',
-    shellOn ? t('aiBar.shell.label') : '',
-    computerOn ? t('aiBar.computer.label') : '',
-    ...(mcpOn ? mcpSelected : [])
+    (running ? runShell : shellOn) ? t('aiBar.shell.label') : '',
+    (running ? runComputer : computerOn) ? t('aiBar.computer.label') : '',
+    ...(running ? (run.mcpServers ?? []) : mcpOn ? mcpSelected : [])
   ].filter(Boolean)
+  // Bildinhalt in Suchanfragen stünde bei lokalem Modell sonst nur im zugeklappten Modell-Menü
+  // (Codex F05) — daran hängt die Freigabe von describe_image in Web-Läufen, deshalb zusätzlich
+  // unter der Karte, aber nur wenn Websuche UND Bilder im Anhang zusammenkommen. Der allgemeine
+  // Hinweis zum Bild-Prompt an Google (F06) stand kurz ebenfalls dort und ist wieder entfernt:
+  // er erschien bei jedem Auftrag, lenkte ab und war für neue Nutzer unverständlich (Nutzer,
+  // 25.11.2026). Er bleibt im Modell-Menü („Bilder“) und unter „Welche Daten wohin gehen“.
+  const noteImageViewWeb = imageViewRelevant && !!shownImageView?.ok && (running ? runWeb : webOn)
+
   const permsText = summaryPerms.length ? summaryPerms.join(', ') : t('agentCard.sumNoPerms')
   const modelText = [
     summaryOut
@@ -995,13 +1007,10 @@ export function AgentView({ tabId }: Props) {
                     {webMissing && <span className={firstGap === 'web' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(webHint)}</span>}
                     {mindmapWithWeb && <span className="agent-card-help">{t('agentCard.mindmapNoWeb')}</span>}
                     {lockedReason && <span id={lockedReasonId} className="agent-card-muted">{lockedReason}</span>}
-                    {actsNow && (
-                      <div className="agent-card-acts">
-                        <span className="agent-card-acts-title">{t('agentCard.actsNow')}</span>
-                        {ops.map(o => <span key={o}>{o}</span>)}
-                        <span>{t('agentCard.askAtStart')}</span>
-                      </div>
-                    )}
+                    {/* Die Warnung „handelt sofort“ steht einmal, unter der Karte. Im Menü stand sie als roter
+                        Kasten ein zweites Mal — doppelt und überladen (Nutzer, 25.11.2026). Hier bleibt nur,
+                        was dort fehlt: dass die App beim Start einmal fragt; die Vorgänge im Einzelnen als Tooltip. */}
+                    {actsNow && <span className="agent-card-muted" title={ops.join('\n')}>{t('agentCard.askAtStart')}</span>}
                   </div>
                 </div>
 
@@ -1207,18 +1216,29 @@ export function AgentView({ tabId }: Props) {
               erzeugt keinen Gedächtnisblock im Lauf. Leer (und während der Prüfung) entfällt
               die Zeile: sie hätte nichts zu tun (Design-Runde F08). „Unbekannt“ bleibt sichtbar. */}
           {memoryState !== 'empty' && memoryState !== 'checking' && (
-          <div className="agent-card-row is-center">
+          <div className="agent-card-row is-two-col">
             <span className="agent-card-label">{t('agentCard.rowMemory')}</span>
-            <span className={`agent-card-value ${memoryState === 'long' ? 'agent-card-warn-text' : memoryState === 'filled' ? '' : 'agent-card-muted'}`}>
-              {t(
-                memoryState === 'long' ? 'agentCard.memLong'
-                : memoryState === 'filled' ? 'agentCard.memFilled'
-                : 'agentCard.memUnknown'
+            <div className="agent-card-value">
+              {memoryState === 'unknown' && <span className="agent-card-muted">{t('agentCard.memUnknown')}</span>}
+              {/* Die Regeln selbst zeigen: „wird berücksichtigt“ sagte nicht, was jeder Lauf mitbekommt. */}
+              {(memory.rules?.length ?? 0) > 0 && (
+                <ul className="agent-card-mem-rules">
+                  {memory.rules!.map(rule => (
+                    <li key={rule.raw} className="agent-card-mem-rule">{rule.text}</li>
+                  ))}
+                </ul>
               )}
-            </span>
-            {(memoryState === 'filled' || memoryState === 'long')
-              ? <button type="button" className="agent-card-link-btn" onClick={() => void openMemoryNote()}>{t('agentCard.memView')}</button>
-              : <span />}
+              {(memory.freeLines ?? 0) > 0 && <span className="agent-card-help">{t('agentCard.memFreeText', { n: memory.freeLines ?? 0 })}</span>}
+              {memoryState === 'long' && <span className="agent-card-warn-text">{t('agentCard.memLong')}</span>}
+              {(memory.rulesHidden ?? 0) > 0 && <span className="agent-card-help">{t('agentCard.memMore', { n: memory.rulesHidden ?? 0 })}</span>}
+              {(memory.rulesNotInRun ?? 0) > 0 && <span className="agent-card-warn-text">{t('agentCard.memNotInRun', { n: memory.rulesNotInRun ?? 0 })}</span>}
+              {(memoryState === 'filled' || memoryState === 'long') && (
+                <span className="agent-card-help">
+                  {t('agentCard.memApplies')}{' '}
+                  <button type="button" className="agent-card-link-btn" onClick={() => void openMemoryNote()}>{t('agentCard.memView')}</button>
+                </span>
+              )}
+            </div>
           </div>
           )}
           </div>
@@ -1235,6 +1255,7 @@ export function AgentView({ tabId }: Props) {
               {t('agentCard.footer')}
             </span>
             {actsNow && <span className="agent-card-acts-title">{t('agentCard.footerActsNow')}</span>}
+            {noteImageViewWeb && <span className="agent-card-out-text">{t('agentCard.rowImageView')}: {t('agentCard.imageViewWeb')}</span>}
             {!cloudSelected && <span>{t('agentCard.duration')}</span>}
           </div>
         </div>

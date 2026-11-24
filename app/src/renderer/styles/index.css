@@ -24179,6 +24179,10 @@ body.presentation-mode *::after {
 .agent-card-context-range { flex: 1; min-width: 0; accent-color: var(--accent-color); }
 .agent-card-context-value { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-primary); }
 
+/* Gedächtnis im Modell-Menü (nur bei eingeschaltetem Gedächtnis): die Regeln selbst, zum Nachlesen. */
+.agent-card-mem-rules { list-style: disc; margin: 0; padding: 0 0 0 16px; display: flex; flex-direction: column; gap: 5px; }
+.agent-card-mem-rule { font-size: 12px; line-height: 1.4; color: var(--text-primary); }
+
 /* Unter der Karte: Zusage und — nur auf Wunsch — die Beispiele. */
 .agent-card-footer { padding: 0 4px; }
 .agent-card-footer-text { max-width: none; }
@@ -24215,3 +24219,9 @@ body.presentation-mode *::after {
 .petrol-chat.is-empty { --petrol-col: 860px; justify-content: flex-start; flex: 0 0 auto; }
 .petrol-chat.is-empty > .petrol-chat-hero { display: none; }
 .petrol-chat.is-empty > .petrol-chat-examples { order: 5; justify-content: flex-start; padding: 2px 2px 0; }
+
+/* Chat-Fußzeile bleibt einzeilig: links darf kürzen, die Modellgruppe rechts bricht nicht um. */
+.petrol-chat-foot { flex-wrap: nowrap; }
+.petrol-chat-foot-left { flex: 1 1 auto; }
+.petrol-chat-foot .petrol-chat-model { flex: 0 0 auto; }
+@container (max-width: 640px) { .petrol-chat-foot { flex-wrap: wrap; } }

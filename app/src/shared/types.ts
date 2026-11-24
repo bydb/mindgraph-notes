@@ -997,7 +997,7 @@ export interface ElectronAPI {
   mcpConfirmReadOnly: (id: string, confirmed: boolean) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
   mcpReapprove: (id: string) => Promise<{ success: boolean; server?: McpServerSummary; error?: string }>;
   noteAgentRemember: (vaultPath: string, text: string) => Promise<{ success: boolean; relPath?: string; error?: string }>;
-  noteAgentMemoryStatus: (vaultPath: string) => Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string }>;
+  noteAgentMemoryStatus: (vaultPath: string) => Promise<{ state: 'empty' | 'filled' | 'long'; relPath: string; rules: import('./agentMemoryRules').MemoryRule[]; rulesHidden: number; rulesNotInRun: number; freeLines: number }>;
   imageGenHasKey: () => Promise<boolean>;
   // Agent-Skills Stufe 1
   noteSkillsList: (vaultPath: string) => Promise<{ skills: NoteAgentSkill[]; vaultKey?: string; skipped?: { tooLarge: string[]; overLimit: number }; bodyLimit?: number; error?: string }>;

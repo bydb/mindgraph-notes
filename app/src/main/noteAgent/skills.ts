@@ -560,7 +560,10 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         const isImage = contextKindFromFilename(res.fileName) === 'image'
         ctx.run.sources.add(isImage ? `Text erkannt: ${safeImageLabel(`${res.folderName}/${res.fileName}`)}` : `${res.folderName}/${res.fileName}`)
         ctx.run.folderReads.set(res.folderName, (ctx.run.folderReads.get(res.folderName) ?? 0) + 1)
-        recordFolderFileRead(ctx.run, res.folderName, res.fileName)
+        // Für die Lese-Abdeckung zählt nur die GANZE Datei: kein Ausschnitt (offset, max_rows, einzelnes
+        // Blatt) und nichts Gekapptes — sonst gälte eine angelesene Datei als gelesen (Codex F10).
+        const wholeFile = !res.truncated && !(typeof args.offset === 'number' && args.offset > 1) && typeof args.max_rows !== 'number' && typeof args.sheet !== 'string'
+        if (wholeFile) recordFolderFileRead(ctx.run, res.folderName, res.fileName)
         if (ctx.run.imageView && isImage) res.content += IMAGE_VIEW_HINT
         return {
           ok: true,
@@ -768,6 +771,11 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         })
         if (!res.ok) return err(res.content.replace(/^Fehler:\s*/, ''))
         ctx.run.sources.add(`Ordner: ${parsed.folder}`)
+        // Nur ein Durchgang über den GANZEN Ordner deckt ihn für die Lese-Abdeckung ab — nicht ein
+        // Teil (subfolder), ein Zeitraum oder ausgewählte Dateiarten.
+        if (!parsed.subfolder && !parsed.from && !parsed.to && !parsed.kinds?.length) {
+          try { (ctx.run.digestedFolders ??= new Set()).add(resolveFolderName(ctx.senderId, ctx.run.attachmentIds, parsed.folder)) } catch { /* Name nicht auflösbar: zählt nicht */ }
+        }
         if (res.coverageLine) ctx.run.sources.add(res.coverageLine)
         return { ok: true, content: res.content, display: `folder_digest: ${parsed.folder}` }
       } catch (e) {
