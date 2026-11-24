@@ -11,14 +11,18 @@ import { bundledResourcesDir } from '../bundledResources'
 import { skillActivityId, vaultActivityKey } from '../skillActivityId'
 import { listVaultSkillsDetailed, setSkillEnabled, createSkill, SKILLS_DIRNAME, MAX_SKILL_BODY_CHARS } from './skillsLoader'
 import { fetchSkillsCatalog, installCatalogSkill, importSkillFromPath } from './skillsCatalog'
+import { applySkillUpdates, checkSkillUpdates, previewSkillUpdate } from './skillUpdates'
 
 export interface NoteSkillsIpcDeps {
   assertApprovedVault: (vaultPath: string, op: string) => void
   copyDirectoryRecursive: (src: string, dest: string) => Promise<void>
+  /** Sicherung einer .md-Datei unter .mindgraph/backups, bevor sie überschrieben wird. */
+  backupMarkdownBeforeWrite: (filePath: string, nextContent: string) => Promise<void>
 }
 
 export function registerNoteSkillsIpc(deps: NoteSkillsIpcDeps): void {
-  const { assertApprovedVault, copyDirectoryRecursive } = deps
+  const { assertApprovedVault, copyDirectoryRecursive, backupMarkdownBeforeWrite } = deps
+  const starterDir = (): string => path.join(bundledResourcesDir(), 'starter-skills')
 
   // ── Agent-Skills Stufe 1: Vault-Skills verwalten (docs/agent-skills-plan.md) ──
   ipcMain.handle('note-skills-list', async (event, vaultPath: string) => {
@@ -87,6 +91,43 @@ export function registerNoteSkillsIpc(deps: NoteSkillsIpcDeps): void {
       return { success: true, installed }
     } catch (error) {
       return { success: false, installed: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+    }
+  })
+
+  // ── Skill-Updater (24.11.2026): mitgelieferte Skills, für die diese App eine neuere Fassung hat ──
+  // Regeln in skillUpdates.ts. Der Zustand wird bei jedem Aufruf im Main neu bestimmt.
+  ipcMain.handle('note-skills-updates', async (event, vaultPath: string) => {
+    if (!isTrustedSender(event)) return { updates: [], error: 'Nicht autorisierter Aufrufer' }
+    try {
+      assertApprovedVault(vaultPath, 'note-skills-updates')
+      return { updates: await checkSkillUpdates(vaultPath, starterDir()) }
+    } catch (error) {
+      return { updates: [], error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+    }
+  })
+
+  ipcMain.handle('note-skills-update-preview', async (event, vaultPath: string, folderName: string) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+    try {
+      assertApprovedVault(vaultPath, 'note-skills-update-preview')
+      const preview = await previewSkillUpdate(vaultPath, starterDir(), String(folderName))
+      return preview ? { success: true, preview } : { success: false, error: 'Kein mitgelieferter Skill oder nicht lesbar' }
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
+    }
+  })
+
+  ipcMain.handle('note-skills-update-apply', async (event, vaultPath: string, folderNames: string[], confirmedModified: string[]) => {
+    const empty = { updated: [], needsConfirm: [], failed: [] }
+    if (!isTrustedSender(event)) return { success: false, ...empty, error: 'Nicht autorisierter Aufrufer' }
+    try {
+      assertApprovedVault(vaultPath, 'note-skills-update-apply')
+      const names = Array.isArray(folderNames) ? folderNames.filter((n): n is string => typeof n === 'string') : []
+      const confirmed = Array.isArray(confirmedModified) ? confirmedModified.filter((n): n is string => typeof n === 'string') : []
+      const res = await applySkillUpdates(vaultPath, starterDir(), names, confirmed, { backup: backupMarkdownBeforeWrite })
+      return { success: true, ...res }
+    } catch (error) {
+      return { success: false, ...empty, error: error instanceof Error ? error.message : 'Unbekannter Fehler' }
     }
   })
 

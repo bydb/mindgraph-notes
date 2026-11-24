@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "skills": {
+    "ablaufdiagramm": {
+      "hashes": [
+        "e85a6bca6379b6633753f19a7c88b6b4e2df14f53dfee06e2bab0f4c4afe1f4c"
+      ]
+    },
+    "arbeitsblatt": {
+      "hashes": [
+        "056bffd04dc54f97fd9fc663fb30682761505c9f3f9a38be31049a51e8b99026"
+      ]
+    },
+    "begriffsnetz": {
+      "hashes": [
+        "373485f551a5e0d9329dfdd601350bd887dd8dc86fb8325360dabce6d57e2e26"
+      ]
+    },
+    "edumap": {
+      "hashes": [
+        "9bc231ca48ee4304f67f604b090f66f750e043eeeb3009b2c73a040b71174b23"
+      ]
+    },
+    "edupool-recherche": {
+      "hashes": [
+        "61785d1fcbdc0d70549a89e8446e12e0053ba173eb297e1769101231fa5ada2c",
+        "45574d026b024c8b6ad00b2991f21269498655e3666ba50709259b5d3c490b33",
+        "8a8407d8fd696237fe81d91ae498ccc678b1d867e199bdc5066c63a17f35ebf7",
+        "a285f85e79950a39bd823e624ed06ab52f1a3ebe73331c7070a6e05f3a48bed1"
+      ]
+    },
+    "elternbrief": {
+      "hashes": [
+        "8a1762979ee0344daddb9df7b3e1c751e32c1db3348b79ae9c75ff1138cb943c"
+      ]
+    },
+    "infografik": {
+      "hashes": [
+        "4626df97d5ecd112205132176adc7e28df4562629a5cb73860385c031ca11a31"
+      ]
+    },
+    "mindmap": {
+      "hashes": [
+        "2dabb1e5fefffdc99c9ebff65212661377e9f97f437cd4079afdebe7dedbd3fe"
+      ]
+    },
+    "praesentation-nach-vorlage": {
+      "keepLine": "^- Vorlage: ",
+      "hashes": [
+        "182538b1ccd743c92f3489ea641b01ddf50b39e980abc19f4a3d5cd7a093bf46",
+        "040e9da1c61c733e717e3be70ab949fc83c5af556a247931b6311b92bf02bda3",
+        "6e83a7bc40d5eed2f75383f16986ce8ed251b628c7319fa949e0df6734fac686"
+      ]
+    },
+    "protokoll": {
+      "hashes": [
+        "38fae0cec01be53b795574f0bcc88b9e24b06e20d7626cf699804f8592de785b",
+        "5bf3b159f2c59c3b9b8bbabbb3b74738919860955e79b77efe350fa7cfacc6eb"
+      ]
+    },
+    "tabellen-zuordnung": {
+      "hashes": [
+        "4dc9c01342980c6c2c7e97f6b5abca2830e6437f2c21948aaab7080f2a070f42"
+      ]
+    },
+    "teilnehmerliste": {
+      "hashes": [
+        "d18d0240908e04fc8dfafa812c5c9c8d72e52246d0a53bb36374eea7359e8731"
+      ]
+    },
+    "veranstaltungsjournal": {
+      "hashes": [
+        "819ebe286c35ac1d75d6824be237a80f6f00e0ce2e69bbc86a647dd3186a27e2",
+        "7605065f2293c605e8a55ef1c247a10cf1a74b602e4521749979f57775853015",
+        "2365be6840e3832de9dd98ac17fbd23c4cb2bfe4c214e5f29134ab6934086f16"
+      ]
+    },
+    "vier-felder-matrix": {
+      "hashes": [
+        "655d0710b882409b7c749a71fbd1a8e9a29a66cc802adeacef9aa9b2dad17225"
+      ]
+    },
+    "webseiten-artikel": {
+      "hashes": [
+        "2538e202bb1334c58a8f4a6e99203faa905e1ef99dc5358b939ab7661a785527"
+      ]
+    },
+    "wissenschaftliche-webseite": {
+      "hashes": [
+        "c3a338e31d8fb778ddbf896c8dc699623e12b9a1918121b9fcdfb251bd9c414c"
+      ]
+    },
+    "zeitstrahl": {
+      "hashes": [
+        "0e5f8666aa78193fce8b77e34fb852b4478d758c5d0861f2bb9b05af5eeb8040"
+      ]
+    },
+    "zusammenfassung": {
+      "hashes": [
+        "f90130fa78318470d775898ca3ca153ea234beae7df964abc5a8108f2535407f"
+      ]
+    }
+  }
+}

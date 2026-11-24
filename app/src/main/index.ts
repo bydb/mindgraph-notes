@@ -5070,7 +5070,7 @@ ipcMain.handle('activity-summary', async (event, vaultPath: string, range?: { fr
 })
 
 // Agent-Skills: Liste, Aktivierung, Anlegen, Starter-Skills, Katalog, Import (main/noteAgent/skillsIpc.ts).
-registerNoteSkillsIpc({ assertApprovedVault, copyDirectoryRecursive })
+registerNoteSkillsIpc({ assertApprovedVault, copyDirectoryRecursive, backupMarkdownBeforeWrite: (file, next) => backupMarkdownBeforeWrite(file, next) })
 
 
 // Liest die registrierten Kontext-Dateien des Senders und baut den Prompt-Abschnitt.

@@ -1000,6 +1000,10 @@ export interface ElectronAPI {
   noteSkillsSetEnabled: (vaultPath: string, folderName: string, enabled: boolean) => Promise<{ success: boolean; error?: string }>;
   noteSkillsCreate: (vaultPath: string, name: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;
   noteSkillsInstallStarter: (vaultPath: string) => Promise<{ success: boolean; installed: string[]; error?: string }>;
+  // Skill-Updater: `outdated` = unveränderte ältere Auslieferung, `modified` = vom Nutzer angepasst
+  noteSkillsUpdates: (vaultPath: string) => Promise<{ updates: Array<{ folderName: string; state: 'outdated' | 'modified' }>; error?: string }>;
+  noteSkillsUpdatePreview: (vaultPath: string, folderName: string) => Promise<{ success: boolean; preview?: { folderName: string; state: 'current' | 'outdated' | 'modified'; oldText: string; newText: string; carried: string | null }; error?: string }>;
+  noteSkillsUpdateApply: (vaultPath: string, folderNames: string[], confirmedModified: string[]) => Promise<{ success: boolean; updated: string[]; needsConfirm: string[]; failed: Array<{ folderName: string; error: string }>; error?: string }>;
   // Agent-Skills Stufe 2: Katalog + Import
   noteSkillsCatalog: () => Promise<{ skills: NoteAgentCatalogSkill[]; error?: string }>;
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => Promise<{ success: boolean; relPath?: string; folderName?: string; error?: string }>;

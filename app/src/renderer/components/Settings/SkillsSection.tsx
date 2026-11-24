@@ -5,6 +5,7 @@ import { generateNoteId } from '../../utils/linkExtractor'
 import type { NoteAgentSkill, NoteAgentCatalogSkill } from '../../../shared/types'
 import { PageHeader, SectionTitle, Card, Row, Note, Details, Toggle, Button, Code } from './SettingsUI'
 import { BrandSection } from './BrandSection'
+import { compactSkillDiff, diffSkillLines } from '../../../shared/skillUpdate'
 
 // Agent-Skills Stufe 1 (docs/agent-skills-plan.md): Vault-Skills verwalten.
 // Skills sind Markdown-Notizen (Skills/<ordner>/SKILL.md, agentskills.io-Format) —
@@ -30,6 +31,13 @@ export function SkillsSection({ onClose }: Props) {
   const [catalog, setCatalog] = useState<NoteAgentCatalogSkill[] | null>(null)
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [previewId, setPreviewId] = useState<string | null>(null)
+  // Skill-Updater: mitgelieferte Skills, für die diese App eine neuere Fassung hat.
+  // `outdated` = unveränderte ältere Auslieferung (ein Klick), `modified` = vom Nutzer angepasst
+  // (erst Unterschiede ansehen, dann ausdrücklich ersetzen). Entschieden wird im Main.
+  const [updates, setUpdates] = useState<Record<string, 'outdated' | 'modified'>>({})
+  const [updateBusy, setUpdateBusy] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null)
+  const [updatePreview, setUpdatePreview] = useState<{ folderName: string; oldText: string; newText: string; carried: string | null } | null>(null)
 
   const reload = useCallback(async () => {
     if (!vaultPath) return
@@ -40,6 +48,9 @@ export function SkillsSection({ onClose }: Props) {
     if (res.bodyLimit) setBodyLimit(res.bodyLimit)
     setError(res.error || null)
     setLoading(false)
+    // Fehler hier bleiben still: ohne Auskunft gibt es schlicht kein Update-Angebot.
+    const upd = await window.electronAPI.noteSkillsUpdates(vaultPath)
+    setUpdates(Object.fromEntries(upd.updates.map(u => [u.folderName, u.state])))
   }, [vaultPath])
 
   useEffect(() => { void reload() }, [reload])
@@ -142,6 +153,30 @@ export function SkillsSection({ onClose }: Props) {
     await reload()
   }
 
+  const applyUpdates = async (folderNames: string[], confirmedModified: string[] = []) => {
+    if (!vaultPath || folderNames.length === 0) return
+    setError(null)
+    setUpdateStatus(null)
+    setUpdateBusy(true)
+    const res = await window.electronAPI.noteSkillsUpdateApply(vaultPath, folderNames, confirmedModified)
+    setUpdateBusy(false)
+    setUpdatePreview(null)
+    const problems = [res.error, ...res.failed.map(f => `${f.folderName}: ${f.error}`)].filter(Boolean)
+    if (problems.length > 0) setError(problems.join(' · '))
+    if (res.updated.length > 0) setUpdateStatus(t('settings.skills.updateDone', { names: res.updated.join(', ') }))
+    await reload()
+  }
+
+  const showUpdateDiff = async (folderName: string) => {
+    if (!vaultPath) return
+    if (updatePreview?.folderName === folderName) { setUpdatePreview(null); return }
+    setError(null)
+    const res = await window.electronAPI.noteSkillsUpdatePreview(vaultPath, folderName)
+    if (!res.success || !res.preview) { setError(res.error || null); return }
+    setUpdatePreview({ folderName, oldText: res.preview.oldText, newText: res.preview.newText, carried: res.preview.carried })
+  }
+
+  const outdatedNames = skills.filter(s => updates[s.folderName] === 'outdated').map(s => s.folderName)
   const enabledCount = skills.filter(s => s.enabled).length
 
   return (
@@ -152,6 +187,12 @@ export function SkillsSection({ onClose }: Props) {
 
       <SectionTitle title={t('settings.skills.groupVault')} meta={loading ? undefined : t('settings.skills.meta', { n: skills.length, on: enabledCount })} />
       <Card>
+        {outdatedNames.length > 1 && (
+          <Note tone="warn" action={t('settings.skills.updateAll', { n: outdatedNames.length })} onAction={() => void applyUpdates(outdatedNames)} actionDisabled={updateBusy}>
+            {t('settings.skills.updateAllHint', { n: outdatedNames.length })}
+          </Note>
+        )}
+        {updateStatus && <Note tone="ok">{updateStatus}</Note>}
         {loading ? (
           <Note tone="muted">…</Note>
         ) : skills.length === 0 ? (
@@ -170,6 +211,44 @@ export function SkillsSection({ onClose }: Props) {
           >
             <Toggle id={`skill-${skill.folderName}`} checked={skill.enabled} onChange={() => void toggleSkill(skill)} ariaLabel={skill.enabled ? t('settings.skills.disable') : t('settings.skills.enable')} />
           </Row>
+          {updates[skill.folderName] === 'outdated' && (
+            <Note tone="warn" action={t('settings.skills.update')} onAction={() => void applyUpdates([skill.folderName])} actionDisabled={updateBusy}>
+              {t('settings.skills.updateAvailable')}{' '}
+              <button type="button" className="sui-link" onClick={() => void showUpdateDiff(skill.folderName)}>
+                {updatePreview?.folderName === skill.folderName ? t('settings.skills.updateDiffClose') : t('settings.skills.updateDiff')}
+              </button>
+            </Note>
+          )}
+          {updates[skill.folderName] === 'modified' && (
+            <Note tone="warn" action={updatePreview?.folderName === skill.folderName ? t('settings.skills.updateDiffClose') : t('settings.skills.updateDiff')} onAction={() => void showUpdateDiff(skill.folderName)}>
+              {t('settings.skills.updateAvailableModified')}
+            </Note>
+          )}
+          {updatePreview?.folderName === skill.folderName && (
+            <Row label={t('settings.skills.updateDiffTitle')} stacked>
+              {updatePreview.carried && <Note tone="muted">{t('settings.skills.updateCarried', { line: updatePreview.carried })}</Note>}
+              <div className="sui-preview sui-skilldiff" role="group" aria-label={t('settings.skills.updateDiffTitle')}>
+                {compactSkillDiff(diffSkillLines(updatePreview.oldText, updatePreview.newText)).map((l, i) => l === null
+                  ? <div key={i} className="sui-skilldiff-gap">⋯</div>
+                  : (
+                    <div key={i} className={`sui-skilldiff-line is-${l.type}`}>
+                      <span className="sui-skilldiff-mark" aria-hidden="true">{l.type === 'add' ? '+' : l.type === 'del' ? '−' : ' '}</span>
+                      <span className="sui-skilldiff-sr">{l.type === 'add' ? t('settings.skills.updateDiffAdded') : l.type === 'del' ? t('settings.skills.updateDiffRemoved') : ''}</span>
+                      {l.text || ' '}
+                    </div>
+                  ))}
+              </div>
+              {updates[skill.folderName] === 'modified' && (
+                <>
+                  <Note tone="muted">{t('settings.skills.updateReplaceHint')}</Note>
+                  <div className="sui-pair">
+                    <Button variant="primary" disabled={updateBusy} onClick={() => void applyUpdates([skill.folderName], [skill.folderName])}>{t('settings.skills.updateReplace')}</Button>
+                    <Button onClick={() => setUpdatePreview(null)}>{t('settings.skills.updateKeep')}</Button>
+                  </div>
+                </>
+              )}
+            </Row>
+          )}
           {skill.truncated && <Note tone="warn">{t('settings.skills.truncated', { limit: bodyLimit.toLocaleString('de-DE'), chars: skill.bodyChars.toLocaleString('de-DE') })}</Note>}
           </Fragment>
         ))}

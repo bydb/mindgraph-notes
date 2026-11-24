@@ -310,6 +310,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('note-skills-set-enabled', vaultPath, folderName, enabled),
   noteSkillsCreate: (vaultPath: string, name: string) => ipcRenderer.invoke('note-skills-create', vaultPath, name),
   noteSkillsInstallStarter: (vaultPath: string) => ipcRenderer.invoke('note-skills-install-starter', vaultPath),
+  // Skill-Updater: neuere Fassungen mitgelieferter Skills
+  noteSkillsUpdates: (vaultPath: string) => ipcRenderer.invoke('note-skills-updates', vaultPath),
+  noteSkillsUpdatePreview: (vaultPath: string, folderName: string) => ipcRenderer.invoke('note-skills-update-preview', vaultPath, folderName),
+  noteSkillsUpdateApply: (vaultPath: string, folderNames: string[], confirmedModified: string[]) =>
+    ipcRenderer.invoke('note-skills-update-apply', vaultPath, folderNames, confirmedModified),
   // Agent-Skills Stufe 2: Katalog + Import
   noteSkillsCatalog: () => ipcRenderer.invoke('note-skills-catalog'),
   noteSkillsCatalogInstall: (vaultPath: string, id: string) => ipcRenderer.invoke('note-skills-catalog-install', vaultPath, id),
