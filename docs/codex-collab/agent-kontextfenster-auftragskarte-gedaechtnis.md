@@ -2,7 +2,7 @@
 
 ## Aufgabe
 
-Adversariale Prüfung aller Änderungen vom 24./25.11.2026:
+Adversariale Prüfung aller Änderungen vom 24.11.2026:
 
 1. **Fünf Commits auf `master` seit `17b51445`** (`git log 17b51445..HEAD`, `git diff 17b51445..HEAD`):
    - `42f823f8` Kontextfenster lokaler Agentenläufe einstellbar
@@ -229,7 +229,7 @@ Jede lokale Einstellung über dem jeweiligen Laufstandard hebt das Limit auf 30 
 
 ## Claude-Antwort
 
-Runde 1, 25.11.2026. Alle 18 Befunde gegen den Code nachgeprüft: 14 tragen ganz, 4 teilweise
+Runde 1, 24.11.2026. Alle 18 Befunde gegen den Code nachgeprüft: 14 tragen ganz, 4 teilweise
 (F08, F13, F14, F16), keiner ist falsch. Der Nutzer hat die Umsetzung freigegeben und entschieden,
 das Agent-Gedächtnis abschaltbar zu machen (Standard aus), weil er es als störend empfindet.
 
@@ -275,8 +275,14 @@ das Agent-Gedächtnis abschaltbar zu machen (Standard aus), weil er es als stör
 - **F18 [ADRESSIERT]** — Zurück auf 20 Runden; in den Regeln als nicht gemessen vermerkt.
 
 Belege: `npm run typecheck` grün; `vitest run src/shared src/main/noteAgent` 2699 bestanden.
-Nicht geprüft: ein echter Lauf mit den Loop-Korrekturen (F10, F12, F13, F14).
+Echter Lauf nach den Korrekturen (24.11.2026, Test-Instanz, `qwen3.8:27b-mlx`, 49 152 Token, sieben
+kleine erfundene Dateien, rund fünf Minuten, 7 von 20 Runden): eine Datei gelesen → Schreiben
+zurückgestellt, sechs fehlende Dateien beim Namen genannt (`A/bericht.md` und `B/bericht.md`
+getrennt, F09) → alle nachgelesen, auch die Datei mit zerlegt gespeichertem Umlaut (NFC-Vergleich)
+→ neu geschrieben, alle sieben Kennwörter im Ergebnis. Kein „Merken“-Feld bei ausgeschaltetem
+Gedächtnis. Im Lauf NICHT ausgelöst und damit nur durch Tests bzw. gar nicht belegt: F10
+(Teil-Lesung), F11/F12, F13, F14 (Nachfassen), F17.
 
 ## Status
 
-Runde 1 angefragt und beantwortet am 25.11.2026. F15 und F16 offen (Diskussion). Abnahme durch den Nutzer steht aus.
+Runde 1 angefragt und beantwortet am 24.11.2026. F15 und F16 offen (Diskussion). Abnahme durch den Nutzer steht aus.

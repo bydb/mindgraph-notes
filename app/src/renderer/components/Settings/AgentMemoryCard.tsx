@@ -3,7 +3,7 @@ import { useUIStore, flushUISettings } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { Card, Row, Toggle, Note } from './SettingsUI'
 
-// Agent-Gedächtnis ein/aus. Standard aus (25.11.2026): Die App schlug nach jedem Lauf eine Regel
+// Agent-Gedächtnis ein/aus. Standard aus (24.11.2026): Die App schlug nach jedem Lauf eine Regel
 // vor, und gespeicherte Regeln standen über jedem Auftrag — auch über solchen, zu denen sie nicht
 // passten. Der Main liest den Schalter selbst aus ui-settings.json; die Notiz bleibt unberührt.
 export function AgentMemoryCard() {

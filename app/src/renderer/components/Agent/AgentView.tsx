@@ -667,7 +667,7 @@ export function AgentView({ tabId }: Props) {
   // unter der Karte, aber nur wenn Websuche UND Bilder im Anhang zusammenkommen. Der allgemeine
   // Hinweis zum Bild-Prompt an Google (F06) stand kurz ebenfalls dort und ist wieder entfernt:
   // er erschien bei jedem Auftrag, lenkte ab und war für neue Nutzer unverständlich (Nutzer,
-  // 25.11.2026). Er bleibt im Modell-Menü („Bilder“) und unter „Welche Daten wohin gehen“.
+  // 24.11.2026). Er bleibt im Modell-Menü („Bilder“) und unter „Welche Daten wohin gehen“.
   const noteImageViewWeb = imageViewRelevant && !!shownImageView?.ok && (running ? runWeb : webOn)
 
   const permsText = summaryPerms.length ? summaryPerms.join(', ') : t('agentCard.sumNoPerms')
@@ -1008,7 +1008,7 @@ export function AgentView({ tabId }: Props) {
                     {mindmapWithWeb && <span className="agent-card-help">{t('agentCard.mindmapNoWeb')}</span>}
                     {lockedReason && <span id={lockedReasonId} className="agent-card-muted">{lockedReason}</span>}
                     {/* Die Warnung „handelt sofort“ steht einmal, unter der Karte. Im Menü stand sie als roter
-                        Kasten ein zweites Mal — doppelt und überladen (Nutzer, 25.11.2026). Hier bleibt nur,
+                        Kasten ein zweites Mal — doppelt und überladen (Nutzer, 24.11.2026). Hier bleibt nur,
                         was dort fehlt: dass die App beim Start einmal fragt; die Vorgänge im Einzelnen als Tooltip. */}
                     {actsNow && <span className="agent-card-muted" title={ops.join('\n')}>{t('agentCard.askAtStart')}</span>}
                   </div>

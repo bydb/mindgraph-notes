@@ -547,7 +547,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       // Agent-Skills Stufe 1: aktivierte Vault-Skills als Discovery-Metadaten mitgeben.
       const skills = await listEnabledSkillHeaders(params.vaultPath).catch(() => [])
       // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen in den Prompt.
-      // Seit 25.11.2026 nur noch auf Wunsch (Einstellungen → KI, Standard aus): Regeln aus einzelnen
+      // Seit 24.11.2026 nur noch auf Wunsch (Einstellungen → KI, Standard aus): Regeln aus einzelnen
       // Läufen standen sonst über jedem Auftrag, und nach jedem Lauf kam ein Vorschlag (Nutzer: „störend“).
       const memoryEnabled = (await loadUISettings().catch(() => ({} as Record<string, unknown>))).noteAgentMemoryEnabled === true
       const agentMemory = memoryEnabled ? await readAgentMemory(params.vaultPath).catch(() => '') : ''

@@ -183,7 +183,7 @@ ${run.skills.map(s => `- ${s.name}: ${s.description || '(keine Beschreibung)'}`)
   // Hausdesign (F03): Rangfolge und Vorlagen, Name nur als zitierte Daten.
   const brandBlock = run.brand ? brandPromptBlock(run.brand.profile, run.brand.folderRel, run.brand.letterSkills) : ''
 
-  // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen. Bis 25.11.2026 „immer einhalten“ —
+  // Mitlernen (Stufe 3): bestätigte Regeln aus früheren Läufen. Bis 24.11.2026 „immer einhalten“ —
   // eine aus EINEM Auftrag gewonnene Regel („Tabellen im Excel-Format, Recherche in kleinen Schritten“)
   // stand damit auch über Aufträgen, zu denen sie nicht passt. Jetzt gilt sie nur, wenn sie passt.
   const memoryBlock = agentMemory

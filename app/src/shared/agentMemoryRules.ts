@@ -1,4 +1,4 @@
-// Agent-Gedächtnis als Regelliste (25.11.2026). Die Notiz bleibt eine frei editierbare
+// Agent-Gedächtnis als Regelliste (24.11.2026). Die Notiz bleibt eine frei editierbare
 // Markdown-Datei; hier wird nur gelesen, welche Regeln als Aufzählungspunkte darin stehen,
 // damit die Auftragskarte sie ZEIGEN kann statt „wird berücksichtigt“. Geändert wird die Notiz
 // nur im Editor — ein eigener Entfernen-Weg aus der Karte brachte mehr Risiko als Nutzen

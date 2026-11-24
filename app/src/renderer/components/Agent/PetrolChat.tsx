@@ -1237,7 +1237,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             maxWidth={260}
           />
           {/* Cloud: Der Anbieter steht schon in der Modellwahl daneben — die Marke nennt nur noch die Folge,
-                sonst bricht die Zeile um (Nutzerbefund 25.11.2026). Der volle Text bleibt als Tooltip. */}
+                sonst bricht die Zeile um (Nutzerbefund 24.11.2026). Der volle Text bleibt als Tooltip. */}
             {hasModel && <span className={`agent-card-route ${routeClass}`} title={routeText}>{routeKind === 'cloud' ? t('petrolChat.routeCloudShort') : routeText}</span>}
         </span>
       </div>
