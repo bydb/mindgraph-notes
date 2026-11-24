@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.7] - 2026-11-24
+
+**Mitgelieferte Skills lassen sich jetzt mit einem Klick auf die neue Fassung bringen.** Unter Einstellungen → Skills steht an jedem veralteten Skill „Neue Fassung verfügbar“ mit dem Knopf „Aktualisieren“. Haben Sie einen Skill selbst angepasst, zeigt die App vorher, was sich ändern würde, und Sie entscheiden. Die bisherige Fassung bleibt in jedem Fall als Sicherung erhalten.
+
+### Hintergrund
+
+- **Auslöser:** Die App überschreibt einen vorhandenen Skill nie. Wer einen mitgelieferten Skill einmal installiert hatte, arbeitete deshalb mit der alten Fassung weiter, auch wenn ein Update ihn verbessert hatte, und erfuhr es nirgends.
+- **Unverändert oder angepasst:** Die App kennt alle Fassungen, die sie je ausgeliefert hat. Entspricht Ihr Skill einer davon, genügt ein Klick; bei mehreren gibt es „Alle aktualisieren“. Weicht er ab, gilt er als von Ihnen angepasst: Dann sehen Sie alt und neu Zeile für Zeile und wählen „Durch neue Fassung ersetzen“ oder „Meine Fassung behalten“.
+- **Sicherung:** Vor dem Ersetzen legt die App die bisherige Datei im Vault unter `.mindgraph/backups` ab. Gelingt das nicht, wird nichts geändert.
+- **Eigene Vorlage bleibt:** Im Skill „Präsentation nach Vorlage“ wird der eingetragene Pfad zur eigenen Vorlage übernommen und zählt nicht als Anpassung.
+- **Grenzen:** Der Updater gilt für die mitgelieferten Skills, noch nicht für Skills aus dem Katalog. Er läuft nie von selbst. Eigene Anpassungen und neue Fassung werden nicht zusammengeführt. Zusatzdateien eines Skills, etwa die Muster-Präsentation, werden nur ergänzt und nie überschrieben.
+
 ## [1.4.6] - 2026-11-24
 
 **Der Agent sieht sich jetzt Bilder an: Fotos, Diagramme und Abläufe im Anhang wertet ein Modell auf Ihrem Rechner aus.** Die Auftragskarte zeigt schon vor dem Start, ob das gewählte Modell Bilder ansehen kann. Bei der Webrecherche verliert der Agent keine Abrufe mehr an Websites, die ihn abweisen, und lange Skills kommen vollständig beim Modell an.
