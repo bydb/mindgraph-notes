@@ -21548,29 +21548,8 @@ details.callout[open] > summary.callout-title .callout-fold-indicator::after {
   font-size: 13px;
   color: var(--text-primary);
 }
-/* Lesebreite 780 px, solange die Karte einspaltig ist; breit wird sie zweispaltig. */
-.agent-view-inner > * { width: 100%; max-width: 780px; margin-inline: auto; }
 .agent-card-main > :first-child { border-top-left-radius: 14px; border-top-right-radius: 14px; }
 .agent-card-side > :last-child { border-bottom-left-radius: 14px; border-bottom-right-radius: 14px; }
-@container (min-width: 1000px) {
-  .agent-view-inner > * { max-width: none; }
-  .agent-card { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); }
-  .agent-card-main { display: flex; flex-direction: column; border-right: 1px solid var(--border-subtle); min-width: 0; }
-  .agent-card-main > .agent-card-task { flex: 1; }
-  .agent-card-main .agent-card-task-top { flex: 1; align-items: stretch; }
-  .agent-card-main .agent-card-flag { align-self: flex-start; }
-  .agent-card-main .agent-card-input { min-height: 120px; resize: none; }
-  .agent-card-main > :first-child { border-top-right-radius: 0; }
-  .agent-card-main > :last-child { border-bottom-left-radius: 14px; }
-  .agent-card-side { min-width: 0; }
-  .agent-card-side > .agent-card-row:first-child { border-top: none; border-top-right-radius: 14px; }
-  .agent-card-side > :last-child { border-bottom-left-radius: 0; }
-  /* Linke Spalte: zwei Beispiele je Reihe, ein einzelnes letztes mittig. */
-  .agent-card-main .agent-card-examples-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .agent-card-main .agent-card-examples-grid > * { grid-column: span 2; }
-  .agent-card-main .agent-card-examples-grid > :nth-child(4):nth-last-child(2) { grid-column: span 2; }
-  .agent-card-main .agent-card-examples-grid > :last-child:nth-child(odd) { grid-column: 2 / span 2; }
-}
 .agent-card-task { display: flex; flex-direction: column; gap: 7px; padding: 13px 16px 10px; }
 /* Übergabe aus dem Chat: nächste Schritte + übernommene Einstellungen, über dem Entwurf. */
 .agent-card-handover {
@@ -23384,7 +23363,6 @@ body.presentation-mode *::after {
    Tabellen und Code nutzen die volle Spalte. Verlauf, Eingabe und Fußzeile teilen dieselbe Breite. */
 .agent-view-inner.is-chat { max-width: none; }
 /* Der Kopf behält die Breite des Auftragsmodus (1180 − 2 × 24 px), sonst springt er beim Umschalten. */
-@container (min-width: 1000px) { .agent-view-inner.is-chat > .agent-card-head { max-width: 1132px; } }
 .petrol-chat { --petrol-col: max(800px, min(82%, 1240px)); display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 12px; }
 .agent-view-inner.is-chat > .petrol-chat { max-width: none; }
 .petrol-chat > * { width: 100%; max-width: var(--petrol-col); margin-inline: auto; box-sizing: border-box; }
@@ -24090,4 +24068,128 @@ body.presentation-mode *::after {
   overflow: hidden;
   text-overflow: ellipsis;
   pointer-events: none;
+}
+
+/* ---- Auftragskarte, Fassung 11/2026 (Entwurf aus Claude Design, danach mit dem Nutzer verfeinert) ----
+   Eine Spalte, 860 px. In der Karte: Eingabe, „+“ zum Anhängen von Unterlagen (Quelle) und der
+   Startknopf. Darunter eine leise Zeile: links „Ergebnis ablegen in“ (Ziel), rechts zwei kleine Menüs
+   (Befugnisse, Modell). Quelle und Ziel stehen bewusst nicht nebeneinander als gleichartige Knöpfe —
+   ein „Ordner wählen“ direkt unter „aus welchen Unterlagen?“ las sich als Quellordner. Alle Menüs
+   klappen nach unten und schließen bündig mit der rechten Kante ihres Knopfs ab. */
+.agent-view-inner > * { width: 100%; max-width: 860px; margin-inline: auto; }
+/* Leerlauf: Kopf und Eingabe rücken gemeinsam zur Mitte (im Chat dieselbe Höhe, siehe dort). Fester
+   Abstand statt echter Zentrierung, damit aufklappende Menüs und Beispiele die Karte nicht verschieben.
+   Sobald ein Lauf beginnt, steht alles wieder oben — dann braucht das Protokoll den Platz. */
+.agent-view-inner.is-idle { padding-top: clamp(32px, 22vh, 260px); }
+.agent-card { box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 5%, transparent); }
+.agent-card-task { padding: 16px 20px 6px; }
+.agent-card-input { font-size: 16px; line-height: 1.5; min-height: 104px; resize: none; }
+
+/* Leiste in der Karte: Anhängen links, Start rechts. */
+.agent-card-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 6px 20px 14px; }
+.agent-card-bar-docs { flex: 1; min-width: 0; }
+.agent-card-bar .ai-bar-context-btn.is-icon {
+  width: 28px; height: 28px; padding: 0; border-radius: 50%; justify-content: center;
+  border: 1px solid transparent; background: none; color: var(--text-primary);
+}
+.agent-card-bar .ai-bar-context-btn.is-icon svg { width: 13px; height: 13px; }
+.agent-card-bar .ai-bar-context-btn.is-icon:hover:not(:disabled) { background: var(--bg-secondary); border-color: var(--border-subtle); }
+.agent-card-bar .ai-bar-context-btn.is-icon:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.agent-card-bar .agent-card-start { padding: 10px 18px; border-radius: 10px; font-size: 14px; }
+/* Lücken erscheinen erst nach einem Startversuch, nicht schon auf der leeren Karte. */
+.agent-card-bar-error { margin: -6px 20px 12px; font-size: 12.5px; color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
+.agent-card-bar-hint { margin: -6px 20px 12px; font-size: 12.5px; color: var(--text-secondary); }
+
+/* Zeile unter der Karte: Ziel links, Menüs rechts. */
+.agent-card-under-wrap { position: relative; }
+.agent-card-under { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 0 6px; margin-top: -6px; }
+.agent-card-under-target { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; }
+.agent-card-under-label { color: var(--text-secondary); white-space: nowrap; }
+.agent-card-under-label.is-missing { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
+.agent-card-under .ai-bar-context-picker-wrap { position: relative; display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.agent-card-under .ai-bar-context-picker.agent-card-picker { left: 0; right: auto; }
+.agent-card-under-pick {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 8px;
+  border: none; background: none; color: var(--text-primary); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer;
+}
+.agent-card-under-pick:hover:not(:disabled) { background: var(--bg-secondary); }
+.agent-card-under-pick:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.agent-card-under-pick.is-missing { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); box-shadow: inset 0 0 0 1px var(--color-warning); }
+.agent-card-under-menus { display: flex; align-items: center; gap: 4px; min-width: 0; margin-left: auto; }
+/* Der Befugnisse-Knopf schrumpft nie (schmal verschwand sonst sein Wert); der Modellname kürzt mit „…“. */
+.agent-card-menu { position: relative; display: inline-flex; min-width: 0; flex-shrink: 0; }
+.agent-card-menu-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 420px;
+  padding: 5px 9px; border-radius: 8px; border: none; background: none;
+  color: var(--text-primary); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.agent-card-menu > .agent-card-menu-btn { flex-shrink: 0; }
+.agent-card-under-menus > .agent-card-menu-btn { flex: 0 1 auto; }
+.agent-card-menu-btn:hover:not(:disabled), .agent-card-menu-btn[aria-expanded="true"]:not(:disabled) { background: var(--bg-secondary); }
+.agent-card-menu-btn:disabled { cursor: default; }
+.agent-card-menu-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.agent-card-menu-btn-kind { color: var(--text-secondary); }
+.agent-card-menu-btn-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.agent-card-menu-btn-text.is-out { color: color-mix(in srgb, var(--color-warning) 70%, var(--text-primary)); }
+.agent-card-menu-btn.is-missing .agent-card-menu-btn-kind { color: color-mix(in srgb, var(--color-warning) 75%, var(--text-primary)); }
+
+/* Bedingungen des Laufs. Als Aufklappmenü (.is-popover) oder — wenn vor dem Start etwas gesehen
+   werden muss (Cloud-Weg, Zustimmung, fehlendes Modell) — fest als Karte unter der Zeile. */
+.agent-card.is-details[hidden] { display: none; }
+.agent-card-under-wrap > .agent-card.is-details { margin-top: 10px; }
+.agent-card-side { background: color-mix(in srgb, var(--bg-secondary) 55%, var(--bg-primary)); }
+.agent-card.is-details .agent-card-side { border-radius: 14px; }
+.agent-card.is-details .agent-card-side > .agent-card-row:first-child { border-top: none; }
+.agent-card-side .agent-card-row { padding: 12px 20px; grid-template-columns: 104px minmax(0, 1fr) auto; }
+.agent-card-side .agent-card-row.is-two-col { grid-template-columns: 104px minmax(0, 1fr); }
+.agent-card-under-wrap > .agent-card.is-details.is-popover,
+.agent-card-menu > .agent-card.is-details.is-popover {
+  position: absolute; top: 100%; z-index: 30; margin-top: 6px;
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--text-primary) 16%, transparent), 0 2px 6px color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+.agent-card-under-wrap > .agent-card.is-details.is-popover { right: 6px; width: min(380px, 100%); }
+.agent-card-menu > .agent-card.is-details.is-popover { right: 0; width: max-content; max-width: min(340px, 90cqw); }
+.agent-card.is-details.is-popover .agent-card-side { background: var(--bg-primary); }
+.agent-card.is-details.is-popover .agent-card-row { grid-template-columns: 72px minmax(0, 1fr) auto; padding: 9px 14px; gap: 0 10px; }
+.agent-card.is-details.is-popover .agent-card-row.is-two-col { grid-template-columns: 72px minmax(0, 1fr); }
+.agent-card.is-details.is-popover .agent-card-out-text,
+.agent-card.is-details.is-popover .agent-card-help { font-size: 11.5px; }
+
+/* Befugnisse: „Lesen“ und „Ausführen“ getrennt. Ausführen handelt auf dem Rechner — eingeschaltet
+   in Warnfarbe statt Petrol, damit der Unterschied ohne Text sichtbar ist. Kein Tooltip mit dem
+   Sperrgrund: er steht als Zeile im Menü und lief als Tooltip quer über die Karte. */
+.agent-card-perms.is-grouped { flex-direction: column; align-items: stretch; gap: 6px; }
+.agent-card-perm-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.agent-card-perm-kind { width: 58px; flex-shrink: 0; font-size: 11px; color: var(--text-secondary); }
+.agent-card-perm-group.is-act .agent-card-perm.is-on { border-color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 8%, var(--bg-primary)); }
+.agent-card-perm-group.is-act .agent-card-perm.is-on .agent-card-switch { background: var(--color-warning); }
+.agent-card-perm:focus { outline: none; }
+.agent-card-perm:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.agent-card.is-details.is-perms .agent-card-row { padding: 10px 12px; }
+.agent-card.is-details.is-perms .agent-card-row.is-two-col { grid-template-columns: minmax(0, 1fr); }
+.agent-card.is-details.is-perms .agent-card-row > .agent-card-label { display: none; }
+.agent-card.is-details.is-perms .agent-card-perm { padding: 3px 9px 3px 5px; font-size: 12px; }
+.agent-card.is-details.is-perms .agent-card-value { gap: 8px; }
+.agent-card.is-details.is-perms .agent-card-muted,
+.agent-card.is-details.is-perms .agent-card-help,
+.agent-card.is-details.is-perms .agent-card-acts { font-size: 11.5px; line-height: 1.4; max-width: 300px; white-space: normal; }
+
+/* Kontextfenster im Modell-Menü. */
+.agent-card-context { display: flex; align-items: center; gap: 10px; }
+.agent-card-context-range { flex: 1; min-width: 0; accent-color: var(--accent-color); }
+.agent-card-context-value { font-size: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--text-primary); }
+
+/* Unter der Karte: Zusage und — nur auf Wunsch — die Beispiele. */
+.agent-card-footer { padding: 0 4px; }
+.agent-card-footer-text { max-width: none; }
+.agent-view-inner > .agent-card-examples { border: none; background: none; padding: 4px 0 0; }
+.agent-view-inner > .agent-card-examples .agent-card-examples-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.agent-view-inner > .agent-card-examples .agent-card-examples-grid > *,
+.agent-view-inner > .agent-card-examples .agent-card-examples-grid > :nth-child(4):nth-last-child(2),
+.agent-view-inner > .agent-card-examples .agent-card-examples-grid > :last-child:nth-child(odd) { grid-column: auto; }
+@container (max-width: 560px) {
+  .agent-card-bar { align-items: stretch; }
+  .agent-card-bar .agent-card-start { width: 100%; }
+  .agent-card-side .agent-card-row,
+  .agent-card-side .agent-card-row.is-two-col { grid-template-columns: minmax(0, 1fr); }
 }

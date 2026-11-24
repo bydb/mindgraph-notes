@@ -16,6 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore, flushUISettings } from '../../stores/uiStore'
+import { ContextWindowRow } from './ContextWindowRow'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useComposeMeasurement } from '../../utils/activeTimeTracker'
 import { useComparisonStore } from '../../stores/comparisonStore'
@@ -113,10 +114,9 @@ function openPermSetup(state: PermState, moduleId: string, aiAnchor: string) {
 }
 
 /** Einzelschalter der Befugnis-Zeile. Nicht verfügbare Schalter nennen den nächsten Schritt. */
-function PermToggle({ label, state, reason, reasonId, disabled, onToggle, onSetup }: {
+function PermToggle({ label, state, reasonId, disabled, onToggle, onSetup }: {
   label: string
   state: PermState
-  reason?: string
   reasonId?: string
   disabled: boolean
   onToggle: () => void
@@ -140,7 +140,6 @@ function PermToggle({ label, state, reason, reasonId, disabled, onToggle, onSetu
       disabled={disabled}
       aria-pressed={on}
       aria-disabled={state === 'locked'}
-      title={state === 'locked' ? reason : undefined}
       aria-describedby={state === 'locked' ? reasonId : undefined}
     >
       <span className="agent-card-switch" aria-hidden="true"><span /></span>
@@ -149,6 +148,10 @@ function PermToggle({ label, state, reason, reasonId, disabled, onToggle, onSetu
   )
 }
 
+
+const MenuChevron = () => (
+  <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ flexShrink: 0 }}><path d="M4 6l4 4 4-4" /></svg>
+)
 export function AgentView({ tabId }: Props) {
   const { t, language } = useTranslation()
   const en = language === 'en'
@@ -414,7 +417,12 @@ export function AgentView({ tabId }: Props) {
     setTargetQuery('')
   }
   const openTargetPicker = () => {
-    setTargetLayout(measurePlacement(targetWrapRef.current))
+    // Die Zielordner-Zeile steht unter der Karte: nach unten öffnen, solange dort Platz ist —
+    // nach oben verdeckte die Auswahl das Eingabefeld.
+    const measured = measurePlacement(targetWrapRef.current)
+    const rect = targetWrapRef.current?.getBoundingClientRect()
+    const below = rect ? window.innerHeight - rect.bottom - 24 : 0
+    setTargetLayout(below >= 220 ? { placement: 'below', maxHeight: Math.min(360, below) } : measured)
     setTargetPickerOpen(true)
   }
 
@@ -522,7 +530,6 @@ export function AgentView({ tabId }: Props) {
   // Steht die Lücke sichtbar in der Karte (markierte Zeile mit eigener Handlung), heißt
   // der Knopf schlicht „Starten“ — ein zweiter Knopf „Unterlagen anhängen“ neben „+ Kontext“
   // war doppelt (Nutzer, 04.10.2026). Lücken ohne eigene Zeile nennt weiter der Knopf.
-  const gapShownInCard = firstGap === 'docs' || firstGap === 'target' || firstGap === 'web' || firstGap === 'model'
 
   // Übergabe aus dem Chat (docs/codex-collab/chat-daraus-erstellen.md, F04): Befugnisse
   // wirken sofort und dürfen nicht still aus einem früheren Auftrag mitlaufen — bei jeder
@@ -530,6 +537,15 @@ export function AgentView({ tabId }: Props) {
   const handover = scope.chatHandover ?? null
   const chatContext = scope.chatContext ?? null
   const [showChatContext, setShowChatContext] = useState(false)
+  // Auftragskarte (Entwurf „Petrol Agent Auftrag v2“, 24.11.2026): Einstellungen zugeklappt, als eine
+  // Zeile zusammengefasst. null = der Nutzer hat nicht selbst gewählt, dann entscheidet `autoOpen`.
+  const [menu, setMenu] = useState<'perms' | 'model' | null>(null)
+  // Lücken erst nach einem Startversuch in Warnfarbe zeigen, nicht schon auf der leeren Karte.
+  const [tried, setTried] = useState(false)
+  const settingsWrapRef = useRef<HTMLDivElement>(null)
+  // Beispiele nur auf Wunsch: offen wirkte die leere Karte überfrachtet (Nutzerbefund 24.11.2026).
+  const [showExamples, setShowExamples] = useState(false)
+  const localContextTokens = useUIStore(s => s.noteAgentLocalContextTokens)
   useEffect(() => {
     if (!handover) return
     setShellArmed(false)
@@ -630,6 +646,51 @@ export function AgentView({ tabId }: Props) {
     )
   }
 
+  // Zusammenfassung der zugeklappten Einstellungen. Was den Rechner verlässt oder vor dem Start
+  // gesehen werden muss (Cloud-Weg, Zustimmung, ungeprüfter Weg, fehlende Angabe in den
+  // Einstellungen), klappt sie von selbst auf — der Hinweis darf nicht hinter „Ändern“ liegen.
+  const summaryRoute = running ? run.route : preRoute
+  const summaryOut = summaryRoute ? summaryRoute.kind === 'cloud' : cloudSelected
+  const autoOpen = summaryOut || summaryRoute?.kind === 'unverified' || modelMissing || !!gateBlock
+  const summaryPerms = [
+    (running ? runWeb : webOn) ? t('aiBar.web.label') : '',
+    shellOn ? t('aiBar.shell.label') : '',
+    computerOn ? t('aiBar.computer.label') : '',
+    ...(mcpOn ? mcpSelected : [])
+  ].filter(Boolean)
+  const permsText = summaryPerms.length ? summaryPerms.join(', ') : t('agentCard.sumNoPerms')
+  const modelText = [
+    summaryOut
+      ? t('agentCard.sumCloud', { provider: summaryRoute?.providerLabel ?? cloudProviderLabel })
+      : summaryRoute?.kind === 'unverified' ? t('agentCard.sumUnverified') : t('agentCard.sumLocal'),
+    (running ? run.model : (activeCloudRoute?.model ?? effectiveModel)) || t('agentCard.modelMissing'),
+    !summaryOut && summaryRoute?.kind === 'local' && localContextTokens > 32_768 ? t('agentCard.sumContext', { n: localContextTokens.toLocaleString(en ? 'en-US' : 'de-DE') }) : '',
+    imageViewRelevant && shownImageView ? t(shownImageView.ok ? 'agentCard.sumImagesView' : 'agentCard.sumImagesText') : ''
+  ].filter(Boolean).join(' · ')
+  // Zwei kleine Menüs unter der Karte (Befugnisse, Modell) statt einer großen Einstellungskarte.
+  // Klick daneben oder Escape schließt. Muss beim Modellweg etwas vor dem Start gesehen werden
+  // (`autoOpen`), steht der Modell-Block stattdessen fest als Karte da.
+  const modelFixed = autoOpen
+  const modelOpen = modelFixed || menu === 'model'
+  const popoverOpen = menu === 'perms' || (menu === 'model' && !modelFixed)
+  useEffect(() => {
+    if (!popoverOpen) return
+    const onDown = (e: MouseEvent): void => {
+      // Außerhalb = weder im Menü noch auf einem der beiden Menüknöpfe. Die fest stehende Modell-Karte
+      // (Cloud-Weg) zählt als außerhalb — vorher blieb das Befugnisse-Menü bei einem Klick dorthin offen.
+      if (e.target instanceof Element && !e.target.closest('.agent-card.is-details.is-popover, .agent-card-menu-btn')) setMenu(null)
+    }
+    const onKey = (e: KeyboardEvent): void => { if (e.key === 'Escape') setMenu(null) }
+    // Einfangphase: Die Modellauswahl im Menü entfernt ihren Listeneintrag schon beim Drücken — in der
+    // Blasenphase hing das Ziel dann nicht mehr im Menü, und es schloss sich bei jedem Modellwechsel.
+    document.addEventListener('mousedown', onDown, true)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown, true); document.removeEventListener('keydown', onKey) }
+  }, [popoverOpen])
+  const tryStart = (): void => {
+    if (canRun) { setTried(false); void submit() } else setTried(true)
+  }
+
   // Startknopf: erste Lücke in fester Reihenfolge — Auftrag, dann Zielordner.
   const buttonLabel = busy ? t('aiBar.agent.working')
     : !vaultPath ? t('agentCard.btnNoVault')
@@ -661,7 +722,7 @@ export function AgentView({ tabId }: Props) {
       <div className="agent-card-head-text">
         {/* Ein Titel für beide Ansichten, der Modus steht im Umschalter; der Untertitel ist
             einzeilig, damit der Kopf beim Umschalten nicht springt (Optikprüfung F01/F02). */}
-        <h2 className="agent-view-title">{t('agentTab.title')}</h2>
+        <h2 className="agent-view-title">{t(tabMode === 'chat' ? 'agentTab.titleChat' : 'agentTab.title')}</h2>
         <p className="agent-card-tagline" title={t(tabMode === 'chat' ? 'petrolChat.tagline' : 'agentCard.tagline')}>
           {t(tabMode === 'chat' ? 'petrolChat.tagline' : 'agentCard.tagline')}
         </p>
@@ -744,13 +805,17 @@ export function AgentView({ tabId }: Props) {
                 rows={3}
                 disabled={busy}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); void submit() }
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); tryStart() }
                 }}
               />
-              {!hasTask && <span className="agent-card-flag">&#9679; {t('agentCard.taskMissing')}</span>}
             </div>
             <div className="agent-card-task-foot">
               <span className="agent-card-help">{t('agentCard.inputHelp')}</span>
+              {!hasTask && !busy && (
+                <button type="button" className="agent-card-link-btn" aria-expanded={showExamples} onClick={() => setShowExamples(v => !v)}>
+                  {t(showExamples ? 'agentCard.examplesHide' : 'agentCard.examplesShow')}
+                </button>
+              )}
               {/* Rückweg zu den Beispielen — nur solange der Text ein unverändertes Beispiel
                   ist; einen eigenen Entwurf ersetzt ein Klick nicht (Design-Runde F04). */}
               {hasTask && !busy && pickedExample?.text === instruction && (
@@ -778,39 +843,12 @@ export function AgentView({ tabId }: Props) {
             </div>
           </div>
 
-          {/* Beispiele nur im leeren Zustand: ein Klick füllt den Text, Unterlagen hängt
-              der Nutzer selbst an — ein Beispiel kennt seine Dateien nicht. */}
-          {!hasTask && !busy && (
-            <div className="agent-card-examples">
-              <span className="agent-card-eyebrow">{t('agentCard.examplesTitle')}</span>
-              <div className="agent-card-examples-grid">
-                {EXAMPLES.map(ex => (
-                  <button
-                    key={ex.text}
-                    type="button"
-                    className="agent-card-example"
-                    onClick={() => pickExample(ex)}
-                  >
-                    <span className="agent-card-example-icon" aria-hidden="true"><ExampleGlyph icon={ex.icon} /></span>
-                    <span className="agent-card-example-body">
-                      <span className="agent-card-example-title">{t(ex.title)}</span>
-                      <span className="agent-card-example-meta">
-                        {t(ex.docs)} <span aria-hidden="true">&rarr;</span> <span className="is-accent">{t(ex.result)}</span>
-                      </span>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           </div>
 
-          <div className="agent-card-side">
-          {/* Unterlagen */}
-          <div className={`agent-card-row ${firstGap === 'docs' ? 'is-missing' : docsMissing ? 'is-gap' : ''}`}>
-            <span className="agent-card-label">{t('agentCard.rowDocs')}{docsMissing && <> &#9679;</>}</span>
-            <div className="agent-card-value">
+          {/* Leiste: die zwei Pflichtangaben stehen dort, wo gestartet wird. Der Zielordner ist die
+              Ablage, nicht die Datenquelle (Codex F11) — kein automatischer Vorschlag. */}
+          <div className="agent-card-bar">
+            <div className="agent-card-bar-docs">
               <ContextAttachmentRow
                 attachments={scope.attachments}
                 onAttachDialog={() => void store().attachFromDialog(tabId)}
@@ -821,46 +859,47 @@ export function AgentView({ tabId }: Props) {
                 attachError={scope.attachError}
                 cloudSelected={false}
                 allowImages
+                label={t('agentCard.barDocs')}
+                addTitle={t('agentCard.barDocsTitle')}
+                iconOnly
               />
-              {docsMissing && <span className={firstGap === 'docs' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(docsHint)}</span>}
-              {!docsMissing && scope.attachments.length === 0 && <span className="agent-card-help">{t('agentCard.docsHelp')}</span>}
             </div>
+            <button type="button" className={`agent-card-start ${busy ? '' : 'is-ready'}`} onClick={tryStart} disabled={busy}>
+              {busy ? t('aiBar.agent.working') : t('agentCard.btnStart')}{canRun && <span className="agent-card-kbd"> {SUBMIT_KEYS}</span>}
+            </button>
           </div>
+          {tried && !canRun && !busy && <p className="agent-card-bar-error" role="alert">{buttonLabel}</p>}
 
-          {/* Ablage — kein automatischer Vorschlag: der Zielordner ist die Ablage, nicht
-              die Datenquelle (Codex F11). */}
-          <div className={`agent-card-row ${firstGap === 'target' ? 'is-missing' : hasTarget ? '' : 'is-gap'}`}>
-            <span className="agent-card-label">
-              {t('agentCard.rowTarget')}{!hasTarget && <> &#9679;</>}
-            </span>
-            <div className="agent-card-value">
-              {hasTarget ? (
-                (() => {
-                  const p = splitTargetPath(scope.targetFolder ?? '')
-                  return (
-                    <span className="agent-card-target" title={scope.targetFolder ?? ''}>
-                      <FolderGlyph size={13} />
-                      <span className="agent-card-target-name">{p.name}</span>
-                      {p.parent && <span className="agent-card-target-parent">in {p.deeper ? '… / ' : ''}{p.parent}</span>}
-                    </span>
-                  )
-                })()
-              ) : (
-                <>
-                  <span className={firstGap === 'target' ? 'agent-card-missing-title' : 'agent-card-muted'}>{t('agentCard.targetMissing')}</span>
-                  <span className="agent-card-help">{t('agentCard.targetHelp')}</span>
-                </>
-              )}
-            </div>
+          {docsMissing && !busy && <p className={tried ? 'agent-card-bar-error' : 'agent-card-bar-hint'}>{t(docsHint)}</p>}
+        </div>
+
+        {/* Unter der Karte, leise: wohin das Ergebnis geht (links) und womit der Lauf arbeitet (rechts).
+            Der Zielordner ist die Ablage, nicht die Datenquelle (Codex F11) — deshalb ausdrücklich
+            beschriftet und getrennt vom „+ Unterlagen“ in der Karte. */}
+        <div className="agent-card-under-wrap" ref={settingsWrapRef}>
+        <div className="agent-card-under">
+          <div className="agent-card-under-target">
+            <span className={`agent-card-under-label ${tried && !hasTarget ? 'is-missing' : ''}`}>{t('agentCard.underTarget')}</span>
             <div className="ai-bar-context-picker-wrap" ref={targetWrapRef}>
+              {hasTarget && (() => {
+                const p = splitTargetPath(scope.targetFolder ?? '')
+                return (
+                  <span className="agent-card-target" title={scope.targetFolder ?? ''}>
+                    <FolderGlyph size={13} />
+                    <span className="agent-card-target-name">{p.name}</span>
+                    {p.parent && <span className="agent-card-target-parent">in {p.deeper ? '… / ' : ''}{p.parent}</span>}
+                  </span>
+                )
+              })()}
               <button
                 type="button"
-                className={hasTarget ? 'agent-card-link-btn' : 'agent-card-btn'}
+                className={hasTarget ? 'agent-card-link-btn' : `agent-card-under-pick ${tried ? 'is-missing' : ''}`}
                 onClick={() => (targetPickerOpen ? closeTargetPicker() : openTargetPicker())}
                 disabled={busy}
                 aria-expanded={targetPickerOpen}
+                title={hasTarget ? undefined : t('agentCard.targetHelp')}
               >
-                {hasTarget ? t('agentCard.targetChange') : <><FolderGlyph /> {t('agentCard.targetPick')}</>}
+                {hasTarget ? t('agentCard.targetChange') : <><FolderGlyph size={13} /> {t('agentCard.targetPick')} <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 6l4 4 4-4" /></svg></>}
               </button>
               {targetPickerOpen && (
                 <div
@@ -896,67 +935,88 @@ export function AgentView({ tabId }: Props) {
               )}
             </div>
           </div>
-
-          {/* Befugnisse */}
-          <div className={`agent-card-row is-two-col ${firstGap === 'web' ? 'is-missing' : webMissing ? 'is-gap' : ''}`}>
-            <span className="agent-card-label">{t('agentCard.rowPerms')}{webMissing && <> &#9679;</>}</span>
-            <div className="agent-card-value">
-              <div className="agent-card-perms">
-                <PermToggle
-                  label={t('aiBar.web.label')}
-                  state={shownWebState}
-                  reason={lockedReason}
-                  reasonId={lockedReasonId}
-                  disabled={busy}
-                  onToggle={() => { setWebArmed(!webArmed); setShellArmed(false); setComputerArmed(false) }}
-                  onSetup={() => openPermSetup(webState, 'web-research', 'ai-webresearch')}
-                />
-                {HAS_MAC_TOOLS && (
-                  <>
-                    <PermToggle
-                      label={t('aiBar.shell.label')}
-                      state={shownShellState}
-                      reason={lockedReason}
-                      reasonId={lockedReasonId}
-                      disabled={busy}
-                      onToggle={() => { setShellArmed(v => !v); setWebArmed(false) }}
-                      onSetup={() => openPermSetup(shellState, 'agent-shell', 'ai-agentshell')}
-                    />
-                    <PermToggle
-                      label={t('aiBar.computer.label')}
-                      state={shownComputerState}
-                      reason={lockedReason}
-                      reasonId={lockedReasonId}
-                      disabled={busy}
-                      onToggle={() => { setComputerArmed(v => !v); setWebArmed(false) }}
-                      onSetup={() => openPermSetup(computerState, 'agent-computer', 'ai-agentcomputer')}
-                    />
-                  </>
-                )}
-                {mcpModule && (
-                  <McpServerPicker
-                    selected={mcpSelected}
-                    onChange={setMcpSelected}
-                    disabled={busy}
-                    en={en}
-                    onOpenSettings={() => openSettingsAt('ai', 'ai-mcp')}
-                    runningServers={running ? (run.mcpServers ?? []) : undefined}
-                  />
-                )}
-              </div>
-              {webMissing && <span className={firstGap === 'web' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(webHint)}</span>}
-              {mindmapWithWeb && <span className="agent-card-help">{t('agentCard.mindmapNoWeb')}</span>}
-              {lockedReason && <span id={lockedReasonId} className="agent-card-muted">{lockedReason}</span>}
-              {actsNow && (
-                <div className="agent-card-acts">
-                  <span className="agent-card-acts-title">{t('agentCard.actsNow')}</span>
-                  {ops.map(o => <span key={o}>{o}</span>)}
-                  <span>{t('agentCard.askAtStart')}</span>
+          <div className="agent-card-under-menus">
+            <div className="agent-card-menu">
+              <button type="button" className={`agent-card-menu-btn ${webMissing ? 'is-missing' : ''}`} aria-expanded={menu === 'perms'} onClick={() => setMenu(m => (m === 'perms' ? null : 'perms'))}>
+                <span className="agent-card-menu-btn-kind">{t('agentCard.rowPerms')}</span>
+                <span className="agent-card-menu-btn-text">{permsText}</span>
+                <MenuChevron />
+              </button>
+              <div className="agent-card is-details is-popover is-perms" hidden={menu !== 'perms'}>
+                <div className="agent-card-side">
+                {/* Befugnisse */}
+                <div className={`agent-card-row is-two-col ${firstGap === 'web' ? 'is-missing' : webMissing ? 'is-gap' : ''}`}>
+                  <span className="agent-card-label">{t('agentCard.rowPerms')}{webMissing && <> &#9679;</>}</span>
+                  <div className="agent-card-value">
+                    <div className="agent-card-perms is-grouped">
+                      <div className="agent-card-perm-group">
+                        <span className="agent-card-perm-kind">{t('agentCard.permsRead')}</span>
+                      <PermToggle
+                        label={t('aiBar.web.label')}
+                        state={shownWebState}
+                        reasonId={lockedReasonId}
+                        disabled={busy}
+                        onToggle={() => { setWebArmed(!webArmed); setShellArmed(false); setComputerArmed(false) }}
+                        onSetup={() => openPermSetup(webState, 'web-research', 'ai-webresearch')}
+                      />
+                      {mcpModule && (
+                        <McpServerPicker
+                          selected={mcpSelected}
+                          onChange={setMcpSelected}
+                          disabled={busy}
+                          en={en}
+                          onOpenSettings={() => openSettingsAt('ai', 'ai-mcp')}
+                          runningServers={running ? (run.mcpServers ?? []) : undefined}
+                        />
+                      )}
+                      </div>
+                      {HAS_MAC_TOOLS && (
+                        <div className="agent-card-perm-group is-act">
+                          <span className="agent-card-perm-kind">{t('agentCard.permsAct')}</span>
+                          <PermToggle
+                            label={t('aiBar.shell.label')}
+                            state={shownShellState}
+                            reasonId={lockedReasonId}
+                            disabled={busy}
+                            onToggle={() => { setShellArmed(v => !v); setWebArmed(false) }}
+                            onSetup={() => openPermSetup(shellState, 'agent-shell', 'ai-agentshell')}
+                          />
+                          <PermToggle
+                            label={t('aiBar.computer.label')}
+                            state={shownComputerState}
+                            reasonId={lockedReasonId}
+                            disabled={busy}
+                            onToggle={() => { setComputerArmed(v => !v); setWebArmed(false) }}
+                            onSetup={() => openPermSetup(computerState, 'agent-computer', 'ai-agentcomputer')}
+                          />
+                                          </div>
+                      )}
+                    </div>
+                    {webMissing && <span className={firstGap === 'web' ? 'agent-card-missing-title' : 'agent-card-help'}>{t(webHint)}</span>}
+                    {mindmapWithWeb && <span className="agent-card-help">{t('agentCard.mindmapNoWeb')}</span>}
+                    {lockedReason && <span id={lockedReasonId} className="agent-card-muted">{lockedReason}</span>}
+                    {actsNow && (
+                      <div className="agent-card-acts">
+                        <span className="agent-card-acts-title">{t('agentCard.actsNow')}</span>
+                        {ops.map(o => <span key={o}>{o}</span>)}
+                        <span>{t('agentCard.askAtStart')}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
 
+                </div>
+              </div>
+            </div>
+            <button type="button" className="agent-card-menu-btn" aria-expanded={modelOpen} disabled={modelFixed} onClick={() => setMenu(m => (m === 'model' ? null : 'model'))}>
+              <span className={`agent-card-menu-btn-text ${summaryOut ? 'is-out' : ''}`}>{modelText}</span>
+              {!modelFixed && <MenuChevron />}
+            </button>
+          </div>
+        </div>
+
+        <div className={`agent-card is-details ${modelFixed ? '' : 'is-popover'}`} hidden={!modelOpen}>
+          <div className="agent-card-side">
           {/* Modell + Datenwege nach Weg, nicht nach Hersteller. Vor dem Lauf zeigt die Karte die
               Vorabprüfung, während des Laufs ausschließlich den beim Start gespeicherten Befund. */}
           <div className={`agent-card-row is-two-col ${modelMissing && !running ? 'is-missing' : ''}`}>
@@ -1107,6 +1167,11 @@ export function AgentView({ tabId }: Props) {
             </div>
           </div>
 
+          {/* Kontextfenster: nur für lokale Ollama-Modelle, dort setzt die App es selbst. */}
+          {!running && summaryRoute?.kind === 'local' && !activeCloudRoute && ollama.backend !== 'lm-studio' && (
+            <ContextWindowRow model={effectiveModel} disabled={busy} />
+          )}
+
           {imageViewRelevant && shownImageView !== null && (
             <div className="agent-card-row is-two-col">
               <span className="agent-card-label">{t('agentCard.rowImageView')}</span>
@@ -1159,6 +1224,8 @@ export function AgentView({ tabId }: Props) {
           </div>
         </div>
 
+        </div>
+
         <div className="agent-card-footer">
           <div className="agent-card-footer-text">
             <span className="agent-card-promise">
@@ -1170,12 +1237,34 @@ export function AgentView({ tabId }: Props) {
             {actsNow && <span className="agent-card-acts-title">{t('agentCard.footerActsNow')}</span>}
             {!cloudSelected && <span>{t('agentCard.duration')}</span>}
           </div>
-          <div className="agent-card-actions">
-            <button type="button" className={`agent-card-start ${canRun ? 'is-ready' : ''}`} onClick={() => void submit()} disabled={!canRun}>
-              {gapShownInCard ? t('agentCard.btnStart') : buttonLabel}{canRun && <span className="agent-card-kbd"> {SUBMIT_KEYS}</span>}
-            </button>
-          </div>
         </div>
+
+        {/* Beispiele nur im leeren Zustand: ein Klick füllt den Text, Unterlagen hängt
+            der Nutzer selbst an — ein Beispiel kennt seine Dateien nicht. */}
+        {!hasTask && !busy && showExamples && (
+          <div className="agent-card-examples">
+            <span className="agent-card-eyebrow">{t('agentCard.examplesTitle')}</span>
+            <div className="agent-card-examples-grid">
+              {EXAMPLES.map(ex => (
+                <button
+                  key={ex.text}
+                  type="button"
+                  className="agent-card-example"
+                  onClick={() => pickExample(ex)}
+                >
+                  <span className="agent-card-example-icon" aria-hidden="true"><ExampleGlyph icon={ex.icon} /></span>
+                  <span className="agent-card-example-body">
+                    <span className="agent-card-example-title">{t(ex.title)}</span>
+                    <span className="agent-card-example-meta">
+                      {t(ex.docs)} <span aria-hidden="true">&rarr;</span> <span className="is-accent">{t(ex.result)}</span>
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         <AgentRunPanel
           run={run}

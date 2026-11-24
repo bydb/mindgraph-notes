@@ -25,6 +25,11 @@ interface Props {
   extra?: ReactNode
   /** Nur im Agent-Auftrag: Bilder anbieten (Texterkennung). */
   allowImages?: boolean
+  /** Beschriftung des Knopfs statt „Kontext“ (Auftragskarte: „Unterlagen“). */
+  label?: string
+  addTitle?: string
+  /** Nur das Plus zeigen (Auftragskarte, wie ein Eingabefeld mit Anhang-Knopf); die Beschriftung bleibt als aria-label. */
+  iconOnly?: boolean
 }
 
 export const FolderGlyph = ({ size = 11 }: { size?: number }) => (
@@ -115,7 +120,7 @@ function ContextFormatsInfo({ images = false }: { images?: boolean }) {
   )
 }
 
-export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected, extra, allowImages }: Props) {
+export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFolderDialog, onAttachVaultFile, onDetach, disabled, attachError, cloudSelected, extra, allowImages, label, addTitle, iconOnly }: Props) {
   const { t } = useTranslation()
   const vaultFiles = useContextVaultFiles({ images: allowImages })
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -142,7 +147,11 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
     setPickerQuery('')
   }
   const openPicker = () => {
-    setLayout(measurePlacement(wrapRef.current))
+    // Einheitlich nach unten, solange dort Platz ist (Auftragskarte: alle Menüs klappen nach unten).
+    const measured = measurePlacement(wrapRef.current)
+    const rect = wrapRef.current?.getBoundingClientRect()
+    const below = rect ? window.innerHeight - rect.bottom - 24 : 0
+    setLayout(below >= 260 ? { placement: 'below', maxHeight: Math.min(420, below) } : measured)
     setPickerOpen(true)
   }
 
@@ -152,13 +161,14 @@ export function ContextAttachmentRow({ attachments, onAttachDialog, onAttachFold
         <div className="ai-bar-context-picker-wrap" ref={wrapRef}>
           <button
             type="button"
-            className="ai-bar-context-btn"
+            className={`ai-bar-context-btn ${iconOnly ? 'is-icon' : ''}`}
+            aria-label={iconOnly ? (addTitle ?? label ?? t('aiBar.context.add')) : undefined}
             onClick={() => (pickerOpen ? closePicker() : openPicker())}
             disabled={disabled}
-            title={t('aiBar.context.add')}
+            title={addTitle ?? t('aiBar.context.add')}
             aria-expanded={pickerOpen}
           >
-            <PlusGlyph /> {t('aiBar.context.label')}
+            <PlusGlyph />{iconOnly ? null : <> {label ?? t('aiBar.context.label')}</>}
           </button>
           {pickerOpen && (
             <div
