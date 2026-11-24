@@ -24193,3 +24193,25 @@ body.presentation-mode *::after {
   .agent-card-side .agent-card-row,
   .agent-card-side .agent-card-row.is-two-col { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---- Chat im Stil der Auftragskarte (11/2026) ----
+   Plus statt Büroklammer im Eingabefeld; Modell und Rechenort leise unter dem Feld rechts, links die
+   Zusage und die Gesprächs-Links. Der Kopf steht in derselben Spalte wie das Eingabefeld. Leer rückt
+   der Chat wie die Auftragskarte zur Mitte, auf dieselbe Höhe und Breite — der Umschalter springt
+   beim Wechsel nicht. Die Überschrift entfällt dort: die Frage steht schon als Platzhalter im Feld. */
+.petrol-chat-compose { border-radius: 14px; padding: 14px 14px 12px 20px; box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 5%, transparent); }
+.petrol-chat-input textarea { font-size: 16px; line-height: 1.5; }
+.petrol-chat-foot { margin-top: -2px; align-items: center; }
+.petrol-chat-foot-left { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-width: 0; }
+.petrol-chat-foot .petrol-chat-model { margin-left: auto; gap: 6px; font-size: 12.5px; }
+.petrol-chat-foot .petrol-chat-model .model-picker { font-size: 12.5px; }
+.petrol-chat-foot .petrol-chat-model .model-picker > button { border-color: transparent; background: none; padding: 4px 8px; }
+.petrol-chat-foot .petrol-chat-model .model-picker > button:hover:not(:disabled) { background: var(--bg-secondary); }
+.petrol-chat-foot .petrol-chat-model .agent-card-route { font-size: 11.5px; }
+@container (max-width: 640px) { .petrol-chat-foot .petrol-chat-model { order: 0; flex-basis: auto; margin-left: 0; } }
+.agent-view-inner.is-chat > .agent-card-head { max-width: max(800px, min(82%, 1240px)); }
+.agent-view-inner.is-chat:has(> .petrol-chat.is-empty) { padding-top: clamp(32px, 22vh, 260px); }
+.agent-view-inner.is-chat:has(> .petrol-chat.is-empty) > .agent-card-head { max-width: 860px; }
+.petrol-chat.is-empty { --petrol-col: 860px; justify-content: flex-start; flex: 0 0 auto; }
+.petrol-chat.is-empty > .petrol-chat-hero { display: none; }
+.petrol-chat.is-empty > .petrol-chat-examples { order: 5; justify-content: flex-start; padding: 2px 2px 0; }

@@ -271,6 +271,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
   const historyHasImages = messages.some(m => m.role === 'user' && !!m.images?.length)
   const [imageError, setImageError] = useState<string | null>(null)
   const [imageDragOver, setImageDragOver] = useState(false)
+  // Beispiele nur auf Wunsch (wie in der Auftragskarte): offen wirkte der leere Chat überfrachtet.
+  const [showExamples, setShowExamples] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const addImages = async (files: File[]) => {
     const pics = files.filter(f => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name))
@@ -386,6 +388,8 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
     t('petrolChat.webPathPages'),
     webModelPath
   ].filter(Boolean)
+  // Für die kurze Zeile: nur, was über den Normalfall hinausgeht.
+  const webPathExtra = webPathParts.filter(p => p !== t('petrolChat.webPathPages') && p !== t('petrolChat.webPathLocal'))
   // Senden mit Globus wartet auf die Wegprüfung; scheitert sie, ist Senden erlaubt.
   const webWaitsForRoute = webOn && !routeSettled
   const followUpMissing = followUpActive && !followUpMsg
@@ -939,7 +943,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
           <p className="petrol-chat-hero-title">{t('petrolChat.emptyTitle')}</p>
         </div>
       )}
-      {empty && (
+      {empty && showExamples && (
         <div className="petrol-chat-examples" role="group" aria-label={t('agentCard.examplesTitle')}>
           {CHAT_EXAMPLES.map(ex => (
             <button
@@ -1041,7 +1045,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
               disabled={busyElsewhere || draftImages.length >= CHAT_IMAGE_MAX_PER_MESSAGE}
               onClick={() => fileRef.current?.click()}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.5l-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l9.2-9.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6l8.5-8.5" /></svg>
+              <svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" fill="none" /></svg>
             </button>
           )}
           {webModule && !busy && (
@@ -1074,23 +1078,6 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             </button>
           )}
           <span className="petrol-chat-tools-gap" />
-          {/* Modell und Weg direkt an der Eingabe (F01/F03): Empfänger ist vor dem Senden sichtbar. */}
-          <span className="petrol-chat-model">
-            <ModelPicker
-              value={pickerValue}
-              models={[...cloudRoutes.map(r => ({ name: r.sentinel })), ...models]}
-              onChange={name => {
-                const provider = cloudProviderForSentinel(name)
-                if (provider) chat().setModel(tabId, { cloudProvider: provider })
-                else chat().setModel(tabId, { cloudProvider: null, localModel: name })
-              }}
-              getLabel={name => cloudRoutes.find(r => r.sentinel === name)?.label ?? name}
-              disabled={busy}
-              ariaLabel={t('petrolChat.modelLabel')}
-              maxWidth={260}
-            />
-            {hasModel && <span className={`agent-card-route ${routeClass}`}>{routeText}</span>}
-          </span>
           {busy ? (
             <button type="button" className="petrol-chat-send is-stop" onClick={() => chat().stop(tabId)} aria-label={t('petrolChat.stop')} title={t('petrolChat.stop')}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
@@ -1107,7 +1094,12 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
             sichtbare Text, nichts wird still gekürzt). */}
         {webDeep && !busy && (
           <div className="petrol-web-line">
-            <span>{[t(webLoopOn ? 'petrolChat.webLoopConsent' : 'petrolChat.webDeepConsent', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathParts].join(' · ')}</span>
+            {/* Ein Satz mit Empfänger der Suchanfragen; die vollständige Fassung (Grenzen, Seitenabruf, Modellweg)
+                steht als Tooltip. Was den Rechner zusätzlich verlässt (eigene Suchinstanz, Themen, Cloud-Modell),
+                bleibt sichtbar — nur „Seiten von diesem Rechner“ und „Modell auf diesem Rechner“ entfallen (F11). */}
+            <span title={[t(webLoopOn ? 'petrolChat.webLoopConsent' : 'petrolChat.webDeepConsent', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathParts].join(' · ')}>
+              {[t(webLoopOn ? 'petrolChat.webLoopConsentShort' : 'petrolChat.webDeepConsentShort', { route: activeCloudRoute ? activeCloudRoute.label : model, provider: webProvider }), ...webPathExtra].join(' · ')}
+            </span>
             {!webLoopOn && <button type="button" className="agent-card-link-btn" aria-pressed={true} onClick={() => chat().setWeb(tabId, { webDeep: false })}>{t('petrolChat.webDeepOff')}</button>}
             {topicHint && (
               <span className="petrol-web-line-warn">
@@ -1209,6 +1201,7 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
 
       {/* Fußzeile: Tastenhilfe, Zusage „liest keine Notizen“ und „Neues Gespräch“ (F15 aus chat-optik.md). */}
       <div className="petrol-chat-foot">
+        <span className="petrol-chat-foot-left">
         {/* Schmal blendet CSS die Tastenhilfe aus (sonst bricht die Zeile um); sie bleibt als Tooltip. */}
         <span title={t('petrolChat.sendKeys')}>
           {(!webOn || busy || webQueryOpen || webWaitsForRoute) && <span className="petrol-chat-foot-keys">{webWaitsForRoute ? t('petrolChat.webSendChecking') : t('petrolChat.sendKeys')} · </span>}
@@ -1217,9 +1210,32 @@ export function PetrolChat({ tabId, onSwitchToTask }: Props) {
         <span className="petrol-chat-foot-actions">
           {notSaved && <span className="petrol-chat-notsaved" title={t(storageState === 'failed' ? 'petrolChat.historySaveFailed' : storageState === 'memory' ? 'petrolChat.historyNoVault' : storageState === 'basic-text' ? 'petrolChat.historyBasicText' : 'petrolChat.historyNoKey')}>{t('petrolChat.notSaved')}</span>}
           <button type="button" className="agent-card-link-btn" onClick={showHistory}>{t('petrolChat.historyOpen')}</button>
+          {empty && (
+            <button type="button" className="agent-card-link-btn" aria-expanded={showExamples} onClick={() => setShowExamples(v => !v)}>
+              {t(showExamples ? 'agentCard.examplesHide' : 'agentCard.examplesShow')}
+            </button>
+          )}
           {!empty && (
             <button type="button" className="agent-card-link-btn" onClick={() => chat().clear(tabId)}>{t('petrolChat.newChat')}</button>
           )}
+        </span>
+        </span>
+        {/* Modell und Weg direkt an der Eingabe (F01/F03): Empfänger ist vor dem Senden sichtbar. */}
+        <span className="petrol-chat-model">
+          <ModelPicker
+            value={pickerValue}
+            models={[...cloudRoutes.map(r => ({ name: r.sentinel })), ...models]}
+            onChange={name => {
+              const provider = cloudProviderForSentinel(name)
+              if (provider) chat().setModel(tabId, { cloudProvider: provider })
+              else chat().setModel(tabId, { cloudProvider: null, localModel: name })
+            }}
+            getLabel={name => cloudRoutes.find(r => r.sentinel === name)?.label ?? name}
+            disabled={busy}
+            ariaLabel={t('petrolChat.modelLabel')}
+            maxWidth={260}
+          />
+          {hasModel && <span className={`agent-card-route ${routeClass}`}>{routeText}</span>}
         </span>
       </div>
     </div>
