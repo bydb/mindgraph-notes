@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.9] - 2026-11-25
+
+**Der Agent findet jetzt alle Notizen zu einem Thema in einem Ordner und legt sie als Sammelnotiz mit Verweisen ab.** Hängen Sie einen Ordner an und schreiben Sie zum Beispiel „Suche alle Notizen zu künstlicher Intelligenz“. Die Sammelnotiz nennt je Notiz die Fundstelle und führt Notizen, die das Thema nur sinngemäß behandeln, in einem eigenen Abschnitt. Im Kopf des Auftrags zeigt das Zeichen der App außerdem, was der Agent gerade tut.
+
+### Hintergrund
+
+- **Auslöser:** Ein Auftrag dieser Art lief bisher über viele einzelne Suchen, dauerte eine halbe Stunde und endete ohne Ergebnis. Jetzt durchsucht der Agent die angehängten Ordner in einem Schritt und arbeitet danach nur noch mit der Trefferliste.
+- **Sammelnotiz:** Die App schreibt die Notiz selbst aus der Trefferliste: nach Ordnern gruppiert, mit dem sprechenden Namen jeder Notiz und der Stelle, an der das Thema vorkommt. Jede Notiz wird vor dem Schreiben noch einmal geprüft. An Ihren Notizen ändert sich nichts.
+- **Sinngemäße Treffer:** Ist der Vault-Index eingerichtet, ergänzt der Agent Notizen, die kein Suchwort enthalten, aber zum Thema passen, höchstens 20. Sie stehen getrennt und mit einem Textauszug, damit Sie sie selbst beurteilen können. Ohne Index bleibt es bei den Worttreffern, und die Sammelnotiz sagt das.
+- **Statuszeichen:** Das Zeichen hat vier Knoten für Agent, Auftrag, Unterlagen und Ergebnis. Fehlt vor dem Start eine Angabe, ist ihr Knoten blass. Im Lauf wandert ein Punkt beim Lesen von den Unterlagen zur Mitte und beim Schreiben von der Mitte zum Ergebnis; liegt ein Ergebnis bereit, trägt dessen Knoten einen Ring. Ist „Bewegung reduzieren“ eingeschaltet, bewegt sich nichts.
+- **Grenzen:** Durchsucht werden nur angehängte Ordner im Vault, nicht der ganze Vault und keine Ordner außerhalb. Verschieben kann der Agent Notizen weiterhin nicht. Die Suche ist nicht vollständig: In einem Versuch mit einem lokalen Modell fand sie 12 von 14 passenden Notizen in gut sieben Minuten, ohne falsche Treffer. Bei Aufträgen mit Webrecherche steht sie nicht zur Verfügung.
+
 ## [1.4.8] - 2026-11-24
 
 **Agent und Chat haben eine neue, ruhigere Oberfläche, und der Agent kann bei lokalen Modellen mit einem größeren Kontextfenster arbeiten.** In der Auftragskarte stehen nur noch Eingabe, ein „+“ für Unterlagen und der Startknopf; Zielordner, Befugnisse und Modell liegen in einer leisen Zeile darunter. Das Kontextfenster stellen Sie im Modell-Menü oder unter Einstellungen → KI ein. Dateien mit Umlaut im Namen kann der Agent jetzt lesen.
