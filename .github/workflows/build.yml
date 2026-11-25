@@ -42,10 +42,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -149,7 +149,7 @@ jobs:
       # um doppelte Uploads im release-Step (GitHub API 404 bei Duplikaten) zu vermeiden
       - name: Upload macOS artifacts (arm64 incl. yml)
         if: matrix.arch == 'arm64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-${{ matrix.arch }}
           path: |
@@ -161,7 +161,7 @@ jobs:
 
       - name: Upload macOS artifacts (x64 without yml)
         if: matrix.arch == 'x64'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-${{ matrix.arch }}
           path: |
@@ -176,10 +176,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -203,7 +203,7 @@ jobs:
           npx electron-builder --linux snap --x64 --publish never
 
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux
           path: |
@@ -244,10 +244,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
@@ -310,7 +310,7 @@ jobs:
 
       - name: SimplySign-Installer cachen (274 MB)
         if: steps.signing.outputs.enabled == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: SimplySignDesktop.msi
           key: simplysign-msi-${{ env.SIMPLYSIGN_URL }}
@@ -337,7 +337,7 @@ jobs:
       # Aufbewahrung; zu sehen sind die Login-Adresse und ein abgelaufener Einmalcode, kein Geheimnis.
       - name: Anmelde-Screenshots hochladen (Diagnose)
         if: always() && inputs.signing_diagnostics
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: simplysign-diagnostics
           path: simplysign-diag-*.png
@@ -392,7 +392,7 @@ jobs:
           Write-Host "Alle Signaturen OK"
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows
           path: |
@@ -409,7 +409,7 @@ jobs:
 
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts
 
@@ -417,7 +417,7 @@ jobs:
         run: find artifacts -type f -name "*" | head -20
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: |
             artifacts/**/*.dmg
