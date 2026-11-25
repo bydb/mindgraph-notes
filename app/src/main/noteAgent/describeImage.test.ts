@@ -11,8 +11,7 @@ import * as path from 'path'
 import {
   AGENT_IMAGE_VIEW_MAX_CHARS, AGENT_IMAGE_VIEW_MAX_QUESTION_CHARS, callLocalImageView, createAgentImageViewState, describeImageForAgent,
   frameImageView, markImageViewCut, probeImageView, safeImageLabel,
-  type DescribeImageDeps, type ImageViewCall
-} from './describeImage'
+  type DescribeImageDeps, type ImageViewCall, AGENT_IMAGE_VIEW_RETRY_TOKENS } from './describeImage'
 import { clearContextAttachments, readImageForAgent, registerContextAttachment, registerContextFolder } from './contextFiles'
 import { LocalModelError } from '../rag/localModel'
 import type { AgentRoute } from '../../shared/agentRoute'
@@ -155,6 +154,18 @@ describe('describeImageForAgent', () => {
     const long = await describeImageForAgent(Buffer.from('b'), 'b.png', 'Was?', deps({ call: async () => ({ text: 'x'.repeat(AGENT_IMAGE_VIEW_MAX_CHARS + 500), cut: false }) }))
     expect(long.split('\n\n')[0]).toContain('UNVOLLSTÄNDIG')
     expect(long.length).toBeLessThan(AGENT_IMAGE_VIEW_MAX_CHARS + 600)
+  })
+
+  it('Grenze erreicht ohne Text: genau ein zweiter Versuch mit mehr Spielraum', async () => {
+    const seen: Array<number | undefined> = []
+    const d = deps({ call: async (_j, _p, o) => { seen.push(o.maxTokens); return seen.length === 1 ? { text: '', cut: true } : { text: 'drei Themen', cut: false } } })
+    expect(await describeImageForAgent(Buffer.from('a'), 'b.png', 'Was?', d)).toContain('drei Themen')
+    expect(seen).toEqual([undefined, AGENT_IMAGE_VIEW_RETRY_TOKENS])
+    expect(d.state.used).toBe(1)
+
+    let calls = 0
+    await expect(describeImageForAgent(Buffer.from('c'), 'b.png', 'Was?', deps({ call: async () => { calls++; return { text: '', cut: true } } }))).rejects.toThrow(/keine Antwort/)
+    expect(calls).toBe(2)
   })
 
   it('leere Antwort und fehlende Frage sind Fehler', async () => {

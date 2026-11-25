@@ -38,6 +38,12 @@ const VIEW_TIMEOUT_MS = 120_000
 /** Obergrenze der Antwort; im Regelfall ist sie viel kürzer (gezielte Frage, knappe Antwort). */
 export const AGENT_IMAGE_VIEW_MAX_CHARS = 2_500
 const VIEW_OUTPUT_TOKENS = 700
+/**
+ * Zweiter Versuch, wenn der erste an der Ausgabegrenze endet und KEINEN Text liefert: Manche
+ * Modelle denken trotz `think: false` weiter und verbrauchen die 700 Token, bevor die Antwort
+ * beginnt (real, 25.11.2026, inkling-2-mini: 700 → leer, 2 058 Token → richtige Antwort).
+ */
+export const AGENT_IMAGE_VIEW_RETRY_TOKENS = 3_000
 export const AGENT_IMAGE_VIEW_MAX_QUESTION_CHARS = 600
 const MAX_LABEL_CHARS = 160
 
@@ -124,7 +130,7 @@ export interface ImageViewCallResult {
   cut: boolean
 }
 
-export type ImageViewCall = (jpegBase64: string, prompt: string, opts: { model: string; numCtx?: number; signal?: AbortSignal; timeoutMs: number; runId?: string }) => Promise<ImageViewCallResult>
+export type ImageViewCall = (jpegBase64: string, prompt: string, opts: { model: string; numCtx?: number; signal?: AbortSignal; timeoutMs: number; runId?: string; maxTokens?: number }) => Promise<ImageViewCallResult>
 
 /** Der eine Aufruf an das lokale Modell. Nicht gestreamt: die Antwort ist kurz. */
 export const callLocalImageView: ImageViewCall = async (jpegBase64, prompt, opts) => {
@@ -144,7 +150,7 @@ export const callLocalImageView: ImageViewCall = async (jpegBase64, prompt, opts
         messages: [{ role: 'user', content: prompt, images: [jpegBase64] }],
         stream: false,
         think: false,
-        options: { ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}), num_predict: VIEW_OUTPUT_TOKENS, temperature: 0.1 }
+        options: { ...(opts.numCtx ? { num_ctx: opts.numCtx } : {}), num_predict: opts.maxTokens ?? VIEW_OUTPUT_TOKENS, temperature: 0.1 }
       }),
       signal: controller.signal
     })
@@ -222,9 +228,15 @@ export async function describeImageForAgent(buf: Buffer, label: string, question
   const startedAt = Date.now()
   let r: ImageViewCallResult
   try {
-    r = await (deps.call ?? callLocalImageView)(jpeg, IMAGE_VIEW_PROMPT(question), {
-      model, numCtx: deps.numCtx, signal: deps.signal, timeoutMs: Math.min(VIEW_TIMEOUT_MS, remaining), runId: deps.runId
-    })
+    const call = deps.call ?? callLocalImageView
+    const base = { model, numCtx: deps.numCtx, signal: deps.signal, runId: deps.runId }
+    r = await call(jpeg, IMAGE_VIEW_PROMPT(question), { ...base, timeoutMs: Math.min(VIEW_TIMEOUT_MS, remaining) })
+    // Grenze erreicht, aber kein Text: einmal mit mehr Spielraum, im selben Zeitbudget.
+    const left = remaining - (Date.now() - startedAt)
+    if (!r.text && r.cut && left > 5_000) {
+      deps.onStep?.(`Bild ansehen: keine Antwort innerhalb der Ausgabegrenze — zweiter Versuch mit mehr Spielraum · ${safeImageLabel(label)}`)
+      r = await call(jpeg, IMAGE_VIEW_PROMPT(question), { ...base, timeoutMs: Math.min(VIEW_TIMEOUT_MS, left), maxTokens: AGENT_IMAGE_VIEW_RETRY_TOKENS })
+    }
   } finally {
     // Auch ein gescheiterter oder abgebrochener Aufruf hat Zeit gekostet.
     state.spentMs += Date.now() - startedAt
