@@ -19,11 +19,16 @@ const NOTE_HINT_RESERVE = 80
 const NOTE_MIN_PIECE_TOKENS = 400
 import type { ToolContext as TelegramToolContext } from '../telegram/agent/tools/registry'
 import {
-  getContextAttachmentInfos, readAttachmentRaw, extractFileContentRaw,
+  getContextAttachmentInfos, readAttachmentRaw, extractFileContentRaw, inVaultFolderRoots,
   listFolderManifest, readFolderFile, collectFolderTable,
   resolveFolderName, countFolderTables, describeIncomplete, readImageForAgent, contextKindFromFilename, type FolderManifest
 } from './contextFiles'
-import { registerResult, registerDataset, getDataset, recordFolderFileRead, type AgentRun } from './runRegistry'
+import { registerResult, registerDataset, getDataset, recordFolderFileRead, registerNoteSet, getNoteSet, type AgentRun } from './runRegistry'
+import { scanNotes, toNoteSet, recheckEntries } from './findNotes'
+import { todayIsoDate } from '../../shared/aiProvenance'
+/** Ab dieser Länge zeigt die Ergebnisvorschau nur den Anfang (noteAgent/ipc.ts, MAX_PREVIEW_CHARS). */
+const NOTE_LIST_PREVIEW_CHARS = 200_000
+import { normalizeTerms, parseNumbers, refineEntries, findTerm, formatNoteSet, buildNoteList, folderOf } from '../../shared/noteSet'
 import { formatCollectReport, type RowFilter, type RowFilterOp, type CollectedTable } from '../../shared/tableCollect'
 import { queryDataset, markdownTable, fillDatasetPlaceholders, DatasetQueryError, WHERE_OPS, AGG_OPS, type DatasetQuery } from '../../shared/datasetQuery'
 import { wrapForeignResult } from '../../shared/mcp'
@@ -1147,6 +1152,126 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
         const msg = err instanceof Error ? err.message : String(err)
         return { ok: false, content: `Fehler bei der Suche im Vault-Index: ${msg}. Nutze stattdessen note_search mit Stichworten.`, display: `vault_search: Fehler` }
       }
+    }
+  })
+
+  // Notizmengen (Stufe 1, docs/codex-collab/agent-notizen-einsortieren.md): EIN Aufruf durchsucht
+  // die angehängten Vault-Ordner und legt die Treffer als Menge am Lauf ab — statt vieler
+  // Suchaufrufe mit Auszügen im Kontext (real: 15 Suchen, 31 Minuten, kein Ergebnis).
+  registry.register({
+    name: 'find_notes',
+    description:
+      'Findet ALLE Notizen in den angehängten Vault-Ordnern (samt Unterordnern), die mindestens eines der Suchwörter enthalten — in Dateiname, Titel, Überschrift oder Text. Die App durchsucht selbst und legt eine NOTIZMENGE an; du bekommst je Notiz eine Zeile mit Nummer (n1, n2 …), Titel, Ordner und Fundstelle. Das ist der Weg für „finde/sammle/liste alle Notizen zu X“ — nicht note_search in Schleife. Sucht WÖRTER, keine Bedeutung: gib Synonyme, englische Begriffe und Produktnamen als weitere terms mit. Verfeinern: from_set + drop (Nummern von Fehltreffern) und/oder keep_only (Wörter) ergibt eine neue Menge mit denselben Nummern. Danach write_note_list.',
+    parameters: {
+      type: 'object',
+      properties: {
+        terms: { type: 'array', items: { type: 'string' }, description: 'Suchwörter oder Wortgruppen; eine Notiz zählt, wenn EINES vorkommt. Kurze Wörter wie "KI" treffen nur als ganzes Wort.' },
+        from_set: { type: 'string', description: 'Kennung einer vorhandenen Notizmenge, die verfeinert werden soll (statt neu zu suchen)' },
+        drop: { type: 'array', items: { type: 'string' }, description: 'Nur mit from_set: Nummern, die aus der Menge fallen, z. B. ["n3","n17"]' },
+        keep_only: { type: 'array', items: { type: 'string' }, description: 'Nur mit from_set: nur Notizen behalten, deren Titel oder Fundstelle eines dieser Wörter enthält' }
+      }
+    },
+    isWrite: false,
+    run: async (args, ctx) => {
+      const fromId = requireString(args, 'from_set')
+      if (fromId) {
+        const base = getNoteSet(ctx.run, fromId)
+        if (!base) return err(`Notizmenge "${fromId}" gibt es in diesem Lauf nicht. Vorhanden: ${[...(ctx.run.noteSets?.keys() ?? [])].join(', ') || 'keine'}.`)
+        const { numbers, bad } = parseNumbers(args.drop)
+        const keep = normalizeTerms(args.keep_only)
+        if (numbers.length === 0 && keep.length === 0) return err('Mit from_set brauchst du drop (Nummern) und/oder keep_only (Wörter).')
+        const { kept, unknown } = refineEntries(base.entries, numbers, keep.length ? e => keep.some(k => findTerm(`${e.title}\n${e.hit}`, k) >= 0) : undefined)
+        const set = registerNoteSet(ctx.run, id => ({ ...base, id, entries: kept, related: undefined }))
+        const notes = [
+          unknown.length ? `Nummern, die es in ${base.id} nicht gibt: ${unknown.map(n => `n${n}`).join(', ')}.` : '',
+          bad.length ? `Nicht als Nummer lesbar: ${bad.join(', ')}.` : ''
+        ].filter(Boolean).join(' ')
+        return { ok: true, content: `${formatNoteSet(set)}${notes ? `\n\n${notes}` : ''}`, display: `find_notes: ${set.id} aus ${base.id} — ${kept.length} von ${base.entries.length} Notizen` }
+      }
+      const terms = normalizeTerms(args.terms)
+      if (terms.length === 0) return err('Parameter "terms" fehlt: gib mindestens ein Suchwort an (jedes mindestens 2 Zeichen).')
+      let roots
+      try {
+        roots = await inVaultFolderRoots(ctx.senderId, ctx.run.attachmentIds)
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e))
+      }
+      if (roots.roots.length === 0) {
+        return err(roots.external > 0
+          ? 'find_notes durchsucht nur angehängte Ordner, die im Vault liegen. Der angehängte Ordner liegt außerhalb — nutze dafür list_context_folder und read_context_file.'
+          : 'find_notes braucht einen angehängten Vault-Ordner. Der Nutzer muss den Ordner anhängen, in dem gesucht werden soll.')
+      }
+      const scan = await scanNotes(roots.roots, terms, { signal: ctx.run.abort.signal })
+      if (ctx.run.abort.signal.aborted) return { ok: false, content: 'Abgebrochen.', display: 'find_notes: abgebrochen' }
+      const set = registerNoteSet(ctx.run, id => toNoteSet(id, terms, roots.roots.map(r => r.name), scan))
+      for (const r of roots.roots) ctx.run.sources.add(`Notizsuche: ${r.name}`)
+      const extra = roots.external > 0 ? `\n\n${roots.external} angehängte ${roots.external === 1 ? 'Ordner liegt' : 'Ordner liegen'} außerhalb des Vaults und wurden nicht durchsucht.` : ''
+      return {
+        ok: true,
+        content: `${formatNoteSet(set)}${extra}`,
+        display: `find_notes: ${terms.map(t => `„${t}“`).join(', ')} — ${set.entries.length} von ${set.scanned} Notizen${set.complete ? '' : ' (unvollständig)'}`
+      }
+    }
+  })
+
+  registry.register({
+    name: 'write_note_list',
+    description:
+      'Schreibt aus einer Notizmenge (find_notes) eine SAMMELNOTIZ: je Notiz eine Zeile mit Verweis und Fundstelle, nach Ordnern gruppiert. Die App baut die Liste selbst — du tippst keine Notiznamen oder Pfade ab. Parameter: set (Kennung der Menge), file_name, title, optional intro (ein kurzer Absatz), optional drop (Nummern, die fehlen sollen). Zählt als die Markdown-Datei des Laufs. Verschoben wird dabei nichts.',
+    parameters: {
+      type: 'object',
+      properties: {
+        set: { type: 'string', description: 'Kennung der Notizmenge, z. B. "m2"' },
+        file_name: { type: 'string' },
+        title: { type: 'string', description: 'Überschrift der Sammelnotiz' },
+        intro: { type: 'string', description: 'Optional: ein kurzer Absatz unter der Überschrift' },
+        drop: { type: 'array', items: { type: 'string' }, description: 'Optional: Nummern, die nicht in die Liste sollen' }
+      },
+      required: ['set', 'file_name', 'title']
+    },
+    isWrite: true,
+    run: async (args, ctx) => {
+      const setId = requireString(args, 'set')
+      if (!setId) return err('Parameter "set" fehlt')
+      const set = getNoteSet(ctx.run, setId)
+      if (!set) return err(`Notizmenge "${setId}" gibt es in diesem Lauf nicht. Vorhanden: ${[...(ctx.run.noteSets?.keys() ?? [])].join(', ') || 'keine — rufe zuerst find_notes auf'}.`)
+      const rawName = requireString(args, 'file_name')
+      const title = requireString(args, 'title')
+      if (!rawName || !title) return err('Parameter "file_name" und "title" sind nötig')
+      // Ein Markdown-Ergebnis je Lauf (Codex F38) — die Sammelnotiz ist dieses Ergebnis.
+      if ([...ctx.run.results.values()].some(r => r.kind === 'md')) {
+        return err('Dieser Lauf hat schon eine Markdown-Datei erzeugt. Jedes Format gibt es nur einmal je Lauf.')
+      }
+      const { numbers, bad } = parseNumbers(args.drop)
+      const { kept, unknown } = refineEntries(set.entries, numbers)
+      if (kept.length === 0) return err('Die Menge ist leer — es gibt nichts aufzulisten.')
+      let vaultReal: string
+      try {
+        vaultReal = await fs.realpath(ctx.run.vaultPath)
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e))
+      }
+      const { fresh, stale } = await recheckEntries(vaultReal, kept, set.terms)
+      if (fresh.length === 0) return err('Keine der Notizen passt mehr zu den Suchwörtern oder ist noch vorhanden. Rufe find_notes erneut auf.')
+      const intro = typeof args.intro === 'string' ? args.intro.slice(0, 1200) : undefined
+      const built = buildNoteList({ title, intro, set, entries: fresh, stale, date: todayIsoDate() })
+      const fileName = sanitizeOutputFileName(rawName, '.md')
+      const folders = new Set(fresh.map(e => folderOf(e.relPath))).size
+      const summary = [
+        `Sammelnotiz, ${fresh.length} Notizen aus ${folders} ${folders === 1 ? 'Ordner' : 'Ordnern'}`,
+        built.plain ? `${built.plain} ohne Verweis` : '',
+        stale.length ? `${stale.length} seit der Suche geändert` : '',
+        set.complete ? '' : 'Suche unvollständig',
+        built.markdown.length > NOTE_LIST_PREVIEW_CHARS ? 'Vorschau zeigt nur den Anfang' : ''
+      ].filter(Boolean).join(' · ')
+      const res = await registerStagedResult(ctx, fileName, 'md', built.markdown, summary)
+      const notes = [
+        unknown.length ? `Nummern, die es in ${set.id} nicht gibt: ${unknown.map(n => `n${n}`).join(', ')}.` : '',
+        bad.length ? `Nicht als Nummer lesbar: ${bad.join(', ')}.` : '',
+        stale.length ? `${stale.length} ${stale.length === 1 ? 'Notiz steht' : 'Notizen stehen'} nicht in der Liste, weil sie seit der Suche geändert wurden oder fehlen — nenne das im Abschlusstext.` : '',
+        set.complete ? '' : `Die Suche war unvollständig (${set.incomplete.join('; ')}) — nenne das im Abschlusstext.`
+      ].filter(Boolean).join(' ')
+      return notes && res.ok ? { ...res, content: `${res.content}\n${notes}` } : res
     }
   })
 

@@ -3,6 +3,7 @@
 // opake Result-Handles (der Renderer sieht nie Staging-Pfade), Results höchstens
 // einmal konsumierbar, verspätete Ergebnisse abgebrochener Läufe werden verworfen.
 
+import type { NoteSet } from '../../shared/noteSet'
 import type { DayOverviewData } from '../../shared/dayOverview'
 import type { BrandRunContext } from '../brand/brandService'
 import type { ChatMessage } from '../llm/chatClient'
@@ -90,6 +91,9 @@ export interface AgentRun {
   // Zusammengeführte Tabellen dieses Laufs (collect_table). Sie leben NUR hier —
   // ihre Zeilen gehen nie an das Modell, sondern direkt in die Ergebnisdatei.
   datasets: Map<string, CollectedTable>
+  // Notizmengen aus find_notes (shared/noteSet.ts): Die Liste der Treffer liegt hier, nicht im
+  // Modellkontext; das Modell nennt Kennung und Nummern.
+  noteSets?: Map<string, NoteSet>
   // Einzeln gelesene Dateien je Ordner. Zwei Zwecke: die Leitplanke, die nach ein
   // paar Dateien auf collect_table verweist, und eine ehrliche Fehlermeldung bei
   // Zeitüberschreitung (real: 31 Einzeldateien statt EINES Zusammenführens).
@@ -336,6 +340,7 @@ export function finishRun(run: AgentRun, status: Exclude<AgentRunStatus, 'runnin
       transcript: run.transcript,
       transcriptTokens: run.transcriptTokens,
       datasets: new Map(run.datasets),
+      ...(run.noteSets?.size ? { noteSets: new Map(run.noteSets) } : {}),
       folderReads: new Map(run.folderReads),
       folderFilesRead: new Map([...(run.folderFilesRead ?? [])].map(([k, v]) => [k, new Set(v)])),
       coverageAsked: run.coverageAsked,
@@ -359,6 +364,7 @@ export interface RunContinuation {
   transcript: ChatMessage[]
   transcriptTokens?: number
   datasets: Map<string, CollectedTable>
+  noteSets?: Map<string, NoteSet>
   folderReads: Map<string, number>
   folderFilesRead?: Map<string, Set<string>>
   coverageAsked?: boolean
@@ -380,6 +386,7 @@ const continuations = new Map<number, RunContinuation>()
  *  ihre IDs und Namen, und das Modell soll nichts davon erneut lesen. */
 export function inheritContinuation(run: AgentRun, prev: RunContinuation): void {
   for (const [id, table] of prev.datasets) run.datasets.set(id, table)
+  if (prev.noteSets?.size) run.noteSets = new Map(prev.noteSets)
   for (const [folder, n] of prev.folderReads) run.folderReads.set(folder, n)
   for (const [folder, names] of prev.folderFilesRead ?? []) for (const name of names) recordFolderFileRead(run, folder, name)
   if (prev.coverageAsked) run.coverageAsked = true
@@ -430,6 +437,19 @@ export function registerDataset(run: AgentRun, table: CollectedTable): string {
   const id = `tabelle${run.datasets.size + 1}`
   run.datasets.set(id, table)
   return id
+}
+
+/** Notizmenge am Lauf ablegen; Kennung „m1“, „m2“ … — kurz, damit das Modell sie fehlerfrei wiederholt. */
+export function registerNoteSet(run: AgentRun, build: (id: string) => NoteSet): NoteSet {
+  const sets = (run.noteSets ??= new Map())
+  const set = build(`m${sets.size + 1}`)
+  sets.set(set.id, set)
+  return set
+}
+
+export function getNoteSet(run: AgentRun, id: string): NoteSet | null {
+  const key = id.trim().toLowerCase()
+  return run.noteSets?.get(key) ?? null
 }
 
 export function getDataset(run: AgentRun, id: string): CollectedTable | null {

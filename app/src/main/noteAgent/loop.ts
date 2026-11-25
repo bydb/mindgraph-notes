@@ -61,7 +61,8 @@ const BUDGETED_READ_TOOLS = new Set([
 // query_dataset und mcp_collect legen Datensätze an (Nebenwirkung) — wie collect_table.
 // describe_image: der Bildaufruf ist nach dem Lauf schon bezahlt (Zeit, später Geld) — nie
 // nachträglich verwerfen, höchstens sichtbar kürzen; der Kopf bis zur Leerzeile bleibt (F06).
-const LOCK_ONLY_TOOLS = new Set(['collect_table', 'folder_digest', 'query_dataset', 'mcp_collect', 'describe_image'])
+// find_notes legt eine Notizmenge am Lauf an und begrenzt seine Antwort selbst (Codex F20).
+const LOCK_ONLY_TOOLS = new Set(['collect_table', 'folder_digest', 'query_dataset', 'mcp_collect', 'describe_image', 'find_notes'])
 
 // Ordner-Läufe brauchen mehr Luft: Manifest, zwei bis drei Stichproben, das
 // Zusammenführen und erst danach die Ergebnisdateien — das sind schnell acht
@@ -132,7 +133,8 @@ export function buildSystemPrompt(run: AgentRun, noteContent: string, senderId: 
 ANGEHÄNGTE ORDNER (${folders.map(f => `"${f.name}"`).join(', ')}):
 - Arbeite so: (1) list_context_folder für die Übersicht — sie zeigt auch Unterordner; bei großen Ordnern mit subfolder hineingehen. (2) Dann den Weg nach Manifest und Auftrag wählen:
   • Betrifft der Auftrag ALLE oder VIELE Text-/Mischdateien (ab etwa 15) — alles auflisten, alle X finden, zusammenfassen, Rückblick, Zeitraum — → folder_digest. Die App wertet dann JEDE Datei aus, du bekommst Befunde mit Fundstelle und eine Abdeckung.
-  • Gleich aufgebaute Tabellen → collect_table.
+  • Gleich aufgebaute Tabellen → collect_table.${folders.some(f => f.insideVault) && !run.web ? `
+  • „Finde / sammle / liste alle Notizen zu einem Thema“ → find_notes mit mehreren Suchwörtern (EIN Aufruf durchsucht alle Notizen der angehängten Vault-Ordner), Fehltreffer über ihre Nummern streichen, dann write_note_list. Nicht note_search in Schleife und nicht jede Notiz lesen. Verschieben kannst du Notizen nicht — sag das, wenn der Auftrag es verlangt, und liefere die Sammelnotiz.` : ''}
   • Wenige bestimmte Dateien → read_context_file, einzeln, mit dem Pfad aus dem Manifest, bei großen Tabellen abschnittsweise über offset/max_rows.
 - Unterordner gehören zum Ordner. Durchsuche sie, wenn der Auftrag den ganzen Ordner meint — nicht nur die oberste Ebene.
 - Lies bei vielen Dateien NICHT jede einzeln oder Stichproben und rate den Rest — einzeln läuft dein Kontext voll, Stichproben lassen Einträge still weg.
@@ -334,6 +336,14 @@ export async function runNoteAgentLoop(params: NoteAgentLoopParams): Promise<Not
     allowed.add('peek_dataset')
     allowed.add('query_dataset')
     allowed.add('folder_digest')
+  }
+  // Notizmengen: nur mit einem angehängten Ordner, der im Vault liegt (sonst gibt es keine
+  // Vault-Pfade für Verweise), und nicht im Web-Lauf — dort gilt „genau ein Ergebnis mit
+  // Quellenblock“ (Codex F23/F33).
+  const hasVaultFolder = attachments.some(a => a.kind === 'folder' && a.insideVault)
+  if (hasVaultFolder && !run.web) {
+    allowed.add('find_notes')
+    allowed.add('write_note_list')
   }
   if (run.skills.length > 0) {
     allowed.add('use_skill')
@@ -835,7 +845,9 @@ GROSSES KONTEXTFENSTER (${contextWindow.tokens.toLocaleString('de-DE')} Token, v
         pushMessage({ role: 'tool', tool_call_id: call.id, tool_name: call.name, content: 'Noch nicht geschrieben — siehe die Rückfrage der App zu den ungelesenen Dateien oben.' })
         continue
       }
-      if (readWholeFolder && tool.isWrite && !run.coverageAsked && run.results.size === 0
+      // write_note_list ist ausgenommen: Die Sammelnotiz nennt Fundstellen aus einem Durchlauf der
+      // App und behauptet nicht, das Modell habe die Notizen gelesen (Codex F23).
+      if (readWholeFolder && tool.isWrite && call.name !== 'write_note_list' && !run.coverageAsked && run.results.size === 0
         && iteration <= maxIterations - 3 && !isReadLocked(budget)) {
         // Erst nach gelungener Bestandsaufnahme als gefragt merken: ein einmaliger Fehler beim
         // Auflisten soll die Prüfung nicht für den ganzen Lauf verbrauchen (Codex F13).
@@ -968,6 +980,13 @@ function summarizeArgs(skill: string, args: Record<string, unknown>): string {
     return json === '{}' ? '' : json.length > 160 ? `${json.slice(0, 160)}…` : json
   }
   switch (skill) {
+    case 'find_notes': {
+      const list = (k: string): string => (Array.isArray(args[k]) ? (args[k] as unknown[]).map(String).join(', ') : pick(k))
+      return pick('from_set')
+        ? `aus ${pick('from_set')}${list('drop') ? ` · ohne ${list('drop')}` : ''}${list('keep_only') ? ` · nur ${list('keep_only')}` : ''}`
+        : list('terms')
+    }
+    case 'write_note_list': return `${pick('file_name')} aus ${pick('set')}`
     case 'shell_execute': return pick('command')
     case 'shell_stage_file': return pick('file')
     case 'computer_open': return `${pick('file')}${pick('app') ? ` · ${pick('app')}` : ''}`

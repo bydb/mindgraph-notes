@@ -625,6 +625,23 @@ export function resolveFolderName(senderId: number, ids: string[], folderName: s
   return requireFolderEntry(senderId, ids, folderName).name
 }
 
+/**
+ * Angehängte Ordner, die IM Vault liegen — der Umfang von find_notes (Notizmengen). Ordner von
+ * außerhalb haben keine Vault-Pfade und werden gezählt, nicht durchsucht (Codex F33). Jeder Ordner
+ * wird vor der Verwendung kanonisch gegen seinen Vault geprüft (wie vor jedem Lesen).
+ */
+export async function inVaultFolderRoots(senderId: number, ids: string[]): Promise<{ roots: Array<{ name: string; rootReal: string; vaultReal: string }>; external: number }> {
+  const roots: Array<{ name: string; rootReal: string; vaultReal: string }> = []
+  let external = 0
+  for (const e of attachmentsOf(senderId, ids)) {
+    if (e.kind !== 'folder') continue
+    if (!e.insideVault || !e.vaultRoot) { external++; continue }
+    const rootReal = await assertEntryReadable(e)
+    roots.push({ name: e.name, rootReal, vaultReal: await fs.realpath(e.vaultRoot) })
+  }
+  return { roots, external }
+}
+
 /** Alle lesbaren Dateien aller angehängten Ordner samt Unterordnern (für die Lese-Abdeckung, shared/folderCoverage.ts). */
 export async function listAllFolderFiles(senderId: number, ids: string[]): Promise<Array<{ folder: string; files: Array<{ name: string; kind: ContextFileKind }> }>> {
   const out: Array<{ folder: string; files: Array<{ name: string; kind: ContextFileKind }> }> = []
