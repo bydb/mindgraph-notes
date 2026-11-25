@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildNoteList, displayNameFromFile, findTerm, formatNoteSet, matchNote, normalizeTerms, noteListLink, parseNumbers,
-  refineEntries, relatedWords, sortForSet, splitNote, wordSet, NOTE_SET_MAX_LINES, type NoteSet, type NoteSetEntry
+  refineEntries, relatedWords, semanticThreshold, sortForSet, splitNote, wordSet, NOTE_SET_MAX_LINES, type NoteSet, type NoteSetEntry
 } from './noteSet'
 
 const entry = (n: number, relPath: string, title = `Notiz ${n}`, score = 1): NoteSetEntry => ({ n, relPath, title, hit: `Fundstelle ${n}`, score, hash: `h${n}` })
@@ -141,5 +141,51 @@ describe('relatedWords', () => {
     const all = new Map<string, number>([['sprachmodell', 2], ['unterricht', 9], ['lernen', 1], ['daten', 1]])
     expect(relatedWords(hits, all, ['KI'])).toEqual(['sprachmodell'])
     expect(relatedWords(hits, all, ['Sprachmodell'])).toEqual([])
+  })
+})
+
+describe('sinngemäße Ergänzung in Rückgabe und Sammelnotiz', () => {
+  const base = { id: 'm1', terms: ['KI'], folders: ['Notizen'], scanned: 10, complete: true, incomplete: [] }
+  const e = (n: number, relPath: string, semantic?: boolean): NoteSetEntry => ({ n, relPath, title: `T${n}`, hit: `Text ${n}`, score: semantic ? 0 : 1, hash: 'h', ...(semantic ? { semantic } : {}) })
+  it('zeigt sinngemäße Treffer getrennt und mit Prüfauftrag', () => {
+    const out = formatNoteSet({ ...base, entries: [e(1, 'Notizen/a.md'), e(2, 'Notizen/b.md', true)], semantic: { state: 'used', topic: 'künstliche Intelligenz', cut: 3 } })
+    expect(out).toContain('1 Notizen mit Suchwort + 1 sinngemäß')
+    expect(out.indexOf('SINNGEMÄSS (1)')).toBeGreaterThan(out.indexOf('n1 ·'))
+    expect(out.indexOf('n2 ·')).toBeGreaterThan(out.indexOf('SINNGEMÄSS (1)'))
+    expect(out).toContain('3 weitere, schwächere Kandidaten')
+  })
+  it('sagt, wenn die Ergänzung nicht möglich war', () => {
+    const out = formatNoteSet({ ...base, entries: [e(1, 'Notizen/a.md')], semantic: { state: 'unavailable', topic: 'x', reason: 'kein Index' } })
+    expect(out).toContain('nicht möglich (kein Index)')
+    expect(out).not.toContain('SINNGEMÄSS (')
+  })
+  it('lässt bei vielen Worttreffern die sinngemäßen nicht aus der Liste fallen', () => {
+    const many = Array.from({ length: NOTE_SET_MAX_LINES + 5 }, (_, i) => e(i + 1, `Notizen/w${i}.md`))
+    const out = formatNoteSet({ ...base, entries: [...many, e(999, 'Notizen/s.md', true)], semantic: { state: 'used', topic: 'x' } })
+    expect(out).toContain('n999 ·')
+    expect(out).toContain('6 weitere Notizen stehen in der Menge')
+  })
+  it('schreibt einen eigenen Abschnitt in die Sammelnotiz', () => {
+    const md = buildNoteList({ title: 'Liste', set: { ...base, semantic: { state: 'used', topic: 'x' } }, entries: [e(1, 'Notizen/a.md'), e(2, 'Notizen/Sub/b.md', true)], stale: [], date: '2026-11-25' }).markdown
+    expect(md).toContain('1 Notizen mit Suchwort und 1 sinngemäß passende')
+    expect(md).toContain('## Sinngemäß passend, ohne Suchwort (1)')
+    expect(md).toContain('- [[Notizen/Sub/b|T2]] (Notizen/Sub) — Text 2')
+    expect(md).not.toContain('## Notizen/Sub')
+    const none = buildNoteList({ title: 'Liste', set: { ...base, semantic: { state: 'unavailable', topic: 'x', reason: 'kein Index' } }, entries: [e(1, 'Notizen/a.md')], stale: [], date: '2026-11-25' }).markdown
+    expect(none).toContain('Ergänzung über den Vault-Index nicht möglich: kein Index')
+  })
+})
+
+describe('semanticThreshold', () => {
+  it('eicht sich an den schwächsten Notizen mit Suchwort, nicht am Ausreißer', () => {
+    // Werte aus dem Testordner vom 25.11.2026: drei sinngemäße Notizen lagen bei 0,453 / 0,415 / 0,407.
+    const lexical = [0.499, 0.492, 0.465, 0.437, 0.436, 0.432, 0.430, 0.417, 0.413, 0.410, 0.406, 0.405]
+    const t = semanticThreshold(lexical, 0.48)
+    expect(t).toBe(0.406)
+    expect(semanticThreshold([...lexical, 0.2], 0.48)).toBe(0.405)
+  })
+  it('nimmt bei zu wenigen Vergleichswerten die feste Zahl', () => {
+    expect(semanticThreshold([0.6, 0.2, 0.5], 0.48)).toBe(0.48)
+    expect(semanticThreshold([], 0.48)).toBe(0.48)
   })
 })

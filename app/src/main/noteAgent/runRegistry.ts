@@ -135,6 +135,8 @@ export interface AgentRun {
   // Suche nach Bedeutung über den Vault-Index — nur gesetzt, wenn der Index für diesen Vault
   // abfragbar ist (Main-seitig beim Start geprüft). Die Einbettung der Anfrage bleibt lokal.
   vaultSearch?: (query: string, topK: number, signal: AbortSignal) => Promise<VaultQueryResult>
+  // Dieselbe Quelle für find_notes: breite Abfrage zu einem Thema, auf Ordner begrenzt (findNotes.ts).
+  vaultTopicSearch?: (query: string, folders: string[], signal: AbortSignal) => Promise<VaultQueryResult>
   // Tagesüberblick (day_overview): gemessene Tagesdaten dieses Rechners, beim Start Main-seitig
   // an Vault und Brain-Ordner gebunden. Das Werkzeug wählt nur das Datum.
   dayOverview?: (isoDate: string, range: { from: number; to: number }) => Promise<DayOverviewData>
@@ -235,6 +237,7 @@ export function startRun(params: {
   brand?: BrandRunContext
   route?: AgentRoute
   vaultSearch?: AgentRun['vaultSearch']
+  vaultTopicSearch?: AgentRun['vaultTopicSearch']
   dayOverview?: AgentRun['dayOverview']
   mcp?: McpRunState
   mcpServers?: string[]
@@ -278,6 +281,7 @@ export function startRun(params: {
     ...(params.brand ? { brand: params.brand } : {}),
     route: params.route,
     vaultSearch: params.vaultSearch,
+    vaultTopicSearch: params.vaultTopicSearch,
     dayOverview: params.dayOverview
   }
   activeBySender.set(params.senderId, run)

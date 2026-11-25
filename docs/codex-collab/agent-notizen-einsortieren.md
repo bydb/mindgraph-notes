@@ -564,3 +564,12 @@ Stufe 1 jetzt bauen, Stufe 2 als eigenes Vorhaben mit eigenem Plan, Stufe 3 dana
 ## Status
 
 Rev. 3, 25.11.2026. Stufe 1 wird gebaut; Stufe 2 und 3 sind nicht begonnen und brauchen einen eigenen Plan.
+
+### Nachtrag 25.11.2026 — sinngemäße Ergänzung über den Vault-Index (nach Stufe 1, nicht von Codex geprüft)
+
+Der Testlauf von Stufe 1 fand 9 bzw. 7 von 14 Notizen. `find_notes` fragt deshalb zusätzlich den
+Vault-Index mit dem Thema ab und nimmt Notizen ohne Suchwort als gekennzeichnete Gruppe in die
+Menge auf. Schwelle geeicht an den Worttreffern statt fester Zahl; Messwerte und Grenzen stehen in
+`.claude/rules/note-agent.md`. Ergebnis im selben Testordner: 12 von 14, keine falsche Notiz.
+Datenweg unverändert gegenüber `vault_search`: Einbettung lokal, Titel und Auszüge der Kandidaten
+gehen an das Modell des Laufs.

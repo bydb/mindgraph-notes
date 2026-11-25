@@ -24,7 +24,7 @@ import {
   resolveFolderName, countFolderTables, describeIncomplete, readImageForAgent, contextKindFromFilename, type FolderManifest
 } from './contextFiles'
 import { registerResult, registerDataset, getDataset, recordFolderFileRead, registerNoteSet, getNoteSet, type AgentRun } from './runRegistry'
-import { scanNotes, toNoteSet, recheckEntries } from './findNotes'
+import { scanNotes, toNoteSet, recheckEntries, addSemanticNotes } from './findNotes'
 import { todayIsoDate } from '../../shared/aiProvenance'
 /** Ab dieser Länge zeigt die Ergebnisvorschau nur den Anfang (noteAgent/ipc.ts, MAX_PREVIEW_CHARS). */
 const NOTE_LIST_PREVIEW_CHARS = 200_000
@@ -1161,11 +1161,12 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
   registry.register({
     name: 'find_notes',
     description:
-      'Findet ALLE Notizen in den angehängten Vault-Ordnern (samt Unterordnern), die mindestens eines der Suchwörter enthalten — in Dateiname, Titel, Überschrift oder Text. Die App durchsucht selbst und legt eine NOTIZMENGE an; du bekommst je Notiz eine Zeile mit Nummer (n1, n2 …), Titel, Ordner und Fundstelle. Das ist der Weg für „finde/sammle/liste alle Notizen zu X“ — nicht note_search in Schleife. Sucht WÖRTER, keine Bedeutung: gib Synonyme, englische Begriffe und Produktnamen als weitere terms mit. Verfeinern: from_set + drop (Nummern von Fehltreffern) und/oder keep_only (Wörter) ergibt eine neue Menge mit denselben Nummern. Danach write_note_list.',
+      'Findet ALLE Notizen in den angehängten Vault-Ordnern (samt Unterordnern), die mindestens eines der Suchwörter enthalten — in Dateiname, Titel, Überschrift oder Text. Die App durchsucht selbst und legt eine NOTIZMENGE an; du bekommst je Notiz eine Zeile mit Nummer (n1, n2 …), Titel, Ordner und Fundstelle. Das ist der Weg für „finde/sammle/liste alle Notizen zu X“ — nicht note_search in Schleife. Gesucht wird nach WÖRTERN: gib Synonyme, englische Begriffe und Produktnamen als weitere terms mit. Zusätzlich ergänzt die App, wenn ein Vault-Index da ist, Notizen OHNE Suchwort, die dem Thema ähneln — getrennt als „SINNGEMÄSS“ ausgewiesen und von dir zu prüfen; dafür topic angeben. Verfeinern: from_set + drop (Nummern von Fehltreffern) und/oder keep_only (Wörter) ergibt eine neue Menge mit denselben Nummern. Danach write_note_list.',
     parameters: {
       type: 'object',
       properties: {
         terms: { type: 'array', items: { type: 'string' }, description: 'Suchwörter oder Wortgruppen; eine Notiz zählt, wenn EINES vorkommt. Kurze Wörter wie "KI" treffen nur als ganzes Wort.' },
+        topic: { type: 'string', description: 'Das Thema als kurzer Begriff für die sinngemäße Ergänzung, z. B. "künstliche Intelligenz" — nur der Begriff, kein Satz und kein "Notizen zu …". Fehlt er, gilt das erste Suchwort.' },
         from_set: { type: 'string', description: 'Kennung einer vorhandenen Notizmenge, die verfeinert werden soll (statt neu zu suchen)' },
         drop: { type: 'array', items: { type: 'string' }, description: 'Nur mit from_set: Nummern, die aus der Menge fallen, z. B. ["n3","n17"]' },
         keep_only: { type: 'array', items: { type: 'string' }, description: 'Nur mit from_set: nur Notizen behalten, deren Titel oder Fundstelle eines dieser Wörter enthält' }
@@ -1201,15 +1202,24 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
           ? 'find_notes durchsucht nur angehängte Ordner, die im Vault liegen. Der angehängte Ordner liegt außerhalb — nutze dafür list_context_folder und read_context_file.'
           : 'find_notes braucht einen angehängten Vault-Ordner. Der Nutzer muss den Ordner anhängen, in dem gesucht werden soll.')
       }
-      const scan = await scanNotes(roots.roots, terms, { signal: ctx.run.abort.signal })
+      const worded = await scanNotes(roots.roots, terms, { signal: ctx.run.abort.signal })
+      const topic = (requireString(args, 'topic') || terms[0]).replace(/\s+/g, ' ').trim().slice(0, 120)
+      const topicSearch = ctx.run.vaultTopicSearch
+      const runVaultReal = await fs.realpath(ctx.run.vaultPath).catch(() => '')
+      // Ein abgebrochener oder zeitlich gekappter Durchlauf wird nicht noch ergänzt.
+      const scan = ctx.run.abort.signal.aborted || !runVaultReal
+        ? worded
+        : await addSemanticNotes(worded, roots.roots, runVaultReal, topic, topicSearch, ctx.run.abort.signal)
       if (ctx.run.abort.signal.aborted) return { ok: false, content: 'Abgebrochen.', display: 'find_notes: abgebrochen' }
       const set = registerNoteSet(ctx.run, id => toNoteSet(id, terms, roots.roots.map(r => r.name), scan))
       for (const r of roots.roots) ctx.run.sources.add(`Notizsuche: ${r.name}`)
+      const semCount = set.entries.filter(e => e.semantic).length
+      if (scan.semantic?.state === 'used') ctx.run.sources.add('Vault-Index (sinngemäße Ergänzung)')
       const extra = roots.external > 0 ? `\n\n${roots.external} angehängte ${roots.external === 1 ? 'Ordner liegt' : 'Ordner liegen'} außerhalb des Vaults und wurden nicht durchsucht.` : ''
       return {
         ok: true,
         content: `${formatNoteSet(set)}${extra}`,
-        display: `find_notes: ${terms.map(t => `„${t}“`).join(', ')} — ${set.entries.length} von ${set.scanned} Notizen${set.complete ? '' : ' (unvollständig)'}`
+        display: `find_notes: ${terms.map(t => `„${t}“`).join(', ')} — ${set.entries.length - semCount} von ${set.scanned} Notizen${semCount ? ` + ${semCount} sinngemäß` : scan.semantic && scan.semantic.state !== 'used' ? ' · ohne sinngemäße Ergänzung' : ''}${set.complete ? '' : ' (unvollständig)'}`
       }
     }
   })
@@ -1259,6 +1269,7 @@ export function createNoteAgentRegistry(): ToolRegistry<NoteAgentContext> {
       const folders = new Set(fresh.map(e => folderOf(e.relPath))).size
       const summary = [
         `Sammelnotiz, ${fresh.length} Notizen aus ${folders} ${folders === 1 ? 'Ordner' : 'Ordnern'}`,
+        fresh.some(e => e.semantic) ? `davon ${fresh.filter(e => e.semantic).length} sinngemäß ohne Suchwort` : '',
         built.plain ? `${built.plain} ohne Verweis` : '',
         stale.length ? `${stale.length} seit der Suche geändert` : '',
         set.complete ? '' : 'Suche unvollständig',

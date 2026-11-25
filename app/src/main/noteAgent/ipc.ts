@@ -5,6 +5,7 @@
 // Die Handler werden erst in registerNoteAgentIpc() angemeldet, nicht beim Import.
 // Was der Block aus index.ts braucht, kommt über NoteAgentIpcDeps herein.
 import { BrowserWindow, ipcMain, dialog } from 'electron'
+import { FIND_NOTES_SEMANTIC_QUERY_FLOOR, FIND_NOTES_SEMANTIC_TOP_K } from './findNotes'
 import * as path from 'path'
 import * as fs from 'fs/promises'
 import { loadWebResearchConfig, loadProviderKey } from '../webResearch/config'
@@ -620,12 +621,19 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       // Einbettung der Anfrage bleibt lokal und meldet sich als Vordergrund an, damit der
       // Indexer nicht gleichzeitig einbettet — auch in einem Cloud-Lauf, der selbst nicht zählt.
       let vaultSearch: ((query: string, topK: number, signal: AbortSignal) => Promise<VaultQueryResult>) | undefined
+      let vaultTopicSearch: ((query: string, folders: string[], signal: AbortSignal) => Promise<VaultQueryResult>) | undefined
       try {
         const mgr = getVaultRagManager()
         if (await mgr.isQueryable(params.vaultPath)) {
           const vp = params.vaultPath
           vaultSearch = (query, topK, signal) =>
             withOllamaActivity('vault-query', () => mgr.query(vp, query, undefined, { topK, signal }))
+          // find_notes: viele Dateien, je Datei ein Treffer, niedrige Untergrenze — die Schwelle setzt
+          // findNotes.ts, die Auswahl trifft danach das Modell anhand von Titel und Auszug (Werte und Messung: findNotes.ts).
+          vaultTopicSearch = (query, folders, signal) =>
+            withOllamaActivity('vault-query', () => mgr.query(vp, query, folders.length ? { folders } : undefined, {
+              topK: FIND_NOTES_SEMANTIC_TOP_K, perFileCap: 1, minScore: FIND_NOTES_SEMANTIC_QUERY_FLOOR, signal
+            }))
         }
       } catch { /* ohne Index kein Werkzeug */ }
 
@@ -679,6 +687,7 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
         imageGen,
         route,
         vaultSearch,
+        vaultTopicSearch,
         dayOverview,
         ...(brand ? { brand } : {}),
         ...(mcp ? { mcp, mcpServers: mcpGate.serverIds } : {}),
