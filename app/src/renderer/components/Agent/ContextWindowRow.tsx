@@ -61,7 +61,8 @@ export function ContextWindowRow({ model, disabled }: { model: string; disabled?
   const refreshIfStale = (): void => {
     if (!model || memoryPictureAge(model) < 10_000) return
     const asked = model
-    void loadMemoryPicture(asked, true).then(data => { if (data && mounted.current && shownModel.current === asked) setMemory(data) })
+    // Auch ein Fehlschlag wird übernommen: der Balken von vorhin gilt dann nicht mehr (agy F21).
+    void loadMemoryPicture(asked, true).then(data => { if (mounted.current && shownModel.current === asked) setMemory(data) })
   }
 
   const change = async (next: number): Promise<void> => {

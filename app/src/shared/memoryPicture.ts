@@ -240,10 +240,17 @@ export function fitModelMemory(samples: MemorySample[]): MeasuredModelMemory | n
   const bytesPerToken = median(slopes)
   const baseBytes = median(clean.map(s => s.bytes - bytesPerToken * s.tokens))
   if (!(bytesPerToken >= 10 * 1024) || !(bytesPerToken <= 1024 * 1024) || !(baseBytes > 0)) return null
-  const bound = Math.max(0.3 * 1024 ** 3, 0.02 * baseBytes)
-  const off = clean.filter(s => Math.abs(s.bytes - baseBytes - bytesPerToken * s.tokens) > bound).length
-  if (off > clean.length / 4) return null
-  return { baseBytes, bytesPerToken, samples: clean.length, maxTokens }
+  // Toleranz am gemessenen Anstieg ausgerichtet, nicht nur an der Modellgröße: über eine kurze
+  // Spanne ging sonst reines Rauschen als Messung durch (agy F18). Der Anstieg muss die Toleranz
+  // deutlich übersteigen, sonst ist er von Streuung nicht zu unterscheiden.
+  const rise = bytesPerToken * (maxTokens - Math.min(...tokens))
+  const bound = Math.min(Math.max(0.3 * 1024 ** 3, 0.02 * baseBytes), Math.max(0.1 * 1024 ** 3, 0.25 * rise))
+  if (rise < 2 * bound) return null
+  const inliers = clean.filter(s => Math.abs(s.bytes - baseBytes - bytesPerToken * s.tokens) <= bound)
+  if (clean.length - inliers.length > clean.length / 4) return null
+  // Grundlage sind nur die Paare, die zur Geraden passen — ein Ausreißer bei 100 000 Token
+  // ließe die Oberfläche sonst „gemessen bis 100.000 Token“ behaupten.
+  return { baseBytes, bytesPerToken, samples: inliers.length, maxTokens: Math.max(...inliers.map(s => s.tokens)) }
 }
 
 /** Speicher je Prozessnummer aus `top -l 1 -stats pid,mem` („447M“, „17G“, „512K+“). */
@@ -377,7 +384,13 @@ export function reliefPlan(picture: MemoryPicture, apps: ProcessGroup[], targetT
   const needBytes = bar.modelBytes + bar.bufferBytes + bar.contextBytes
   const allowedOtherBytes = picture.totalBytes - needBytes
   const deficitBytes = bar.overBytes
-  const impossible = picture.gpuLimitBytes != null && needBytes > picture.gpuLimitBytes ? 'gpu'
+  // „Geht gar nicht“ ist eine harte Aussage und braucht eine belastbare Rechnung. Ollamas
+  // Vorausrechnung ist das nicht: sie setzt je Token gut das Doppelte an und rechnet 4 GB Puffer
+  // dazu — ein ungemessenes Modell galt damit schon beim Standardfenster als unmöglich (agy F17).
+  // Dann bleibt es bei „es fehlen … GB“ mit Schließvorschlägen.
+  const firm = picture.tokenSource !== 'projection'
+  const impossible = !firm ? null
+    : picture.gpuLimitBytes != null && needBytes > picture.gpuLimitBytes ? 'gpu'
     : allowedOtherBytes < MIN_OTHER_BYTES ? 'memory' : null
   const picks: ProcessGroup[] = []
   let pickedBytes = 0

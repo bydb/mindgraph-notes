@@ -20,10 +20,17 @@ export interface MemoryPictureData {
 export interface MemoryPictureRequest { model: string; targetTokens: number | null }
 
 const FRESH_MS = 60_000
-const cache = new Map<string, { at: number; data: MemoryPictureData }>()
+// `started` = wann die Messung begann: eine ältere Antwort überschreibt keine jüngere.
+const cache = new Map<string, { at: number; started: number; data: MemoryPictureData }>()
 // Laufende Messungen je Modell: Menü und Karte teilen sich eine, statt je vier Prozesse zu starten.
 const inFlight = new Map<string, Promise<MemoryPictureData | null>>()
 let request: MemoryPictureRequest | null = null
+let platformUnsupported = false
+
+/** Dieser Rechner hat gar kein Speicherbild (nicht macOS auf Apple Silicon) — bekannt nach der ersten Abfrage. */
+export function memoryPictureUnsupported(): boolean {
+  return platformUnsupported
+}
 
 /**
  * Speicherbild für das Modell; `fresh` misst neu, sonst reicht ein Stand der letzten Minute.
@@ -34,24 +41,31 @@ export function loadMemoryPicture(model: string, fresh = false): Promise<MemoryP
   if (!model) return Promise.resolve(null)
   const hit = cache.get(model)
   if (!fresh && hit && Date.now() - hit.at < FRESH_MS) return Promise.resolve(hit.data)
+  // „Neu messen“ heißt neu messen: eine Messung, die schon vor dem Beenden der Programme lief,
+  // zeigte sonst den Stand von davor als Nachmessung (agy F21).
   const running = inFlight.get(model)
-  if (running) return running
+  if (running && !fresh) return running
+  const startedAt = Date.now()
+  let self: Promise<MemoryPictureData | null> | null = null
   const started = (async (): Promise<MemoryPictureData | null> => {
     try {
       const res = await window.electronAPI.noteAgentMemoryPicture({ model })
+      if (res.success && res.supported === false && res.reason === 'platform') platformUnsupported = true
       if (!res.success || !res.supported || !res.picture) return null
       const data: MemoryPictureData = {
         picture: res.picture, swapUsedBytes: res.swapUsedBytes ?? null, apps: res.apps ?? [],
         reopenable: res.reopenable ?? [], sizesPartial: res.sizesPartial === true
       }
-      cache.set(model, { at: Date.now(), data })
+      const known = cache.get(model)
+      if (!known || known.started <= startedAt) cache.set(model, { at: Date.now(), started: startedAt, data })
       return data
     } catch {
       return null
     } finally {
-      inFlight.delete(model)
+      if (inFlight.get(model) === self) inFlight.delete(model)
     }
   })()
+  self = started
   inFlight.set(model, started)
   return started
 }
@@ -68,7 +82,7 @@ export function memoryPictureAge(model: string): number {
  * dieselben Zahlen nennen.
  */
 export function openMemoryPictureFor(model: string, shown: MemoryPictureData | null, targetTokens: number | null): void {
-  if (shown) cache.set(model, { at: Date.now(), data: shown })
+  if (shown) cache.set(model, { at: Date.now(), started: Date.now(), data: shown })
   request = { model, targetTokens }
   window.dispatchEvent(new CustomEvent('mindgraph:memoryPictureModel', { detail: request }))
   window.dispatchEvent(new CustomEvent('mindgraph:openSettings', { detail: { tab: 'ai', anchor: 'ai-memory-picture' } }))

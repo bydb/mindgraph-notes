@@ -112,7 +112,7 @@ async function architectureBytesPerToken(model: string): Promise<number | null> 
 }
 
 export type MemoryPictureResult =
-  | { supported: false }
+  | { supported: false; reason?: 'platform' }
   | {
       supported: true
       picture: MemoryPicture
@@ -129,7 +129,7 @@ export type MemoryPictureResult =
     }
 
 export async function readMemoryPicture(model: string): Promise<MemoryPictureResult> {
-  if (process.platform !== 'darwin' || process.arch !== 'arm64') return { supported: false }
+  if (process.platform !== 'darwin' || process.arch !== 'arm64') return { supported: false, reason: 'platform' }
   const [vm, swap, ps, top, projection, weights, loaded, architecture, measured] = await Promise.all([
     run('/usr/bin/vm_stat', []),
     run('/usr/sbin/sysctl', ['-n', 'vm.swapusage']),

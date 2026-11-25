@@ -27,7 +27,11 @@ const MAX_TARGETS = 12
 
 interface BundleIdentity { bundleIno: number; plistIno: number }
 const closedHere = new Map<string, { name: string; identity: BundleIdentity }>()
-let offered = new Map<string, string>()
+// Angebote gelten ein paar Minuten und werden ergänzt, nicht ersetzt: eine Hintergrundmessung des
+// Modell-Menüs mit kürzerer Liste nahm der offenen Karte sonst die Programme weg, und der Klick auf
+// „Ausgewählte beenden“ blieb ohne jede Meldung (agy F19).
+const OFFER_TTL_MS = 5 * 60_000
+let offered = new Map<string, { name: string; at: number }>()
 
 type Runner = (file: string, args: string[], timeout: number) => Promise<{ ok: boolean; out: string }>
 
@@ -51,7 +55,9 @@ export function ownBundlePath(): string {
 
 /** Vom Speicherbild aufgerufen: genau diese Programme darf der Renderer danach zum Beenden nennen. */
 export function offerAppsForRelief(apps: ProcessGroup[]): void {
-  offered = new Map(apps.filter(a => a.path).map(a => [a.path as string, a.name]))
+  const now = Date.now()
+  for (const [key, entry] of offered) if (now - entry.at > OFFER_TTL_MS) offered.delete(key)
+  for (const a of apps) if (a.path) offered.set(a.path, { name: a.name, at: now })
 }
 
 /** Echtes Bündel am genannten Ort? Liefert dessen Kennung, sonst null. */
@@ -91,7 +97,14 @@ export interface ReliefResult {
   /** Namen, die noch laufen (Rückfrage abgelehnt, Beenden verweigert) oder kein echtes Bündel sind. */
   failed: string[]
   cancelled?: boolean
+  /** Etwas war ausgewählt, aber nichts davon läuft noch oder ist noch angeboten — die Karte misst neu. */
+  stale?: boolean
 }
+
+/** Fester Skripttext, der Pfad kommt als Argument — nie in den Skripttext eingesetzt. Läuft das
+ *  Programm nicht mehr (während der Rückfrage geschlossen), passiert nichts: `quit` an ein
+ *  beendetes Programm darf es bei keinem Bündel erst starten. */
+export const QUIT_SCRIPT = ['-e', 'on run argv', '-e', 'if application (item 1 of argv) is running then tell application (item 1 of argv) to quit', '-e', 'end run']
 
 export async function quitAppsForRelief(paths: unknown, window: BrowserWindow | null, en: boolean): Promise<ReliefResult> {
   if (process.platform !== 'darwin') return { closed: [], failed: [] }
@@ -102,11 +115,12 @@ export async function quitAppsForRelief(paths: unknown, window: BrowserWindow | 
   for (const candidate of wanted) {
     if (targets.length >= MAX_TARGETS) break
     const name = running.get(candidate)
-    if (!name || !offered.has(candidate)) continue
+    const offer = offered.get(candidate)
+    if (!name || !offer || Date.now() - offer.at > OFFER_TTL_MS) continue
     const identity = await bundleIdentity(candidate)
     if (identity) targets.push({ path: candidate, name, identity })
   }
-  if (targets.length === 0) return { closed: [], failed: [] }
+  if (targets.length === 0) return { closed: [], failed: [], ...(wanted.length > 0 ? { stale: true } : {}) }
   const names = targets.map(t => t.name)
   const options = {
     type: 'question' as const,
@@ -122,8 +136,7 @@ export async function quitAppsForRelief(paths: unknown, window: BrowserWindow | 
   if (answer.response !== 0) return { closed: [], failed: [], cancelled: true }
 
   for (const target of targets) {
-    // Fester Skripttext, der Pfad kommt als Argument — nie in den Skripttext eingesetzt.
-    await run('/usr/bin/osascript', ['-e', 'on run argv', '-e', 'tell application (item 1 of argv) to quit', '-e', 'end run', target.path], QUIT_TIMEOUT_MS)
+    await run('/usr/bin/osascript', [...QUIT_SCRIPT, target.path], QUIT_TIMEOUT_MS)
   }
   // Nachsehen statt glauben: was nach der Wartezeit noch läuft, ist nicht beendet.
   let still = await runningNow()
@@ -147,11 +160,27 @@ export function reopenableApps(): string[] {
   return [...closedHere.values()].map(entry => entry.name)
 }
 
-export async function reopenAppsAfterRelief(): Promise<{ reopened: string[]; skipped: string[] }> {
+export interface ReopenResult {
+  reopened: string[]
+  /** Am Ort liegt nicht mehr dasselbe Bündel — nicht gestartet. */
+  skipped: string[]
+  /** Der Start ist fehlgeschlagen; das Programm bleibt in der Liste. */
+  failed: string[]
+  cancelled?: boolean
+}
+
+/**
+ * Beendete Programme wieder öffnen — nach eigener Rückfrage im Main. Die Kennung des Bündels
+ * (Dateinummern) erkennt einen Tausch des Ordners, nicht aber ein an Ort und Stelle überschriebenes
+ * Programm; deshalb startet hier nichts, ohne dass der Nutzer die Liste mit Ort gesehen hat (agy F16).
+ */
+export async function reopenAppsAfterRelief(window: BrowserWindow | null, en: boolean): Promise<ReopenResult> {
   if (process.env.VITEST && run === realRun) throw new Error('reopenAppsAfterRelief: im Testlauf nur mit gesetztem Prozessstarter')
   const reopened: string[] = []
   const skipped: string[] = []
+  const failed: string[] = []
   const running = await runningNow()
+  const targets: Array<{ path: string; name: string }> = []
   for (const [target, entry] of [...closedHere]) {
     // Schon wieder offen (von Hand gestartet): nichts zu tun, aus der Liste nehmen.
     if (running.has(target)) { closedHere.delete(target); continue }
@@ -162,11 +191,25 @@ export async function reopenAppsAfterRelief(): Promise<{ reopened: string[]; ski
       closedHere.delete(target)
       continue
     }
-    // -g: im Hintergrund öffnen, der Nutzer bleibt, wo er ist.
-    const res = await run('/usr/bin/open', ['-g', '-a', target], 10_000)
-    if (res.ok) { reopened.push(entry.name); closedHere.delete(target) }
+    targets.push({ path: target, name: entry.name })
   }
-  return { reopened, skipped }
+  if (targets.length === 0) return { reopened, skipped, failed }
+  const options = {
+    type: 'question' as const,
+    buttons: en ? ['Open apps', 'Cancel'] : ['Programme öffnen', 'Abbrechen'],
+    defaultId: 0,
+    cancelId: 1,
+    message: en ? 'Reopen these apps?' : 'Diese Programme wieder öffnen?',
+    detail: targets.map(t => `${t.name} — ${t.path}`).join('\n')
+  }
+  const answer = window ? await dialog.showMessageBox(window, options) : await dialog.showMessageBox(options)
+  if (answer.response !== 0) return { reopened, skipped, failed, cancelled: true }
+  for (const target of targets) {
+    // -g: im Hintergrund öffnen, der Nutzer bleibt, wo er ist.
+    const res = await run('/usr/bin/open', ['-g', '-a', target.path], 10_000)
+    if (res.ok) { reopened.push(target.name); closedHere.delete(target.path) } else failed.push(target.name)
+  }
+  return { reopened, skipped, failed }
 }
 
 /** Nur für Tests. */

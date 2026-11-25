@@ -10,7 +10,7 @@ vi.mock('electron', () => ({
   dialog: { showMessageBox: async (options: { detail: string }) => { dialogCalls.push(options); return dialogAnswer } }
 }))
 
-const { offerAppsForRelief, quitAppsForRelief, reopenAppsAfterRelief, reopenableApps, resetReliefStateForTests, setReliefRunnerForTests } = await import('./memoryRelief')
+const { QUIT_SCRIPT, bundleIdentity, offerAppsForRelief, quitAppsForRelief, reopenAppsAfterRelief, reopenableApps, resetReliefStateForTests, setReliefRunnerForTests } = await import('./memoryRelief')
 
 const CALC = '/System/Applications/Calculator.app'
 const NOPE = '/Applications/Gibt-Es-Nicht-12345.app'
@@ -33,7 +33,7 @@ afterEach(() => { setReliefRunnerForTests(null); resetReliefStateForTests(); dia
 describe.skipIf(process.platform !== 'darwin')('Platz schaffen: Beenden und Wiederöffnen', () => {
   it('beendet nichts, was der Main nicht selbst angeboten hat — auch wenn es läuft', async () => {
     const sys = fakeSystem([psLine(11, CALC, 'Calculator')])
-    expect(await quitAppsForRelief([CALC], null, false)).toEqual({ closed: [], failed: [] })
+    expect(await quitAppsForRelief([CALC], null, false)).toEqual({ closed: [], failed: [], stale: true })
     expect(dialogCalls).toHaveLength(0)
     expect(sys.calls.some(c => c.file === '/usr/bin/osascript')).toBe(false)
   })
@@ -41,7 +41,7 @@ describe.skipIf(process.platform !== 'darwin')('Platz schaffen: Beenden und Wied
   it('angeboten, aber kein echtes Bündel am Pfad: kein Ziel', async () => {
     const sys = fakeSystem([psLine(12, NOPE, 'Nope')])
     offerAppsForRelief([{ name: 'Gibt-Es-Nicht-12345', bytes: 1, path: NOPE }])
-    expect(await quitAppsForRelief([NOPE], null, false)).toEqual({ closed: [], failed: [] })
+    expect(await quitAppsForRelief([NOPE], null, false)).toEqual({ closed: [], failed: [], stale: true })
     expect(sys.calls.some(c => c.file === '/usr/bin/osascript')).toBe(false)
   })
 
@@ -60,11 +60,15 @@ describe.skipIf(process.platform !== 'darwin')('Platz schaffen: Beenden und Wied
     expect(res).toEqual({ closed: ['Calculator'], failed: [] })
     const quits = sys.calls.filter(c => c.file === '/usr/bin/osascript')
     expect(quits).toHaveLength(1)
-    expect(quits[0].args).toEqual(['-e', 'on run argv', '-e', 'tell application (item 1 of argv) to quit', '-e', 'end run', CALC])
+    expect(quits[0].args).toEqual([...QUIT_SCRIPT, CALC])
+    // Nur wenn es läuft: ein inzwischen geschlossenes Programm wird durch „quit“ nicht gestartet.
+    expect(QUIT_SCRIPT.join(' ')).toContain('is running then tell application (item 1 of argv) to quit')
     expect(dialogCalls[0].detail.startsWith('Calculator\n')).toBe(true)
     expect(reopenableApps()).toEqual(['Calculator'])
 
-    expect(await reopenAppsAfterRelief()).toEqual({ reopened: ['Calculator'], skipped: [] })
+    expect(await reopenAppsAfterRelief(null, false)).toEqual({ reopened: ['Calculator'], skipped: [], failed: [] })
+    // Vor dem Start fragt der Main selbst nach und nennt den Ort.
+    expect(dialogCalls[1].detail).toBe(`Calculator — ${CALC}`)
     expect(sys.calls.filter(c => c.file === '/usr/bin/open').map(c => c.args)).toEqual([['-g', '-a', CALC]])
     expect(reopenableApps()).toEqual([])
   })
@@ -82,7 +86,55 @@ describe.skipIf(process.platform !== 'darwin')('Platz schaffen: Beenden und Wied
     offerAppsForRelief([{ name: 'Calculator', bytes: 1, path: CALC }])
     await quitAppsForRelief([CALC], null, false)
     sys.ps = [psLine(31, CALC, 'Calculator')]
-    expect(await reopenAppsAfterRelief()).toEqual({ reopened: [], skipped: [] })
+    expect(await reopenAppsAfterRelief(null, false)).toEqual({ reopened: [], skipped: [], failed: [] })
     expect(sys.calls.some(c => c.file === '/usr/bin/open')).toBe(false)
+  })
+
+  it('Wiederöffnen: abgelehnt startet nichts und behält die Liste; ein fehlgeschlagener Start wird gemeldet (agy F16)', async () => {
+    const sys = fakeSystem([psLine(11, CALC, 'Calculator')])
+    offerAppsForRelief([{ name: 'Calculator', bytes: 1, path: CALC }])
+    await quitAppsForRelief([CALC], null, false)
+    dialogAnswer.response = 1
+    expect(await reopenAppsAfterRelief(null, false)).toEqual({ reopened: [], skipped: [], failed: [], cancelled: true })
+    expect(sys.calls.some(c => c.file === '/usr/bin/open')).toBe(false)
+    expect(reopenableApps()).toEqual(['Calculator'])
+    dialogAnswer.response = 0
+    setReliefRunnerForTests(async file => file === '/bin/ps' ? { ok: true, out: '' } : { ok: false, out: 'nein' }, 600)
+    expect(await reopenAppsAfterRelief(null, false)).toEqual({ reopened: [], skipped: [], failed: ['Calculator'] })
+    expect(reopenableApps()).toEqual(['Calculator'])
+  })
+
+  it('eine spätere, kürzere Messung nimmt der offenen Karte die Programme nicht weg; Veraltetes wird gemeldet (agy F19)', async () => {
+    const sys = fakeSystem([psLine(11, CALC, 'Calculator')])
+    offerAppsForRelief([{ name: 'Calculator', bytes: 1, path: CALC }])
+    offerAppsForRelief([])
+    expect(await quitAppsForRelief([CALC], null, false)).toEqual({ closed: ['Calculator'], failed: [] })
+    // Jetzt läuft es nicht mehr: die Auswahl ist veraltet, und das kommt zurück statt Schweigen.
+    expect(await quitAppsForRelief([CALC], null, false)).toEqual({ closed: [], failed: [], stale: true })
+    expect(await quitAppsForRelief([], null, false)).toEqual({ closed: [], failed: [] })
+    expect(sys.calls.filter(c => c.file === '/usr/bin/osascript')).toHaveLength(1)
+  })
+
+  it('Kennung nur für ein echtes Bündel: kein Symlink, kein Ordner ohne Info.plist', async () => {
+    const { mkdtemp, mkdir, writeFile, symlink, realpath, rm } = await import('node:fs/promises')
+    const { tmpdir } = await import('node:os')
+    const dir = await realpath(await mkdtemp(`${tmpdir()}/mg-relief-`))
+    try {
+      await mkdir(`${dir}/Echt.app/Contents`, { recursive: true })
+      await writeFile(`${dir}/Echt.app/Contents/Info.plist`, '<plist/>')
+      await mkdir(`${dir}/Leer.app/Contents`, { recursive: true })
+      await symlink(`${dir}/Echt.app`, `${dir}/Link.app`)
+      const real = await bundleIdentity(`${dir}/Echt.app`)
+      expect(real).not.toBeNull()
+      expect(await bundleIdentity(`${dir}/Leer.app`)).toBeNull()
+      expect(await bundleIdentity(`${dir}/Link.app`)).toBeNull()
+      // Ordner getauscht: die Kennung ist eine andere.
+      await rm(`${dir}/Echt.app`, { recursive: true })
+      await mkdir(`${dir}/Echt.app/Contents`, { recursive: true })
+      await writeFile(`${dir}/Echt.app/Contents/Info.plist`, '<plist/>')
+      expect(await bundleIdentity(`${dir}/Echt.app`)).not.toEqual(real)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

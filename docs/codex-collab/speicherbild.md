@@ -236,6 +236,94 @@ Status: [OFFEN]
 4. **Duplizierte Main-Helfer, Einheiten und Doku-Drift:** `ownAppName()` und `run()` sind in `main/noteAgent/memoryPicture.ts:26-30,142` und `main/noteAgent/memoryRelief.ts:19-27` doppelt vorhanden. Alle Werte werden durch `1024**3` (GiB) bzw. `1024` (KiB) geteilt, aber als `GB`/`KB` beschriftet, was gegenüber dezimalen Ollama-Angaben (`5,89 GB` vs. `5,5 GiB`) um ~7 % abweicht; `footprintsFromTop` (`shared/memoryPicture.ts:213`) erkennt zudem nur `K|M|G` (kein `B`/`T`). `.claude/rules/note-agent.md:67` führt das bereits gebaute Modell-Menü noch als „Nicht gebaut“ und beschreibt die Programmgröße noch ohne `top`.
 Vorschlag: Gemeinsame `MemoryBarView`-Komponente (ohne 0%-`min-width`-Artefakte) und geteilte Main-Helfer auslagern, `appsGain`-Bedingung bereinigen, `.claude/rules/note-agent.md:67` aktualisieren und die Binär-/Dezimal-Einheit konsistent handhaben.
 
+### Runde 2
+
+Nachprüfung gegen Commit `763f4d7b` (nur Code gelesen, keine Programme/Tests/Modelle ausgeführt).
+
+#### Stand der Findings aus Runde 1
+- **F01:** teilweise — `PROGRAM_FOLDER` (`app/src/shared/memoryPicture.ts:142,172`), `offerAppsForRelief` (`app/src/main/noteAgent/memoryRelief.ts:53-55,105`), `ownBundlePath` (`:48-50`) und Symlink-/`realpath`-Prüfung (`:58-69`) sind umgesetzt; aber `bundleIdentity` lässt In-Place-Manipulation von Binary/`Info.plist` durch (F16), `offerAppsForRelief` wird bedingungslos überschrieben (F19), und dialogfreies Wiederöffnen ist so nicht haltbar.
+- **F02:** teilweise — Pfad-Gruppierung (`app/src/shared/memoryPicture.ts:162,173-175`), Pfad-Label (`app/src/main/noteAgent/memoryRelief.ts:83-86,117`; `MemoryPictureCard.tsx:161,246`), Deduplizierung (`memoryRelief.ts:99`) und 6-s-`ps`-Nachprüfung (`:129-141`) sind umgesetzt; zur Ablehnung des `osascript`-Teilpunkts siehe Bewertung unten.
+- **F03:** behoben — `baseModelBytes` zählt `workspaceBytes` bei geladenem Modell nicht mehr mit (`app/src/shared/memoryPicture.ts:324`), und `reliefPlan` rechnet Bedarf und Lücke direkt aus `memoryBar` (`app/src/shared/memoryPicture.ts:374-396`).
+- **F04:** teilweise — Theil-Sen (`app/src/shared/memoryPicture.ts:226-247`), `modelMemoryKey` (`app/src/main/llm/modelMemory.ts:32-35`) und `loaded.length !== 1` (`:84`) sind umgesetzt; aber `measuredModelMemory` prüft keinen Digest, GGUF-Ausschluss ist fail-open, Streaming-`hiddenThinking` bleibt `false` und das Toleranzband akzeptiert Rauschen (F18; Bildaufrufe und High-Water-Mark weiter offen wie benannt).
+- **F05:** behoben — „das reicht“ durch Obergrenzen-Hinweis ersetzt (`app/src/renderer/utils/i18n/settingsPages.ts:49-50,59,61`; `MemoryPictureCard.tsx:247,255`) und `loadedBytes` nutzt nur noch `loaded.sizeBytes` (`app/src/main/noteAgent/memoryPicture.ts:155`).
+- **F06:** teilweise — `reliefPlan.impossible` verhindert negatives Budget und Schließvorschläge (`app/src/shared/memoryPicture.ts:380-384`), aber bei gleichzeitigem `overModel > 0` verschluckt `MemoryPictureCard.tsx:129-137,232-237` die `impossible`-Meldung komplett (F17).
+- **F07:** nicht behoben — zurückgestellt; `readMemoryPicture` (`app/src/main/noteAgent/memoryPicture.ts:141,155`) trennt fremde geladene Modelle weiter nicht von `otherBytes` (nur `sampleModelMemory` bricht bei `loaded.length !== 1` ab, `modelMemory.ts:84`).
+- **F08:** teilweise — „mindestens rund“ und `settingOver` sind weg (`settingsPages.ts:38-39`), `tight` unter 1 GiB und Stichprobenangabe sind da (`shared/memoryPicture.ts:342,394`, `settingsPages.ts:46,56`); aber `gpuLimitFromLog` missdeutet dynamisches `available` als Hardware-Grenze (F17) und `maxTokens` zählt Ausreißer mit (F18).
+- **F09:** teilweise — Tab-Modell in `inUse` (`MemoryPictureCard.tsx:48`), `targetTokens`-Übergabe (`memoryPictureClient.ts:70-75`), Warnfarbe über `plan` (`MemoryPictureCard.tsx:154`) und Ladeplatzhalter (`:84-96`) sind umgesetzt; aber `asked.targetTokens` blockiert danach den Kontextregler, und `picker` blendet die Karte auf nicht unterstützten Plattformen/LM Studio ein (F20).
+- **F10:** teilweise — `modelMemory.ts:58-73` nutzt geteilte `loading`-Promise, Temp-Datei + `rename` und `parseModelMemoryStore`; `memory-projections.json` in `app/src/main/noteAgent/memoryPicture.ts:56-83` ist unverändert offen.
+- **F11:** nicht behoben — zurückgestellt (`app/src/shared/memoryPicture.ts:40-53`, `app/src/main/noteAgent/memoryPicture.ts:32-47,67-83`).
+- **F12:** nicht behoben — Formel in `app/src/shared/memoryPicture.ts:65-92` unverändert; nur der Hinweistext in `settingsPages.ts:69` ergänzt.
+- **F13:** teilweise — kein `null`-Cache (`memoryPictureClient.ts:42,47-50`), `inFlight`-Map (`:25,37-38`), Request-ID/`alive` (`MemoryPictureCard.tsx:59-74,173-191`), `mounted`/`shownModel` (`ContextWindowRow.tsx:57-65`) und 8-s-`top`-Timeout mit `sizesPartial` (`main/noteAgent/memoryPicture.ts:138,166`) sind umgesetzt; aber `fresh = true` übernimmt veraltete `inFlight`-Läufe, im `hidden`-Zustand fehlt „Neu messen“ und `ContextWindowRow` behält bei Ausfall alte Daten (F20, F21).
+- **F14:** teilweise — Sitzungshinweis im Dialog/Text ergänzt (`memoryRelief.ts:119`, `settingsPages.ts:65`); neue Tests (`memoryRelief.test.ts`, `modelMemory.test.ts`) lassen zentrale Pfade ungetestet (F22), `closedHere` weiter flüchtig und `main/noteAgent/memoryPicture.ts` ungetestet.
+- **F15:** teilweise — `appsGain` entfernt, `ownBundlePath` vereinheitlicht (`memoryRelief.ts:48-50`); Balken-Duplikat inkl. 0%-`min-width`-Artefakt (`ContextWindowRow.tsx:99-101`), Inline-Styles, GiB/GB und doppeltes `run()` unverändert offen.
+
+#### Bewertung zu Frage (3): Ablehnung in F02 & „Wiederöffnen ohne zweiten Dialog“
+- **Ablehnung in F02 (`osascript … to quit` startet beendete App nicht):** Nur **eingeschränkt haltbar**. Die Messung an `/System/Applications/Calculator.app` auf macOS 26.6 ist für Apple-Systemprogramme plausibel, beweist aber nicht, dass `tell application (item 1 of argv) to quit` bei beliebigen Drittanbieter-, Electron- oder älteren Bündeln unter `~/Applications` niemals startet. Zudem trägt `quitAppsForRelief` (`app/src/main/noteAgent/memoryRelief.ts:124-141`) ein Programm, das während des Dialogs bereits geschlossen wurde, ohne `is running`-Prüfung trotzdem in `closed` und `closedHere` ein. `if application (item 1 of argv) is running then` im Skript kostet eine Zeile und schließt beides aus.
+- **Diskussionspunkt F01 („Wiederöffnen ohne zweiten Dialog“):** **In der aktuellen Form nicht haltbar.** Die Begründung stützt sich auf „ein unverändertes Programm“. Genau das garantiert `bundleIdentity` (`app/src/main/noteAgent/memoryRelief.ts:58-69`) aber nicht, weil es nur Ordner- und `Info.plist`-Inode prüft (siehe F16). Selbst mit echter Integritätsprüfung bliebe offen, dass ein kompromittierter Renderer `note-agent-memory-relief-reopen` still während eines Laufs auslösen und gerade geschlossene Programme im Hintergrund wieder starten kann, um den Arbeitsspeicher erneut zu füllen. Ohne starke Integritätsprüfung (mindestens Hash von `Info.plist` + Executable oder `codesign --verify`) gehört ein Dialog davor — insbesondere für `~/Applications`.
+
+### F16 — `bundleIdentity` lässt In-Place-Manipulation von Binary und `Info.plist` durch; `skipped` beim Wiederöffnen wird verschluckt
+Schwere: hoch
+Stelle: app/src/main/noteAgent/memoryRelief.ts:58-69,150-170; app/src/renderer/components/Settings/MemoryPictureCard.tsx:184-193
+Status: [OFFEN]
+1. **Umgehbare Integritätsprüfung (`memoryRelief.ts:58-69,159-164`):** `bundleIdentity` prüft lediglich die Inodes des `.app`-Ordners (`bundleIno`) und von `Contents/Info.plist` (`plistIno`, ohne `st_dev`). In jedem benutzerbeschreibbaren Bündel (insbesondere unter `~/Applications/...`, oder einem beschreibbaren `/Applications/...`) kann ein Angreifer, Skript oder die Agent-Shell das eigentliche Binary unter `Contents/MacOS/*` bzw. eine Bibliothek unter `Contents/Frameworks/*` austauschen — oder `Contents/Info.plist` in-place überschreiben (`O_TRUNC` ändert den Inode nicht!). Beide Inodes bleiben identisch; `reopenAppsAfterRelief` startet dann ohne Rückfrage fremden Code per `open -g -a`.
+2. **Stilles Verschlucken von `skipped` und Fehlern (`MemoryPictureCard.tsx:184-193`, `memoryRelief.ts:160-169`):** `reopenAppsAfterRelief` liefert `{ reopened, skipped }`, aber `MemoryPictureCard.tsx:187` verwirft den Rückgabewert komplett. Wird ein Bündel wegen Inode-Abweichung übersprungen (und aus `closedHere` gelöscht) oder scheitert `open -g -a` (`!res.ok`), erhält der Nutzer keinerlei Rückmeldung.
+Vorschlag: `bundleIdentity` um `st_dev` sowie SHA-256 von `Contents/Info.plist` und dem darin genannten `CFBundleExecutable` (oder `codesign --verify`) erweitern; für `~/Applications` bzw. ohne vollständige Signaturprüfung beim Wiederöffnen einen Bestätigungsdialog zeigen; `skipped` und fehlgeschlagene Starts in `MemoryPictureCard.tsx` anzeigen.
+
+### F17 — `gpuLimitFromLog` missdeutet Ollamas momentanes `available` als Hardware-Obergrenze und sperrt „Platz schaffen“ fälschlich aus
+Schwere: hoch
+Stelle: app/src/shared/memoryPicture.ts:99-109,375-384; app/src/main/noteAgent/memoryPicture.ts:65,71,160; app/src/shared/memoryPicture.test.ts:92-94; app/src/renderer/components/Settings/MemoryPictureCard.tsx:129-137,232-263; app/src/renderer/utils/i18n/settingsPages.ts:47
+Status: [OFFEN]
+1. **Dynamische Momentaufnahme als statisches Hardware-Limit (`shared/memoryPicture.ts:99-109`, `main/noteAgent/memoryPicture.ts:65,71`):** `gpuLimitFromLog` liest `available="..."` aus der jüngsten `msg="gpu memory"`-Zeile. Schon das eigene Testfixture (`memoryPicture.test.ts:92-94`) zeigt, dass `available` auf demselben Rechner schwankt (`20.0 GiB` vs. `24.5 GiB`): in Ollamas Scheduler ist `available` der *zum Zeitpunkt des Log-Eintrags frei verfügbare* Grafikspeicher, nicht das feste Hardware-Limit (`iogpu.wired_limit_mb`). War zu diesem Zeitpunkt bereits ein Modell geladen oder anderer Speicher belegt, sinkt `available` stark ab, wird in `lastGpuLimit` festgehalten (`main/noteAgent/memoryPicture.ts:71`) und löst in `reliefPlan` (`shared/memoryPicture.ts:380`) fälschlich `impossible: 'gpu'` aus — die Karte verweigert dann alle Schließvorschläge mit „auch wenn alle Programme geschlossen sind“, obwohl Schließen helfen würde.
+2. **Überhöhte Vorausrechnung sperrt das 32k-Standardfenster mit „Wähle ein kleineres Fenster“ (`shared/memoryPicture.ts:377,380`, `settingsPages.ts:47`):** Bei ungeladenem, ungemessenem Modell addiert `needBytes` Ollamas 4-GiB-`bufferBytes` und die überhöhte Vorausrechnung (`17 + 4 + 5,5 = 26,5 GiB > 24,5 GiB` für `qwen3.8:27b-mlx` bei 32 768 Token). `reliefPlan` stuft damit selbst das kleinste Standardfenster als `impossible: 'gpu'` ein, schlägt kein „Platz schaffen“ vor und fordert „Wähle ein kleineres Fenster“, obwohl 32 768 bereits die kleinste Stufe ist und real nur ~19,5 GiB benötigt.
+3. **`overModel > 0` verschluckt `impossible` komplett (`MemoryPictureCard.tsx:129-137,232-237`):** Ist gleichzeitig `overModel > 0` und `plan.impossible != null`, trifft Zeile 129 vor Zeile 132/135, während die Zeilen 232 und 237 wegen `!plan.impossible` ausgeblendet bleiben — die Karte nennt dann weder die Unmöglichkeit noch bietet sie „Platz schaffen“ an.
+Vorschlag: Hardware-GPU-Grenze nicht aus dem schwankenden Log-Feld `available` ziehen (stattdessen `sysctl -n iogpu.wired_limit_mb` bzw. dokumentiertes Systemlimit); unbestätigte Ollama-Vorausrechnungen nicht als harte `impossible`-Sperre gegen „Platz schaffen“ verwenden; in `MemoryPictureCard.tsx` bei `plan.impossible` den Hinweis unabhängig von `overModel > 0` anzeigen.
+
+### F18 — `modelMemory.ts` & `fitModelMemory`: `measuredModelMemory` ignoriert Digest (Altdaten/GGUF bleiben aktiv), GGUF-Filter fail-open, Streaming-`hiddenThinking` unwirksam, Rauschen passiert Toleranzband
+Schwere: hoch
+Stelle: app/src/main/llm/modelMemory.ts:76-110; app/src/main/llm/telemetry.ts:107; app/src/main/index.ts:6127,6266,8516; app/src/shared/memoryPicture.ts:226-247
+Status: [OFFEN]
+1. **Digest wird beim Lesen nie geprüft (`modelMemory.ts:104-110`):** `measuredModelMemory(model)` liest `store[modelMemoryKey(model)]?.samples` ohne Abgleich gegen den aktuellen Digest aus `/api/tags`. Nach einem `ollama pull` derselben Modellbezeichnung gelten die alten Messwerte bis zum nächsten Aufruf weiter. Schlimmer noch: für ein GGUF-Modell mit Alt-Samples aus der Version vor Commit `763f4d7b` bricht `sampleModelMemory` jetzt in Zeile 88 ab, ohne den alten Eintrag zu löschen — die vergifteten GGUF-Samples gewinnen über `measured` (`shared/memoryPicture.ts:327-330`) dauerhaft gegen die `architecture`-Rechnung.
+2. **GGUF-Filter fail-open und Vision/OCR weiter ungefiltert (`modelMemory.ts:88`, `telemetry.ts:107`):** `hit.details?.format === 'gguf'` schließt nur exakt klein geschriebenes `'gguf'` aus; fehlt `details`/`format`, wird trotzdem gemessen (was Ollama für MLX in `details.format` liefert, konnte ohne Modellstart nicht live geprüft werden). Vision-OCR- und `describeImage`-Aufrufe (`telemetry.ts:107`) bleiben weiter in der Messung.
+3. **`!run.hiddenThinking` greift bei Streaming-Aufrufen nicht (`telemetry.ts:107`, `main/index.ts:6127,6266,8516`):** Im Streaming (`ollama-chat`, `streamPetrolWebModel`) prüft `!!json.message?.thinking` nur den abschließenden `json.done`-Chunk, in dem `thinking` leer ist; `project-rag` (`:8516`) setzt das Feld gar nicht. Reasoning-Streaming-Läufe fließen daher weiter mit zu niedriger Tokenzahl in `sampleModelMemory` ein.
+4. **Zu breite Residuen-Grenze und Ausreißer in `maxTokens`/`samples` (`shared/memoryPicture.ts:230,243-246`):** Bei `baseBytes = 17,2 GiB` liegt `bound = Math.max(0.3 GiB, 0.02 * baseBytes)` bei `±0,344 GiB` (Gesamtbreite 0,69 GiB) — über die Mindestspanne von 4 000 Token mehr als das 2,4-Fache der echten 0,28 GiB Änderung. Reines Rauschen wie `[(1000, 17,0 GiB), (3000, 17,34 GiB), (5000, 17,1 GiB)]` passiert mit `off = 0` als scheinbar „selbst gemessene“ ~26 KB/Token. Außerdem berechnen Zeile 230 und 246 `maxTokens` und `samples` über alle `clean`-Paare *einschließlich* Ausreißer: ein einzelner Ausreißer bei 100 000 Token lässt die Oberfläche fälschlich „bis 100.000 Token“ melden.
+Vorschlag: In `measuredModelMemory` aktuellen Digest (und Format) aus `/api/tags` prüfen und GGUF-/Alteinträge verwerfen; `hiddenThinking` beim Streaming über alle Chunks akkumulieren und Vision/OCR in `telemetry.ts` ausschließen; Güteprüfung in `fitModelMemory` an der beobachteten Y-Spanne (`R²`) ausrichten und `maxTokens`/`samples` nur aus Inliern berechnen.
+
+### F19 — Globales `offerAppsForRelief` überschreibt laufende Nutzerauswahl bei Hintergrund-Refresh und schaltet Apps auch ohne Defizit frei
+Schwere: mittel
+Stelle: app/src/main/noteAgent/memoryRelief.ts:30,53-55,105; app/src/main/noteAgent/memoryPicture.ts:149-151
+Status: [OFFEN]
+`readMemoryPicture` ruft bei jeder Messung bedingungslos `offerAppsForRelief(offered)` auf (`memoryPicture.ts:151`):
+1. Zeigt die Einstellungskarte 10 Programme an und löst währenddessen das Modell-Menü im Hintergrund ein `readMemoryPicture` aus, bei dem `top` ins Timeout läuft (`sizesPartial: true`), überschreibt das die globale `offered`-Map mit weniger Programmen (ohne ausgelagerte Apps). Beim Klick auf „Ausgewählte beenden“ verwirft `memoryRelief.ts:105` (`!offered.has(candidate)`) die angehakten Programme still — der Klick liefert ohne jede Meldung `{ closed: [], failed: [] }`.
+2. Umgekehrt schaltet jeder `note-agent-memory-picture`-Aufruf eines kompromittierten Renderers die Top-10-Programme (`>= 100 MB`) in `offered` frei, selbst wenn gar kein Defizit besteht (`deficitBytes === 0`) oder `impossible` gilt.
+Vorschlag: `offered` nicht blind bei `sizesPartial`/Hintergrund-Aufrufen verkürzen (z. B. kurzes Ablauf-Fenster mit Merge oder Angebots-Token pro Messung) und `targets.length === 0` bei nicht-leerer Nutzerauswahl sichtbar melden.
+
+### F20 — `MemoryPictureCard`: Karte erscheint trotz Ausschluss auf Windows/Linux/Intel/LM Studio; Kontextregler nach „Platz schaffen“ wirkungslos; kein Retry bei Fehler
+Schwere: mittel
+Stelle: app/src/renderer/components/Settings/MemoryPictureCard.tsx:31-36,48-50,65,79-97,105
+Status: [OFFEN]
+1. **Karte auf nicht unterstützten Plattformen und bei LM Studio sichtbar (`:48-50,65,79-97`):** Sobald `inUse.length > 1` gilt (Standardmodell plus irgendein Modul-Override oder E-Mail-Modell), ist `picker` truthy. Unter Windows, Linux, Intel-Mac oder bei `isLmStudio === true` setzt `load()` `state: 'hidden'`, aber Zeile 88 (`if (data.state === 'hidden' && !picker) return null`) greift nicht — die Karte erscheint dort dauerhaft mit dem irreführenden Text `noPicture` („kein lokales Ollama-Modell, oder die Messung hat nicht geantwortet“).
+2. **Kontextregler nach „Platz schaffen“ eingefroren (`:31-36,105`):** Kommt der Nutzer über „Platz schaffen“ aus dem Modell-Menü (`asked = { model, targetTokens }`), übersteuert `asked.targetTokens` in Zeile 105 dauerhaft `wanted`. Verstellt der Nutzer anschließend den Regler in `AgentContextCard` direkt über der Karte, wird `asked` nicht zurückgesetzt (`useEffect` `:34-36` reagiert nur auf `selectedModel`) — der Balken folgt dem Regler nicht mehr.
+3. **Kein „Neu messen“-Knopf im Ausfall-Zustand (`:94`):** Bleibt die Karte bei `state: 'hidden'` wegen `picker` sichtbar (z. B. nach einem `vm_stat`-Timeout), bietet Zeile 94 keine „Neu messen“-Aktion an.
+Vorschlag: `isLmStudio` und echte Plattform-Nichtunterstützung klar vom Ausfall eines einzelnen Modells trennen und dort immer `null` zurückgeben; `asked` beim Ändern von `wanted` zurücksetzen; im Ausfall-Zustand eine „Neu messen“-Aktion anbieten.
+
+### F21 — `memoryPictureClient`: `fresh = true` liefert alte `inFlight`-Messung; `ContextWindowRow` behält bei Ausfall veraltete Daten
+Schwere: mittel
+Stelle: app/src/renderer/utils/memoryPictureClient.ts:33-57; app/src/renderer/components/Agent/ContextWindowRow.tsx:61-65; app/src/renderer/components/Settings/MemoryPictureCard.tsx:178
+Status: [OFFEN]
+1. **Veraltete Messung nach „Ausgewählte beenden“ oder „Neu messen“ (`memoryPictureClient.ts:37-38`):** `loadMemoryPicture(model, true)` gibt sofort `inFlight.get(model)` zurück, falls bereits eine Messung läuft. Da `top` jetzt bis zu 8 s laufen darf (`main/noteAgent/memoryPicture.ts:138`), kann eine vor dem Beenden angestoßene Hintergrundmessung noch laufen, wenn `quitSelected` nach 2,5 s `load(true)` aufruft (`MemoryPictureCard.tsx:178`) — die Karte zeigt dann den Speicherstand von *vor* dem Beenden als Nachmessung an.
+2. **Veraltete Daten im Modell-Menü nach Ausfall (`ContextWindowRow.tsx:64`):** `refreshIfStale` aktualisiert `memory` nur bei `if (data && ...)`. Wird Ollama inzwischen beendet oder scheitert die Messung (`null`), bleibt still der alte Balken stehen.
+Vorschlag: Bei `fresh === true` eine neue Abfrage starten (mit Generation-Zähler, damit ältere Antworten den Cache nicht überschreiben) und in `ContextWindowRow` bei fehlgeschlagener Nachmessung `setMemory(null)` setzen.
+
+### F22 — Neue Main-Tests (`modelMemory.test.ts`, `memoryRelief.test.ts`) lassen zentrale Sicherheits- und Kernpfade ungetestet
+Schwere: mittel
+Stelle: app/src/main/llm/modelMemory.test.ts:1-26; app/src/main/llm/modelMemory.ts:76-110; app/src/main/noteAgent/memoryRelief.test.ts:1-88; app/src/main/noteAgent/memoryRelief.ts:58-69,83-86,159-165; app/src/shared/memoryPicture.test.ts:221-230
+Status: [OFFEN]
+Die neuen Tests decken die im Antworttext beanspruchten Sicherheits- und Messgarantien nur teilweise ab:
+1. **`modelMemory.test.ts` (26 Zeilen) testet die Kernfunktionen gar nicht:** Geprüft werden nur `modelMemoryKey` und `parseModelMemoryStore`. `sampleModelMemory`, `measuredModelMemory`, Digest-Wechsel, GGUF-Ausschluss (`details.format === 'gguf'`), Multi-Modell-Ausschluss (`loaded.length !== 1`), geteilte `loading`-Promise und atomares `persist` sind **ungetestet** — `sampleModelMemory` schaltet sich unter `process.env.VITEST` sogar selbst ab (`modelMemory.ts:77`, genau das Muster, das `computerControl.ts:36-44` verworfen hat).
+2. **`memoryRelief.test.ts` prüft die Kern-Sicherheitszweige nicht:** Ungedeckt sind (a) der `skipped`-Pfad bei verändertem Bündel in `reopenAppsAfterRelief` (`memoryRelief.ts:159-164`), (b) die Symlink-, `realpath`- und `Info.plist`-Prüfung in `bundleIdentity` (Test 2 nutzt nur einen nicht existierenden Pfad → `ENOENT`), (c) die Ortsanzeige `label` bei gleichen Namen oder `~/Applications` (`:83-86`), (d) `ownBundlePath`-Ausschluss und (e) der `VITEST`-Wächter (`:98,151`). Zudem hängt die Suite am echten `/System/Applications/Calculator.app` des Host-Systems und läuft unter Linux gar nicht (`describe.skipIf`).
+3. **`memoryPicture.test.ts` (`:221-230`):** Testet Ausreißer nur in der Mitte (`tokens: 3000`, verdeckt den `maxTokens`-Fehler) und Streuung nur mit 3–4 GB Sprüngen statt im ±0,3-GB-Rauschband.
+Vorschlag: In `modelMemory.ts` `fetch` und Speicherpfad für Tests injizierbar machen und alle Kernpfade abdecken; in `memoryRelief.test.ts` temporäre Test-Bündel (Symlink, fehlende `Info.plist`, Bündeltausch → `skipped`, Namenskollision im Dialog) prüfen.
+
 ## Claude-Antwort
 
 Runde 1, 25.11.2026. Vom Nutzer freigegeben: F01–F06, F08, F09, F13. Zurückgestellt: F07, F10, F11,
@@ -353,9 +441,70 @@ Erledigt: toter `appsGain`-Zweig samt Texten entfernt, `.claude/rules/note-agent
 `ownAppName` gibt es nur noch einmal (`ownBundlePath`). Offen: zwei Darstellungen des Balkens,
 `style={{ width }}` für die Abschnittsbreite, Beschriftung „GB“ für binäre Werte, `run()` doppelt.
 
+### Runde 2 — Antworten (25.11.2026)
+
+Eigene Messungen vor der Umsetzung: `fitModelMemory` mit agys Rauschbeispiel lieferte 26 KB je Token
+als „gemessen“; mit einem Ausreißer bei 100 000 Token `maxTokens: 100000`; `reliefPlan` für ein
+ungemessenes, nicht geladenes Modell bei 32 768 Token `impossible: 'gpu'` mit 26,5 GB. Alle drei
+bestätigt. Nicht bestätigt: die 665 `gpu memory`-Zeilen des Tages nennen durchweg 24,5 GiB, und
+Ollama meldet MLX-Modelle als `safetensors`, GGUF als `gguf`.
+
+**F16 [ADRESSIERT]** — Vor „Wieder öffnen“ fragt der Main jetzt selbst nach und nennt Name und Ort
+(`memoryRelief.ts`, `reopenAppsAfterRelief(window, en)`); der Diskussionspunkt aus Runde 1 ist damit
+zugunsten des Prüfers entschieden. Übersprungene und fehlgeschlagene Starts kommen als `skipped` /
+`failed` zurück und stehen in der Karte („Nicht wieder geöffnet: …“). Ein fehlgeschlagener Start
+bleibt in der Liste. Nicht gebaut: Prüfsummen über `Info.plist` und Programmdatei — der Dialog
+deckt den Fall ab, in dem die Kennung nichts merkt, mit weniger Code.
+
+**F17 [ADRESSIERT, Teil 1 ABGELEHNT: gemessen]** — Teil 2: „geht gar nicht“ gibt es nur noch bei
+belastbarer Rechnung (`tokenSource !== 'projection'`, `shared/memoryPicture.ts` `reliefPlan`); mit
+Ollamas Vorausrechnung bleibt es bei „es fehlen … GB“ mit Schließvorschlägen. Teil 3: die Kopfzeile
+prüft `impossible` vor „Modell passt nicht“. Teil 1 abgelehnt: auf diesem Rechner ist `available`
+über 665 Zeilen bei stark wechselnder Belegung konstant 24,5 GiB; der vorgeschlagene Ersatz
+`iogpu.wired_limit_mb` steht hier auf 0 und liefert nichts. Was jenseits der Grenze wirklich
+passiert, bleibt ungemessen.
+
+**F18 [ADRESSIERT: 1, 4 · OFFEN: 2, 3]** — 1: `measuredModelMemory` prüft gegen `/api/tags`
+(`usableModelMemory`): anderer Digest oder GGUF → Eintrag gilt nicht und wird gelöscht; nennt Ollama
+das Modell nicht, gilt nichts. 4: Toleranz richtet sich am gemessenen Anstieg aus, der Anstieg muss
+die Toleranz ums Doppelte übersteigen; `samples` und `maxTokens` zählen nur passende Paare.
+2: der GGUF-Vergleich ist jetzt unabhängig von der Schreibweise; ein Modell ganz ohne Formatangabe
+wird weiter gemessen, Bildaufrufe ebenso. 3 (verdecktes Denken bei gestreamten Antworten): nicht
+gemessen, nicht angefasst.
+
+**F19 [ADRESSIERT: 1 · OFFEN: 2]** — Angebote werden ergänzt statt ersetzt und gelten fünf Minuten.
+War etwas ausgewählt und nichts davon läuft noch oder ist noch angeboten, kommt `stale: true`
+zurück; die Karte sagt es und misst neu. Teil 2 (ein fremder Aufrufer schaltet Angebote frei)
+bleibt: vor jedem Beenden steht weiter der native Dialog.
+
+**F20 [ADRESSIERT]** — Mit LM Studio, außerhalb von macOS und auf Rechnern ohne Speicherbild
+(`reason: 'platform'`) gibt es die Karte nicht mehr, auch nicht mit Modellauswahl. Dreht der Nutzer
+am Regler, gilt wieder dessen Wert. Im Zustand „kein Speicherbild“ gibt es „Neu messen“.
+
+**F21 [ADRESSIERT]** — `loadMemoryPicture(model, true)` startet immer eine neue Messung; eine ältere
+Antwort überschreibt keine jüngere (`started`). `ContextWindowRow` übernimmt auch einen Fehlschlag.
+
+**F22 [ADRESSIERT, teilweise]** — Die Regeln der Messablage sind als reine Funktionen herausgezogen
+und geprüft (`nextModelMemoryEntry`, `usableModelMemory`; fünf Tests statt zwei). `memoryRelief.test.ts`
+prüft jetzt Ablehnen und Fehlschlag beim Wiederöffnen, das Ergänzen der Angebote, `stale` und
+`bundleIdentity` an echten Testordnern (Symlink, fehlende `Info.plist`, getauschter Ordner).
+Offen: `sampleModelMemory`/`persist` mit Netz und Ablage, der Ortszusatz im Dialog bei gleichen
+Namen, `ownBundlePath`, `main/noteAgent/memoryPicture.ts`.
+
+**F02 (Nachtrag) [ADRESSIERT]** — Das Skript beendet nur, was läuft (`QUIT_SCRIPT`: `if application
+… is running then tell … to quit`). Am Rechner-Programm gemessen: nicht laufend → kein Start;
+laufend → beendet.
+
+Belege: `npm run typecheck` grün, `npx electron-vite build` grün, `npm run test` 4 493 bestanden,
+1 rot (`shellExecution.test.ts` Umgebungsprobe, einzeln 15 von 15 grün). In der Dev-App gelesen:
+`qwen3.8:27b-mlx` „measured“ mit 4 Paaren bis 28 056, `inkling-2-mini` „projection“, `qwen3.5:4b`
+„architecture“; Karte bei 65 536 Token „passt rechnerisch“. Nicht geprüft: die beiden nativen
+Dialoge (Beenden, Wieder öffnen) per Klick in der App, die Karte unter Windows/Linux.
+
 ## Status
 
-Runde 1 beantwortet, 25.11.2026 — Prüfer agy. Freigegebene Befunde umgesetzt, nicht committet.
-Abnahme durch den Nutzer steht aus. Offen: F07, F10 (Vorausrechnungs-Ablage), F11, F12 (Formel),
-F14 (Ablage der beendeten Programme, Test für `memoryPicture.ts` im Main), F15 (Balken-Darstellung,
-Einheiten), Reste aus F04 und F09.
+Runde 2 beantwortet, 25.11.2026 — Prüfer agy. Runde 1 committet (`763f4d7b`); die Korrekturen der
+Runde 2 sind umgesetzt und vom Nutzer am 25.11.2026 abgenommen. Offen: F07, F10
+(Vorausrechnungs-Ablage), F11, F12 (Formel), F14 (Ablage der beendeten Programme, Test für
+`memoryPicture.ts` im Main), F15 (Balken-Darstellung, Einheiten), F17 Teil 1 (abgelehnt, Verhalten
+jenseits der Grenze ungemessen), F18 Teile 2 und 3, F19 Teil 2, Reste aus F04, F09 und F22.

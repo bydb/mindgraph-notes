@@ -239,7 +239,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   noteAgentContextInfo: (params: { model: string }) => ipcRenderer.invoke('note-agent-context-info', params),
   noteAgentMemoryPicture: (params: { model: string }) => ipcRenderer.invoke('note-agent-memory-picture', params),
   noteAgentMemoryReliefQuit: (params: { paths: string[]; en?: boolean }) => ipcRenderer.invoke('note-agent-memory-relief-quit', params),
-  noteAgentMemoryReliefReopen: () => ipcRenderer.invoke('note-agent-memory-relief-reopen'),
+  noteAgentMemoryReliefReopen: (params: { en?: boolean }) => ipcRenderer.invoke('note-agent-memory-relief-reopen', params),
   noteAgentCancel: (runId: string) => ipcRenderer.invoke('note-agent-cancel', runId),
   // Rechner-Steuerung: Programm über den Systemdialog freigeben (liefert Bundle-Kennung).
   computerControlPickApp: () => ipcRenderer.invoke('computer-control-pick-app'),

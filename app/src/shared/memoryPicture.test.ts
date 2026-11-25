@@ -229,6 +229,16 @@ describe('eigene Messung', () => {
     expect(fitModelMemory([{ tokens: Number.NaN, bytes: 1 }, { tokens: 1, bytes: Number.NaN }, { tokens: 5, bytes: 5 }])).toBeNull()
   })
 
+  it('Rauschen über eine kurze Spanne ist keine Messung; ein Ausreißer zählt nicht zur Grundlage (agy F18)', () => {
+    // ±0,3 GB Streuung über 4 000 Token: ging vorher als „26 KB je Token, selbst gemessen“ durch.
+    expect(fitModelMemory([{ tokens: 1000, bytes: 17.0 * GB }, { tokens: 3000, bytes: 17.34 * GB }, { tokens: 5000, bytes: 17.1 * GB }])).toBeNull()
+    // Ausreißer am oberen Ende: die Gerade hält, „gemessen bis“ bleibt bei den passenden Paaren.
+    const top = fitModelMemory([...real, { tokens: 100000, bytes: 17.3 * GB }])
+    expect(top).toMatchObject({ samples: 4, maxTokens: 28056 })
+    // Die echte Messung über eine kurze Spanne gilt weiter.
+    expect(fitModelMemory([{ tokens: 1000, bytes: 17.29 * GB }, { tokens: 3000, bytes: 17.43 * GB }, { tokens: 5000, bytes: 17.57 * GB }])).not.toBeNull()
+  })
+
   it('je 1 000-Token-Stufe bleibt das jüngste Paar; Unsinn wird nicht aufgenommen', () => {
     const a = addMemorySample([{ tokens: 7022, bytes: 1 }], { tokens: 7900, bytes: 2 })
     expect(a).toEqual([{ tokens: 7900, bytes: 2 }])
@@ -287,6 +297,21 @@ describe('reliefPlan', () => {
     // 131 072 Token = 8 GB → 25 GB: in den Arbeitsspeicher ginge es, auf die Grafikeinheit (24,5 GB) nicht.
     expect(reliefPlan({ ...picture, gpuLimitBytes: 24.5 * GB }, apps, 131072)).toMatchObject({ impossible: 'gpu', picks: [] })
     expect(reliefPlan(picture, apps, 131072)).toMatchObject({ impossible: null, deficitBytes: 2 * GB })
+  })
+
+  it('Ollamas Vorausrechnung reicht nicht für „geht gar nicht“ (agy F17)', () => {
+    // Ungemessen, nicht geladen: 17 GB Modell + 4 GB Puffer + 5,5 GB Kontext = 26,5 GB bei 32 768
+    // Token — über der Grenze der Grafikeinheit, real sind es rund 19,5 GB.
+    const p = memoryPicture({
+      totalBytes: 32 * GB, usedBytes: 9 * GB, modelBytes: 17 * GB, loadedBytes: null,
+      projection: { contextLength: 32768, fullContextBytes: 5.5 * GB, workspaceBytes: 4 * GB },
+      architectureBytesPerToken: null, measured: null, gpuLimitBytes: 24.5 * GB
+    })
+    expect(p.tokenSource).toBe('projection')
+    const plan = reliefPlan(p, apps, 32768)
+    expect(plan).toMatchObject({ impossible: null })
+    expect((plan as { deficitBytes: number }).deficitBytes).toBeGreaterThan(0)
+    expect((plan as { picks: unknown[] }).picks.length).toBeGreaterThan(0)
   })
 
   it('passt, aber knapp', () => {

@@ -3,7 +3,7 @@ import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { Card, Row, Note, Select, Button } from './SettingsUI'
 import { AGENT_CONTEXT_DEFAULT, normalizeAgentContextSetting } from '../../../shared/agentContext'
-import { loadMemoryPicture, takeMemoryPictureRequest, type MemoryPictureData, type MemoryPictureRequest } from '../../utils/memoryPictureClient'
+import { loadMemoryPicture, memoryPictureUnsupported, takeMemoryPictureRequest, type MemoryPictureData, type MemoryPictureRequest } from '../../utils/memoryPictureClient'
 import { memoryBar, reliefPlan, roundTokens } from '../../../shared/memoryPicture'
 
 type State =
@@ -55,6 +55,13 @@ export function MemoryPictureCard() {
   const [chosen, setChosen] = useState<Set<string> | null>(null)
   const [working, setWorking] = useState(false)
   const [outcome, setOutcome] = useState<{ closed: string[]; failed: string[] } | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  // Dreht der Nutzer hier am Regler, gilt wieder dessen Wert — das aus dem Menü übergebene Fenster
+  // hielt den Balken sonst fest (agy F20).
+  const firstWanted = useRef(wanted)
+  useEffect(() => {
+    if (firstWanted.current !== wanted) { firstWanted.current = wanted; setAsked(a => (a ? { ...a, targetTokens: null } : a)) }
+  }, [wanted])
   // Eine verspätete Antwort für ein anderes Modell oder nach dem Schließen darf nichts überschreiben.
   const requestId = useRef(0)
   const alive = useRef(true)
@@ -85,13 +92,18 @@ export function MemoryPictureCard() {
     // Während der Messung steht die Karte schon da (der Sprung aus dem Modell-Menü landete sonst im
     // Leeren). Gibt es für das Modell kein Speicherbild, bleibt die Auswahl sichtbar, solange es
     // andere Modelle gibt.
+    // Ohne Speicherbild auf diesem Rechner oder mit LM Studio gibt es die Karte nicht — auch nicht
+    // mit Modellauswahl (agy F20: sie stand sonst unter Windows und Linux dauerhaft leer da).
+    if (isLmStudio || window.electronAPI.platform !== 'darwin' || memoryPictureUnsupported()) return null
     if (data.state === 'hidden' && !picker) return null
     return (
       <Card>
         <Row label={t('settings.memoryPicture.label', { model })} hint={t('settings.memoryPicture.hint')} stacked>
           <div className="sui-membar-wrap">{picker}</div>
         </Row>
-        <Note tone="muted">{t(data.state === 'loading' ? 'settings.memoryPicture.loading' : 'settings.memoryPicture.noPicture')}</Note>
+        {data.state === 'loading'
+          ? <Note tone="muted">{t('settings.memoryPicture.loading')}</Note>
+          : <Note tone="muted" action={t('settings.memoryPicture.refresh')} onAction={() => { void load(true) }} actionDisabled={busy}>{t('settings.memoryPicture.noPicture')}</Note>}
       </Card>
     )
   }
@@ -126,14 +138,15 @@ export function MemoryPictureCard() {
   if (picture.modelBytes == null) {
     headline = t('settings.memoryPicture.unknownModel')
     tone = 'warn'
-  } else if (overModel > 0) {
-    headline = t('settings.memoryPicture.modelOver', { gb: gb(overModel) })
-    tone = 'danger'
   } else if (plan?.impossible === 'gpu') {
+    // Vor „Modell passt nicht“: dann gibt es keine Schließvorschläge, und die Karte muss sagen, warum.
     headline = t('settings.memoryPicture.impossibleGpu', { n: fmt(target), need: gb(plan.needBytes), gpu: gb(picture.gpuLimitBytes ?? 0) })
     tone = 'danger'
   } else if (plan?.impossible === 'memory') {
     headline = t('settings.memoryPicture.impossibleMemory', { n: fmt(target), need: gb(plan.needBytes), total: gb(picture.totalBytes) })
+    tone = 'danger'
+  } else if (overModel > 0) {
+    headline = t('settings.memoryPicture.modelOver', { gb: gb(overModel) })
     tone = 'danger'
   } else if (over > 0) {
     headline = t('settings.memoryPicture.bufferOver', { buffer: gb(bufferBytes), gb: gb(over) })
@@ -168,10 +181,15 @@ export function MemoryPictureCard() {
   const quitSelected = async (): Promise<void> => {
     setWorking(true)
     setOutcome(null)
+    setNotice(null)
     try {
       const res = await window.electronAPI.noteAgentMemoryReliefQuit({ paths: [...selected], en: language === 'en' })
       if (!alive.current) return
-      if (res.success && !res.cancelled) {
+      if (res.success && res.stale) {
+        // Nichts aus der Auswahl läuft noch oder ist noch angeboten: sagen und neu messen.
+        setNotice(t('settings.memoryPicture.reliefStale'))
+        await load(true)
+      } else if (res.success && !res.cancelled) {
         setOutcome({ closed: res.closed ?? [], failed: res.failed ?? [] })
         // Der Speicher eines beendeten Programms ist erst einen Moment später frei.
         await wait(2500)
@@ -183,8 +201,13 @@ export function MemoryPictureCard() {
   }
   const reopen = async (): Promise<void> => {
     setWorking(true)
+    setNotice(null)
     try {
-      await window.electronAPI.noteAgentMemoryReliefReopen()
+      const res = await window.electronAPI.noteAgentMemoryReliefReopen({ en: language === 'en' })
+      if (!alive.current || res.cancelled) return
+      const missed = [...(res.skipped ?? []), ...(res.failed ?? [])]
+      if (!res.success) setNotice(t('settings.memoryPicture.reopenFailed', { list: reopenable.join(', ') }))
+      else if (missed.length > 0) setNotice(t('settings.memoryPicture.reopenFailed', { list: missed.join(', ') }))
       await wait(1500)
       if (alive.current) await load(true)
     } finally {
@@ -267,6 +290,7 @@ export function MemoryPictureCard() {
           {outcome.failed.length > 0 && <> {t('settings.memoryPicture.reliefFailed', { list: outcome.failed.join(', ') })}</>}
         </Note>
       )}
+      {notice && <Note tone="warn">{notice}</Note>}
       {reopenable.length > 0 && (
         <Note tone="muted" action={t('settings.memoryPicture.reliefReopen')} onAction={() => { void reopen() }} actionDisabled={working}>
           {t('settings.memoryPicture.reliefReopenHint', { list: reopenable.join(', ') })}

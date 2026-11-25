@@ -367,10 +367,10 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }
   })
-  ipcMain.handle('note-agent-memory-relief-reopen', async event => {
+  ipcMain.handle('note-agent-memory-relief-reopen', async (event, params: { en?: boolean }) => {
     if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
     try {
-      return { success: true, ...(await reopenAppsAfterRelief()) }
+      return { success: true, ...(await reopenAppsAfterRelief(BrowserWindow.fromWebContents(event.sender), params?.en === true)) }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }

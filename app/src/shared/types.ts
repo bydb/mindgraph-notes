@@ -986,11 +986,13 @@ export interface ElectronAPI {
     projectionContext?: number | null;
     reopenable?: string[];
     sizesPartial?: boolean;
+    /** Bei `supported: false`: 'platform' = dieser Rechner hat gar kein Speicherbild (nicht macOS auf Apple Silicon). */
+    reason?: 'platform';
     error?: string;
   }>;
   /** Platz schaffen: Programme beenden (der Main fragt selbst nach) und später wieder öffnen. */
-  noteAgentMemoryReliefQuit: (params: { paths: string[]; en?: boolean }) => Promise<{ success: boolean; closed?: string[]; failed?: string[]; cancelled?: boolean; error?: string }>;
-  noteAgentMemoryReliefReopen: () => Promise<{ success: boolean; reopened?: string[]; skipped?: string[]; error?: string }>;
+  noteAgentMemoryReliefQuit: (params: { paths: string[]; en?: boolean }) => Promise<{ success: boolean; closed?: string[]; failed?: string[]; cancelled?: boolean; stale?: boolean; error?: string }>;
+  noteAgentMemoryReliefReopen: (params: { en?: boolean }) => Promise<{ success: boolean; reopened?: string[]; skipped?: string[]; failed?: string[]; cancelled?: boolean; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   computerControlPickApp: () => Promise<{ success: boolean; app?: { id: string; label: string; path: string }; error?: string }>;
   // Externe Werkzeuge (MCP) — Einstellungen. Speichern nur nach nativem Dialog im Main.
