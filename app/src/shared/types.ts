@@ -985,11 +985,12 @@ export interface ElectronAPI {
     apps?: import('./memoryPicture').ProcessGroup[];
     projectionContext?: number | null;
     reopenable?: string[];
+    sizesPartial?: boolean;
     error?: string;
   }>;
   /** Platz schaffen: Programme beenden (der Main fragt selbst nach) und später wieder öffnen. */
   noteAgentMemoryReliefQuit: (params: { paths: string[]; en?: boolean }) => Promise<{ success: boolean; closed?: string[]; failed?: string[]; cancelled?: boolean; error?: string }>;
-  noteAgentMemoryReliefReopen: () => Promise<{ success: boolean; reopened?: string[]; error?: string }>;
+  noteAgentMemoryReliefReopen: () => Promise<{ success: boolean; reopened?: string[]; skipped?: string[]; error?: string }>;
   noteAgentCancel: (runId: string) => Promise<{ success: boolean }>;
   computerControlPickApp: () => Promise<{ success: boolean; app?: { id: string; label: string; path: string }; error?: string }>;
   // Externe Werkzeuge (MCP) — Einstellungen. Speichern nur nach nativem Dialog im Main.

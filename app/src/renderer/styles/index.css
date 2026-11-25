@@ -24249,3 +24249,6 @@ body.presentation-mode *::after {
 @keyframes agent-logo-read { 0% { opacity: 0; transform: translate(8px, 23px); } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(16px, 16px); } }
 @keyframes agent-logo-write { 0% { opacity: 0; transform: translate(16px, 16px); } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(24px, 23px); } }
 @keyframes agent-logo-done { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: .85; transform: scale(1); } }
+
+/* Auftragskarte, Modell-Menü: Speicherbalken unter dem Kontextfenster-Regler */
+.agent-card-membar { height: 10px; margin: 6px 0 2px; }

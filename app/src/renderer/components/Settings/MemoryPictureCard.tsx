@@ -1,21 +1,22 @@
-import { useCallback, useEffect, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react'
 import { useUIStore } from '../../stores/uiStore'
 import { useTranslation } from '../../utils/translations'
 import { Card, Row, Note, Select, Button } from './SettingsUI'
 import { AGENT_CONTEXT_DEFAULT, normalizeAgentContextSetting } from '../../../shared/agentContext'
-import { contextBytes, reliefPlan, roundTokens, type MemoryPicture, type ProcessGroup } from '../../../shared/memoryPicture'
+import { loadMemoryPicture, takeMemoryPictureRequest, type MemoryPictureData, type MemoryPictureRequest } from '../../utils/memoryPictureClient'
+import { memoryBar, reliefPlan, roundTokens } from '../../../shared/memoryPicture'
 
 type State =
   | { state: 'loading' }
   | { state: 'hidden' }
-  | { state: 'ready'; picture: MemoryPicture; swapUsedBytes: number | null; apps: ProcessGroup[]; reopenable: string[] }
+  | ({ state: 'ready' } & MemoryPictureData)
 
 const GB = 1024 ** 3
 
-// Speicherbild (shared/memoryPicture.ts): was Programme und Modell gerade belegen und wie viel
-// Kontext daneben noch in den Arbeitsspeicher passt. Belegung ist gemessen, die Token-Zahl aus
-// Ollamas Vorausrechnung gerechnet — die Karte sagt das dazu. Nur für lokale Modelle auf Rechnern
-// mit gemeinsamem Speicher; sonst erscheint sie nicht.
+// Speicherbild (shared/memoryPicture.ts): was Programme und Modell gerade belegen und ob ein volles
+// Kontextfenster daneben noch in den Arbeitsspeicher passt. Belegung ist gemessen; woher die Kosten
+// je Token stammen (eigene Messung, Ollamas Vorausrechnung, Modellaufbau), steht auf der Karte.
+// Nur für lokale Modelle auf Rechnern mit gemeinsamem Speicher.
 export function MemoryPictureCard() {
   const { t, language } = useTranslation()
   // Welches Modell? Vorgabe ist das Standardmodell und folgt dessen Wechsel — wer oben ein anderes
@@ -25,10 +26,27 @@ export function MemoryPictureCard() {
   const overrides = useUIStore(s => s.ollama.moduleModelOverrides)
   const emailModel = useUIStore(s => (s.email.enabled ? s.email.analysisModel : '') || '')
   const agentModel = overrides?.['note-agent'] || selectedModel
-  const inUse = [...new Set([selectedModel, ...Object.values(overrides ?? {}), emailModel].filter((m): m is string => !!m))]
-  const [picked, setPicked] = useState('')
-  useEffect(() => { setPicked('') }, [selectedModel])
-  const model = picked && inUse.includes(picked) ? picked : selectedModel || inUse[0] || ''
+  // Kommt der Nutzer über „Platz schaffen“ aus dem Modell-Menü, zeigt die Karte dessen Modell und
+  // dessen Fenster — auch wenn das Modell nur im Agent-Tab gewählt ist (agy F09).
+  const [asked, setAsked] = useState<MemoryPictureRequest | null>(() => takeMemoryPictureRequest())
+  const [picked, setPicked] = useState(() => asked?.model ?? '')
+  const firstModel = useRef(selectedModel)
+  useEffect(() => {
+    if (firstModel.current !== selectedModel) { firstModel.current = selectedModel; setPicked(''); setAsked(null) }
+  }, [selectedModel])
+  useEffect(() => {
+    const onRequest = (e: Event): void => {
+      const detail = (e as CustomEvent<MemoryPictureRequest>).detail
+      if (!detail?.model) return
+      takeMemoryPictureRequest()
+      setAsked(detail)
+      setPicked(detail.model)
+    }
+    window.addEventListener('mindgraph:memoryPictureModel', onRequest)
+    return () => window.removeEventListener('mindgraph:memoryPictureModel', onRequest)
+  }, [])
+  const inUse = [...new Set([selectedModel, ...Object.values(overrides ?? {}), emailModel, picked].filter((m): m is string => !!m))]
+  const model = picked || selectedModel || inUse[0] || ''
   const isLmStudio = useUIStore(s => s.ollama.backend === 'lm-studio')
   const wanted = normalizeAgentContextSetting(useUIStore(s => s.noteAgentLocalContextTokens))
   const [data, setData] = useState<State>({ state: 'loading' })
@@ -37,32 +55,54 @@ export function MemoryPictureCard() {
   const [chosen, setChosen] = useState<Set<string> | null>(null)
   const [working, setWorking] = useState(false)
   const [outcome, setOutcome] = useState<{ closed: string[]; failed: string[] } | null>(null)
+  // Eine verspätete Antwort für ein anderes Modell oder nach dem Schließen darf nichts überschreiben.
+  const requestId = useRef(0)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
 
-  const load = useCallback(async (): Promise<void> => {
+  const load = useCallback(async (fresh = false): Promise<void> => {
+    const id = ++requestId.current
     if (isLmStudio || !model) { setData({ state: 'hidden' }); return }
     setBusy(true)
     try {
-      const res = await window.electronAPI.noteAgentMemoryPicture({ model })
-      if (!res.success || !res.supported || !res.picture) setData({ state: 'hidden' })
-      else setData({ state: 'ready', picture: res.picture, swapUsedBytes: res.swapUsedBytes ?? null, apps: res.apps ?? [], reopenable: res.reopenable ?? [] })
+      const res = await loadMemoryPicture(model, fresh)
+      if (!alive.current || id !== requestId.current) return
+      setData(res ? { state: 'ready', ...res } : { state: 'hidden' })
       setChosen(null)
-    } catch {
-      setData({ state: 'hidden' })
     } finally {
-      setBusy(false)
+      if (alive.current && id === requestId.current) setBusy(false)
     }
   }, [model, isLmStudio])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { setData({ state: 'loading' }); void load() }, [load])
 
-  if (data.state !== 'ready') return null
-  const { picture, swapUsedBytes, apps, reopenable } = data
+  const picker = inUse.length > 1 && (
+    <Select aria-label={t('settings.memoryPicture.pick')} value={model} onChange={e => { setAsked(null); setPicked(e.target.value) }}>
+      {inUse.map(m => <option key={m} value={m}>{m}{m === agentModel ? ` · ${t('settings.memoryPicture.agentModel')}` : ''}</option>)}
+    </Select>
+  )
+  if (data.state !== 'ready') {
+    // Während der Messung steht die Karte schon da (der Sprung aus dem Modell-Menü landete sonst im
+    // Leeren). Gibt es für das Modell kein Speicherbild, bleibt die Auswahl sichtbar, solange es
+    // andere Modelle gibt.
+    if (data.state === 'hidden' && !picker) return null
+    return (
+      <Card>
+        <Row label={t('settings.memoryPicture.label', { model })} hint={t('settings.memoryPicture.hint')} stacked>
+          <div className="sui-membar-wrap">{picker}</div>
+        </Row>
+        <Note tone="muted">{t(data.state === 'loading' ? 'settings.memoryPicture.loading' : 'settings.memoryPicture.noPicture')}</Note>
+      </Card>
+    )
+  }
+  const { picture, swapUsedBytes, apps, reopenable, sizesPartial } = data
   const locale = language === 'en' ? 'en-US' : 'de-DE'
   const gb = (bytes: number): string => (bytes / GB).toLocaleString(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const fmt = (n: number): string => n.toLocaleString(locale)
 
-  // Ziel ist ein volles Fenster — beim Agent-Modell das eingestellte, sonst der Standard.
-  const target = model === agentModel ? wanted : AGENT_CONTEXT_DEFAULT
+  // Ziel ist ein volles Fenster: das aus dem Modell-Menü übergebene, beim Agent-Modell das
+  // eingestellte, sonst der Standard.
+  const target = asked?.model === model && asked.targetTokens ? asked.targetTokens : model === agentModel ? wanted : AGENT_CONTEXT_DEFAULT
   const modelBytes = picture.modelBytes ?? 0
   const bufferBytes = picture.bufferBytes
   const needed = picture.otherBytes + modelBytes + bufferBytes
@@ -70,19 +110,16 @@ export function MemoryPictureCard() {
   const overModel = Math.max(0, picture.otherBytes + modelBytes - picture.totalBytes)
   const over = Math.max(0, needed - picture.totalBytes)
   // Der Balken zeigt zusätzlich das GEFÜLLTE Zielfenster: dreht der Nutzer am Regler, wächst der
-  // Abschnitt, und was nicht mehr hineinpasst, wird rot. Ist das Modell geladen, steckt der
-  // schon belegte Kontext in dessen Größe — dann zählt nur, was bis zum vollen Fenster dazukommt.
-  const fullContext = picture.modelBytes == null ? null : contextBytes(picture, target)
-  const contextSeg = fullContext == null ? 0
-    : picture.loaded && picture.baseModelBytes != null ? Math.max(0, picture.baseModelBytes + fullContext - modelBytes)
-      : fullContext
-  const neededAll = needed + contextSeg
-  const overAll = Math.max(0, neededAll - picture.totalBytes)
-  const free = Math.max(0, picture.totalBytes - neededAll)
-  const scale = Math.max(picture.totalBytes, neededAll)
+  // Abschnitt, und was nicht mehr hineinpasst, wird rot. Bedarf und Lücke kommen für Balken,
+  // Kopfzeile und Plan aus derselben Rechnung (`memoryBar` → `reliefPlan`).
+  const bar = memoryBar(picture, target)
+  const plan = reliefPlan(picture, apps, target)
+  const contextSeg = bar.contextBytes
+  const overAll = bar.overBytes
+  const free = bar.freeBytes
+  const scale = bar.scaleBytes
   const pct = (bytes: number): string => `${(bytes / scale) * 100}%`
   const tokens = picture.tokensFit == null ? null : roundTokens(picture.tokensFit)
-  const wantedBytes = contextBytes(picture, wanted)
 
   let headline: string
   let tone: 'ok' | 'warn' | 'danger' = 'ok'
@@ -92,11 +129,17 @@ export function MemoryPictureCard() {
   } else if (overModel > 0) {
     headline = t('settings.memoryPicture.modelOver', { gb: gb(overModel) })
     tone = 'danger'
+  } else if (plan?.impossible === 'gpu') {
+    headline = t('settings.memoryPicture.impossibleGpu', { n: fmt(target), need: gb(plan.needBytes), gpu: gb(picture.gpuLimitBytes ?? 0) })
+    tone = 'danger'
+  } else if (plan?.impossible === 'memory') {
+    headline = t('settings.memoryPicture.impossibleMemory', { n: fmt(target), need: gb(plan.needBytes), total: gb(picture.totalBytes) })
+    tone = 'danger'
   } else if (over > 0) {
     headline = t('settings.memoryPicture.bufferOver', { buffer: gb(bufferBytes), gb: gb(over) })
     tone = 'warn'
   } else if (tokens == null) {
-    headline = t('settings.memoryPicture.noTokens', { gb: gb(free) })
+    headline = t('settings.memoryPicture.noTokens', { gb: gb(Math.max(0, picture.freeBytes ?? 0)) })
   } else {
     const arch = picture.tokenSource === 'architecture'
     const exact = picture.tokenSource === 'measured'
@@ -106,46 +149,49 @@ export function MemoryPictureCard() {
         : (arch ? 'settings.memoryPicture.fitsArch' : exact ? 'settings.memoryPicture.fitsMeasured' : 'settings.memoryPicture.fits'),
       { n: fmt(tokens) }
     )
-    if (model === agentModel && tokens < wanted) tone = 'warn'
+    // Die Farbe hängt am Plan, nicht an der abgerundeten Token-Zahl — sonst warnte die Kopfzeile
+    // über einem grünen „passt“ (agy F09).
+    if (plan && (plan.deficitBytes > 0 || plan.tight)) tone = 'warn'
   }
 
-  const plan = reliefPlan(picture, apps, target)
   const closable = apps.filter(a => a.path)
   const selected = chosen ?? new Set((plan?.picks ?? []).map(p => p.path as string))
   const selectedBytes = closable.reduce((sum, a) => sum + (selected.has(a.path as string) ? a.bytes : 0), 0)
+  // Gleiche Namen an zwei Orten: dann steht der Ort dabei.
+  const nameCount = (name: string): number => closable.filter(a => a.name === name).length
   const toggle = (appPath: string): void => {
     const next = new Set(selected)
     if (next.has(appPath)) next.delete(appPath); else next.add(appPath)
     setChosen(next)
   }
+  const wait = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))
   const quitSelected = async (): Promise<void> => {
     setWorking(true)
     setOutcome(null)
     try {
       const res = await window.electronAPI.noteAgentMemoryReliefQuit({ paths: [...selected], en: language === 'en' })
+      if (!alive.current) return
       if (res.success && !res.cancelled) {
         setOutcome({ closed: res.closed ?? [], failed: res.failed ?? [] })
-        // Die Programme brauchen einen Moment, bis ihr Speicher frei ist.
-        await new Promise(resolve => setTimeout(resolve, 4000))
-        await load()
+        // Der Speicher eines beendeten Programms ist erst einen Moment später frei.
+        await wait(2500)
+        if (alive.current) await load(true)
       }
     } finally {
-      setWorking(false)
+      if (alive.current) setWorking(false)
     }
   }
   const reopen = async (): Promise<void> => {
     setWorking(true)
     try {
       await window.electronAPI.noteAgentMemoryReliefReopen()
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      await load()
+      await wait(1500)
+      if (alive.current) await load(true)
     } finally {
-      setWorking(false)
+      if (alive.current) setWorking(false)
     }
   }
 
-  const biggest = apps[0]
-  const gain = biggest && picture.bytesPerToken ? roundTokens(biggest.bytes / picture.bytesPerToken) : 0
   const segment = (bytes: number, kind: string, label: string): ReactElement | null => bytes <= 0 ? null : (
     <div className={`sui-membar-seg is-${kind}`} title={`${label}: ${gb(bytes)} GB`} style={{ width: pct(bytes) }} />
   )
@@ -161,11 +207,7 @@ export function MemoryPictureCard() {
     <Card>
       <Row label={t('settings.memoryPicture.label', { model })} hint={t('settings.memoryPicture.hint')} stacked>
         <div className="sui-membar-wrap">
-          {inUse.length > 1 && (
-            <Select aria-label={t('settings.memoryPicture.pick')} value={model} onChange={e => setPicked(e.target.value)}>
-              {inUse.map(m => <option key={m} value={m}>{m}{m === agentModel ? ` · ${t('settings.memoryPicture.agentModel')}` : ''}</option>)}
-            </Select>
-          )}
+          {picker}
           <div className="sui-membar" role="img" aria-label={headline}>
             {segment(inRam(picture.otherBytes, 0), 'other', t('settings.memoryPicture.other'))}
             {segment(inRam(modelBytes, picture.otherBytes), 'model', modelLabel)}
@@ -184,16 +226,15 @@ export function MemoryPictureCard() {
           </div>
         </div>
       </Row>
-      <Note tone={tone} action={t('settings.memoryPicture.refresh')} onAction={() => { void load() }} actionDisabled={busy}>
+      <Note tone={tone} action={t('settings.memoryPicture.refresh')} onAction={() => { void load(true) }} actionDisabled={busy}>
         {headline}
-        {model === agentModel && tokens != null && over === 0 && tokens < wanted && wantedBytes != null && (
-          <> {t('settings.memoryPicture.settingOver', { n: fmt(wanted), gb: gb(wantedBytes) })}</>
-        )}
       </Note>
-      {plan && plan.deficitBytes === 0 && (
-        <Note tone="ok">{t('settings.memoryPicture.reliefFits', { n: fmt(target), need: gb(plan.needBytes), other: gb(picture.otherBytes), allowed: gb(plan.allowedOtherBytes) })}</Note>
+      {plan && !plan.impossible && plan.deficitBytes === 0 && (
+        <Note tone={plan.tight ? 'warn' : 'ok'}>
+          {t(plan.tight ? 'settings.memoryPicture.reliefTight' : 'settings.memoryPicture.reliefFits', { n: fmt(target), need: gb(plan.needBytes), other: gb(picture.otherBytes), free: gb(plan.freeBytes) })}
+        </Note>
       )}
-      {plan && plan.deficitBytes > 0 && (
+      {plan && !plan.impossible && plan.deficitBytes > 0 && (
         <Note tone="warn">
           {t('settings.memoryPicture.reliefNeed', { n: fmt(target), need: gb(plan.needBytes), other: gb(picture.otherBytes), allowed: gb(plan.allowedOtherBytes), gb: gb(plan.deficitBytes) })}
           {closable.length > 0 && (
@@ -202,16 +243,17 @@ export function MemoryPictureCard() {
               {closable.map(a => (
                 <label key={a.path} className="sui-relief-item">
                   <input type="checkbox" checked={selected.has(a.path as string)} disabled={working} onChange={() => toggle(a.path as string)} />
-                  <span>{a.name}</span>
-                  <span className="sui-relief-size">{gb(a.bytes)} GB</span>
+                  <span>{a.name}{nameCount(a.name) > 1 ? ` — ${a.path}` : ''}</span>
+                  <span className="sui-relief-size">{t('settings.memoryPicture.reliefUpToSize', { gb: gb(a.bytes) })}</span>
                 </label>
               ))}
               <div className="sui-relief-foot">
                 <Button variant="primary" onClick={() => { void quitSelected() }} disabled={working || selected.size === 0}>
                   {t('settings.memoryPicture.reliefQuit')}
                 </Button>
-                <span className={selectedBytes >= plan.deficitBytes ? 'sui-relief-sum is-enough' : 'sui-relief-sum'}>
-                  {t(selectedBytes >= plan.deficitBytes ? 'settings.memoryPicture.reliefEnough' : 'settings.memoryPicture.reliefShort', { gb: gb(selectedBytes), need: gb(plan.deficitBytes) })}
+                <span className="sui-relief-sum">
+                  {t(selectedBytes >= plan.deficitBytes ? 'settings.memoryPicture.reliefUpTo' : 'settings.memoryPicture.reliefShort', { gb: gb(selectedBytes), need: gb(plan.deficitBytes) })}
+                  {sizesPartial && <> {t('settings.memoryPicture.sizesPartial')}</>}
                 </span>
               </div>
             </div>
@@ -230,17 +272,15 @@ export function MemoryPictureCard() {
           {t('settings.memoryPicture.reliefReopenHint', { list: reopenable.join(', ') })}
         </Note>
       )}
-      {!plan && apps.length > 0 && over > 0 && (
-        <Note tone="muted">
-          {t('settings.memoryPicture.apps', { list: apps.slice(0, 4).map(a => `${a.name} ${gb(a.bytes)} GB`).join(' · ') })}
-          {gain >= 1000 && <> {t('settings.memoryPicture.appsGain', { app: biggest.name, n: fmt(gain) })}</>}
-        </Note>
-      )}
       {swapUsedBytes != null && swapUsedBytes >= GB && (
         <Note tone="muted">{t('settings.memoryPicture.swap', { gb: gb(swapUsedBytes) })}</Note>
       )}
       {picture.bytesPerToken != null && (
-        <Note tone="muted">{t(picture.tokenSource === 'architecture' ? 'settings.memoryPicture.sourceArch' : picture.tokenSource === 'measured' ? 'settings.memoryPicture.sourceMeasured' : 'settings.memoryPicture.source', { kb: fmt(Math.round(picture.bytesPerToken / 1024)) })}</Note>
+        <Note tone="muted">
+          {picture.tokenSource === 'measured' && picture.measured
+            ? t('settings.memoryPicture.sourceMeasured', { kb: fmt(Math.round(picture.bytesPerToken / 1024)), samples: String(picture.measured.samples), max: fmt(picture.measured.maxTokens) })
+            : t(picture.tokenSource === 'architecture' ? 'settings.memoryPicture.sourceArch' : 'settings.memoryPicture.source', { kb: fmt(Math.round(picture.bytesPerToken / 1024)) })}
+        </Note>
       )}
     </Card>
   )

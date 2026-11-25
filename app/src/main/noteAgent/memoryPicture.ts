@@ -13,19 +13,19 @@ import { app } from 'electron'
 import { OLLAMA_LOCAL_URL } from '../rag/localModel'
 import { ollamaLoadedModel } from './localContext'
 import { measuredModelMemory } from '../llm/modelMemory'
-import { reopenableApps } from './memoryRelief'
+import { offerAppsForRelief, ownBundlePath, reopenableApps } from './memoryRelief'
 import {
-  groupProcesses, kvBytesPerTokenFromShow, latestContextProjection, memoryPicture, swapUsedBytes, usedBytesFromVmStat,
+  footprintsFromTop, gpuLimitFromLog, groupProcesses, kvBytesPerTokenFromShow, latestContextProjection, memoryPicture, swapUsedBytes, usedBytesFromVmStat,
   type MemoryPicture, type OllamaContextProjection, type ProcessGroup
 } from '../../shared/memoryPicture'
 
 const LOG_TAIL_BYTES = 2 * 1024 * 1024
-const TOP_APPS = 8
-const MIN_APP_BYTES = 150 * 1024 * 1024
+const TOP_APPS = 10
+const MIN_APP_BYTES = 100 * 1024 * 1024
 
-function run(file: string, args: string[]): Promise<string> {
+function run(file: string, args: string[], timeout = 4000): Promise<string> {
   return new Promise(resolve => {
-    execFile(file, args, { timeout: 4000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? '' : stdout))
+    execFile(file, args, { timeout, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => resolve(err ? '' : stdout))
   })
 }
 
@@ -62,10 +62,14 @@ async function readProjectionCache(): Promise<Record<string, OllamaContextProjec
   }
 }
 
+let lastGpuLimit: number | null = null
+
 async function contextProjection(model: string): Promise<OllamaContextProjection | null> {
   const dir = path.join(os.homedir(), '.ollama', 'logs')
-  const found = latestContextProjection(await logTail(path.join(dir, 'server.log')), model)
-    ?? latestContextProjection(await logTail(path.join(dir, 'server-1.log')), model)
+  const [current, previous] = await Promise.all([logTail(path.join(dir, 'server.log')), logTail(path.join(dir, 'server-1.log'))])
+  // Grenze der Grafikeinheit steht in denselben Logs; nach einem Ollama-Neustart gilt der letzte bekannte Wert.
+  lastGpuLimit = gpuLimitFromLog(current) ?? gpuLimitFromLog(previous) ?? lastGpuLimit
+  const found = latestContextProjection(current, model) ?? latestContextProjection(previous, model)
   const cache = await readProjectionCache()
   if (!found) {
     const kept = cache[model]
@@ -120,14 +124,18 @@ export type MemoryPictureResult =
       projectionContext: number | null
       /** Programme, die über „Platz schaffen“ beendet wurden und sich wieder öffnen lassen. */
       reopenable: string[]
+      /** `top` hat nicht geantwortet: die Programmgrößen zählen dann nur, was im Arbeitsspeicher liegt. */
+      sizesPartial: boolean
     }
 
 export async function readMemoryPicture(model: string): Promise<MemoryPictureResult> {
   if (process.platform !== 'darwin' || process.arch !== 'arm64') return { supported: false }
-  const [vm, swap, ps, projection, weights, loaded, architecture, measured] = await Promise.all([
+  const [vm, swap, ps, top, projection, weights, loaded, architecture, measured] = await Promise.all([
     run('/usr/bin/vm_stat', []),
     run('/usr/sbin/sysctl', ['-n', 'vm.swapusage']),
-    run('/bin/ps', ['-axo', 'rss=,comm=']),
+    run('/bin/ps', ['-axo', 'pid=,rss=,comm=']),
+    // Größe je Prozess einschließlich Ausgelagertem — `ps` allein sieht das nicht.
+    run('/usr/bin/top', ['-l', '1', '-stats', 'pid,mem'], 8000),
     contextProjection(model),
     modelWeightsBytes(model),
     ollamaLoadedModel(model),
@@ -136,18 +144,25 @@ export async function readMemoryPicture(model: string): Promise<MemoryPictureRes
   ])
   const usedBytes = usedBytesFromVmStat(vm)
   if (usedBytes == null) return { supported: false }
+  const footprints = footprintsFromTop(top)
   // Die App schlägt sich nicht selbst zum Schließen vor.
-  const ownName = /\/([^/]+)\.app\//.exec(process.execPath)?.[1] ?? ''
-  const { apps, ollamaBytes } = groupProcesses(ps, ownName)
-  // Geladen: der größere Wert aus Prozessmessung und Ollamas Angabe — die Prozessgröße erfasst
-  // den Grafikanteil nicht immer vollständig.
-  const loadedBytes = loaded ? Math.max(ollamaBytes, loaded.sizeBytes) : null
+  const offered = groupProcesses(ps, ownBundlePath(), footprints).apps.filter(a => a.bytes >= MIN_APP_BYTES).slice(0, TOP_APPS)
+  // Nur was hier angeboten wurde, darf der Renderer danach zum Beenden nennen.
+  offerAppsForRelief(offered)
+  // Geladen zählt Ollamas eigene Angabe. Die Prozessgröße taugt dafür nicht: `ps` sieht den
+  // Grafikanteil nicht (0,3 GB bei 19 GB belegt), `top` rechnet Ausgelagertes mit ein, das in
+  // der Belegung aus `vm_stat` nicht steckt (agy F05).
+  const loadedBytes = loaded ? loaded.sizeBytes : null
   return {
     supported: true,
-    picture: memoryPicture({ totalBytes: os.totalmem(), usedBytes, modelBytes: weights, loadedBytes, projection, architectureBytesPerToken: architecture, measured }),
+    picture: memoryPicture({
+      totalBytes: os.totalmem(), usedBytes, modelBytes: weights, loadedBytes, projection,
+      architectureBytesPerToken: architecture, measured, gpuLimitBytes: lastGpuLimit
+    }),
     swapUsedBytes: swapUsedBytes(swap),
-    apps: apps.filter(a => a.bytes >= MIN_APP_BYTES).slice(0, TOP_APPS),
+    apps: offered,
     projectionContext: projection?.contextLength ?? null,
-    reopenable: reopenableApps()
+    reopenable: reopenableApps(),
+    sizesPartial: footprints.size === 0
   }
 }

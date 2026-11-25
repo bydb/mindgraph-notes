@@ -91,6 +91,23 @@ export function kvBytesPerTokenFromShow(show: unknown): number | null {
   return kvHeads * (keyLength + valueLength) * 2
 }
 
+/**
+ * Obergrenze der Grafikeinheit aus dem Ollama-Log (`msg="gpu memory" … available="24.5 GiB"`),
+ * jüngste Zeile. Modell und Kontext liegen bei gemeinsamem Speicher auf der Grafikeinheit; was
+ * darüber hinausgeht, passt nicht, egal wie viele Programme geschlossen sind. null = nicht gefunden.
+ */
+export function gpuLimitFromLog(logText: string): number | null {
+  let found: number | null = null
+  for (const line of logText.split('\n')) {
+    if (!line.includes('gpu memory')) continue
+    const m = /\bavailable="([\d.]+) (MiB|GiB)"/.exec(line)
+    if (!m) continue
+    const bytes = Number(m[1]) * (m[2] === 'GiB' ? 1024 ** 3 : 1024 ** 2)
+    if (Number.isFinite(bytes) && bytes > 0) found = Math.round(bytes)
+  }
+  return found
+}
+
 /** Belegter Speicher aus `vm_stat`: Programme + fest belegt + komprimiert. null = nicht lesbar. */
 export function usedBytesFromVmStat(text: string): number | null {
   const pageSize = Number(/page size of (\d+) bytes/.exec(text)?.[1])
@@ -117,38 +134,47 @@ export function swapUsedBytes(text: string): number | null {
 export interface ProcessGroup {
   name: string
   bytes: number
-  /** Pfad des Programmbündels (`…/Name.app`), wenn es eins ist — nur solche lassen sich sauber beenden. */
+  /** Pfad des Programmbündels (`…/Name.app`) — der Schlüssel, über den beendet wird. */
   path?: string
 }
 
+/** Nur hier liegen Programme, die ein Nutzer als Programm kennt und schließen kann. */
+const PROGRAM_FOLDER = /^\/(Applications|System\/Applications|Users\/[^/]+\/Applications)\//
+
 /**
- * `ps -axo rss=,comm=` je Programm zusammengefasst (alle Hilfsprozesse eines `.app`-Bündels
- * zählen zum Programm). Liefert Ollama getrennt, weil dessen Anteil das Modell ist.
+ * `ps -axo pid=,rss=,comm=` je Programmbündel zusammengefasst (alle Hilfsprozesse eines
+ * `.app`-Bündels zählen zum Programm). Liefert Ollama getrennt, weil dessen Anteil das Modell ist.
  *
- * In die Liste kommt nur, was ein Nutzer schließen kann: Programme unter `/Applications`,
- * `/System/Applications` (Kalender, Mail …) und im Benutzerordner. Systemdienste (Fensterdarstellung, Spotlight …) gehören nicht hinein — die Karte
- * schlug real „WindowServer“ zum Schließen vor. `ownName` ist die App selbst.
+ * In die Liste kommt nur, was ein Nutzer schließen kann: Bündel unter `/Applications`,
+ * `/System/Applications` (Kalender, Mail …) und `~/Applications`. Nicht `~/Library` (Hintergrund-
+ * Helfer, Updater, Sync-Dienste), keine Projektordner, die zufällig auf `.app` enden, keine
+ * Systemdienste — die Karte schlug real „WindowServer“ zum Schließen vor. `ownPath` ist das
+ * Bündel der App selbst.
+ *
+ * Gruppiert wird nach dem BÜNDELPFAD, nicht nach dem Namen: zwei Programme gleichen Namens an
+ * verschiedenen Orten bleiben zwei Einträge (vorher vermischt, beendet wurde nur eins).
+ *
+ * `footprints` (aus `top`, je Prozessnummer) gewinnt gegen die Größe aus `ps`, wenn sie höher ist:
+ * `ps` zählt nur, was gerade im Arbeitsspeicher liegt. Die Zahl ist damit eine OBERGRENZE dessen,
+ * was das Beenden freigibt — sie enthält Ausgelagertes und zählt geteilten Speicher je Hilfsprozess.
  */
-export function groupProcesses(psText: string, ownName = ''): { apps: ProcessGroup[]; ollamaBytes: number } {
-  const sums = new Map<string, number>()
-  const paths = new Map<string, string>()
+export function groupProcesses(psText: string, ownPath = '', footprints?: Map<number, number>): { apps: ProcessGroup[]; ollamaBytes: number } {
+  const groups = new Map<string, ProcessGroup>()
   let ollamaBytes = 0
   for (const line of psText.split('\n')) {
-    const m = /^\s*(\d+)\s+(.+)$/.exec(line)
+    const m = /^\s*(\d+)\s+(\d+)\s+(.+)$/.exec(line)
     if (!m) continue
-    const bytes = Number(m[1]) * 1024
-    const command = m[2].trim()
+    const bytes = Math.max(Number(m[2]) * 1024, footprints?.get(Number(m[1])) ?? 0)
+    const command = m[3].trim()
     const bundle = /^(.*?\/([^/]+)\.app)\//.exec(command)
     const name = bundle ? bundle[2] : command.split('/').pop() || command
     if (/ollama/i.test(name) || /\/ollama(\s|$)/i.test(command)) { ollamaBytes += bytes; continue }
-    if (name === ownName || !/^\/(Applications|System\/Applications|Users)\//.test(command)) continue
-    sums.set(name, (sums.get(name) ?? 0) + bytes)
-    if (bundle && !paths.has(name)) paths.set(name, bundle[1])
+    if (!bundle || !PROGRAM_FOLDER.test(command) || bundle[1] === ownPath) continue
+    const group = groups.get(bundle[1])
+    if (group) group.bytes += bytes
+    else groups.set(bundle[1], { name, bytes, path: bundle[1] })
   }
-  const apps = [...sums]
-    .map(([name, bytes]): ProcessGroup => (paths.has(name) ? { name, bytes, path: paths.get(name) } : { name, bytes }))
-    .sort((a, b) => b.bytes - a.bytes)
-  return { apps, ollamaBytes }
+  return { apps: [...groups.values()].sort((a, b) => b.bytes - a.bytes), ollamaBytes }
 }
 
 // ─── Selbst gemessen ────────────────────────────────────────────────────────────
@@ -168,6 +194,8 @@ export interface MeasuredModelMemory {
   baseBytes: number
   bytesPerToken: number
   samples: number
+  /** Größter gemessener Füllstand — darüber ist die Gerade hochgerechnet. */
+  maxTokens: number
 }
 
 const SAMPLE_BUCKET_TOKENS = 1000
@@ -181,25 +209,53 @@ export function addMemorySample(samples: MemorySample[], sample: MemorySample): 
   return [...kept, sample].slice(-MAX_SAMPLES)
 }
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  const mid = sorted.length >> 1
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+}
+
 /**
- * Gerade durch die Wertepaare. null, solange sie nichts taugt: unter drei Paaren, Spanne unter
- * 4 000 Token, oder eine Steigung außerhalb dessen, was ein Kontext kosten kann (10 KB–1 MB je
- * Token; darunter fällt GGUF mit gleichbleibender Größe).
+ * Gerade durch die Wertepaare — über Mediane (Theil-Sen), damit EIN Ausreißer sie nicht kippt:
+ * ein kurzer Aufruf, der mit der Größe eines langen Laufs davor gepaart wurde, hätte die
+ * Ausgleichsgerade auf Dauer verdorben. null, solange sie nichts taugt: unter drei Paaren, Spanne
+ * unter 4 000 Token, eine Steigung außerhalb dessen, was ein Kontext kosten kann (10 KB–1 MB je
+ * Token), oder mehr als ein Viertel der Paare weit neben der Geraden (dann streut es, statt zu
+ * messen).
  */
 export function fitModelMemory(samples: MemorySample[]): MeasuredModelMemory | null {
-  if (samples.length < 3) return null
-  const tokens = samples.map(s => s.tokens)
-  if (Math.max(...tokens) - Math.min(...tokens) < 4000) return null
-  const n = samples.length
-  const meanX = tokens.reduce((a, b) => a + b, 0) / n
-  const meanY = samples.reduce((a, s) => a + s.bytes, 0) / n
-  let sxx = 0
-  let sxy = 0
-  for (const s of samples) { sxx += (s.tokens - meanX) ** 2; sxy += (s.tokens - meanX) * (s.bytes - meanY) }
-  const bytesPerToken = sxy / sxx
-  const baseBytes = meanY - bytesPerToken * meanX
+  const clean = samples.filter(s => Number.isFinite(s.tokens) && Number.isFinite(s.bytes) && s.tokens > 0 && s.bytes > 0)
+  if (clean.length < 3) return null
+  const tokens = clean.map(s => s.tokens)
+  const maxTokens = Math.max(...tokens)
+  if (maxTokens - Math.min(...tokens) < 4000) return null
+  const slopes: number[] = []
+  for (let i = 0; i < clean.length; i++) {
+    for (let j = i + 1; j < clean.length; j++) {
+      const span = clean[j].tokens - clean[i].tokens
+      if (Math.abs(span) >= SAMPLE_BUCKET_TOKENS) slopes.push((clean[j].bytes - clean[i].bytes) / span)
+    }
+  }
+  if (slopes.length < 2) return null
+  const bytesPerToken = median(slopes)
+  const baseBytes = median(clean.map(s => s.bytes - bytesPerToken * s.tokens))
   if (!(bytesPerToken >= 10 * 1024) || !(bytesPerToken <= 1024 * 1024) || !(baseBytes > 0)) return null
-  return { baseBytes, bytesPerToken, samples: n }
+  const bound = Math.max(0.3 * 1024 ** 3, 0.02 * baseBytes)
+  const off = clean.filter(s => Math.abs(s.bytes - baseBytes - bytesPerToken * s.tokens) > bound).length
+  if (off > clean.length / 4) return null
+  return { baseBytes, bytesPerToken, samples: clean.length, maxTokens }
+}
+
+/** Speicher je Prozessnummer aus `top -l 1 -stats pid,mem` („447M“, „17G“, „512K+“). */
+export function footprintsFromTop(text: string): Map<number, number> {
+  const out = new Map<number, number>()
+  for (const line of text.split('\n')) {
+    const m = /^\s*(\d+)\s+([\d.]+)([KMG])[+-]?\s*$/.exec(line)
+    if (!m) continue
+    const factor = m[3] === 'G' ? 1024 ** 3 : m[3] === 'M' ? 1024 ** 2 : 1024
+    out.set(Number(m[1]), Math.round(Number(m[2]) * factor))
+  }
+  return out
 }
 
 export interface MemoryPictureInput {
@@ -215,6 +271,8 @@ export interface MemoryPictureInput {
   architectureBytesPerToken?: number | null
   /** Eigene Messung; gewinnt gegen Vorausrechnung und Modellaufbau. */
   measured?: MeasuredModelMemory | null
+  /** So viel darf die Grafikeinheit laut Ollama höchstens belegen; null = unbekannt. */
+  gpuLimitBytes?: number | null
 }
 
 /** Woher die Kosten je Token stammen. */
@@ -233,7 +291,11 @@ export interface MemoryPicture {
    */
   bufferBytes: number
   loaded: boolean
-  /** Was das Modell mit leerem Kontext braucht (Messung, sonst Gewichte plus Rechenpuffer). null = unbekannt. */
+  /**
+   * Was das Modell mit leerem Kontext braucht: Messung, sonst Gewichte — plus Rechenpuffer nur,
+   * solange es nicht geladen ist. Geladen steht fest, was es belegt; der Puffer aus der
+   * Vorausrechnung landete sonst als „Kontext“ im Balken.
+   */
   baseModelBytes: number | null
   /** Frei neben Programmen, Modell und Rechenpuffer. Negativ = so viel wird schon ohne Kontext ausgelagert. */
   freeBytes: number | null
@@ -241,6 +303,10 @@ export interface MemoryPicture {
   tokenSource: TokenCostSource | null
   /** Token, die noch in den Arbeitsspeicher passen. null = nicht berechenbar. */
   tokensFit: number | null
+  /** Obergrenze der Grafikeinheit für Modell plus Kontext; null = unbekannt. */
+  gpuLimitBytes: number | null
+  /** Grundlage der eigenen Messung, wenn sie gilt. */
+  measured: { samples: number; maxTokens: number } | null
 }
 
 /** Mindestens so viel gilt als „System“, auch wenn die Abzüge mehr ergäben (Messungenauigkeit). */
@@ -255,7 +321,7 @@ export function memoryPicture(input: MemoryPictureInput): MemoryPicture {
   const bufferBytes = loaded || measured ? 0 : input.projection?.workspaceBytes ?? 0
   const unloadedBytes = measured ? measured.baseBytes : input.modelBytes
   const modelBytes = loaded ? input.usedBytes - otherBytes : unloadedBytes
-  const baseModelBytes = unloadedBytes == null ? null : unloadedBytes + (measured ? 0 : input.projection?.workspaceBytes ?? 0)
+  const baseModelBytes = unloadedBytes == null ? null : unloadedBytes + (measured || loaded ? 0 : input.projection?.workspaceBytes ?? 0)
   const freeBytes = modelBytes == null ? null : input.totalBytes - otherBytes - modelBytes - bufferBytes
   const architecture = input.architectureBytesPerToken && input.architectureBytesPerToken > 0 ? input.architectureBytesPerToken : null
   const bytesPerToken = measured
@@ -263,50 +329,112 @@ export function memoryPicture(input: MemoryPictureInput): MemoryPicture {
     : input.projection ? input.projection.fullContextBytes / input.projection.contextLength : architecture
   const tokenSource: TokenCostSource | null = measured ? 'measured' : input.projection ? 'projection' : architecture ? 'architecture' : null
   const tokensFit = freeBytes == null || !bytesPerToken ? null : Math.max(0, Math.floor(freeBytes / bytesPerToken))
-  return { totalBytes: input.totalBytes, otherBytes, modelBytes, bufferBytes, loaded, baseModelBytes, freeBytes, bytesPerToken, tokenSource, tokensFit }
+  const gpuLimitBytes = input.gpuLimitBytes && input.gpuLimitBytes > 0 ? input.gpuLimitBytes : null
+  return {
+    totalBytes: input.totalBytes, otherBytes, modelBytes, bufferBytes, loaded, baseModelBytes, freeBytes, bytesPerToken, tokenSource, tokensFit,
+    gpuLimitBytes, measured: measured ? { samples: measured.samples, maxTokens: measured.maxTokens } : null
+  }
 }
 
 // ─── Platz schaffen ─────────────────────────────────────────────────────────────
+
+/** Unter diesem freien Rest gilt „passt“ nur als „passt knapp“: macOS lagert schon vor 100 % aus. */
+export const RELIEF_MARGIN_BYTES = 1024 ** 3
 
 export interface ReliefPlan {
   targetTokens: number
   /** Modell mit gefülltem Zielfenster. */
   needBytes: number
-  /** So viel dürfen System und Programme höchstens belegen. */
+  /** So viel dürfen System und Programme höchstens belegen (kann negativ sein — dann `impossible`). */
   allowedOtherBytes: number
-  /** Fehlt, damit das Zielfenster ohne Auslagerung passt. 0 = passt. */
+  /** Fehlt, damit das Zielfenster in den Arbeitsspeicher passt. 0 = passt rechnerisch. */
   deficitBytes: number
-  /** Vorschlag: größte beendbare Programme, bis die Lücke gedeckt ist. */
+  /** Bleibt bei vollem Fenster frei. */
+  freeBytes: number
+  /**
+   * Das Fenster passt auf diesem Rechner gar nicht, auch wenn alle Programme zu sind:
+   * 'memory' = Modell und Fenster brauchen mehr, als nach dem Mindestbedarf des Systems bleibt;
+   * 'gpu' = mehr, als die Grafikeinheit belegen darf. Dann gibt es keine Schließvorschläge.
+   */
+  impossible: 'memory' | 'gpu' | null
+  /** Passt rechnerisch, aber mit weniger als `RELIEF_MARGIN_BYTES` Rest. */
+  tight: boolean
+  /** Vorschlag: größte beendbare Programme, bis die Lücke gedeckt wäre. */
   picks: ProcessGroup[]
+  /** Summe der Vorschläge — eine Obergrenze (siehe `groupProcesses`), keine zugesagte Ersparnis. */
   pickedBytes: number
-  /** Deckt der Vorschlag die Lücke? */
-  enough: boolean
 }
 
 /**
  * Was müsste weg, damit ein volles Fenster von `targetTokens` neben dem Modell in den
  * Arbeitsspeicher passt? null = nicht berechenbar (Modellgröße oder Kosten je Token unbekannt).
- * Vorgeschlagen werden nur Programme mit Bündelpfad — nur die lassen sich sauber beenden.
+ * Bedarf und Lücke kommen aus `memoryBar` — Balken, Kopfzeile und Plan können sich so nicht
+ * widersprechen.
  */
 export function reliefPlan(picture: MemoryPicture, apps: ProcessGroup[], targetTokens: number): ReliefPlan | null {
-  if (picture.baseModelBytes == null || !picture.bytesPerToken) return null
-  const needBytes = Math.round(picture.baseModelBytes + picture.bytesPerToken * targetTokens)
+  if (picture.modelBytes == null || !picture.bytesPerToken) return null
+  const bar = memoryBar(picture, targetTokens)
+  const needBytes = bar.modelBytes + bar.bufferBytes + bar.contextBytes
   const allowedOtherBytes = picture.totalBytes - needBytes
-  const deficitBytes = Math.max(0, picture.otherBytes - allowedOtherBytes)
+  const deficitBytes = bar.overBytes
+  const impossible = picture.gpuLimitBytes != null && needBytes > picture.gpuLimitBytes ? 'gpu'
+    : allowedOtherBytes < MIN_OTHER_BYTES ? 'memory' : null
   const picks: ProcessGroup[] = []
   let pickedBytes = 0
-  for (const app of apps) {
-    if (pickedBytes >= deficitBytes) break
-    if (!app.path) continue
-    picks.push(app)
-    pickedBytes += app.bytes
+  if (!impossible) {
+    for (const app of apps) {
+      if (pickedBytes >= deficitBytes) break
+      if (!app.path) continue
+      picks.push(app)
+      pickedBytes += app.bytes
+    }
   }
-  return { targetTokens, needBytes, allowedOtherBytes, deficitBytes, picks, pickedBytes, enough: pickedBytes >= deficitBytes }
+  return {
+    targetTokens, needBytes, allowedOtherBytes, deficitBytes, freeBytes: bar.freeBytes, impossible,
+    tight: deficitBytes === 0 && !impossible && bar.freeBytes < RELIEF_MARGIN_BYTES, picks, pickedBytes
+  }
 }
 
 /** Speicher für einen gefüllten Kontext dieser Größe. null = Kosten je Token unbekannt. */
 export function contextBytes(picture: MemoryPicture, tokens: number): number | null {
   return picture.bytesPerToken ? Math.round(picture.bytesPerToken * tokens) : null
+}
+
+export interface MemoryBar {
+  otherBytes: number
+  modelBytes: number
+  bufferBytes: number
+  /** Was das gefüllte Zielfenster zusätzlich braucht. */
+  contextBytes: number
+  /** Bleibt auch bei vollem Fenster frei. */
+  freeBytes: number
+  /** Ragt über den Arbeitsspeicher hinaus. */
+  overBytes: number
+  /** Länge des ganzen Balkens: Arbeitsspeicher oder Bedarf, je nachdem, was größer ist. */
+  scaleBytes: number
+}
+
+/**
+ * Abschnitte des Speicherbalkens für ein GEFÜLLTES Fenster von `targetTokens`. Ist das Modell
+ * geladen, steckt der schon belegte Kontext in dessen Größe — dann zählt als Kontext nur, was
+ * bis zum vollen Fenster dazukommt. Eine Quelle für Karte und Modell-Menü.
+ */
+export function memoryBar(picture: MemoryPicture, targetTokens: number): MemoryBar {
+  const modelBytes = picture.modelBytes ?? 0
+  const full = picture.modelBytes == null ? null : contextBytes(picture, targetTokens)
+  const context = full == null ? 0
+    : picture.loaded && picture.baseModelBytes != null ? Math.max(0, picture.baseModelBytes + full - modelBytes)
+      : full
+  const needed = picture.otherBytes + modelBytes + picture.bufferBytes + context
+  return {
+    otherBytes: picture.otherBytes,
+    modelBytes,
+    bufferBytes: picture.bufferBytes,
+    contextBytes: context,
+    freeBytes: Math.max(0, picture.totalBytes - needed),
+    overBytes: Math.max(0, needed - picture.totalBytes),
+    scaleBytes: Math.max(picture.totalBytes, needed)
+  }
 }
 
 /** Auf Tausender abgerundet — die Zahl ist eine Rechnung, keine Messung. */
