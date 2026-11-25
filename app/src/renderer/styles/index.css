@@ -24225,3 +24225,27 @@ body.presentation-mode *::after {
 .petrol-chat-foot-left { flex: 1 1 auto; }
 .petrol-chat-foot .petrol-chat-model { flex: 0 0 auto; }
 @container (max-width: 640px) { .petrol-chat-foot { flex-wrap: wrap; } }
+
+/* ---- Logo als Statusanzeige im Agent-Kopf (AgentStatusLogo.tsx) ----
+   Mitte = Agent, oben = Auftrag, unten links = Unterlagen, unten rechts = Ergebnis.
+   Bewegung nur während eines Laufs; bei „Bewegung reduzieren“ steht alles still. */
+.agent-status-logo { display: block; border-radius: 8px; overflow: visible; }
+.agent-status-logo circle, .agent-status-logo line { transition: opacity .25s ease; }
+.agent-status-logo-ring, .agent-status-logo-dot { opacity: 0; transform-box: fill-box; transform-origin: center; }
+.agent-status-logo.is-done .agent-status-logo-ring.is-done { opacity: .85; }
+@media (prefers-reduced-motion: no-preference) {
+  .agent-status-logo.is-think .agent-status-logo-ring.is-think { animation: agent-logo-ring 2.6s ease-out infinite; }
+  .agent-status-logo.is-read .agent-status-logo-dot { animation: agent-logo-read 1.3s ease-in-out infinite; }
+  .agent-status-logo.is-write .agent-status-logo-dot { animation: agent-logo-write 1.3s ease-in-out infinite; }
+  .agent-status-logo.is-done .agent-status-logo-ring.is-done { animation: agent-logo-done .9s ease-out 1; }
+}
+/* Ohne Bewegung: die betroffene Kante trägt die Aussage. */
+@media (prefers-reduced-motion: reduce) {
+  .agent-status-logo.is-read .agent-status-logo-edge-read,
+  .agent-status-logo.is-write .agent-status-logo-edge-write { stroke-width: 2.4; }
+  .agent-status-logo.is-think .agent-status-logo-ring.is-think { opacity: .6; transform: scale(1.7); }
+}
+@keyframes agent-logo-ring { 0% { opacity: .9; transform: scale(1); } 100% { opacity: 0; transform: scale(3.1); } }
+@keyframes agent-logo-read { 0% { opacity: 0; transform: translate(8px, 23px); } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(16px, 16px); } }
+@keyframes agent-logo-write { 0% { opacity: 0; transform: translate(16px, 16px); } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; transform: translate(24px, 23px); } }
+@keyframes agent-logo-done { 0% { opacity: 0; transform: scale(.6); } 100% { opacity: .85; transform: scale(1); } }

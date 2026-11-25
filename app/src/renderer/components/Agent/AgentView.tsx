@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useUIStore, flushUISettings } from '../../stores/uiStore'
 import { ContextWindowRow } from './ContextWindowRow'
+import { AgentStatusLogo } from './AgentStatusLogo'
 import { useNotesStore, createNoteFromFile } from '../../stores/notesStore'
 import { useComposeMeasurement } from '../../utils/activeTimeTracker'
 import { useComparisonStore } from '../../stores/comparisonStore'
@@ -726,11 +727,32 @@ export function AgentView({ tabId }: Props) {
 
   const head = (
     <div className="agent-card-head">
-      <span className="agent-card-logo" aria-hidden="true">
-        {customLogo
-          ? <img src={customLogo} width="30" height="30" alt="" />
-          : <MindGraphLogo size={30} />}
-      </span>
+      {/* Im Auftrag ist das Logo die Statusanzeige des Laufs (AgentStatusLogo): Mitte = Agent,
+          oben = Auftrag, unten links = Unterlagen, unten rechts = Ergebnis. Ein eigenes Logo des
+          Nutzers und der Chat bleiben beim stillen Zeichen. */}
+      {customLogo || tabMode === 'chat' ? (
+        <span className="agent-card-logo" aria-hidden="true">
+          {customLogo
+            ? <img src={customLogo} width="30" height="30" alt="" />
+            : <MindGraphLogo size={30} />}
+        </span>
+      ) : (
+        <span className="agent-card-logo">
+          <AgentStatusLogo
+            size={30}
+            phase={starting ? 'running' : run.phase}
+            steps={run.steps}
+            hasTask={hasTask}
+            hasDocs={scope.attachments.length > 0}
+            hasTarget={hasTarget}
+            hasResult={run.results.length > 0}
+            labels={{
+              idle: t('agentLogo.idle'), read: t('agentLogo.read'), write: t('agentLogo.write'),
+              think: t('agentLogo.think'), done: t('agentLogo.done')
+            }}
+          />
+        </span>
+      )}
       <div className="agent-card-head-text">
         {/* Ein Titel für beide Ansichten, der Modus steht im Umschalter; der Untertitel ist
             einzeilig, damit der Kopf beim Umschalten nicht springt (Optikprüfung F01/F02). */}
