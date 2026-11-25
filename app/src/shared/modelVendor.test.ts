@@ -15,6 +15,8 @@ describe('getModelVendor', () => {
     ['codellama:13b', 'llama'],
     ['phi-4:latest', 'phi'],
     ['deepseek-r1:14b', 'deepseek'],
+    ['inkling-2-mini:26b-a5b-nvfp4', 'inkling'],
+    ['openrouter/thinkingmachines/inkling-2-small', 'inkling'],
     ['gpt-oss:120b-cloud', 'openai'],
     ['Claude (Fable 5)', 'anthropic'],
     // Cloud-Route: der echte Vendor gewinnt vor dem Provider-Sentinel.

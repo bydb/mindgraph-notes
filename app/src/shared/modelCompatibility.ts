@@ -1063,7 +1063,7 @@ export function modelMarkers(model: string): string {
 // (ministral/mixtral → Mistral) vor generischen Treffern. Unbekannt → 'generic'.
 export type ModelVendorId =
   | 'qwen' | 'gemma' | 'mistral' | 'llama' | 'phi' | 'deepseek'
-  | 'openai' | 'anthropic' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'llmbase' | 'generic'
+  | 'openai' | 'anthropic' | 'nomic' | 'bge' | 'granite' | 'cohere' | 'openrouter' | 'llmbase' | 'inkling' | 'generic'
 
 const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = [
   { id: 'qwen',    name: 'Qwen (Alibaba)',     re: /\bqwen|qwq/i },
@@ -1072,6 +1072,7 @@ const VENDOR_PATTERNS: Array<{ id: ModelVendorId; name: string; re: RegExp }> = 
   { id: 'llama',   name: 'Llama (Meta)',        re: /\bllama|\bcodellama|\bmeta/i },
   { id: 'phi',     name: 'Phi (Microsoft)',     re: /\bphi[-\d]/i },
   { id: 'deepseek',name: 'DeepSeek',            re: /\bdeepseek/i },
+  { id: 'inkling', name: 'Inkling (Thinking Machines)', re: /\binkling|\bthinkingmachines/i },
   { id: 'openai',  name: 'OpenAI',              re: /\bgpt[-_]?oss|\bgpt-/i },
   // Bewusst nur `claude`/`anthropic` — Modellreihen-Namen (opus/sonnet/haiku/fable)
   // wären zu unspezifisch und würden fremde Tags fälschlich als Anthropic ausweisen.
