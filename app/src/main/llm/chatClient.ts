@@ -312,13 +312,24 @@ async function chatFetch(url: string, init: Omit<RequestInit, 'signal'>, deadlin
   }
 }
 
+// Zweiter Versuch NUR nach Zeitüberschreitung. Ein abgelehnter Verbindungsaufbau kommt
+// sofort zurück und heißt wirklich „Ollama läuft nicht". Eine Zeitüberschreitung heißt
+// dagegen oft nur „Rechner gerade träge": direkt nach einer langen Antwort eines 20-GB-
+// Modells bei vollem Arbeitsspeicher antwortete Ollama laut eigenem Log in 74 ms, die
+// 1,5 s reichten trotzdem nicht — der Agentenlauf brach in Runde 5 mit „nicht erreichbar"
+// ab, obwohl Ollama die ganze Zeit lief (real, 25.11.2026, inkling-2-mini).
+export const OLLAMA_REACHABLE_TIMEOUTS_MS = [1500, 8000]
+
 async function isOllamaReachable(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(1500) })
-    return res.ok
-  } catch {
-    return false
+  for (const timeoutMs of OLLAMA_REACHABLE_TIMEOUTS_MS) {
+    try {
+      const res = await fetch(`${url}/api/tags`, { signal: AbortSignal.timeout(timeoutMs) })
+      return res.ok
+    } catch (e) {
+      if ((e as { name?: string })?.name !== 'TimeoutError') return false
+    }
   }
+  return false
 }
 
 async function isLmStudioReachable(url: string): Promise<boolean> {
