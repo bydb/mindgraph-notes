@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.10] - 2026-11-25
+
+**Der Agent kommt mit Bildern und großen lokalen Modellen zuverlässiger zurecht.** Bildschirmfotos und Scans liest er auch dann, wenn die Texterkennung am Ende einer Seite ins Stocken gerät. Bleibt die Antwort auf eine Frage zu einem Bild aus, versucht er es ein zweites Mal. Ein langer Lauf bricht nicht mehr mit „Ollama ist nicht erreichbar“ ab, nur weil der Rechner kurz ausgelastet ist.
+
+### Hintergrund
+
+- **Texterkennung:** Das Erkennungsmodell gerät am Ende einer Seite gelegentlich in eine Wiederholung. Ollama bricht das inzwischen selbst ab und meldet einen Fehler. Die App verwarf dabei den schon vollständig gelesenen Text, und der Agent bekam nur die Fehlermeldung. Jetzt behält sie den Text und schneidet die Wiederholung am Ende ab. Kam noch gar kein Text, bleibt es beim Fehler.
+- **Bild ansehen:** Manche Modelle denken vor jeder Antwort still nach, auch wenn das abgeschaltet ist, und verbrauchen damit den Spielraum, den die App für eine Bildantwort vorsieht. Das Ergebnis war „Das Modell lieferte keine Antwort“. Endet ein Bildaufruf so, folgt genau ein zweiter Versuch mit mehr Spielraum. Er zählt nicht als weiteres Bild, kostet aber Zeit: mit einem großen lokalen Modell rund anderthalb Minuten je Bild.
+- **Erreichbarkeit von Ollama:** Vor jeder Runde fragt die App kurz nach, ob Ollama läuft. Direkt nach einer langen Antwort eines großen Modells und bei vollem Arbeitsspeicher kam die Rückmeldung zu spät, und der Lauf brach ab, obwohl Ollama lief. Nach einer Zeitüberschreitung wartet die App jetzt ein zweites Mal und länger. Läuft Ollama wirklich nicht, erscheint die Meldung weiterhin sofort.
+- **Modellauswahl:** Modelle der Reihe Inkling von Thinking Machines tragen in der Auswahl ein eigenes Zeichen statt des grauen Platzhalters.
+- **Grenzen:** Bricht die Texterkennung mitten in einer Seite ab statt am Ende, kann der Text unvollständig sein, ohne dass die App das erkennt. Die Korrekturen ändern nichts daran, dass ein großes lokales Modell auf einem Rechner mit 32 GB Arbeitsspeicher langsam wird, wenn daneben viele Programme offen sind.
+
 ## [1.4.9] - 2026-11-25
 
 **Der Agent findet jetzt alle Notizen zu einem Thema in einem Ordner und legt sie als Sammelnotiz mit Verweisen ab.** Hängen Sie einen Ordner an und schreiben Sie zum Beispiel „Suche alle Notizen zu künstlicher Intelligenz“. Die Sammelnotiz nennt je Notiz die Fundstelle und führt Notizen, die das Thema nur sinngemäß behandeln, in einem eigenen Abschnitt. Im Kopf des Auftrags zeigt das Zeichen der App außerdem, was der Agent gerade tut.
