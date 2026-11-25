@@ -7,6 +7,8 @@ import { looksLikeOcrLoop, trimOcrRepetition } from '../shared/ocrRepetition'
 
 // Obergrenze pro Seite: eine dichte Seite braucht real unter 3000 Token.
 export const VISION_OCR_MAX_TOKENS = 8192
+/** Ollamas eigener Abbruch einer Wiederholungsschleife („prediction aborted, token repeat limit reached“). */
+const OLLAMA_REPEAT_ABORT = /token repeat limit/i
 
 export interface OcrPageResult {
   success: boolean
@@ -102,7 +104,17 @@ Rules:
         buffer = buffer.slice(nl + 1)
         if (!line) continue
         const chunk = JSON.parse(line) as { message?: { content?: string }; done?: boolean; done_reason?: string; error?: string } & OllamaTimings
-        if (chunk.error) throw new Error(chunk.error)
+        if (chunk.error) {
+          // Ollama bricht eine Wiederholungsschleife inzwischen selbst ab und meldet das als
+          // Fehler mitten im Stream. Der bis dahin gelesene Text ist brauchbar — real stand
+          // die komplette Seite schon da, die Schleife kam erst am Ende (25.11.2026, glm-ocr,
+          // Bildschirmfoto eines Chats). Wie die eigene Schleifenerkennung behandeln.
+          if (OLLAMA_REPEAT_ABORT.test(chunk.error) && raw.trim()) {
+            looped = true
+            break read
+          }
+          throw new Error(chunk.error)
+        }
         raw += chunk.message?.content ?? ''
         if (chunk.done) {
           sawDone = true

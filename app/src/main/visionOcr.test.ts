@@ -28,6 +28,21 @@ describe('extractOcrPage (Codex F31)', () => {
     expect(await extractOcrPage('http://x', 'b64', 'm', 1)).toMatchObject({ success: true, incomplete: false })
   })
 
+  it('Ollamas eigener Wiederholungs-Abbruch behält den schon gelesenen Text', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => streamOf([
+      JSON.stringify({ message: { content: 'Neues zum Thema?' } }),
+      JSON.stringify({ error: 'prediction aborted, token repeat limit reached' })
+    ])))
+    expect(await extractOcrPage('http://x', 'b64', 'm', 1)).toMatchObject({ success: true, content: 'Neues zum Thema?', incomplete: false })
+  })
+
+  it('Wiederholungs-Abbruch ohne Text und andere Stream-Fehler bleiben Fehler', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => streamOf([JSON.stringify({ error: 'prediction aborted, token repeat limit reached' })])))
+    await expect(extractOcrPage('http://x', 'b64', 'm', 1)).rejects.toThrow(/token repeat limit/)
+    vi.stubGlobal('fetch', vi.fn(async () => streamOf([JSON.stringify({ message: { content: 'Text' } }), JSON.stringify({ error: 'out of memory' })])))
+    await expect(extractOcrPage('http://x', 'b64', 'm', 1)).rejects.toThrow(/out of memory/)
+  })
+
   it('Abbruch von außen beendet einen laufenden Aufruf', async () => {
     // Wie echtes fetch: Abbruch lässt den laufenden Leser mit AbortError scheitern.
     vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
