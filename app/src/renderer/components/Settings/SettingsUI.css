@@ -820,3 +820,29 @@
 .sui-skilldiff-mark { flex-shrink: 0; width: 10px; color: var(--text-secondary); text-decoration: none; }
 .sui-skilldiff-gap { padding: 0 10px; color: var(--text-secondary); }
 .sui-skilldiff-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Speicherbild (MemoryPictureCard): maßstäblicher Balken des Arbeitsspeichers */
+.sui-membar-wrap { display: flex; flex-direction: column; gap: 8px; }
+.sui-membar { display: flex; height: 22px; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); background: var(--bg-tertiary); }
+.sui-membar-seg { min-width: 2px; }
+.sui-membar-seg.is-other, .sui-membar-dot.is-other { background: var(--text-muted); }
+.sui-membar-seg.is-model, .sui-membar-dot.is-model { background: var(--accent-color); }
+.sui-membar-seg.is-buffer, .sui-membar-dot.is-buffer { background: color-mix(in srgb, var(--accent-color) 45%, var(--bg-tertiary)); }
+.sui-membar-seg.is-context, .sui-membar-dot.is-context { background: var(--color-warning); }
+.sui-membar-seg { transition: width 0.2s ease; }
+.sui-membar-seg.is-free, .sui-membar-dot.is-free { background: var(--bg-tertiary); }
+.sui-membar-seg.is-over, .sui-membar-dot.is-over { background: var(--color-danger); }
+.sui-membar-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.sui-membar-key { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sui-membar-dot { width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border-color); display: inline-block; }
+.sui-membar-total { margin-left: auto; white-space: nowrap; }
+
+/* Speicherbild: „Platz schaffen“ — Programme zum Beenden auswählen */
+.sui-relief { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.sui-relief-title { color: var(--text-secondary); }
+.sui-relief-item { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.sui-relief-item input { accent-color: var(--accent-color); }
+.sui-relief-size { margin-left: auto; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.sui-relief-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 6px; }
+.sui-relief-sum { color: var(--text-secondary); }
+.sui-relief-sum.is-enough { color: var(--color-success, var(--accent-color)); }

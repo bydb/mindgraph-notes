@@ -17,6 +17,8 @@ import { isCloudChatBackend, warmPricingCache, type ChatOptions as LlmChatOption
 import { collectRunTotals } from '../llm/telemetry'
 import { sanitizeChatContext } from './chatContext'
 import { agentContextInfo, ollamaModelContextMax } from './localContext'
+import { readMemoryPicture } from './memoryPicture'
+import { quitAppsForRelief, reopenAppsAfterRelief } from './memoryRelief'
 import { chooseAgentContext, agentContextNote } from '../../shared/agentContext'
 import { type CloudProviderSettings } from '../../shared/llmBackend'
 import { petrolCloudAllowed } from '../../shared/webChat'
@@ -337,6 +339,38 @@ export function registerNoteAgentIpc(deps: NoteAgentIpcDeps): void {
       const route = await classifyAgentRoute('ollama', model)
       if (route.kind !== 'local') return { success: true, local: false }
       return { success: true, local: true, ...(await agentContextInfo(model)) }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Speicherbild: Belegung, Auslagerung, größte Programme und wie viel Kontext neben dem Modell
+  // noch in den Arbeitsspeicher passt. Nur Zahlen vom eigenen Rechner, nur für lokale Modelle.
+  ipcMain.handle('note-agent-memory-picture', async (event, params: { model: string }) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+    try {
+      const model = typeof params?.model === 'string' ? params.model : ''
+      const route = await classifyAgentRoute('ollama', model)
+      if (route.kind !== 'local') return { success: true, supported: false }
+      return { success: true, ...(await readMemoryPicture(model)) }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
+  // Platz schaffen: vorgeschlagene Programme beenden (eigener Dialog im Main) bzw. wieder öffnen.
+  ipcMain.handle('note-agent-memory-relief-quit', async (event, params: { paths: string[]; en?: boolean }) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+    try {
+      return { success: true, ...(await quitAppsForRelief(params?.paths, BrowserWindow.fromWebContents(event.sender), params?.en === true)) }
+    } catch (err) {
+      return { success: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+  ipcMain.handle('note-agent-memory-relief-reopen', async event => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Nicht autorisierter Aufrufer' }
+    try {
+      return { success: true, ...(await reopenAppsAfterRelief()) }
     } catch (err) {
       return { success: false, error: err instanceof Error ? err.message : String(err) }
     }

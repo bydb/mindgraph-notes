@@ -18,6 +18,7 @@
 import { BrowserWindow } from 'electron'
 import { summarizeRunCalls, type LlmRunMetrics, type RunCallTotals } from '../../shared/llmTelemetry'
 import { recordTelemetryRun } from './telemetryLedger'
+import { sampleModelMemory } from './modelMemory'
 
 // Reicht für einen Arbeitstag Vergleiche und bleibt weit unter einem Megabyte.
 const MAX_RUNS = 300
@@ -101,6 +102,8 @@ export async function collectRunTotals(runId: string): Promise<RunCallTotals | u
 
 export function recordLlmRun(run: LlmRunMetrics): void {
   runs.push(run)
+  // Speicherbild: was das Modell bei diesem Füllstand belegt (nur lokal, nur zwei Zahlen).
+  if (run.backend === 'ollama' && run.promptTokens) void sampleModelMemory(run.model, run.promptTokens + (run.outputTokens ?? 0))
   if (runs.length > MAX_RUNS) runs.splice(0, runs.length - MAX_RUNS)
   if (run.runId) {
     basketFor(run.runId, Date.now()).runs.push(run)

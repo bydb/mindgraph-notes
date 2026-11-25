@@ -39,6 +39,7 @@ import { IntegrationsTab } from './IntegrationsTab'
 import { useIntegrationStatus, type IntegrationStatus, type ConnState } from './useIntegrationStatus'
 import { AgentCloudConsentCard } from './AgentCloudConsentCard'
 import { AgentContextCard } from './AgentContextCard'
+import { MemoryPictureCard } from './MemoryPictureCard'
 import { AgentMemoryCard } from './AgentMemoryCard'
 import { PageHeader, SectionTitle, Card, ServiceHead, IconTile, TILE_GLYPH, Row, Note, Details, Toggle, Segmented, Select, Button, NumberInput, TextInput, Hero, ModuleOffCard } from './SettingsUI'
 import { CLOUD_TEST_MODELS, RECOMMENDED_PULL_MODELS, isCloudModel, modelMarkers } from '../../../shared/modelCompatibility'
@@ -1837,6 +1838,7 @@ export const Settings: React.FC<SettingsProps> = ({ isOpen, onClose, initialTab,
                   {/* ── Agent-Fähigkeiten (nur bei aktivem Modul) ── */}
                   <SectionTitle title={t('settings.aiTab.agent')} />
                   <div data-settings-anchor="ai-agent-context"><AgentContextCard /></div>
+                  <div data-settings-anchor="ai-memory-picture"><MemoryPictureCard /></div>
                   <div data-settings-anchor="ai-agent-memory"><AgentMemoryCard /></div>
                   {searchWebResearchEnabled && (
                     <Card anchor="ai-webresearch">
