@@ -2,6 +2,19 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.11] - 2026-11-25
+
+**Die App zeigt jetzt, ob ein lokales Modell mit seinem Kontextfenster in den Arbeitsspeicher Ihres Mac passt.** Ein Balken unter dem Kontext-Regler und eine Karte unter Einstellungen → KI zeigen, wie viel System und Programme, das Modell und ein gefülltes Fenster belegen. Reicht der Platz nicht, nennt die App die Lücke und schlägt Programme vor, die Sie für die Dauer des Auftrags beenden können. So sehen Sie vor dem Start, ob ein Lauf zügig durchläuft oder langsam wird, weil der Rechner auslagert.
+
+### Hintergrund
+
+- **Auslöser:** Auf einem Rechner mit 32 GB Arbeitsspeicher passte ein großes lokales Modell neben den üblichen Programmen schon ohne Kontext nicht mehr hinein. Jeder Lauf lief in der Auslagerung und dauerte ein Vielfaches, ohne dass die Oberfläche das zeigte.
+- **Speicherbild:** Die Karte „Speicherbild“ unter Einstellungen → KI zeigt einen maßstäblichen Balken für System und Programme, Modell, Kontext und freien Rest. Dazu nennt sie, wie viele Token neben dem Modell noch Platz haben und wie viel bereits ausgelagert ist. Im Modell-Menü der Auftragskarte steht derselbe Balken unter dem Regler für das Kontextfenster; er wächst mit dem Regler und wird rot, sobald das Fenster nicht mehr passt.
+- **Wie gerechnet wird:** Belegung und Auslagerung misst die App am Rechner. Was ein Modell je Token kostet, entnimmt sie zunächst den Angaben von Ollama oder dem Aufbau des Modells. Nach einigen Aufrufen rechnet sie mit eigenen Messwerten, die deutlich genauer sind, und nennt deren Grundlage. Gespeichert werden dafür nur zwei Zahlen je Aufruf, kein Inhalt.
+- **Platz schaffen:** Fehlt Platz, listet die Karte die größten Programme mit Häkchen auf. Vor dem Beenden fragt die App in einem eigenen Dialog nach. Programme mit ungesicherten Änderungen fragen selbst nach, bevor sie schließen. Solange die App geöffnet bleibt, lassen sich die beendeten Programme über die Karte wieder öffnen, ebenfalls nach Rückfrage.
+- **Zu große Fenster:** Braucht ein Fenster mehr, als der Rechner dem Modell überhaupt geben kann, sagt die Karte das und schlägt nichts zum Beenden vor.
+- **Grenzen:** Das Speicherbild gibt es nur unter macOS auf Apple Silicon und nur für lokale Modelle über Ollama. Die Zahlen für ein gefülltes Fenster sind gerechnet, nicht zugesagt. Die Größe je Programm ist eine Obergrenze; ob das Beenden reicht, zeigt erst die Messung danach. Sind mehrere Modelle gleichzeitig geladen, rechnet die Karte die anderen den Programmen zu.
+
 ## [1.4.10] - 2026-11-25
 
 **Der Agent kommt mit Bildern und großen lokalen Modellen zuverlässiger zurecht.** Bildschirmfotos und Scans liest er auch dann, wenn die Texterkennung am Ende einer Seite ins Stocken gerät. Bleibt die Antwort auf eine Frage zu einem Bild aus, versucht er es ein zweites Mal. Ein langer Lauf bricht nicht mehr mit „Ollama ist nicht erreichbar“ ab, nur weil der Rechner kurz ausgelastet ist.
