@@ -18,6 +18,7 @@ import {
   referencedInlineIds,
   removeInlineToken
 } from '../../../shared/emailInlineImages'
+import { checkSignoff } from '../../../shared/emailSignoff'
 import {
   hasOpenRecipientGroup,
   looksLikeRecipientList,
@@ -462,6 +463,14 @@ export const ComposeView: React.FC = () => {
     if (brokenImages.length > 0) {
       setSendStatus('error')
       setErrorMsg(t('inbox.compose.brokenInlineImage').replace('{names}', brokenImages.join(', ')))
+      return
+    }
+    // Fremder Name unter der Grußformel: nichts senden (27.11.2026, KI-Entwurf mit Namen Dritter).
+    const senderName = account?.name
+    const signoff = checkSignoff(composeState.body, senderName)
+    if (signoff.status === 'foreign') {
+      setSendStatus('error')
+      setErrorMsg(t('inbox.compose.foreignSignoff').replace('{found}', signoff.found || '').replace('{name}', senderName || ''))
       return
     }
     // Erst alle drei Felder übernehmen. Bleibt irgendwo eine ungültige Eingabe stehen,

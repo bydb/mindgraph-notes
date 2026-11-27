@@ -9,6 +9,7 @@ import { useUIStore } from './uiStore'
 import { useNotesStore } from './notesStore'
 import { createActiveMeasurement } from '../utils/activeTimeTracker'
 import { redactForLog, mailRef } from '../../shared/logRedaction'
+import { enforceSignoff } from '../../shared/emailSignoff'
 
 // Speichern bündeln: Jeder Speichervorgang schickt die KOMPLETTE Mailliste an den
 // Main-Prozess (real 38 MB), der sie unter einer Sperre einliest, vereinigt und
@@ -171,7 +172,11 @@ function buildReplyDraft(email: EmailMessage, bodyOverride?: string): Omit<Compo
 
   return {
     subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
-    body: bodyOverride !== undefined ? bodyOverride + sig : sig + quotedHeader + quotedBody,
+    // KI-Entwurf: Unter der Grußformel steht der Name des Absenderkontos, nie ein Name
+    // aus dem Kontext (27.11.2026). Das Modell wird hier nicht beim Wort genommen.
+    body: bodyOverride !== undefined
+      ? enforceSignoff(bodyOverride, emailSettings.accounts.find(a => a.id === accountId)?.name) + sig
+      : sig + quotedHeader + quotedBody,
     inReplyTo: email.id,
     references: email.id,
     accountId,

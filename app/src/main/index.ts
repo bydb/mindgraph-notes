@@ -5893,9 +5893,22 @@ ${context}
 ---
 Beantworte nun die Fragen des Nutzers basierend auf diesen Notizen. Wenn die Antwort nicht in den Notizen zu finden ist, sage das ehrlich.`
 
+    // Wer unterschreibt: Ohne diese Angabe nahm das Modell einen Namen aus dem Kontext
+    // (27.11.2026, zwei Mails gingen mit fremdem Namen hinaus). Der Name kommt aus den
+    // Konten im Main, nie aus dem Kontext. Feste Grenze dahinter: shared/emailSignoff.ts.
+    let emailSignoffRule = '- Beende die E-Mail mit einer Grussformel OHNE Namen darunter. Setze niemals einen Namen aus dem Kontext als Unterschrift ein.'
+    if (chatMode === 'email') {
+      const accounts = ((await loadUISettings()) as { email?: { accounts?: Array<{ name?: string }> } }).email?.accounts ?? []
+      const senderNames = [...new Set(accounts.map(a => sanitizeUntrustedText(String(a?.name ?? '')).replace(/\s+/g, ' ').trim()).filter(Boolean))]
+      if (senderNames.length === 1) {
+        emailSignoffRule = `- Der Nutzer, in dessen Namen du schreibst, heisst ${senderNames[0]}. Unterschreibe die E-Mail AUSSCHLIESSLICH mit diesem Namen (bei vertrauter Du-Anrede genuegt der Vorname). Alle anderen Namen im Kontext gehoeren Absendern, Empfaengern oder Dritten — setze NIEMALS einen davon als Unterschrift ein.`
+      }
+    }
+
     const emailPrompt = `Du bist ein E-Mail-Assistent. Du hilfst beim Verfassen von Antworten und analysierst E-Mails. Antworte auf Deutsch.
 
 WICHTIGE REGELN:
+${emailSignoffRule}
 - Schreibe IMMER eine FERTIGE, versandfertige E-Mail. Keine Platzhalter wie [Name], [Hier entscheiden], [Position]. Stelle KEINE Rueckfragen an den Nutzer.
 - Pruefe die Kalender-Termine im Kontext: Wenn in der E-Mail ein Datum/Termin vorgeschlagen wird, pruefe ob an diesem Tag bereits Termine existieren. Wenn es Konflikte gibt, erwaehne das KURZ im Entwurf (z.B. "leider habe ich an diesem Tag bereits einen Termin") oder schlage einen Alternativtermin vor.
 - Nutze die Kontakt-Historie fuer den richtigen Ton

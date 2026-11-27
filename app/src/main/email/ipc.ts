@@ -22,6 +22,7 @@ import { loadEmailStore, saveEmailStore, mutateEmailStore, type EmailStoreData }
 import { buildImapOptions, type ImapEndpoint, type ImapSecret } from './connection'
 import { buildOutgoingMail, renderRawMessage, findMissingAttachments, renderBodyWithInlineImages, inlineImageTag, type OutgoingAttachment } from './outgoing'
 import { isInlineImageId, findBrokenInlineTokens, referencedInlineIds, COMPOSE_STAGE_MAX_BYTES, COMPOSE_STAGE_MAX_FILES, COMPOSE_STAGE_MAX_TOTAL_BYTES } from '../../shared/emailInlineImages'
+import { checkSignoff } from '../../shared/emailSignoff'
 import { sendViaGraph } from './graphSend'
 import { emailCredentialFileName, isMicrosoftAccountId } from './credentialPath'
 import { chooseSendTransport } from '../../shared/emailAccountKind'
@@ -2670,6 +2671,12 @@ AUSGABEFORMAT (NUR Schema — die <Platzhalter> NICHT abschreiben, sondern aus d
     const brokenImages = findBrokenInlineTokens(String(composeData.body ?? ''), composeData.attachments)
     if (brokenImages.length > 0) {
       return { success: false, error: `Im Text steht ein Bildplatzhalter ohne Bild: ${brokenImages.join(', ')}. Bitte die Zeile entfernen oder das Bild neu einfügen.` }
+    }
+    // Zweite Grenze hinter dem Schreibfenster: Unter der Grußformel darf kein fremder Name
+    // stehen (27.11.2026: KI-Entwürfe gingen mit dem Namen Dritter hinaus).
+    const signoff = checkSignoff(String(composeData.body ?? ''), composeData.account?.name)
+    if (signoff.status === 'foreign') {
+      return { success: false, error: `Die Mail ist mit „${signoff.found}“ unterschrieben, das Absenderkonto gehört ${composeData.account?.name}. Bitte die Unterschrift korrigieren.` }
     }
     // ── Weiche zwischen den Transportwegen, VOR allem, was SMTP anfasst ──
     // Microsoft-Konten senden über Graph (SMTP ist im Mandanten meist gesperrt, ein Passwort
