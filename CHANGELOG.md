@@ -2,6 +2,18 @@
 
 Alle nennenswerten Änderungen an diesem Projekt werden hier dokumentiert.
 
+## [1.4.12] - 2026-11-27
+
+**Der E-Mail-Assistent unterschreibt Antworten nur noch mit Ihrem Namen.** Übernehmen Sie einen Entwurf als Antwort, steht unter der Grußformel der Name Ihres Mailkontos. Steht dort ein anderer Name, sendet die App die Mail nicht und sagt, was nicht stimmt.
+
+### Hintergrund
+
+- **Auslöser:** Der Assistent sollte versandfertige Antworten ohne Platzhalter schreiben, erfuhr aber nicht, wer der Absender ist. In einzelnen Entwürfen setzte das Modell deshalb den Namen einer anderen Person aus der Mail oder dem bisherigen Schriftwechsel unter die Grußformel. Wer den Entwurf ungelesen übernahm, verschickte ihn so.
+- **Der Assistent kennt den Absender:** Der Name stammt aus dem Feld „Name“ des Mailkontos. Sind mehrere Konten mit unterschiedlichen Namen eingerichtet, schreibt der Assistent die Grußformel ohne Namen.
+- **Korrektur beim Übernehmen:** „Als Antwort verwenden“ prüft die Zeile unter der Grußformel. Ein fremder Name wird durch den Namen des Kontos ersetzt, ein fehlender ergänzt. Der eigene Vorname allein bleibt stehen.
+- **Sperre beim Senden:** Steht unter der Grußformel ein fremder Name, geht die Mail nicht hinaus. Das gilt für jede Mail, auch für von Hand geschriebene.
+- **Grenzen:** Geprüft werden nur die letzte Grußformel des eigenen Textes und die Zeile darunter. Ein fremder Name ohne Grußformel davor wird nicht erkannt, eine Mail ohne Namen geht weiter hinaus. Ist im Konto kein Name eingetragen, greift die Prüfung nicht. Wer bewusst im Auftrag einer anderen Person unterschreibt, muss den eigenen Namen dazusetzen.
+
 ## [1.4.11] - 2026-11-25
 
 **Die App zeigt jetzt, ob ein lokales Modell mit seinem Kontextfenster in den Arbeitsspeicher Ihres Mac passt.** Ein Balken unter dem Kontext-Regler und eine Karte unter Einstellungen → KI zeigen, wie viel System und Programme, das Modell und ein gefülltes Fenster belegen. Reicht der Platz nicht, nennt die App die Lücke und schlägt Programme vor, die Sie für die Dauer des Auftrags beenden können. So sehen Sie vor dem Start, ob ein Lauf zügig durchläuft oder langsam wird, weil der Rechner auslagert.
